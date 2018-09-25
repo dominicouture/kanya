@@ -106,6 +106,7 @@ def create_random_sample(number_of_stars, number_of_steps, timestep):
     """
     stars = []
     for star in range(1, number_of_stars + 1):
+        #JG. Changer uniform pour normal
         velocity = np.random.uniform(0, 2, 3)
         position = np.random.uniform(-1, 1, 3) + velocity * timestep * number_of_steps / 2
         stars.append(Star(
