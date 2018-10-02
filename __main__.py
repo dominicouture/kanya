@@ -22,20 +22,22 @@ class Group:
         that are part of that group. Data can be obtained from the database or calculated from a
         raw data file.
     """
-    def __init__(self, name: str, number_of_steps: int, timestep: int, data=None, simulation=None):
-        """ Initializes Star objects, time-independent values and time-dependent arrays to the
-            correct shape.
+    def __init__(self, name: str, duration: float, number_of_steps: int, *parameters, simulation=False, data=None):
+        """ Initializes Star objects and Group object from a simulated sample of stars in a local
+            association, raw data in the form a Python dictionnary or from a database. This dataset
+            is then moved backward in time for a given traceback duration.
         """
         # Creation of a list of Star objects
-        self.stars = data
+        if simulation:
+            self.stars = self.stars_from_simulation(number_of_steps + 1, *parameters)
         # Time-independent parameters
         self.name = name
         self.date = strftime('%Y-%m-%d %H:%M:%S')
-        self.duration = number_of_steps * timestep
+        self.duration = duration
         self.number_of_stars = len(self.stars)
-        self.number_of_steps = number_of_steps + 1
-        self.timestep = timestep
-        self.time = tuple(range(0, self.timestep * self.number_of_steps, self.timestep))
+        self.number_of_steps = number_of_steps + 1 # One more step to account for t = 0
+        self.timestep = duration / number_of_steps
+        self.time = tuple(np.arange(0, self.duration + self.timestep, self.timestep))
         self.average_velocity = sum([star.velocity for star in self.stars])/self.number_of_stars
         self.average_velocity_error = sum([
             star.velocity_error for star in self.stars])/self.number_of_stars
@@ -50,6 +52,34 @@ class Group:
         # Completion of time-dependent values arrays
         for step in range(self.number_of_steps):
             self.create_step(step)
+
+    def stars_from_simulation(
+        self, number_of_steps: int, number_of_stars: int, age: float,
+        avg_position: tuple, avg_position_error: tuple, avg_position_dispersion: tuple,
+        avg_velocity: tuple, avg_velocity_error: tuple, avg_velocity_dispersion: tuple):
+        """ Creates an artificial sample of star for a given number of stars and age based on
+            the intial average position (XYZ) and velocity (UVW), and their respective error and
+            dispersion. The sample is then moved forward in time for the given age.
+        """
+        # Velocity conversion factor from km/s to pc/Myr.
+        vc = 1.0227120263358653
+        stars = []
+        for star in range(1, number_of_stars + 1):
+            velocity = np.random.normal(np.array(avg_velocity)*vc, np.array(avg_velocity_dispersion)*vc, 3)
+            position = np.random.normal(np.array(avg_position), np.array(avg_position_dispersion), 3) + velocity * age
+            stars.append(Star(
+                's{}'.format(star), number_of_steps, position, np.array(avg_position_error), velocity, np.array(avg_velocity_error)*vc))
+        return stars
+
+    def stars_from_dictionary(self, name, number_of_steps, *data):
+        """ Creates a list of Star objects from a dictionnary of parameters including
+            the name of the stars, their position (XYZ) and velocity (UVW), and the respective errors.
+        """
+        return [Star(
+            name, number_of_steps,
+            np.array(value['position']), np.array(value['position_error']),
+            np.array(value['velocity']), np.array(value['velocity_error'])) for name, value in data.items()
+        ]
 
     def create_step(self, step: int):
         """ Creates a time step for the time-dependent arrays of the Group object and Star objects
@@ -100,31 +130,11 @@ class Star:
         self.distance = np.zeros([number_of_steps])
         self.distance_error = np.zeros([number_of_steps])
 
-def create_random_sample(number_of_stars, number_of_steps, timestep):
-    """ This function create an artificial sample of star for a given number_of_stars and duration.
-        The list of Star objects can be used as input for a Group object.
-    """
-    stars = []
-    for star in range(1, number_of_stars + 1):
-        #JG. Changer uniform pour normal
-        velocity = np.random.uniform(0, 2, 3)
-        position = np.random.uniform(-1, 1, 3) + velocity * timestep * number_of_steps / 2
-        stars.append(Star(
-            's{}'.format(star), number_of_steps + 1, position, position * 0.01, velocity, velocity * 0.01))
-    return stars
-
-def create_sample_from_dict(data):
-    """ This function create a list of Star objects from a list of parameters in tuples.
-    """
-    return [Star(
-        name, number_of_steps + 1,
-        np.array(value['position']), np.array(value['position_error']),
-        np.array(value['velocity']), np.array(value['velocity_error'])) for name, value in data.items()
-    ]
-
 if __name__ == '__main__':
     # Initilization of the Simulation object
-    stars_sample = create_random_sample(number_of_stars, number_of_steps, timestep)
-    Simulation = Group('Simulation', number_of_steps, timestep, stars_sample)
+    Simulation = Group(
+        'Simulation', duration, number_of_steps, number_of_stars, age,
+        avg_position, avg_position_error, avg_position_dispersion,
+        avg_velocity, avg_velocity_error, avg_velocity_dispersion, simulation=True)
     # Creation of the output files
     create_graph(Simulation.time, Simulation.dispersion)
