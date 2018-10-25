@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Model for the peewee database of stars and local associations. Time-dependent data is stored in
-# an ndarray() for which axis 0 corresponds to the timestep.
+# an ndarray() for which axis 0 corresponds to the timestep. The database only records coordinates
+# and errors in the XYZ and UVW coordinates system.
 
 import numpy as np
 from traceback import format_exc
@@ -37,6 +38,7 @@ class ArrayField(Field):
 
 class GroupModel(BaseModel):
     """ Time-independent and time-depenent (ArrayField) parameters of a local association of stars.
+        Distances are in pc, durations in Myr and velocities in pc/Myr.
     """
     # Time-independent parameters
     name = CharField(verbose_name='Name', unique=True)
@@ -59,6 +61,7 @@ class GroupModel(BaseModel):
 
 class StarModel(BaseModel):
     """ Time-independent and time-dependent (ArrayField) parameters of a star in a local association.
+        Distances are in pc and velocities in pc/Myr.
     """
     # Time-independent parameters
     group = ForeignKeyField(GroupModel)

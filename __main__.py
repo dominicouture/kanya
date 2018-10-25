@@ -4,13 +4,14 @@
 # Main file of the Traceback algorithm
 
 import numpy as np
+from astropy import units as un
+from argparse import ArgumentParser
 from traceback import format_exc
 from logging import basicConfig, info, warning, INFO
 from time import strftime
 from os.path import join
 from os import remove
 from sys import exit
-import argparse
 from config import *
 from tools import *
 from output import *
@@ -28,10 +29,12 @@ class Group:
     def __init__(self, name: str, duration: float, number_of_steps: int, *parameters, simulation=False, data=None):
         """ Initializes Star objects and Group object from a simulated sample of stars in a local
             association, raw data in the form a Python dictionnary or from a database. This dataset
-            is then moved backward in time for a given traceback duration.
+            is then moved backward in time for a given traceback duration. Distances are in pc,
+            durations in Myr and velocities in pc/Myr.
         """
         # Creation or retrieval of the GroupModel in the database
         self.group, self.created = GroupModel.get_or_create(name=name)
+
         # Initialization from database if no data or simulation parameters are provided
         if not simulation and data == None:
             if self.created:
@@ -40,6 +43,7 @@ class Group:
                 exit('No existing data in the database with the name "{}.db".'.format(name))
             else:
                 self.initialize_from_database(self.group)
+
         # Initialization from a simulation or data
         else:
             # Initialization of a list of Star objects
@@ -55,9 +59,10 @@ class Group:
             self.number_of_steps = number_of_steps + 1 # One more step to account for t = 0
             self.timestep = duration / number_of_steps
             self.time = np.arange(0, self.duration + self.timestep, self.timestep)
-            self.average_velocity = sum([star.velocity for star in self.stars])/self.number_of_stars
-            self.average_velocity_error = sum([
-                star.velocity_error for star in self.stars])/self.number_of_stars
+            self.average_velocity = sum(
+                [star.velocity for star in self.stars]) / self.number_of_stars
+            self.average_velocity_error = sum(
+                [star.velocity_error for star in self.stars]) / self.number_of_stars
             # Initialization of time-dependent paremeters.
             self.barycenter = np.zeros([self.number_of_steps, 3])
             self.barycenter_error = np.zeros([self.number_of_steps, 3])
@@ -66,9 +71,11 @@ class Group:
             self.minimum_spanning_tree = np.zeros([self.number_of_steps])
             self.minimum_spanning_tree_error = np.zeros([self.number_of_steps])
             self.minimum_spanning_tree_points = np.zeros([self.number_of_steps, 2, 3])
+
             # Completion of time-dependent values arrays.
             for step in range(self.number_of_steps):
                 self.create_step(step)
+
             # Deletion of previous entries and creation of new entries in the database
             self.save_to_database()
 
@@ -79,6 +86,7 @@ class Group:
         self.stars = []
         for star in StarModel.select().where(StarModel.group == group):
             self.stars.append(Star(star.name, None, None, None, None, None, star))
+
         # Initialization of time-independent parameters
         self.name = group.name
         self.data = group.date
@@ -104,9 +112,12 @@ class Group:
             and the respective errors.
         """
         return [Star(
-            name, number_of_steps,
-            np.array(value['position']), np.array(value['position_error']),
-            np.array(value['velocity']), np.array(value['velocity_error'])) for name, value in data.items()
+                name, number_of_steps,
+                np.array(value['position']),
+                np.array(value['position_error']),
+                np.array(value['velocity']) * (un.km/un.s).to(un.pc/un.Myr),
+                np.array(value['velocity_error']) * (un.km/un.s).to(un.pc/un.Myr)
+            ) for name, value in data.items()
         ]
 
     def stars_from_simulation(
@@ -117,14 +128,29 @@ class Group:
             the intial average position (XYZ) and velocity (UVW), and their respective error and
             dispersion. The sample is then moved forward in time for the given age.
         """
-        # Velocity conversion factor from km/s to pc/Myr
-        vc = 1.0227120263358653
+        # Velocity conversions from km/s to pc/Myr
+        avg_velocity, avg_velocity_error, avg_velocity_dispersion = np.array((
+            avg_velocity, avg_velocity_error, avg_velocity_dispersion
+        )) * (un.km/un.s).to(un.pc/un.Myr)
+
+        # Creation of Star objects
         stars = []
         for star in range(1, number_of_stars + 1):
-            velocity = np.random.normal(np.array(avg_velocity)*vc, np.array(avg_velocity_dispersion)*vc, 3)
-            position = np.random.normal(np.array(avg_position), np.array(avg_position_dispersion), 3) + velocity * age
-            stars.append(Star(
-                's{}'.format(star), number_of_steps, position, np.array(avg_position_error), velocity, np.array(avg_velocity_error)*vc))
+            velocity = np.random.normal(
+                np.array(avg_velocity),
+                np.array(avg_velocity_dispersion)
+            )
+            position = velocity * age + np.random.normal(
+                np.array(avg_position),
+                np.array(avg_position_dispersion)
+            )
+            stars.append(
+                Star(
+                    's{}'.format(star), number_of_steps,
+                    position, np.array(avg_position_error),
+                    velocity, np.array(avg_velocity_error)
+                )
+            )
         return stars
 
     def create_step(self, step: int):
@@ -136,11 +162,13 @@ class Group:
             for star in self.stars:
                 star.position[step, :] = star.position[0, :] - star.velocity * self.time[step]
                 star.position_error[step, :] = star.position_error[0, :] + star.velocity_error * self.time[step]
+
         # Calculation of the barycenter
         self.barycenter[step] = np.sum(np.array([
             star.position[step, :] for star in self.stars]), axis=0)/self.number_of_stars
         self.barycenter_error[step] = np.sum(np.array([
             star.position_error[step, :] for star in self.stars]), axis=0)/self.number_of_stars
+
         # Calculation of the relative position and distance from the barycenter
         for star in self.stars:
             star.relative_position[step, :] = star.position[step, :] - self.barycenter[step, :]
@@ -148,6 +176,7 @@ class Group:
             star.distance[step] = np.linalg.norm(star.relative_position[step, :])
             star.distance_error[step] = star.distance[step] * np.linalg.norm(
                 star.relative_position_error[step, :] / star.relative_position[step, :])
+
         # Calculation of the dispersion
         self.dispersion[step] = np.std(np.array([star.distance[step] for star in self.stars]))
         self.dispersion_error[step] = self.dispersion[step] * np.std(
@@ -162,6 +191,7 @@ class Group:
             info('New database entry "{}" added.'.format(self.name))
         else:
             info('Previous database entry "{}" deleted and replaced.'.format(self.name))
+
         # Creation of new GroupModel database entry
         self.group = GroupModel.create(
             # Time-independent parameters
@@ -183,7 +213,8 @@ class Group:
             minimum_spanning_tree_error=self.minimum_spanning_tree_error,
             minimum_spanning_tree_points=self.minimum_spanning_tree_points
         )
-        # Creation of new StarModel entries.
+
+        # Creation of new StarModel entries
         for star in self.stars:
             star.save_to_database(self.group)
 
@@ -194,17 +225,19 @@ class Star:
         self, name: str, number_of_steps: int,
         position: np.ndarray, position_error: np.ndarray,
         velocity: np.ndarray, velocity_error: np.ndarray, database_object=None):
-        """ Initializes basic parameters and arrays to the correct shape.
+        """ Initializes basic parameters and arrays to the correct shape. Distances are in pc and
+            velocities in pc/Myr.
         """
         # Initialization from database if possible
         if database_object != None:
             self.initialize_from_database(database_object)
+
         else:
-            # Time-independent parameters
+            # Initialization of time-independent parameters
             self.name = name
             self.velocity = velocity
             self.velocity_error = velocity_error
-            # Time-dependent parameters
+            # Initialization of time-dependent parameters
             self.position = np.pad(np.array(
                 [position]), ((0, number_of_steps - 1), (0, 0)), 'constant', constant_values=0)
             self.position_error = np.pad(np.array(
@@ -217,11 +250,11 @@ class Star:
     def initialize_from_database(self, star):
         """ Initializes Star object from an existing instance in the database.
         """
-        # Time-independent parameters
+        # Initialization of time-independent parameters
         self.name = star.name
         self.velocity = star.velocity
         self.velocity_error = star.velocity_error
-        # Time-dependent parameters
+        # Initialization of time-dependent parameters
         self.position = star.position
         self.position_error = star.position_error
         self.relative_position = star.relative_position
@@ -230,9 +263,9 @@ class Star:
         self.distance_error = star.distance_error
 
     def save_to_database(self, group):
-        """ Saves all parameters to the database and deletes previous entry.
+        """ Saves all parameters to the database in a new StarModel entry and deletes any previous
+            entry.
         """
-        # Creation of new StarModel entry
         StarModel.create(
             group=group,
             # Time-independent parameters
@@ -249,16 +282,26 @@ class Star:
         )
 
 if __name__ == '__main__':
-    # Importation of the arguments
-    parser = argparse.ArgumentParser()
+    # Importation of arguments
+    parser = ArgumentParser()
     parser.add_argument('name', help='name of the traceback used in the outputs filenames.')
-    parser.add_argument('-d', '--data', help='use data parameter in the configuration file as input.', action='store_true')
-    parser.add_argument('-s', '--simulation', help='run a simulation to create an input based on parameters in the configuraiton file.', action='store_true')
+    parser.add_argument(
+        '-d', '--data',
+        help='use data parameter in the configuration file as input.',
+        action='store_true'
+    )
+    parser.add_argument(
+        '-s', '--simulation',
+        help='run a simulation to create an input based on parameters in the configuraiton file.',
+        action='store_true'
+    )
     args = parser.parse_args()
+
     # Initilization of the database
     name = args.name
     from model import *
-    # Initilization of the Simulation object
+
+    # Initilization of the Traceback object
     if args.data and args.simulation:
         warning('Either create the traceback "{}" from data or a simulation, not both.'.format(name))
         exit('Either create the traceback "{}" from data or a simulation, not both.'.format(name))
@@ -274,5 +317,6 @@ if __name__ == '__main__':
             name, duration, number_of_steps, number_of_stars, age,
             avg_position, avg_position_error, avg_position_dispersion,
             avg_velocity, avg_velocity_error, avg_velocity_dispersion, simulation=True)
-    # Creation of the output files
+
+    # Creation of output files
     create_graph(Traceback.time, Traceback.dispersion)

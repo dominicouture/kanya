@@ -1,7 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Configuration of a traceback and/or simulation of the sample of stars
+# Configuration of a traceback and/or simulation of a sample of stars
 
 # Path to the database directory
 output_dir = '/Users/Dominic/Fichiers/Astrophysique/Projet/Traceback/Output/'
@@ -15,7 +15,7 @@ number_of_steps = 50
 # Number of groups to be simulated
 number_of_groups = 1
 
-# Number of stars in the simulated samples of stars
+# Number of stars in the simulated groups of stars
 number_of_stars = 42
 
 # Age of the simulated sample of stars (Myr)
