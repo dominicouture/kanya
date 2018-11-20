@@ -6,35 +6,52 @@
 # Path to the database directory
 output_dir = '/Users/Dominic/Fichiers/Astrophysique/Projet/Traceback/Output/'
 
-# Duration of the traceback (Myr)
-duration = 50.0
+# Time units ('Myr' by default)
+time_unit = 'Myr'
 
-# Number of steps of the traceback, excluding the initial step at t = 0
-number_of_steps = 50
+# Position units ('pc' by default, XYZ or rδα)
+position_units = ('pc', 'pc', 'pc') # ('pc', 'deg', 'deg')
 
+# Velocity units ('km/s' by default, UVW or rvμδμα)
+velocity_units = ('km/s', 'km/s', 'km/s') # ('km/s', 'mas/yr', 'mas/yr')
+
+# Traceback parameters
 # Number of groups to be simulated
-number_of_groups = 1
+number_of_groups = 50
 
-# Number of stars in the simulated groups of stars
-number_of_stars = 42
+# Number of steps of the traceback, excluding the initial step at t = 0, cannot be 0
+number_of_steps = 200
 
-# Age of the simulated sample of stars (Myr)
-age = 24.0
+# Initial age of the traceback (inclusive)
+initial_time = 20.0
 
-# Average position of the simulated sample of stars (pc)
+# Final age of the traceback (inclusive)
+final_time = 30.0
+
+# Simulation parameters, used only in simulation
+# Age of the simulated groups of stars
+age = 25.0
+
+# Number of stars in each simulated group of stars
+number_of_stars = 40 # 42
+
+# Average position of the simulated sample of stars
 avg_position = (0.0, 0.0, 0.0)
 
-# Average position error of the simulated sample of stars (pc)
+# Average position error of the simulated sample of stars
 avg_position_error = (0.1, 0.1, 0.1)
 
-# Average position dispersion of the simulated sample of stars (pc)
-avg_position_dispersion = (29.0, 14.0, 9.0)
+# Average position scatter of the simulated sample of stars
+avg_position_scatter = (25.0, 25.0, 25.0) # (29.3, 14.0, 9.0)
 
-# Average velocity of the simulated sample of stars (km/s)
-avg_velocity = (-10.9, -16.0, -9.0)
+# Average velocity of the simulated sample of stars
+avg_velocity = (11.622, 11.622, 11.622) # (-10.9, -16.0, -9.0)
 
-# Average velocity error of the simulated sample of stars (km/s)
+# Average velocity error of the simulated sample of stars
 avg_velocity_error = (0.1, 0.1, 0.1)
 
-# Average velocity error of the simulated sample of stars (km/s)
-avg_velocity_dispersion = (2.2, 1.2, 1.0)
+# Average velocity error of the simulated sample of stars
+avg_velocity_scatter = (1.382, 1.382, 1.382) # (2.2, 1.2, 1.0)
+
+# Path to CSV data file or dictionary with data. Set as None if no data is needed
+data = None

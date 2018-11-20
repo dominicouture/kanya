@@ -12,9 +12,9 @@ from time import strftime
 from os.path import join
 from os import remove
 from sys import exit
-from config import *
 from tools import *
 from output import *
+from config import *
 
 # Configuration of the log file
 basicConfig(
@@ -22,24 +22,27 @@ basicConfig(
     format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 class Group:
-    """ Contains the values and related methods of a local association and a list of Star objets
-        that are part of that group. Data can be obtained from the database or calculated from a
-        raw data file.
+    """ Contains the values and related methods of a local group and a list of Star objets that
+        are part of it. Data can be obtained from the database or calculated from a raw data file.
     """
-    def __init__(self, name: str, duration: float, number_of_steps: int, *parameters, simulation=False, data=None):
+    def __init__(
+        self, name: str, number_of_steps: int, initial_time: float, final_time: float, data, parameters):
         """ Initializes Star objects and Group object from a simulated sample of stars in a local
             association, raw data in the form a Python dictionnary or from a database. This dataset
             is then moved backward in time for a given traceback duration. Distances are in pc,
             durations in Myr and velocities in pc/Myr.
         """
-        # Creation or retrieval of the GroupModel in the database
+#        # Creation or retrieval of the GroupModel in the database
         self.group, self.created = GroupModel.get_or_create(name=name)
 
         # Initialization from database if no data or simulation parameters are provided
-        if not simulation and data == None:
+        if data is None and parameters is None:
+            pass
             if self.created:
                 remove(join(output_dir, '{}.db'.format(name)))
-                warning('No existing data in the database with the name "{}.db".'.format(name))
+                database_error = 'No existing database with the name "{}.db".'.format(name)
+                info(database_error)
+
                 exit('No existing data in the database with the name "{}.db".'.format(name))
             else:
                 self.initialize_from_database(self.group)
@@ -47,18 +50,20 @@ class Group:
         # Initialization from a simulation or data
         else:
             # Initialization of a list of Star objects
-            if simulation:
-                self.stars = self.stars_from_simulation(number_of_steps + 1, *parameters)
-            if data != None:
+            if data is not None:
                 self.stars = self.stars_from_data(number_of_steps + 1, data)
+            elif parameters is not None:
+                self.stars = self.stars_from_simulation(number_of_steps + 1, *parameters)
             # Initialization of time-independent parameters
             self.name = name
             self.date = strftime('%Y-%m-%d %H:%M:%S')
-            self.duration = duration
+            self.initial_time = initial_time
+            self.final_time = final_time
+            self.duration = self.final_time - self.initial_time
             self.number_of_stars = len(self.stars)
             self.number_of_steps = number_of_steps + 1 # One more step to account for t = 0
-            self.timestep = duration / number_of_steps
-            self.time = np.arange(0, self.duration + self.timestep, self.timestep)
+            self.timestep = self.duration / number_of_steps
+            self.time = np.arange(self.initial_time, self.final_time + self.timestep, self.timestep)
             self.average_velocity = sum(
                 [star.velocity for star in self.stars]) / self.number_of_stars
             self.average_velocity_error = sum(
@@ -66,15 +71,20 @@ class Group:
             # Initialization of time-dependent paremeters.
             self.barycenter = np.zeros([self.number_of_steps, 3])
             self.barycenter_error = np.zeros([self.number_of_steps, 3])
-            self.dispersion = np.zeros([self.number_of_steps])
-            self.dispersion_error = np.zeros([self.number_of_steps])
+            self.scatter_xyz = np.zeros([self.number_of_steps, 3])
+            self.scatter_xyz_error = np.zeros([self.number_of_steps, 3])
+            self.scatter = np.zeros([self.number_of_steps])
+            self.scatter_error = np.zeros([self.number_of_steps])
             self.minimum_spanning_tree = np.zeros([self.number_of_steps])
             self.minimum_spanning_tree_error = np.zeros([self.number_of_steps])
             self.minimum_spanning_tree_points = np.zeros([self.number_of_steps, 2, 3])
+            self.minimum_spanning_tree_age = 0.0
 
             # Completion of time-dependent values arrays.
             for step in range(self.number_of_steps):
                 self.create_step(step)
+            self.scatter_age = self.time[np.argmin(self.scatter)]
+            self.scatter_age_error = 0.0
 
             # Deletion of previous entries and creation of new entries in the database
             self.save_to_database()
@@ -85,11 +95,13 @@ class Group:
         # Initialization of a list of Star objects
         self.stars = []
         for star in StarModel.select().where(StarModel.group == group):
-            self.stars.append(Star(star.name, None, None, None, None, None, star))
+            self.stars.append(Star(star.name, data=star))
 
         # Initialization of time-independent parameters
         self.name = group.name
         self.data = group.date
+        self.initial_time = group.initial_time
+        self.final_time = group.final_time
         self.duration = group.duration
         self.number_of_stars = group.number_of_stars
         self.number_of_steps = group.number_of_steps
@@ -97,11 +109,15 @@ class Group:
         self.time = group.time
         self.average_velocity = group.average_velocity
         self.average_velocity_error = group.average_velocity_error
-        # Initialization of time-dependent paremeters.
+        # Initialization of time-dependent paremeters
         self.barycenter = group.barycenter
         self.barycenter_error = group.barycenter_error
-        self.dispersion = group.dispersion
-        self.dispersion_error = group.dispersion_error
+        self.scatter_xyz = group.scatter_xyz
+        self.scatter_xyz_error = group.scatter_xyz_error
+        self.scatter = group.scatter
+        self.scatter_error = group.scatter_error
+        self.scatter_age = group.scatter_age
+        self.scatter_age_error = group.scatter_age_error
         self.minimum_spanning_tree = group.minimum_spanning_tree
         self.minimum_spanning_tree_error = group.minimum_spanning_tree_error
         self.minimum_spanning_tree_points = group.minimum_spanning_tree_points
@@ -115,38 +131,37 @@ class Group:
                 name, number_of_steps,
                 np.array(value['position']),
                 np.array(value['position_error']),
-                np.array(value['velocity']) * (un.km/un.s).to(un.pc/un.Myr),
-                np.array(value['velocity_error']) * (un.km/un.s).to(un.pc/un.Myr)
+                np.array(value['velocity']),
+                np.array(value['velocity_error'])
             ) for name, value in data.items()
         ]
 
     def stars_from_simulation(
-        self, number_of_steps: int, number_of_stars: int, age: float,
-        avg_position: tuple, avg_position_error: tuple, avg_position_dispersion: tuple,
-        avg_velocity: tuple, avg_velocity_error: tuple, avg_velocity_dispersion: tuple):
+        self, number_of_steps: int, age: float, number_of_stars: int,
+        avg_position: tuple, avg_position_error: tuple, avg_position_scatter: tuple,
+        avg_velocity: tuple, avg_velocity_error: tuple, avg_velocity_scatter: tuple):
         """ Creates an artificial sample of star for a given number of stars and age based on
             the intial average position (XYZ) and velocity (UVW), and their respective error and
-            dispersion. The sample is then moved forward in time for the given age.
+            scatter. The sample is then moved forward in time for the given age.
         """
         # Velocity conversions from km/s to pc/Myr
-        avg_velocity, avg_velocity_error, avg_velocity_dispersion = np.array((
-            avg_velocity, avg_velocity_error, avg_velocity_dispersion
+        avg_velocity, avg_velocity_error, avg_velocity_scatter = np.array((
+            avg_velocity, avg_velocity_error, avg_velocity_scatter
         )) * (un.km/un.s).to(un.pc/un.Myr)
-
         # Creation of Star objects
         stars = []
         for star in range(1, number_of_stars + 1):
             velocity = np.random.normal(
                 np.array(avg_velocity),
-                np.array(avg_velocity_dispersion)
+                np.array(avg_velocity_scatter)
             )
             position = velocity * age + np.random.normal(
                 np.array(avg_position),
-                np.array(avg_position_dispersion)
+                np.array(avg_position_scatter)
             )
             stars.append(
                 Star(
-                    's{}'.format(star), number_of_steps,
+                    'star_{}'.format(star), number_of_steps,
                     position, np.array(avg_position_error),
                     velocity, np.array(avg_velocity_error)
                 )
@@ -177,10 +192,9 @@ class Group:
             star.distance_error[step] = star.distance[step] * np.linalg.norm(
                 star.relative_position_error[step, :] / star.relative_position[step, :])
 
-        # Calculation of the dispersion
-        self.dispersion[step] = np.std(np.array([star.distance[step] for star in self.stars]))
-        self.dispersion_error[step] = self.dispersion[step] * np.std(
-            np.array([star.distance_error[step] / star.distance[step] for star in self.stars]))
+        # Calculation of the scatter
+        self.scatter_xyz[step] = np.std(np.array([star.position[step, :] for star in self.stars]), axis=0)
+        self.scatter[step] = np.prod(self.scatter_xyz[step])**(1/3)
 
     def save_to_database(self):
         """ Saves all parameters to the database, including all Star objects within the Group object.
@@ -197,6 +211,8 @@ class Group:
             # Time-independent parameters
             name=self.name,
             date=self.date,
+            initial_time = self.initial_time,
+            final_time = self.final_time,
             duration=self.duration,
             number_of_stars=self.number_of_stars,
             number_of_steps=self.number_of_steps,
@@ -207,8 +223,12 @@ class Group:
             # Time-dependent parameters
             barycenter=self.barycenter,
             barycenter_error=self.barycenter_error,
-            dispersion=self.dispersion,
-            dispersion_error=self.dispersion_error,
+            scatter_xyz=self.scatter_xyz,
+            scatter_xyz_error=self.scatter_xyz_error,
+            scatter=self.scatter,
+            scatter_error=self.scatter_error,
+            scatter_age=self.scatter_age,
+            scatter_age_error=self.scatter_age_error,
             minimum_spanning_tree=self.minimum_spanning_tree,
             minimum_spanning_tree_error=self.minimum_spanning_tree_error,
             minimum_spanning_tree_points=self.minimum_spanning_tree_points
@@ -222,15 +242,14 @@ class Star:
     """ Contains the values and related methods of a star.
     """
     def __init__(
-        self, name: str, number_of_steps: int,
-        position: np.ndarray, position_error: np.ndarray,
-        velocity: np.ndarray, velocity_error: np.ndarray, database_object=None):
+        self, name: str, number_of_steps=None,
+        position=None, position_error=None, velocity=None, velocity_error=None, data=None):
         """ Initializes basic parameters and arrays to the correct shape. Distances are in pc and
             velocities in pc/Myr.
         """
         # Initialization from database if possible
-        if database_object != None:
-            self.initialize_from_database(database_object)
+        if data != None:
+            self.initialize_from_database(data)
 
         else:
             # Initialization of time-independent parameters
@@ -238,10 +257,14 @@ class Star:
             self.velocity = velocity
             self.velocity_error = velocity_error
             # Initialization of time-dependent parameters
-            self.position = np.pad(np.array(
-                [position]), ((0, number_of_steps - 1), (0, 0)), 'constant', constant_values=0)
-            self.position_error = np.pad(np.array(
-                [position_error]), ((0, number_of_steps - 1), (0, 0)), 'constant', constant_values=0)
+            self.position = np.pad(
+                np.array([position]),
+                ((0, number_of_steps - 1), (0, 0)), 'constant', constant_values=0
+            )
+            self.position_error = np.pad(
+                np.array([position_error]),
+                ((0, number_of_steps - 1), (0, 0)), 'constant', constant_values=0
+            )
             self.relative_position = np.zeros([number_of_steps, 3])
             self.relative_position_error = np.zeros([number_of_steps, 3])
             self.distance = np.zeros([number_of_steps])
@@ -282,41 +305,73 @@ class Star:
         )
 
 if __name__ == '__main__':
-    # Importation of arguments
+    # Import of arguments
     parser = ArgumentParser()
     parser.add_argument('name', help='name of the traceback used in the outputs filenames.')
     parser.add_argument(
-        '-d', '--data',
-        help='use data parameter in the configuration file as input.',
-        action='store_true'
+        '-d', '--data', action='store_true',
+        help='use data parameter in the configuration file as input.'
     )
     parser.add_argument(
-        '-s', '--simulation',
-        help='run a simulation to create an input based on parameters in the configuraiton file.',
-        action='store_true'
+        '-s', '--simulation', action='store_true',
+        help='run a simulation to create an input based on parameters in the configuraiton file.'
     )
     args = parser.parse_args()
 
-    # Initilization of the database
-    name = args.name
-    from model import *
-
-    # Initilization of the Traceback object
+    # Import of configuration parameters
     if args.data and args.simulation:
-        warning('Either create the traceback "{}" from data or a simulation, not both.'.format(name))
-        exit('Either create the traceback "{}" from data or a simulation, not both.'.format(name))
+        error = 'Either create "{}" traceback from data or a simulation, not both.'.format(args.name)
+        info(error)
+        raise ValueError(error)
     elif not args.data and not args.simulation:
-        info('Traceback and output from database.')
-        Traceback = Group(name, duration, number_of_steps)
+        warning('Output from database.')
+        data, parameters = None, None
     elif args.data:
-        info('Traceback and output from data.')
-        Traceback = Group(name, duration, number_of_steps, data=data)
+        warning('Traceback and output from data.')
+        if 'data' not in globals().keys():
+            info('No data provided for traceback.')
+            raise NameError('No data provided for traceback.')
+        elif data is None:
+            info('Data provided for traceback is None.')
+            raise ValueError('Data provided for traceback is None.')
+        else:
+            parameters = None
     elif args.simulation:
-        info('Traceback and output from simulation.')
-        Traceback = Group(
-            name, duration, number_of_steps, number_of_stars, age,
-            avg_position, avg_position_error, avg_position_dispersion,
-            avg_velocity, avg_velocity_error, avg_velocity_dispersion, simulation=True)
+        warning('Traceback and output from simulation.')
+        for parameter in (
+            'age', 'number_of_stars',
+            'avg_position', 'avg_position_error', 'avg_position_scatter',
+            'avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'
+        ): # Add check of the type of the arguments !!!
+            if parameter not in globals().keys():
+                parameter_error = '{} is missing in the configuration file'.format(parameter)
+                info(parameter_error)
+                raise NameError(parameter_error)
+        data = None
+        parameters = (
+            age, number_of_stars,
+            avg_position, avg_position_error, avg_position_scatter,
+            avg_velocity, avg_velocity_error, avg_velocity_scatter
+        )
+
+    # Creation of the database and Traceback objects
+    from model import *
+    groups = []
+    for group_number in range(1, number_of_groups + 1):
+        group_name = '{}_{}'.format(args.name, group_number)
+        print('Tracing back {}'.format(group_name.replace('_', ' ')))
+        warning('Tracing back {}'.format(group_name.replace('_', ' ')))
+        groups.append(
+            Group(group_name, number_of_steps, initial_time, final_time, data, parameters)
+        )
 
     # Creation of output files
-    create_graph(Traceback.time, Traceback.dispersion)
+    create_histogram(
+        np.round([group.scatter_age for group in groups], 3),
+        avg_position_scatter[0],
+        number_of_stars,
+        number_of_groups,
+        age
+    )
+    create_graph(groups[0].time, groups[0].scatter)
+

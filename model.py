@@ -13,8 +13,8 @@ from os.path import join
 from peewee import *
 from playhouse.migrate import *
 from json import dumps, loads
-from __main__ import name
-from config import *
+from __main__ import args
+from config import output_dir
 
 # Configuration of the log file
 basicConfig(
@@ -22,11 +22,11 @@ basicConfig(
     format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 # Definition of the database object
-data = SqliteDatabase(join(output_dir, '{}.db'.format(name)))
+Database = SqliteDatabase(join(output_dir, '{}.db'.format(args.name)))
 
 class BaseModel(Model):
     class Meta:
-        database = data
+        database = Database
 
 class ArrayField(Field):
     """ Defines a database field for numpy arrays.
@@ -43,6 +43,8 @@ class GroupModel(BaseModel):
     # Time-independent parameters
     name = CharField(verbose_name='Name', unique=True)
     date = DateField(verbose_name='Date', default='')
+    initial_time = FloatField(verbose_name='Initial Time', default=0.0)
+    final_time = FloatField(verbose_name='Final Time', default=0.0)
     duration = FloatField(verbose_name='Duration', default=0.0)
     number_of_stars = IntegerField(verbose_name='Number of Stars', default=0)
     number_of_steps = IntegerField(verbose_name='Number of Steps', default=0)
@@ -53,19 +55,27 @@ class GroupModel(BaseModel):
     # Time-dependent parameters
     barycenter = ArrayField(verbose_name='Baraycenter', default=np.array([]))
     barycenter_error = ArrayField(verbose_name='Barycenter Error', default=np.array([]))
-    dispersion = ArrayField(verbose_name='Dispersion', default=np.array([]))
-    dispersion_error = ArrayField(verbose_name='Dispersion Error', default=np.array([]))
+    scatter_xyz = ArrayField(verbose_name='Scatter XYZ', default=np.array([]))
+    scatter_xyz_error = ArrayField(verbose_name='Scatter XYZ', default=np.array([]))
+    scatter = ArrayField(verbose_name='Dispersion', default=np.array([]))
+    scatter_error = ArrayField(verbose_name='Dispersion Error', default=np.array([]))
+    scatter_age = FloatField(verbose_name='Scatter XYZ', default=0.0)
+    scatter_age_errror = FloatField(verbose_name='Scatter XYZ', default=0.0)
     minimum_spanning_tree = ArrayField(verbose_name='Minimum Spanning Tree', default=np.array([]))
-    minimum_spanning_tree_error = ArrayField(verbose_name='Minimum Spanning Tree Error', default=np.array([]))
-    minimum_spanning_tree_points = ArrayField(verbose_name='Minimum Spanning Tree Points', default=np.array([]))
+    minimum_spanning_tree_error = ArrayField(
+        verbose_name='Minimum Spanning Tree Error', default=np.array([])
+    )
+    minimum_spanning_tree_points = ArrayField(
+        verbose_name='Minimum Spanning Tree Points', default=np.array([])
+    )
 
 class StarModel(BaseModel):
-    """ Time-independent and time-dependent (ArrayField) parameters of a star in a local association.
+    """ Time-independent and time-dependent (ArrayField) parameters of a star in a local group.
         Distances are in pc and velocities in pc/Myr.
     """
     # Time-independent parameters
     group = ForeignKeyField(GroupModel)
-    name = CharField(verbose_name='Name', unique=True)
+    name = CharField(verbose_name='Name')
     velocity = ArrayField(verbose_name='Velocity')
     velocity_error = ArrayField(verbose_name='Velocity Error')
     # Time-dependent parameters
