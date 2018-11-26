@@ -23,9 +23,10 @@ def create_graph(x, y):
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
     plt.figure(figsize=(12, 8), facecolor='w')
     plt.plot(x, y,  'k.-')
-    plt.xlabel('Time (Myr)')
+    plt.xlabel('Age (Myr)')
     plt.ylabel('Scatter (pc)')
-    plt.title('Scatter of a moving group over time')
+    plt.title('Scatter of a moving group over time\n')
+    plt.show()
     plt.savefig(join(output_dir, 'Scatter of a moving group over time.pdf'))
 
 def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, age):
