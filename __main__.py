@@ -8,10 +8,13 @@ from astropy import units as un
 from argparse import ArgumentParser
 from traceback import format_exc
 from logging import basicConfig, info, warning, INFO
+from matplotlib import rcParams, pyplot as plt
 from time import strftime
 from os.path import join
 from os import remove
+from scipy.optimize import curve_fit
 from tools import *
+from old_tools import *
 from output import *
 from config import *
 
@@ -35,6 +38,7 @@ class Group:
         """
 #        # Creation or retrieval of the group in the database
         info('Tracing back {}'.format(name.replace('_', ' ')))
+        print('Tracing back {}'.format(name.replace('_', ' ')))
         self.group, self.created = GroupModel.get_or_create(name=name)
 
         # Initialization from a simulation or data if possible
@@ -54,18 +58,20 @@ class Group:
             elif parameters is not None:
                 self.stars = self.stars_from_simulation(*parameters)
             self.number_of_stars = len(self.stars)
-            self.average_velocity = np.mean([star.velocity for star in self.stars])
-            self.average_velocity_error = np.linalg.norm(
-                [star.velocity_error for star in self.stars]) / self.number_of_stars
-            self.barycenter = np.zeros([self.number_of_steps, 3])
-            self.barycenter_error = np.zeros([self.number_of_steps, 3])
+            self.average_velocity = np.sum(
+                np.array([star.velocity for star in self.stars]), axis=0) / self.number_of_stars
+            self.average_velocity_error = np.sum(
+                np.array([star.velocity_error for star in self.stars])**2, axis=0
+            )**0.5 / self.number_of_stars
+            self.barycenter = np.sum(
+                np.array([star.position for star in self.stars]), axis=0) / self.number_of_stars
+            self.barycenter_error = np.sum(
+                np.array([star.position_error for star in self.stars])**2, axis=0
+            )**0.5 / self.number_of_stars
+            for star in self.stars:
+                star.get_distance(self.barycenter, self.barycenter_error)
             # Scatter parameters
-            self.scatter_xyz = np.zeros([self.number_of_steps, 3])
-            self.scatter_xyz_error = np.zeros([self.number_of_steps, 3])
-            self.scatter = np.zeros([self.number_of_steps])
-            self.scatter_error = np.zeros([self.number_of_steps])
-            for step in range(self.number_of_steps):
-                self.get_scatter(step)
+            self.get_scatter()
             self.scatter_age = self.time[np.argmin(self.scatter)]
             self.scatter_age_error = 0.0
             # Minimum spanning tree parameters
@@ -138,56 +144,54 @@ class Group:
             scatter. The sample is then moved forward in time for the given age.
         """
         # Velocity conversions from km/s to pc/Myr
-        avg_velocity, avg_velocity_error, avg_velocity_scatter = np.array((
-            avg_velocity, avg_velocity_error, avg_velocity_scatter
-        )) * (un.km/un.s).to(un.pc/un.Myr)
+        avg_velocity, avg_velocity_scatter = np.array((
+            avg_velocity, avg_velocity_scatter))
+#            avg_velocity, avg_velocity_scatter)) * (un.km/un.s).to(un.pc/un.Myr)
         # Star objects creation
         stars = []
         for star in range(1, number_of_stars + 1):
+            # Picks a velocity and a position based average value and scatter
             velocity = np.random.normal(
                 np.array(avg_velocity), np.array(avg_velocity_scatter))
             position = velocity * age + np.random.normal(
                 np.array(avg_position), np.array(avg_position_scatter))
+            # Scrambles the velocity and position based on errors in spherical coordinates
+            velocity_rvμδμα = uvw_to_rvμδμα(*position, *(velocity * (un.pc/un.Myr).to(un.km/un.s)))
+            position_rδα = xyz_to_rδα(*position)
+            velocity_uvw = rvμδμα_to_uvw(
+                *position_rδα, *np.random.normal(velocity_rvμδμα, np.array(avg_velocity_error))
+            ) * (un.km/un.s).to(un.pc/un.Myr)
+            position_xyz = rδα_to_xyz(
+                *np.random.normal(
+                    position_rδα, np.array(avg_position_error) * np.array([
+                        (position_rδα[0]**2)*un.mas.to(un.arcsec),
+                        un.mas.to(un.deg),
+                        un.mas.to(un.deg)
+                    ])
+                )
+            )
             stars.append(
                 Star(
                     'star_{}'.format(star), self.number_of_steps, self.time,
-                    position, np.array(avg_position_error), velocity, np.array(avg_velocity_error)
+                    np.random.normal(position, avg_position_error), np.array(avg_position_error),
+                    np.random.normal(velocity, avg_velocity_error), np.array(avg_velocity_error)
                 )
             )
         return stars
 
-    def get_scatter(self, step: int):
-        """ Creates a time step for the time-dependent arrays of the Group object and Star objects
-            within self.stars using the time-indenpendent velocities.
+    def get_scatter(self):
+        """ Computes the xyz and total scatter of a group and their respective error for all
+            timesteps, filters stars farther than 3σ from the barycenter from the calculations and
+            compensates for the drift in minimal scatter age due to measurement errors.
         """
-        # Barycenter calculation
-        self.barycenter[step] = np.mean(
-            np.array([star.position[step, :] for star in self.stars]), axis=0)
-        self.barycenter_error[step] = np.linalg.norm(
-            np.array([star.position_error[step, :] for star in self.stars]), axis=0
-        ) / self.number_of_stars
-        # Relative position and distance from the barycenter calculation
-        for star in self.stars:
-            star.relative_position[step, :] = star.position[step, :] - self.barycenter[step, :]
-            star.relative_position_error[step, :] = np.linalg.norm(
-                (star.position_error[step, :], self.barycenter_error[step, :]), axis=0)
-            star.distance[step] = np.linalg.norm(star.relative_position[step, :])
-            star.distance_error[step] = np.linalg.norm(
-                star.relative_position[step, :] * star.relative_position_error[step, :]
-            ) / star.distance[step]
-        # Scatter calculation
-        self.scatter_xyz[step] = np.std(
-            np.array([star.position[step, :] for star in self.stars]), axis=0)
-        self.scatter_xyz_error[step] = self.barycenter_error[step]
-        self.scatter[step] = np.prod(self.scatter_xyz[step])**(1/3)
-        self.scatter_error[step] = np.linalg.norm((
-            (self.scatter_xyz[step, 1]*self.scatter_xyz[step, 2] \
-                / (self.scatter_xyz[step, 0]**2))**(1/3) * self.scatter_xyz_error[step, 0],
-            (self.scatter_xyz[step, 0]*self.scatter_xyz[step, 2] \
-                / (self.scatter_xyz[step, 1]**2))**(1/3) * self.scatter_xyz_error[step, 1],
-            (self.scatter_xyz[step, 0]*self.scatter_xyz[step, 1] \
-                /(self.scatter_xyz[step, 2]**2))**(1/3) * self.scatter_xyz_error[step, 2]
-        )) / 3.0
+        # Add recursive function to filters stars farther than 3σ from the barycenter here !!!
+        self.scatter_xyz = np.std([star.position for star in self.stars], axis=0)
+        self.scatter_xyz_error = self.barycenter_error
+        self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
+            np.array(avg_position_error)**2 + np.array(avg_velocity_error)**2 \
+            * np.expand_dims(self.time, axis=0).T**2, axis=1)**0.5
+        self.scatter_error = np.sum(
+            (self.scatter_xyz * self.scatter_xyz_error)**2, axis=1)**0.5 / self.scatter
 
     def save_to_database(self):
         """ Saves all parameters to the database, including all Star objects within the Group object.
@@ -200,7 +204,7 @@ class Group:
         else:
             info('Previous database entry "{}" deleted and replaced.'.format(self.name))
 
-        # GroupModel database entry creation
+        # GroupModel database entrycreation
         self.group = GroupModel.create(
             # Group parameters
             name=self.name,
@@ -212,7 +216,7 @@ class Group:
             timestep=self.timestep,
             time=self.time,
             # Star parameters
-            number_of_stars=self.number_of_stars,
+#            number_of_stars=self.number_of_stars,
             average_velocity=self.average_velocity,
             average_velocity_error=self.average_velocity_error,
             barycenter=self.barycenter,
@@ -253,16 +257,24 @@ class Star:
             self.velocity_error = velocity_error
             # Time-dependent parameters
             self.position = position - (self.velocity * np.expand_dims(time, axis=0).T)
-            self.position_error = np.linalg.norm(
-                    (position_error, self.velocity_error * np.expand_dims(time, axis=0).T), axis=0)
-            self.relative_position = np.zeros([number_of_steps, 3])
-            self.relative_position_error = np.zeros([number_of_steps, 3])
-            self.distance = np.zeros([number_of_steps])
-            self.distance_error = np.zeros([number_of_steps])
+            self.position_error = np.sum(np.array(
+                [position_error, self.velocity_error * np.expand_dims(time, axis=0).T]
+            )**2, axis=0)**0.5
 
         # Initialization from database
         else:
             self.initialize_from_database(data)
+
+    def get_distance(self, barycenter, barycenter_error):
+        """ Computes the relative position and distance from the barycenter and their respective
+            errorsfor all timesteps.
+        """
+        # Time-dependent parameters
+        self.relative_position = self.position - barycenter
+        self.relative_position_error = (self.position_error**2 + barycenter_error**2)**0.5
+        self.distance = np.sum(self.relative_position**2, axis=1)**0.5
+        self.distance_error = np.sum(
+            (self.relative_position * self.relative_position_error)**2, axis=1)**0.5 / self.distance
 
     def initialize_from_database(self, star):
         """ Initializes Star object from an existing instance in the database.
@@ -318,7 +330,7 @@ if __name__ == '__main__':
     from model import *
 
     # Configuration import
-    # Add check of the type of the arguments. Change to quantity object, default values if absent !!!
+    # Add check of the type of the arguments. Change to Quantity object, default values if absent !!!
     if args.data and args.simulation:
         error = 'Either traceback "{}" from data or a simulation, not both.'.format(args.name)
         warning('ValueError: {}'.format(error))
@@ -376,7 +388,7 @@ if __name__ == '__main__':
             error = 'age must be an integer or float ({} given).', type(age)
             warning('TypeError: {}'.format(error))
             raise TypeError(error)
-        if not age > 0.0:
+        if not age >= 0.0:
             error = 'age must be greater than 0.0 ({} given).'.format(age)
             warning('ValueError: {}'.format(error))
             raise ValueError(error)
@@ -405,11 +417,7 @@ if __name__ == '__main__':
         error = 'number_of_steps must be an integer or float ({} given).'.format(initial_time)
         warming('ValueError: {}'.format(error))
         raise TypeError(error)
-    if not initial_time > 0.0:
-        error = 'initial_time must be greater than 0.0 ({} given).'.format(initial_time)
-        warning('ValueError: {}'.format(error))
-        raise ValueError(error)
-    if type(initial_time) not in (int, float):
+    if type(final_time) not in (int, float):
         error = 'final_time must be an integer or float ({} given).'.format(final_time)
         warming('ValueError: {}'.format(error))
         raise TypeError(error)
@@ -426,14 +434,4 @@ if __name__ == '__main__':
             Group(name, number_of_steps, initial_time, final_time, data, parameters))
 
     # Output creation
-#    create_histogram(
-#        np.round([group.scatter_age for group in groups], 3),
-#        avg_position_scatter[0],
-#        number_of_stars,
-#        number_of_groups,
-#        age
-#    )
-    print(vars(GroupModel).keys())
-
-#    create_graph(groups[0].time, groups[0].scatter)
-#    create_graph(groups[1].time, groups[1].scatter)
+    create_scatter_graph(groups, args.name)

@@ -89,7 +89,7 @@ avg_velocity_scatter_xyz = (2.2, 1.2, 1.0)
 avg_velocity_scatter_xyz = np.full(
     (3,), np.prod(avg_velocity_scatter_xyz)**(1/3) * (un.km/un.s).to(un.pc/un.Myr)
 )
-#avg_velocity_xyz = np.full((3,), np.linalg.norm(avg_velocity)/np.sqrt(3)) * (un.km/un.s).to(un.pc/un.Myr)
+#avg_velocity_xyz = np.full((3,), np.linalg.norm(avg_velocity) / 3**0.5) * (un.km/un.s).to(un.pc/un.Myr)
 #avg_velocity_xyz = np.array(avg_velocity) * (un.km/un.s).to(un.pc/un.Myr)
 #avg_velocity_scatter_xyz = np.array(avg_velocity_scatter) * (un.km/un.s).to(un.pc/un.Myr)
 
@@ -107,7 +107,7 @@ for initial_avg_position_scatter_xyz in initial_avg_position_scatters_xyz:
     scatters_x.append(scatter_x)
     scatters_xyz.append(scatter_xyz)
 
-#y_ans = np.sqrt(3)*np.prod(avg_position_scatter)**(1/3)
+#y_ans = 3**0.5 * np.prod(avg_position_scatter)**(1/3)
 #initial_avg_position_scatters = np.sqrt(3)*avg_position_scatters_x
 create_graph(initial_avg_position_scatters_x, scatters_x, current_avg_position_scatter_x)
 

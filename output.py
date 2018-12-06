@@ -23,11 +23,66 @@ def create_graph(x, y):
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
     plt.figure(figsize=(12, 8), facecolor='w')
     plt.plot(x, y,  'k.-')
+    plt.plot(x, y, '-', color='0.5')
     plt.xlabel('Age (Myr)')
     plt.ylabel('Scatter (pc)')
     plt.title('Scatter of a moving group over time\n')
-    plt.show()
     plt.savefig(join(output_dir, 'Scatter of a moving group over time.pdf'))
+
+def create_scatter_graph(groups, name):
+    """ Creates a graph of scatter over time.
+    """
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+    i = 0
+    plot_i = np.arange(0, len(groups), 20)
+    for group in groups:
+        if i in plot_i:
+            plt.plot(group.time, group.scatter, '-', color='0.7', linewidth=0.5)
+        i += 1
+    mean = np.mean([group.scatter for group in groups], axis=0)
+    print(groups[0].time)
+    print(mean)
+    plt.plot(groups[0].time, mean, 'k-', linewidth=2.0)
+    ages = [group.scatter_age for group in groups]
+    plt.title(
+        'Scatter of {} moving groups over time\nwith measurement errors (corrected). Average age: ({} ± {}) Myr\n'.format(
+            len(groups), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
+        )
+    )
+    plt.xlabel('Time (Myr)')
+    plt.ylabel('Scatter (pc)')
+    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
+    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
+    plt.xlim(14, 34)
+    plt.savefig(join(output_dir, '{}.pdf'.format(name)))
+
+def create_scatter_graph2(groups):
+    """ Creates a graph of scatter over time.
+    """
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+    mean = np.mean([group.scatter for group in groups], axis =0)
+    plt.plot(groups[0].time, mean, '-', color='0.0', linewidth=0.5)
+    plt.xlabel('Time (Myr)')
+    plt.ylabel('Scatter (pc)')
+    plt.xlim(0, 30)
+
+def create_histogram_ages(groups):
+    """ Creates an histogram of ages computed by multiple tracebacks.
+    """
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+    ages = [group.scatter_age for group in groups]
+    plt.hist(ages, bins='auto') # bins=np.arange(21.975, 26.025, 0.05)
+    plt.xlabel('Age (Myr)')
+    plt.ylabel('Number of groups')
+    plt.title(
+        'Distribution of {} moving groups age,\nwithout measurement errors. Average age: ({} ± {}) Myr\n'.format(
+            len(groups), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
+        )
+    )
+    plt.show()
 
 def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, age):
     """ Creates an histogram of ages computed by multiple tracebacks.
@@ -70,7 +125,7 @@ def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_gro
         (grid_x, grid_y),
         method='linear'
     )
-    rcParams.update({'font.family': 'serif', 'font.size': '15'})
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     plt.pcolormesh(grid_x, grid_y, grid_z, cmap=plt.cm.Greens_r, vmin=0, vmax=2)
     plt.colorbar()
@@ -143,11 +198,21 @@ if __name__ == '__main__':
     numbers_of_star = np.array([30, 40, 50, 60, 100, 200])
     number_of_groups = 1000
 
-    create_color_mesh(initial_scatter, numbers_of_star, a24, 5.0, number_of_groups)
-    create_color_mesh(initial_scatter, numbers_of_star, a24, 10.0, number_of_groups)
-    create_color_mesh(initial_scatter, numbers_of_star, a24, 24.0, number_of_groups)
-    create_color_mesh(initial_scatter, numbers_of_star, a24, 50.0, number_of_groups)
-    create_color_mesh(initial_scatter, numbers_of_star, a24, 100.0, number_of_groups)
-    create_color_mesh(
-        initial_scatter, numbers_of_star, (a5+a10+a24+a50+a100)/5, 'x', number_of_groups
-    )
+#    create_color_mesh(initial_scatter, numbers_of_star, a24, 5.0, number_of_groups)
+#    create_color_mesh(initial_scatter, numbers_of_star, a24, 10.0, number_of_groups)
+#    create_color_mesh(initial_scatter, numbers_of_star, a24, 24.0, number_of_groups)
+#    create_color_mesh(initial_scatter, numbers_of_star, a24, 50.0, number_of_groups)
+#    create_color_mesh(initial_scatter, numbers_of_star, a24, 100.0, number_of_groups)
+#    create_color_mesh(
+#        initial_scatter, numbers_of_star, (a5+a10+a24+a50+a100)/5, 'x', number_of_groups
+#    )
+
+    errors = (0.0, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0)
+    ages = (24.001, 23.966, 23.901, 23.74, 23.525, 22.224, 20.301, 18.113, 15.977, 11.293, 7.995, 5.803, 4.358, 3.364, 2.665, 2.204, 1.756, 1.257, 0.933, 0.735, 0.580, 0.488, 0.346, 0.262, 0.192, 0.160, 0.134)
+
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+    plt.xlabel('Error on UVW velcotiy (km/s)')
+    plt.ylabel('Age of minimal scatter (Myr)')
+    plt.plot(errors, ages, '.-', color='0.0', linewidth=1.0)
+    plt.show()

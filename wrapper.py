@@ -31,11 +31,19 @@ for age in  [5.0, 10.0, 50.0, 100.0] :
                     config.write(line)
             config.close()
 
-            # Execution of __main__.py
-            os.system(
-                'python3 . Simulation_{}_pc_{}_stars_{}_Myr -s'.format(
-                    avg_position_scatter[0],
-                    number_of_stars,
-                    age
-                )
-            )
+for avg_velocity_error in  [0.05, 0.1, 0.15]:
+    # Modification of config.py
+    config = open('config.py', 'r')
+    lines = [line for line in config.readlines()]
+    config.close()
+    os.remove('config.py')
+    config = open('config.py', 'w')
+    for line in lines:
+        if line.startswith('avg_velocity_error'):
+            config.write('avg_velocity_error = ({}, {}, {})\n'.format(avg_velocity_error, avg_velocity_error, avg_velocity_error))
+        else:
+            config.write(line)
+    config.close()
+
+    # Execution of __main__.py
+    os.system('python3 . Simulation_{} -s'.format(avg_velocity_error))

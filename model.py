@@ -65,15 +65,12 @@ class GroupModel(BaseModel):
     # Minimum spanning tree parameters
     minimum_spanning_tree = ArrayField(verbose_name='Minimum Spanning Tree', default=np.array([]))
     minimum_spanning_tree_error = ArrayField(
-        verbose_name='Minimum Spanning Tree Error', default=np.array([])
-    )
+        verbose_name='Minimum Spanning Tree Error', default=np.array([]))
     minimum_spanning_tree_points = ArrayField(
-        verbose_name='Minimum Spanning Tree Points', default=np.array([])
-    )
+        verbose_name='Minimum Spanning Tree Points', default=np.array([]))
     minimum_spanning_tree_age = FloatField(verbose_name='Minimum Spanning Tree Age', default=0.0)
     minimum_spanning_tree_age_error = FloatField(
-        verbose_name='Minimum Spanning Tree Age Error', default=0.0
-    )
+        verbose_name='Minimum Spanning Tree Age Error', default=0.0)
 
 class StarModel(BaseModel):
     """ Time-independent and time-dependent (ArrayField) parameters of a star in a local group.
