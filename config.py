@@ -1,10 +1,12 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Configuration of a traceback and/or simulation of a sample of stars
+""" config.py: Configuration of a traceback from a simulated sample of stars or data.
+"""
 
-# Path to the database directory
-output_dir = '/Users/Dominic/Fichiers/Astrophysique/Projet/Traceback/Output/'
+# Location of the output directory, if left blank (e.g. '') or absent, output directory is created
+# in place
+output = '/Users/Dominic/Fichiers/Astrophysique/Projet/Traceback/Output/'
 
 # Time units ('Myr' by default)
 time_unit = 'Myr'

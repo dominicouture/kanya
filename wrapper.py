@@ -1,7 +1,9 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Wraps __main__.py to execute the Traceback algorithm with different configuration files.
+""" wrapper.py: Wraps __main__.py to execute the Traceback algorithm with different configuration
+    files.
+"""
 
 import fileinput
 import os

@@ -1,21 +1,20 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Provide the necesary functions to output data in table, graph or video form
+""" output.py: Provides the necesary functions to output data in table, graph or video form.
+"""
 
 import numpy as np
-from traceback import format_exc
 from logging import basicConfig, warning, INFO
 from time import strftime
 from os.path import join
 from matplotlib import rcParams, pyplot as plt
 from scipy.interpolate import griddata
-from config import *
+from init import *
 
 # Configuration of the log file
 basicConfig(
-    filename=join(output_dir, 'Logs/Traceback_{}.log'.format(strftime('%Y-%m-%d %H:%M:%S'))),
-    format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
+    filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 def create_graph(x, y):
     """ Creates a graph of scatter over time.
@@ -55,7 +54,8 @@ def create_scatter_graph(groups, name):
     plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
     plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
     plt.xlim(14, 34)
-    plt.savefig(join(output_dir, '{}.pdf'.format(name)))
+#    plt.savefig(join(output_dir, '{}.pdf'.format(name)))
+    plt.show()
 
 def create_scatter_graph2(groups):
     """ Creates a graph of scatter over time.

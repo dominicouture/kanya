@@ -1,7 +1,8 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Algorithm to find the original scatter of β-Pictoris.
+""" find_scatter.py: Finds the original scatter of β-Pictoris.
+"""
 
 import numpy as np
 from astropy import units as un
@@ -10,17 +11,14 @@ from argparse import ArgumentParser
 from traceback import format_exc
 from logging import basicConfig, info, warning, INFO
 from time import strftime
-from os.path import join
-from os import remove
-from sys import exit
 from config import *
+from init import *
 from tools import *
 from output import *
 
 # Configuration of the log file
 basicConfig(
-    filename=join(output_dir, 'Logs/Traceback_{}.log'.format(strftime('%Y-%m-%d %H:%M:%S'))),
-    format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
+    filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 def find_scatters(
         number_of_stars: int, age: int,
