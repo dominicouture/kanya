@@ -89,8 +89,7 @@ elif args.simulation:
     for parameter in (
             'number_of_groups', 'number_of_stars', 'age',
             'avg_position', 'avg_position_error', 'avg_position_scatter',
-            'avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'
-        ):
+            'avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
         if parameter not in globals().keys():
             error = '{} is missing in the configuration file.'.format(parameter)
             warning('NameError: {}'.format(parameter))
@@ -123,8 +122,7 @@ elif args.simulation:
     parameters = (
         number_of_stars, age,
         avg_position, avg_position_error, avg_position_scatter,
-        avg_velocity, avg_velocity_error, avg_velocity_scatter
-    )
+        avg_velocity, avg_velocity_error, avg_velocity_scatter)
     group_names = ['{}_{}'.format(args.name, i) for i in range(1, number_of_groups + 1)]
 
 # Check configuration parameters
@@ -154,3 +152,28 @@ if not final_time > initial_time:
         final_time, initial_time)
     warning('ValueError: {}'.format(error))
     raise ValueError(error)
+
+
+def import_config():
+    """ Imports configuration file into Quantity objects and convert units into default units:
+
+        time: million year (Myr)
+        position: parsec (pc)
+        velocity: parsec per million year (pc/Myr)
+        angle: radian
+        angular velocity: (Myr^-1)
+
+        Returns a series a configurations to be passed into a Group object using a recursive
+        algorithm.
+    """
+    pass
+
+class Configuration():
+    """ Contains a configurations to be passed into a Group object. The initialization checks for
+        errors, including TypeError and ValueError.
+    """
+    
+    def __init():
+        """ Checks individual configurations for errors, including TypeError and ValueError
+        """
+        pass

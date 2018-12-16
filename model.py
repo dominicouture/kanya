@@ -49,8 +49,8 @@ class GroupModel(BaseModel):
     time = ArrayField(verbose_name='Time', default=np.array([]))
     # Star parameters
     number_of_stars = IntegerField(verbose_name='Number of Stars', default=0)
-    average_velocity = ArrayField(verbose_name='Average Velocity', default=np.zeros((1, 3)))
-    average_velocity_error = ArrayField(
+    avg_velocity = ArrayField(verbose_name='Average Velocity', default=np.zeros((1, 3)))
+    avg_velocity_error = ArrayField(
         verbose_name='Average Velocity Error', default=np.zeros((1, 3)))
     barycenter = ArrayField(verbose_name='Barycenter', default=np.zeros((1, 3)))
     barycenter_error = ArrayField(verbose_name='Barycenter Error', default=np.zeros((1, 3)))
@@ -77,9 +77,8 @@ class GroupModel(BaseModel):
         database_values = vars(data)['_data']
         del database_values['id']
         vars(group).update(database_values)
-        from __main__ import Star
-        group.stars = [Star(
-            star.name, data=star) for star in StarModel.select().where(StarModel.group == data)]
+        group.stars = [StarModel.initialize_from_database(StarModel, group, star)
+            for star in StarModel.select().where(StarModel.group == data)]
 
     def save_to_database(self, group):
         """ Saves all parameters to the database, including all Star objects within the Group object.
@@ -118,12 +117,16 @@ class StarModel(BaseModel):
     distance = ArrayField(verbose_name='Distance')
     distance_error = ArrayField(verbose_name='Distance Error')
 
-    def initialize_from_database(self, star, data):
+    def initialize_from_database(self, group, data):
         """ Initializes Star object from an existing instance in the database.
         """
+        from __main__ import Star
+        star = Star()
         database_values = vars(data)['_data']
         del database_values['id']
         vars(star).update(database_values)
+        return star
+
 
     def save_to_database(self, star, group):
         """ Saves all parameters to the database in a new StarModel entry.

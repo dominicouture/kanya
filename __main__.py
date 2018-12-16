@@ -22,24 +22,20 @@ class Group:
     """ Contains the values and related methods of a moving group and a list of Star objets that
         are part of it. Data can be obtained from the database or calculated from a raw data file.
     """
-    # All arguments but 'name' are unnecessary, unless support for multiple config is added.
     def __init__(
-        self, name: str, number_of_steps: int,
-        initial_time: float, final_time: float, data, parameters):
-        """ Initializes Star objects and Group object from a simulated sample of stars in a local
-            association, raw data in the form a Python dictionnary or from a database. This dataset
-            is then moved backward in time for a given traceback duration. Distances are in pc,
-            durations in Myr and velocities in pc/Myr.
+            self, name: str, number_of_steps=None,
+            initial_time=None, final_time=None, data=None, parameters=None):
+        """ Initializes a Group object and embedded Star objects from a simulated sample of stars
+            in a moving group, raw data in the form a Python dictionnary or from a database. This
+            dataset is then moved backward in time from the initial to the final time. Distances
+            are in pc, durations in Myr and velocities in pc/Myr.
         """
-#        # Creation or retrieval of the group data in the database
-        info('Tracing back {}'.format(name.replace('_', ' ')))
-        print('Tracing back {}'.format(name.replace('_', ' ')))
+        # Creation or retrieval of the group data in the database
         if args.from_database or args.to_database:
             self.data, self.created = GroupModel.get_or_create(name=name)
 
         # Initialization from database
         if args.from_database:
-#            self.initialize_from_database(self.data)
             GroupModel.initialize_from_database(GroupModel, self, self.data)
 
         # Initialization from a data or simulation
@@ -59,9 +55,9 @@ class Group:
             elif parameters is not None:
                 self.stars = self.stars_from_simulation(*parameters)
             self.number_of_stars = len(self.stars)
-            self.average_velocity = np.sum(
+            self.avg_velocity = np.sum(
                 np.array([star.velocity for star in self.stars]), axis=0) / self.number_of_stars
-            self.average_velocity_error = np.sum(
+            self.avg_velocity_error = np.sum(
                 np.array([star.velocity_error for star in self.stars])**2, axis=0
             )**0.5 / self.number_of_stars
             self.barycenter = np.sum(
@@ -91,13 +87,25 @@ class Group:
             parameters including the name of the stars, their position (XYZ) and velocity (UVW),
             and the respective errors.
         """
-        return [
-            Star(
-                name, self.number_of_steps, self.time,
-                np.array(value['position']), np.array(value['position_error']),
-                np.array(value['velocity']), np.array(value['velocity_error'])
-            ) for name, value in data[self.name].items()
-        ]
+#        return [
+#            Star(
+#                name, self.number_of_steps, self.time,
+#                np.array(value['velocity']), np.array(value['velocity_error']),
+#                np.array(value['position']), np.array(value['position_error'])
+#            ) for name, value in data[self.name].items()
+#        ]
+        stars = []
+        i = 0
+        for star in data[self.name]:
+            position_rδα = [1000/star[0], star[1], star[2]]
+            position_xyz, position_xyz_error = rδα_to_xyz(*position_rδα)
+            velocity_uvw, velocity_uvw_error = rvμδμα_to_uvw(*position_rδα, star[3], star[4], star[5] / np.cos(star[1] * un.deg.to(un.rad)))
+            stars.append(
+                Star('Star_{}'.format(i), self.time, velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
+                np.array(avg_velocity_error) * (un.km/un.s).to(un.pc/un.Myr),
+                position_xyz, np.array(avg_position_error)))
+            i += 1
+        return stars
 
     def stars_from_simulation(
         self, number_of_stars: int, age: float,
@@ -120,25 +128,24 @@ class Group:
             position = velocity * age + np.random.normal(
                 np.array(avg_position), np.array(avg_position_scatter))
             # Scrambles the velocity and position based on errors in spherical coordinates
-            velocity_rvμδμα = uvw_to_rvμδμα(*position, *(velocity * (un.pc/un.Myr).to(un.km/un.s)))
-            position_rδα = xyz_to_rδα(*position)
+            velocity_rvμδμα = uvw_to_rvμδμα(*position, * (velocity * (un.pc/un.Myr).to(un.km/un.s)))[0]
+            position_rδα = xyz_to_rδα(*position)[0]
             velocity_uvw = rvμδμα_to_uvw(
                 *position_rδα, *np.random.normal(velocity_rvμδμα, np.array(avg_velocity_error))
-            ) * (un.km/un.s).to(un.pc/un.Myr)
+            )[0] * (un.km/un.s).to(un.pc/un.Myr)
             position_xyz = rδα_to_xyz(
                 *np.random.normal(
                     position_rδα, np.array(avg_position_error) * np.array([
-                        (position_rδα[0]**2)*un.mas.to(un.arcsec),
-                        un.mas.to(un.deg),
-                        un.mas.to(un.deg)
+                        (position_rδα[0]**2) * un.mas.to(un.arcsec),
+                        un.mas.to(un.deg), un.mas.to(un.deg)
                     ])
                 )
-            )
+            )[0]
             stars.append(
                 Star(
-                    'star_{}'.format(star), self.number_of_steps, self.time,
-                    np.random.normal(position, avg_position_error), np.array(avg_position_error),
-                    np.random.normal(velocity, avg_velocity_error), np.array(avg_velocity_error)
+                    'star_{}'.format(star), self.time,
+                    np.random.normal(velocity, avg_velocity_error), np.array(avg_velocity_error),
+                    np.random.normal(position, avg_position_error), np.array(avg_position_error)
                 )
             )
         return stars
@@ -161,14 +168,15 @@ class Star:
     """ Contains the values and related methods of a star.
     """
     def __init__(
-        self, name: str, number_of_steps=None, time=None,
-        position=None, position_error=None, velocity=None, velocity_error=None, data=None):
-        """ Initializes basic parameters and arrays to the correct shape. Distances are in pc and
-            velocities in pc/Myr.
+            self, name=None, time=None, velocity=None, velocity_error=None,
+            initial_position=None, initial_position_error=None):
+        """ Initializes Star objects and computes its position and position error from an initial
+            position at different times for a given velocity. Distances are in pc and velocities in
+            pc/Myr.
         """
         # Initialization from database
-        if data is not None:
-            StarModel.initialize_from_database(StarModel, self, data)
+        if args.from_database:
+            pass
 
         # Initialization from data or simulation
         else:
@@ -177,9 +185,9 @@ class Star:
             self.velocity = velocity
             self.velocity_error = velocity_error
             # Time-dependent parameters
-            self.position = position - (self.velocity * np.expand_dims(time, axis=0).T)
+            self.position = initial_position - (self.velocity * np.expand_dims(time, axis=0).T)
             self.position_error = np.sum(np.array(
-                [position_error, self.velocity_error * np.expand_dims(time, axis=0).T]
+                [initial_position_error, self.velocity_error * np.expand_dims(time, axis=0).T]
             )**2, axis=0)**0.5
 
     def get_distance(self, barycenter, barycenter_error):
@@ -197,6 +205,8 @@ if __name__ == '__main__':
     # Traceback
     groups = []
     for name in group_names:
+        info('Tracing back {}'.format(name.replace('_', ' ')))
+        print('Tracing back {}'.format(name.replace('_', ' ')))
         groups.append(
             Group(name, number_of_steps, initial_time, final_time, data, parameters))
 

@@ -51,9 +51,9 @@ def create_scatter_graph(groups, name):
     )
     plt.xlabel('Time (Myr)')
     plt.ylabel('Scatter (pc)')
-    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
-    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
-    plt.xlim(14, 34)
+#    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
+#    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
+#    plt.xlim(14, 34)
 #    plt.savefig(join(output_dir, '{}.pdf'.format(name)))
     plt.show()
 
