@@ -7,15 +7,8 @@
 
 import numpy as np
 from astropy import units as un
-from logging import basicConfig, info, warning, INFO
-from time import strftime
-from os.path import join
 from math import cos, sin, asin, atan2, pi as π, degrees, radians
 from init import *
-
-# Configuration of the log file
-basicConfig(
-   filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 class Coordinates:
     """ Contains the values and related methods of coordinates, including its position, velocity,

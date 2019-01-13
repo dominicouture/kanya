@@ -7,18 +7,9 @@
 import numpy as np
 from astropy import units as un
 from matplotlib import rcParams, pyplot as plt
-from argparse import ArgumentParser
-from traceback import format_exc
-from logging import basicConfig, info, warning, INFO
-from time import strftime
-from config import *
 from init import *
 from tools import *
 from output import *
-
-# Configuration of the log file
-basicConfig(
-    filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 def find_scatters(
         number_of_stars: int, age: int,

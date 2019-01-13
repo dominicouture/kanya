@@ -5,8 +5,8 @@
     files.
 """
 
-import fileinput
 import os
+import fileinput
 
 for age in  [5.0, 10.0, 50.0, 100.0] :
     for avg_position_scatter in [5.0, 10.0, 15.0, 20.0, 25.0]:

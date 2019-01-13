@@ -7,16 +7,10 @@
 
 import numpy as np
 from astropy import units as un
-from logging import basicConfig, info, warning, INFO
 from time import strftime
-from config import *
 from init import *
 from output import *
 from tools import *
-
-# Configuration of the log file
-basicConfig(
-    filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 class Group:
     """ Contains the values and related methods of a moving group and a list of Star objets that
@@ -26,12 +20,12 @@ class Group:
             self, name: str, number_of_steps=None,
             initial_time=None, final_time=None, data=None, parameters=None):
         """ Initializes a Group object and embedded Star objects from a simulated sample of stars
-            in a moving group, raw data in the form a Python dictionnary or from a database. This
+            in a moving group, raw data in the form a Python dictionary or from a database. This
             dataset is then moved backward in time from the initial to the final time. Distances
             are in pc, durations in Myr and velocities in pc/Myr.
         """
         # Creation or retrieval of the group data in the database
-        if args.from_database or args.to_database:
+        if args.database:
             self.data, self.created = GroupModel.get_or_create(name=name)
 
         # Initialization from database
@@ -50,9 +44,9 @@ class Group:
             self.timestep = self.duration / number_of_steps
             self.time = np.linspace(self.initial_time, self.final_time, self.number_of_steps)
             # Stars parameters
-            if data is not None:
+            if args.data:
                 self.stars = self.stars_from_data(data)
-            elif parameters is not None:
+            elif args.simulation:
                 self.stars = self.stars_from_simulation(*parameters)
             self.number_of_stars = len(self.stars)
             self.avg_velocity = np.sum(
@@ -77,16 +71,16 @@ class Group:
             self.minimum_spanning_tree_points = np.zeros([self.number_of_steps, 2, 3])
             self.minimum_spanning_tree_age = 0.0
             self.minimum_spanning_tree_age_error = 0.0
-
             # Deletion of previous entries and creation of new entries in the database
             if args.to_database:
                 GroupModel.save_to_database(GroupModel, self)
 
     def stars_from_data(self, data):
-        """ Creates a list of Star objects from a Python dictionnary or CSV files containing the
+        """ Creates a list of Star objects from a Python dictionary or CSV files containing the
             parameters including the name of the stars, their position (XYZ) and velocity (UVW),
             and the respective errors.
         """
+        # From dictionary
 #        return [
 #            Star(
 #                name, self.number_of_steps, self.time,
@@ -94,16 +88,20 @@ class Group:
 #                np.array(value['position']), np.array(value['position_error'])
 #            ) for name, value in data[self.name].items()
 #        ]
+        # From observables
         stars = []
         i = 0
         for star in data[self.name]:
-            position_rδα = [1000/star[0], star[1], star[2]]
-            position_xyz, position_xyz_error = rδα_to_xyz(*position_rδα)
-            velocity_uvw, velocity_uvw_error = rvμδμα_to_uvw(*position_rδα, star[3], star[4], star[5] / np.cos(star[1] * un.deg.to(un.rad)))
+            equatorial, equatorial_error = observables_equatorial(*star, *avg_position_error, *avg_velocity_error)
+            position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(*equatorial[:3], *equatorial_error[:3])
+            velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(*equatorial[:3], equatorial[3] + 2.0, *equatorial[4:], *equatorial_error)
+            print(velocity_uvw_error)
+            position_xyz = position_xyz + velocity_uvw * (un.km/un.s).to(un.pc/un.Myr) * equatorial[0] / (299792458 * (un.m/un.s).to(un.pc/un.Myr))
             stars.append(
-                Star('Star_{}'.format(i), self.time, velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
-                np.array(avg_velocity_error) * (un.km/un.s).to(un.pc/un.Myr),
-                position_xyz, np.array(avg_position_error)))
+                Star('Star_{}'.format(i), self.time,
+                velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
+                velocity_uvw_error * (un.km/un.s).to(un.pc/un.Myr),
+                position_xyz, position_xyz_error))
             i += 1
         return stars
 
@@ -117,7 +115,6 @@ class Group:
         """
         # Velocity conversions from km/s to pc/Myr
         avg_velocity, avg_velocity_scatter = np.array((
-#            avg_velocity, avg_velocity_scatter))
             avg_velocity, avg_velocity_scatter)) * (un.km/un.s).to(un.pc/un.Myr)
         # Star objects creation
         stars = []
@@ -159,7 +156,7 @@ class Group:
         self.scatter_xyz = np.std([star.position for star in self.stars], axis=0)
         self.scatter_xyz_error = self.barycenter_error
         self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
-            np.array(avg_position_error)**2 + np.array(avg_velocity_error)**2 \
+            self.barycenter_error[0]**2 + self.avg_velocity_error**2 \
             * np.expand_dims(self.time, axis=0).T**2, axis=1)**0.5
         self.scatter_error = np.sum(
             (self.scatter_xyz * self.scatter_xyz_error)**2, axis=1)**0.5 / self.scatter
@@ -205,10 +202,9 @@ if __name__ == '__main__':
     # Traceback
     groups = []
     for name in group_names:
-        info('Tracing back {}'.format(name.replace('_', ' ')))
-        print('Tracing back {}'.format(name.replace('_', ' ')))
-        groups.append(
-            Group(name, number_of_steps, initial_time, final_time, data, parameters))
+        info('Tracing back {}.'.format(name.replace('_', ' ')))
+        print('Tracing back {}.'.format(name.replace('_', ' ')))
+        groups.append(Group(name, number_of_steps, initial_time, final_time, data, parameters))
 
     # Output
     create_scatter_graph(groups, args.name)

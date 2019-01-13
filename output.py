@@ -5,16 +5,11 @@
 """
 
 import numpy as np
-from logging import basicConfig, warning, INFO
-from time import strftime
-from os.path import join
 from matplotlib import rcParams, pyplot as plt
 from scipy.interpolate import griddata
+from time import strftime
+from os import path
 from init import *
-
-# Configuration of the log file
-basicConfig(
-    filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
 def create_graph(x, y):
     """ Creates a graph of scatter over time.
@@ -26,7 +21,7 @@ def create_graph(x, y):
     plt.xlabel('Age (Myr)')
     plt.ylabel('Scatter (pc)')
     plt.title('Scatter of a moving group over time\n')
-    plt.savefig(join(output_dir, 'Scatter of a moving group over time.pdf'))
+    plt.savefig(path.join(output_dir, 'Scatter of a moving group over time.pdf'))
 
 def create_scatter_graph(groups, name):
     """ Creates a graph of scatter over time.
@@ -45,8 +40,8 @@ def create_scatter_graph(groups, name):
     plt.plot(groups[0].time, mean, 'k-', linewidth=2.0)
     ages = [group.scatter_age for group in groups]
     plt.title(
-        'Scatter of {} moving groups over time\nwith measurement errors (corrected). Average age: ({} ± {}) Myr\n'.format(
-            len(groups), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
+        'Scatter of β-pictoris over time\nwith measurement errors (rv: + 2.0 km/s). Average age: ({} ± {}) Myr\n'.format(
+            np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
         )
     )
     plt.xlabel('Time (Myr)')
@@ -54,7 +49,7 @@ def create_scatter_graph(groups, name):
 #    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
 #    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 #    plt.xlim(14, 34)
-#    plt.savefig(join(output_dir, '{}.pdf'.format(name)))
+#    plt.savefig(path.join(output_dir, '{}.pdf'.format(name)))
     plt.show()
 
 def create_scatter_graph2(groups):
@@ -103,7 +98,7 @@ def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, a
         )
     )
     plt.savefig(
-        join(
+        path.join(
             output_dir, '{}.pdf'.format(
                 'Distribution of ages ({} groups, {} Myr, {} stars, initial scatter = {} pc)'.format(
                     number_of_groups, age, number_of_stars, initial_scatter
@@ -136,7 +131,7 @@ def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_gro
         'Scatter on age (Myr) over the initial scatter (pc)\n'
         'and the number of stars ({} groups, {} Myr)'.format(number_of_groups, age)
     )
-    plt.savefig(join(output_dir, 'Scatter on age ({} Myr).png').format(age))
+    plt.savefig(path.join(output_dir, 'Scatter on age ({} Myr).png').format(age))
 
 if __name__ == '__main__':
     a5 = np.array(

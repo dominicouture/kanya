@@ -9,18 +9,13 @@
 
 import numpy as np
 from peewee import *
-from logging import basicConfig, info, warning, INFO
 from time import strftime
-from os.path import join
+from os import path
 from json import dumps, loads
 from init import *
 
-# Configuration of the log file
-basicConfig(
-    filename=logs_path, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
-
 # Definition of the database object
-Database = SqliteDatabase(join(output_dir, '{}.db'.format(args.name)))
+Database = SqliteDatabase(path.join(output_dir, '{}.db'.format(args.name)))
 
 class BaseModel(Model):
     class Meta:
@@ -126,7 +121,6 @@ class StarModel(BaseModel):
         del database_values['id']
         vars(star).update(database_values)
         return star
-
 
     def save_to_database(self, star, group):
         """ Saves all parameters to the database in a new StarModel entry.
