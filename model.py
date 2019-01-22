@@ -10,12 +10,14 @@
 import numpy as np
 from peewee import *
 from time import strftime
-from os import path
 from json import dumps, loads
-from init import *
+from init import Config, info
 
-# Definition of the database object
-Database = SqliteDatabase(path.join(output_dir, '{}.db'.format(args.name)))
+__author__ = 'Dominic Couture'
+__email__ = 'dominic.couture.1@umontreal.ca'
+
+# Database object definition
+Database = SqliteDatabase(Config.db_path)
 
 class BaseModel(Model):
     class Meta:
@@ -35,6 +37,7 @@ class GroupModel(BaseModel):
     """
     # Group parameters
     name = CharField(verbose_name='Name', unique=True)
+    series = CharField(verbose_name='Series')
     date = DateField(verbose_name='Date', default=strftime('%Y-%m-%d %H:%M:%S'))
     initial_time = FloatField(verbose_name='Initial Time', default=0.0)
     final_time = FloatField(verbose_name='Final Time', default=1.0)
@@ -66,21 +69,21 @@ class GroupModel(BaseModel):
     minimum_spanning_tree_age_error = FloatField(
         verbose_name='Minimum Spanning Tree Age Error', default=0.0)
 
-    def initialize_from_database(self, group, data):
+    def initialize_from_database(self, group, model):
         """ Initializes Group object from an existing entry in the database.
         """
-        database_values = vars(data)['_data']
+        database_values = vars(model)['_data']
         del database_values['id']
         vars(group).update(database_values)
         group.stars = [StarModel.initialize_from_database(StarModel, group, star)
-            for star in StarModel.select().where(StarModel.group == data)]
+            for star in StarModel.select().where(StarModel.group == model)]
 
     def save_to_database(self, group):
         """ Saves all parameters to the database, including all Star objects within the Group object.
             Previous entries are deleted if necessary and new entries are added.
         """
         # Previous GroupModel and StarModel entries deletion
-        group.data.delete_instance(recursive=True)
+        group.model.delete_instance(recursive=True)
         if group.created:
             info('New database entry "{}" added.'.format(group.name))
         else:
@@ -88,12 +91,12 @@ class GroupModel(BaseModel):
 
         # GroupModel entry creation
         group_values = vars(group).copy()
-        del group_values['data'], group_values['created'], group_values['stars']
-        group.data = self.create(**group_values)
+        del group_values['model'], group_values['created'], group_values['stars']
+        group.model = self.create(**group_values)
 
         # StarModel entries creation
         for star in group.stars:
-            StarModel.save_to_database(StarModel, star, group.data)
+            StarModel.save_to_database(StarModel, star, group.model)
 
 class StarModel(BaseModel):
     """ Time-independent and time-dependent (ArrayField) parameters of a star in a local group.
@@ -112,12 +115,12 @@ class StarModel(BaseModel):
     distance = ArrayField(verbose_name='Distance')
     distance_error = ArrayField(verbose_name='Distance Error')
 
-    def initialize_from_database(self, group, data):
+    def initialize_from_database(self, group, model):
         """ Initializes Star object from an existing instance in the database.
         """
-        from __main__ import Star
-        star = Star()
-        database_values = vars(data)['_data']
+        from group import Star
+        star = Star(group=group)
+        database_values = vars(model)['_data']
         del database_values['id']
         vars(star).update(database_values)
         return star
@@ -127,6 +130,6 @@ class StarModel(BaseModel):
         """
         self.create(group=group, **vars(star))
 
-# Create GroupModel and StarModel tables in the database if they don't exist
+# GroupModel and StarModel tables creation if they don't already exists.
 GroupModel.create_table(fail_silently=True)
 StarModel.create_table(fail_silently=True)

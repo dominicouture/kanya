@@ -8,7 +8,7 @@
 import numpy as np
 from astropy import units as un
 from math import cos, sin, asin, atan2, pi as π, degrees, radians
-from init import *
+from init import info
 
 class Coordinates:
     """ Contains the values and related methods of coordinates, including its position, velocity,

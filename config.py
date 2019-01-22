@@ -4,9 +4,20 @@
 """ config.py: Configuration of a traceback from a simulated sample of stars or data.
 """
 
-# Location of the 'Output' directory. If left blank (i.e. '') or absent, 'Output' directory is
-# in the same directory as the Traceback module.
-output = ''
+__author__ = 'Dominic Couture'
+__email__ = 'dominic.couture.1@umontreal.ca'
+
+# Output directory relative to the directory where the Traceback Package is located. If left blank
+# (i.e. '') or absent, output files will be created in the same directory as the Traceback Package.
+output_dir = 'Output'
+
+# Logs directory relative to the output directory. If left blank (i.e. '') or absent, logs files
+# will be created in the output directory.
+logs_dir = 'Logs'
+
+# Path to the database file used as input or output in the output directory. If it doesn't
+# exist, it will be created. By default, the database is created in the output directory.
+db_path = ''
 
 # Time units ('Myr' by default)
 time_unit = 'Myr'
@@ -18,7 +29,9 @@ position_units = ('pc', 'pc', 'pc') # ('pc', 'deg', 'deg')
 velocity_units = ('km/s', 'km/s', 'km/s') # ('km/s', 'mas/yr', 'mas/yr')
 
 
-# Traceback parameters
+# Traceback parameters (used in simulation or data)
+# Number of groups to be simulated in the series (integer, > 0)
+number_of_groups = 100
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 number_of_steps = 200
@@ -27,14 +40,10 @@ number_of_steps = 200
 initial_time = 0.0
 
 # Final age of the traceback (inclusive, float, > initial_time, Myr)
-final_time = 10.0
+final_time = 30.0
 
 
 # Simulation parameters (used only in simulation)
-
-# Number of groups to be simulated (integer, > 0)
-number_of_groups = 100
-
 # Number of stars in each simulated group of stars (integer, > 0)
 number_of_stars = 42
 
@@ -67,7 +76,7 @@ avg_velocity_scatter = (1.382, 1.382, 1.382)
 # avg_velocity_scatter = (2.2, 1.2, 1.0)
 
 
-# Path to CSV data file or dictionary with data. Set as None if no data is needed
+# Path to CSV data file or Python dictionary with data.
 data = {
     'beta_pictoris': [
         [25.0250, -23.107737, 1.7091324, 6.50000, -47.1210,  96.7760],

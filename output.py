@@ -9,7 +9,10 @@ from matplotlib import rcParams, pyplot as plt
 from scipy.interpolate import griddata
 from time import strftime
 from os import path
-from init import *
+from init import info
+
+__author__ = 'Dominic Couture'
+__email__ = 'dominic.couture.1@umontreal.ca'
 
 def create_graph(x, y):
     """ Creates a graph of scatter over time.

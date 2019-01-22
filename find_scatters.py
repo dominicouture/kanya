@@ -7,9 +7,12 @@
 import numpy as np
 from astropy import units as un
 from matplotlib import rcParams, pyplot as plt
-from init import *
+from init import info
 from tools import *
 from output import *
+
+__author__ = 'Dominic Couture'
+__email__ = 'dominic.couture.1@umontreal.ca'
 
 def find_scatters(
         number_of_stars: int, age: int,
