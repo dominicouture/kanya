@@ -31,7 +31,7 @@ velocity_units = ('km/s', 'km/s', 'km/s') # ('km/s', 'mas/yr', 'mas/yr')
 
 # Traceback parameters (used in simulation or data)
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups = 100
+number_of_groups = 1000
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 number_of_steps = 200
@@ -45,7 +45,7 @@ final_time = 30.0
 
 # Simulation parameters (used only in simulation)
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars = 42
+number_of_stars = 50
 
 # Age of the simulated groups of stars (float, ≥ 0.0, Myr)
 age = 24.0
@@ -59,7 +59,7 @@ avg_position_error = (0.19846, 0.0, 0.0)
 # avg_position_error = (0.0, 0.0, 0.0)
 
 # Average position scatter of the simulated sample of stars (pc, pc, pc)
-avg_position_scatter = (2.0, 2.0, 2.0)
+avg_position_scatter = (4.0, 4.0, 4.0)
 # avg_position_scatter = (29.3, 14.0, 9.0)
 
 # Average velocity of the simulated sample of stars (pc/Myr, pc/Myr, pc/Myr)
@@ -68,7 +68,6 @@ avg_velocity = (-11.622, -11.622, -11.622)
 
 # Average measurement error on the velocity of the simulated sample of stars (km/s, mas/yr, mas/yr)
 avg_velocity_error = (1.0112, 0.30754, 0.26432)
-# avg_velocity_error = (0.0, 0.5, 0.5)
 # avg_velocity_error = (0.0, 0.0, 0.0)
 
 # Average velocity scatter of the simulated sample of stars (pc/Myr, pc/Myr, pc/Myr)
@@ -78,7 +77,7 @@ avg_velocity_scatter = (1.382, 1.382, 1.382)
 
 # Path to CSV data file or Python dictionary with data.
 data = {
-    'beta_pictoris': [
+    'beta_pictoris_1': [
         [25.0250, -23.107737, 1.7091324, 6.50000, -47.1210,  96.7760],
         [27.1700, -66.753496, 4.3491739, 8.75000, -16.8740,  103.039],
         [28.6590, -32.551949, 6.9598490, 8.80000, -47.3890,  109.817],
@@ -131,3 +130,4 @@ data = {
         [36.5320, -12.264637, 353.12918, 1.38000, -81.8890,  139.260]
     ]
 }
+data = 'bpic.csv'

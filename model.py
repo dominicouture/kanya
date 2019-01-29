@@ -16,6 +16,8 @@ from init import Config, info
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
+print('marmalade')
+
 # Database object definition
 Database = SqliteDatabase(Config.db_path)
 

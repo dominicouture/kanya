@@ -4,9 +4,11 @@
 """ init.py: Imports information from config.py, handles exceptions (type, value, shape), handles
     unit conversions, checks for the presence of output and logs directories and creates them if
     necessary, recursively creates a list of configurations to be executed by the main Traceback
-    algorithm. This script is run first before the rest of the module.
+    algorithm. This script must be run first before the rest of the package.
 """
 
+import numpy as np
+from astropy import units as un
 from time import strftime
 from os import path, makedirs, remove, getcwd, chdir
 from logging import basicConfig, info, warning, INFO
@@ -31,6 +33,13 @@ class Config():
         of groups defines how many objects are in a series in which all groups have the same
         Config object as their progenitor.
     """
+    # Arguments default values
+    default_arguments = {
+        'to_database': False,
+        'from_data': False,
+        'from_simulation': False,
+        'series': None
+    }
 
     # Parameters default values
     default_parameters = {
@@ -52,10 +61,31 @@ class Config():
         'data': None
     }
 
-    def __init__(self, config_path):
+    default_units = {
+        'time': un.Myr,
+        'length': un.pc,
+        'speed': (un.pc/un.Myr),
+        'angle': un.rad,
+        'angular speed': (un.rad/un.Myr)
+    }
+
+    def __init__(self, parameters):
+        """ Initializes a Config object from a configuration file, a Python dictionary or another
+            Config object.
+        """
+        if type(parameters) == str:
+            self.init_from_path(parameters)
+        elif type(parameters) == dict:
+            self.init_from_parameters(parameters)
+        elif type(parameters) == Config:
+            self.init_from_Config(parameters)
+        else:
+            raise TypeError("Config cannot be initialized from '{}'.".format(parameters))
+
+    def init_from_path(self, config_path):
         """ Initializes a Config object from a configuration file located at 'config_path' with
-            all or default values if necessary. Also checks for NameError, TypeError and ValueError
-            exceptions.
+            default values if necessary and arguments in the command line. Also checks for
+            NameError, TypeError and ValueError exceptions.
         """
         # Arguments import
         self.import_arguments()
@@ -73,29 +103,41 @@ class Config():
             spec = spec_from_file_location(path.splitext(config_name)[0], config_path)
             config = module_from_spec(spec)
             spec.loader.exec_module(config)
-        # Creation of the parameters dictionary
+        # Parameters dictionary creation
         for value in self.default_parameters.keys():
             if value in vars(config):
                 vars(self)[value] = vars(config)[value]
             else:
                 vars(self)[value] = self.default_parameters[value]
 
-        # Output directory creation
-        self.output_dir = self.create_directory(
-            path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')),
-                self.output_dir, 'output_dir')
-        # Logs configuration
-        self.configure_logs()
+        # Config configuration
+        self.configure_Config()
 
-        # Database configuration
-        if self.from_database or self.to_database:
-            self.configure_database()
-        # Data configuration
-        if self.from_data:
-            self.configure_data()
-        # Simulation configuration
-        if self.from_simulation:
-            self.configure_simulation()
+    def init_from_parameters(self, parameters):
+        """ Initializes a Config object from a Python dictionary with default values if necessary.
+        """
+        # Arguments import
+        for value in self.default_arguments.keys():
+            if value in parameters:
+                vars(self)[value] = parameters[value]
+            else:
+                vars(self)[value] = self.default_parameters[value]
+        self.from_database = True if not self.from_data and not self.from_simulation else False
+
+        # Parameters dictionary creation
+        for value in self.default_parameters.keys():
+            if value in parameters:
+                vars(self)[value] = parameters[value]
+            else:
+                vars(self)[value] = self.default_parameters[value]
+
+        # Config configuration
+        self.configure_Config()
+
+    def init_from_Config(self, config):
+        """ Creates a copy of a Config object.
+        """
+        vars(self).update(vars(config).copy())
 
     def import_arguments(self):
         """ Parses arguments from the commmand line, creates an arguments object, checks for errors
@@ -124,6 +166,37 @@ class Config():
         self.from_data = args.data
         self.from_simulation = args.simulation
         self.series = args.series
+
+    def configure_Config(self):
+        """ Configures a Config object from database, data or simulation, and creates output and
+            Logs directory if necessary.
+        """
+        # Output directory creation
+        self.output_dir = self.create_directory(
+            path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')),
+                self.output_dir, 'output_dir')
+        # Logs configuration
+        self.configure_logs()
+
+        # Check arguments
+        for argument in ('to_database', 'from_data', 'from_simulation'):
+            if type(vars(self)[argument]) != bool:
+                self.stop("'{}' must be a boolean value ({} given).",
+                    'TypeError', argument, type(vars(self)[argument]))
+        if self.series is None:
+            raise NameError("Required argument 'series' is missing.")
+        if type(self.series) != str:
+            raise TypeError("'series' must be a string ('{}' given).".format(type(self.series)))
+
+        # Database configuration
+        if self.from_database or self.to_database:
+            self.configure_database()
+        # Data configuration
+        if self.from_data:
+            self.configure_data()
+        # Simulation configuration
+        if self.from_simulation:
+            self.configure_simulation()
 
     def create_directory(self, base, directory, name):
         """ Checks for type errors, checks if the directory already exists, creates it if
@@ -167,7 +240,8 @@ class Config():
         """
         # Check if output from and to database
         if self.from_database and self.to_database:
-            info('Output from and to database. The database will not be updated with its own data.')
+            info("Output of '{}' from and to database. "
+                "The database will not be updated with its own data.".format(self.series))
             self.to_database = False
         # Creation or import of database
         if self.db_path is None:
@@ -185,7 +259,7 @@ class Config():
         from model import GroupModel
         if self.from_database:
             # Group names creation
-            info('Output from database.')
+            info("Output of '{}' from database.".format(self.series))
             self.groups = [group.name
                 for group in GroupModel.select().where(GroupModel.series == self.series)]
 
@@ -198,23 +272,21 @@ class Config():
         """ Check if traceback and output from data is possible.
         """
         # General configuration
-        info('Traceback and output from data.')
+        info("Traceback and output of '{}' from data.".format(self.series))
         self.configure_traceback()
 
         # Check if data is present
         if self.data is None:
             self.stop("No data provided for traceback '{}'.", 'NameError', self.series)
 
-        # !!! Add import from Python dictionary or CSV file here !!!
-        # Check if data is of the correct type (python dictionary or path to CSV file)
-        # Selects only the data with the correct series
-        # If no series is specified in data (Python dictionary or CSV file), all data is used.
+        from data import Data
+        self.data_series = Data(self.data, self.series)
 
     def configure_simulation(self):
         """ Check if traceback and output from simulation is possible.
         """
         # General configuration
-        info('Traceback and output from simulation.')
+        info("Traceback and output of '{}' from simulation.".format(self.series))
         self.configure_traceback()
 
         # Check if all the necessary parameters are present
@@ -245,6 +317,9 @@ class Config():
         if not self.age >= 0.0:
             self.stop("'age' must be greater than or equal to 0.0 ({} given).",
                 'ValueError', self.age)
+
+        # !!! Add check for 'avg_position', 'avg_position_error', 'avg_position_scatter', !!!
+        # !!! 'avg_velocity', 'avg_velocity_error' and 'avg_velocity_scatter' here !!!
 
     def configure_traceback(self):
         """ Check configuration parameters for traceback and output from data or simulation.
@@ -305,4 +380,4 @@ class Config():
         """
         message = message.format(*values)
         warning('{}: {}'.format(error, message))
-        exec("raise {}('{}')".format(error, message))
+        exec("""raise {}("{}")""".format(error, message))

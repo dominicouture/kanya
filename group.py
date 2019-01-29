@@ -1,7 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" __main__.py: Defines the Group class and the embeded Star classes. The classes contain the
+""" __main__.py: Defines the Group class and the embeded Star classes. These classes contain the
     information and methods necessary to perform a traceback simulation.
 """
 
@@ -9,7 +9,7 @@ import numpy as np
 from astropy import units as un
 from time import strftime
 from tools import *
-from init import *
+from init import info
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -93,11 +93,10 @@ class Group:
         stars = []
         i = 0
         for star in data[self.name]:
-            equatorial, equatorial_error = observables_equatorial(*star, *avg_position_error, *avg_velocity_error)
+            equatorial, equatorial_error = observables_equatorial(*star, *(0.0, 0.0, 0.0), *(0.0, 0.0, 0.0))
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(*equatorial[:3], *equatorial_error[:3])
             velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(*equatorial[:3], equatorial[3] + 0.5, *equatorial[4:], *equatorial_error)
-            print(velocity_uvw_error)
-            position_xyz = position_xyz + velocity_uvw * (un.km/un.s).to(un.pc/un.Myr) * equatorial[0] / (299792458 * (un.m/un.s).to(un.pc/un.Myr))
+            # position_xyz = position_xyz + velocity_uvw * (un.km/un.s).to(un.pc/un.Myr) * equatorial[0] / (299792458 * (un.m/un.s).to(un.pc/un.Myr))
             stars.append(
                 Star('Star_{}'.format(i), self.time,
                 velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
@@ -112,19 +111,20 @@ class Group:
             scatter. The sample is then moved forward in time for the given age.
         """
         # Velocity conversions from km/s to pc/Myr
-        config.avg_velocity, config.avg_velocity_scatter = np.array((
+        avg_velocity, avg_velocity_scatter = np.array((
             config.avg_velocity, config.avg_velocity_scatter)) * (un.km/un.s).to(un.pc/un.Myr)
         # Star objects creation
         stars = []
         for star in range(1, config.number_of_stars + 1):
             # Picks a velocity and a position based average value and scatter
-            velocity = np.random.normal(
-                np.array(config.avg_velocity), np.array(config.avg_velocity_scatter))
-            position = velocity * config.age + np.random.normal(
+            velocity_xyz = np.random.normal(
+                np.array(avg_velocity), np.array(avg_velocity_scatter))
+            position_xyz = velocity_xyz * config.age + np.random.normal(
                 np.array(config.avg_position), np.array(config.avg_position_scatter))
             # Scrambles the velocity and position based on errors in spherical coordinates
-            velocity_rvμδμα = uvw_to_rvμδμα(*position, * (velocity * (un.pc/un.Myr).to(un.km/un.s)))[0]
-            position_rδα = xyz_to_rδα(*position)[0]
+            velocity_rvμδμα = uvw_to_rvμδμα(*position_xyz, * (velocity_xyz * (un.pc/un.Myr).to(un.km/un.s)))[0]
+            velocity_rvμδμα = velocity_rvμδμα - np.array((5, 0.0, 0.0))
+            position_rδα = xyz_to_rδα(*position_xyz)[0]
             velocity_uvw = rvμδμα_to_uvw(
                 *position_rδα,
                 *np.random.normal(velocity_rvμδμα, np.array(config.avg_velocity_error))
@@ -140,9 +140,9 @@ class Group:
             stars.append(
                 Star(
                     'star_{}'.format(star), self.time,
-                    np.random.normal(velocity, config.avg_velocity_error),
+                    np.random.normal(velocity_xyz, config.avg_velocity_error),
                     np.array(config.avg_velocity_error),
-                    np.random.normal(position, config.avg_position_error),
+                    np.random.normal(position_xyz, config.avg_position_error),
                     np.array(config.avg_position_error)
                 )
             )

@@ -5,7 +5,7 @@
 
         Configuration:  arguments, parameters, data and database import, format and check.
         Traceback: data import or simulation, traceback, scatter calculation.
-        Output: graph creation.
+        Output: figures creation.
 """
 
 __author__ = 'Dominic Couture'

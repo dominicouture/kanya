@@ -38,12 +38,12 @@ def create_scatter_graph(groups, name):
             plt.plot(group.time, group.scatter, '-', color='0.7', linewidth=0.5)
         i += 1
     mean = np.mean([group.scatter for group in groups], axis=0)
-    print(groups[0].time)
-    print(mean)
+    # print(groups[0].time)
+    # print(mean)
     plt.plot(groups[0].time, mean, 'k-', linewidth=2.0)
     ages = [group.scatter_age for group in groups]
     plt.title(
-        'Scatter of β-pictoris over time\nwith measurement errors (rv: + 2.0 km/s). Average age: ({} ± {}) Myr\n'.format(
+        'Scatter of a simulation over time of 1000 groups \nwith measurement errors (rv: - 5 km/s). Average age: ({} ± {}) Myr\n'.format(
             np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
         )
     )
