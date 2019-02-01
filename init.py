@@ -58,7 +58,8 @@ class Config():
         'avg_velocity': None,
         'avg_velocity_error': (0.0, 0.0, 0.0),
         'avg_velocity_scatter': None,
-        'data': None
+        'data': None,
+        'representation': None
     }
 
     default_units = {
@@ -179,10 +180,16 @@ class Config():
         self.configure_logs()
 
         # Check arguments
+        # !!! Add check if arguments are present and compatible value !!!
         for argument in ('to_database', 'from_data', 'from_simulation'):
             if type(vars(self)[argument]) != bool:
                 self.stop("'{}' must be a boolean value ({} given).",
                     'TypeError', argument, type(vars(self)[argument]))
+        # Check if traceback and output from both data and simulation
+        if self.from_data and self.from_simulation:
+            self.stop("Either traceback series '{}' from data or a simulation, not both.",
+                'ValueError', self.series)
+        # Check series name
         if self.series is None:
             raise NameError("Required argument 'series' is missing.")
         if type(self.series) != str:
@@ -279,8 +286,9 @@ class Config():
         if self.data is None:
             self.stop("No data provided for traceback '{}'.", 'NameError', self.series)
 
+        # Data import
         from data import Data
-        self.data_series = Data(self.data, self.series)
+        self.data_series = Data(self.series, self.representation, self.data)
 
     def configure_simulation(self):
         """ Check if traceback and output from simulation is possible.
@@ -324,11 +332,6 @@ class Config():
     def configure_traceback(self):
         """ Check configuration parameters for traceback and output from data or simulation.
         """
-        # Check if traceback and output from both data and simulation
-        if self.from_data and self.from_simulation:
-            self.stop("Either traceback series '{}' from data or a simulation, not both.",
-                'ValueError', self.series)
-
         # Check if all the necessary parameters are present
         for parameter in ('number_of_groups', 'number_of_steps', 'initial_time', 'final_time'):
             if vars(self)[parameter] is None:

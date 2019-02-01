@@ -11,14 +11,15 @@
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Configuration
+# Configuration: configs creation
 from init import *
 config = Config('config.py')
 
-# Traceback
-from group import *
-series = {config.series: Group.create(config)}
-
-# Output
-from output import *
-create_scatter_graph(series[config.series], config.series)
+# # Traceback: series creation
+# from group import *
+# Series(config)
+#
+# # Output
+# from output import *
+# for name in series.keys():
+#     create_scatter_graph(series[name])

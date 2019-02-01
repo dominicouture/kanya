@@ -1,9 +1,9 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" data.py: Defines the Data class, which contains all the information from CSV file or a Python
-    dictionary that can then be used as an input for a Group object and all related methods to
-    check and convert this data.
+""" data.py: Defines the Data and embeded Star classes, which contains all the information from
+    CSV file or a Python dictionary, list, tuple or np.ndarray that can then be used as an input
+    for a Group object and all related methods to check and convert this data.
 """
 
 __author__ = 'Dominic Couture'
@@ -11,18 +11,18 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
 from astropy import units as un
-from time import strftime
 from os import path, getcwd, chdir
 from csv import reader, Sniffer
-from tools import *
 from init import Config, info
+from tools import *
 
-class Data:
+class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.
         Data is converted into a Quantity object and units are converted to default units.
     """
 
     # Position and velocity labels per representation
+    # ??? Move to init.py ???
     representation_labels = {
         'observables': (('p', 'δ', 'α'), ('rv', 'μδ', 'μα_cos_δ')),
         'spherical':   (('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
@@ -90,36 +90,76 @@ class Data:
         'pm': 'μ'
     }
 
-    def __init__(self, data, series):
-        """ Initizalizes a Data object from a CSV file or a Python dictionary.
+    def __init__(self, series, representation, data):
+        """ Initizalizes a Data object from a CSV file or a Python dictionary, list, tuple or
+            np.ndarray. The first row must be a header and the second row may be a units row.
+            If no units row is speficied, default units are used.
         """
         # Series name
         self.series = series
-        # !!! Add check for type and value of self.representation here !!!
-        self.representation = 'observables'
+        # Check representation parameter
+        # ??? Move to init.py ???
+        if representation is None:
+            raise NameError("Required argument 'representation' is missing.")
+        if type(representation) != str:
+            Config.stop(Config, "'representation' must be a string ({} given).", 'TypeError',
+                type(representation))
+        self.representation = representation.lower()
+        if self.representation not in self.representation_labels:
+            Config.stop(Config, "'{}' is not a valid representation value.", 'ValueError',
+                self.representation)
+
         # Initialize from a CSV file
         if type(data) == str:
             self.initialize_from_CSV(data)
-        elif type(data) == dict:
-            self.initialize_from_dictionary(data)
+        # Initialize from data
+        elif type(data) in (dict, list, tuple, np.ndarray):
+            self.initialize_from_data(data)
         else:
-            Config.stop(Config, "'{}' parameter must be a path to CSV file or a Python dictionary"
-                "({} given).", 'TypeError', type(data))
+            Config.stop(Config, "'{}' parameter must be a path to CSV file, or a Python dictionary,"
+                "list, tuple or np.ndarray. ({} given).", 'TypeError', type(data))
 
-    def initialize_from_dictionary(self, data):
-        """ Initializes a Data object from the data 'self.series' in a Python dictionary. If the
-            dictionary is not split into series or group, all data is used.
+        # Data configuration
+        self.configure_data()
+
+    def initialize_from_data(self, data):
+        """ Initializes a Data object from a Python dictionary, list, tuple or np.ndarray (2D). If
+            a dictionary is used, only the value with a key that matches 'self.series' is used and
+            its type must be one of the other 3 possible types. If a list, tuple or np.ndarray is
+            used, all data is imported.
         """
-        # !!! Add import from a Python dictionary here !!!
-        # !!! Selects only the data with the correct series or use all data !!!
-        # !!! Add check for the correct units physical types based on the representation !!!
-        pass
+        self.from_data = True
+        self.from_CSV = False
+        # Data import and group filtering
+        if type(data) == dict:
+            if self.series in data.keys():
+                if type(data[self.series]) in (list, tuple, np.ndarray):
+                    self.data = np.array(data[self.series], dtype=object)
+                else:
+                    Config.stop(Config, "Data '{}' in the Python dictionary must be a list, tuple"
+                        "or np.ndarray. ('{}' given).", 'TypeError',
+                        self.series, type(data[self.series]))
+            else:
+                Config.stop(Config, "Group '{}' is not in the data dictionary.",
+                    'ValueError', self.series)
+        if type(data) in (list, tuple, np.ndarray):
+            self.data = np.array(data, dtype=object)
 
+        # Check if self.data is a 2D array
+        if self.data.ndim != 2:
+            Config.stop(Config, "'data' must be a 2D array ({} dimensions in the given data).",
+                'ValueError', self.data.ndim)
+
+        # String conversion
+        self.data = np.vectorize(lambda x: str(x))(self.data)
 
     def initialize_from_CSV(self, data):
         """ Initializes a Data object from the data 'self.series' in a CSV file. If the the CSV
-            file doesn't specify a series or group column, all data is used.
+            file doesn't specify a series or group column, all data is used. The file name must
+            have a '.csv' extension.
         """
+        self.from_CSV = True
+        self.from_data = False
         # CSV file absolute path
         working_dir = getcwd()
         chdir(path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')))
@@ -130,7 +170,7 @@ class Data:
             Config.stop(Config, "'{}' does not exist.", 'NameError', self.data_path)
         # Check if the path links to a CSV file.
         if path.splitext(self.data_path)[1] != '.csv':
-            Config.stop(Config, "'{}' is not a CSV file.", 'TypeError', self.data_path)
+            Config.stop(Config, "'{}' is not a CSV data file.", 'TypeError', self.data_path)
 
         # Reading of CSV file.
         data_csv = open(self.data_path, 'r')
@@ -141,11 +181,19 @@ class Data:
             Config.stop(Config, "The CSV data file located at '{}' doesn't have a header.",
                 'ValueError', self.data_path)
         data_csv.seek(0)
-        self.data_array = np.array([row for row in reader(data_csv, dialect)], dtype=object)
+        # Data import
+        self.data = np.array([row for row in reader(data_csv, dialect)], dtype=object)
         data_csv.close()
 
+    def configure_data(self):
+        """ Configures data in a np.ndarray. Headers, columns, errors units and lines
+            identification. If no errors are specified, errors are set to 0.0 and if no units are
+            specified, default units are used. The first row must be a header and the second row
+            is an can be used as a units row. A star object is then created from each line.
+        """
+
         # Header identification
-        self.header = np.array([label.lower() for label in self.data_array[0]], dtype=object)
+        self.header = np.array([label.lower() for label in self.data[0]], dtype=object)
 
         # Columns identification
         self.columns = {}
@@ -168,19 +216,26 @@ class Data:
             label: self.names[label] for label in self.position_labels + self.velocity_labels}
         for label in self.value_labels.keys():
             if label not in self.columns.keys():
-                Config.stop(Config, "The column '{}' ('{}') is missing from the CSV data file "
-                    "located at '{}'.", 'NameError', self.value_labels[label], label, self.data_path)
+                if self.from_CSV:
+                    Config.stop(Config, "The column '{}' ('{}') is missing "
+                        "from the CSV data file located at '{}'.", 'NameError',
+                        self.value_labels[label], label, self.data_path)
+                if self.from_data:
+                    Config.stop(Config, "The column '{}' ('{}') is missing from the data.",
+                        'NameError', self.value_labels[label], label)
 
         # Error labels identification
         self.position_error_labels = tuple('Δ' + label for label in self.position_labels)
         self.velocity_error_labels = tuple('Δ' + label for label in self.velocity_labels)
-        self.error_labels = {'Δ' + label: name + ' error' for label, name in self.value_labels.items()}
+        self.error_labels = {
+            'Δ' + label: name + ' error' for label, name in self.value_labels.items()}
         for label, name in self.error_labels.items():
             self.physical_types[label] = self.physical_types[label[1:]]
         self.labels = {**self.value_labels, **self.error_labels}
 
         # Units header identification
-        self.units_header = np.array([label.lower() for label in self.data_array[1]], dtype=object)
+        self.units_header = np.array([label.lower() for label in self.data[1]], dtype=object)
+        print(self.units_header)
         # Check if there is a units header below the labels header
         for label in self.value_labels.keys():
             if self.units_header[self.columns[label]].replace('.', '').replace(',', '').isdigit():
@@ -195,34 +250,46 @@ class Data:
                 try:
                     self.units[label] = un.Unit(self.units_header[self.columns[label]])
                 except ValueError:
-                    Config.stop(Config, "Unit '{}' used for column '{}' is not a invalid.",
-                        'ValueError',
-                        self.units_header[self.columns[label]],
+                    Config.stop(Config, "Unit '{}' used for column '{}' is not valid.",
+                        'ValueError', self.units_header[self.columns[label]],
                         self.header(self.columns[label]))
             else:
                 self.units[label] = Config.default_units[self.physical_types[label]]
-        # !!! Add check for the correct units physical types based on the representation !!!
+        # Check for units physical types
+        for label in self.columns.keys():
+            if label in self.labels and self.units[label].physical_type != self.physical_types[label]:
+                    Config.stop(Config, "The unit used for the '{}' ('{}') column, '{}', has an "
+                        "incorrect physical type ('{}' required, '{}' given)", 'ValueError',
+                        self.names[label], label, str(self.units[label]),
+                        self.physical_types[label], self.units[label].physical_type)
 
         # Lines identification and group filtering
         if 'group' in self.columns:
             self.lines = []
-            for line in range(1 if self.units_header is None else 2, self.data_array.shape[0]):
-                if self.data_array[self.columns['group'], line] == self.series:
+            for line in range(1 if self.units_header is None else 2, self.data.shape[0]):
+                if self.data[self.columns['group'], line] == self.series:
                     self.lines.append(i)
+            if len(self.lines) == 0:
+                if self.from_CSV:
+                    Config.stop(Config, "No data for the group '{}' in the CSV data file located"
+                        "at '{}'.", 'ValueError', self.series, self.data_path)
+                if self.from_data:
+                    Config.stop(Config, "No information for the group '{}' in the data.",
+                        'ValueError', self.series, self.data_path)
         else:
             self.lines = list(
-                range(1 if self.units_header is None else 2, self.data_array.shape[0]))
+                range(1 if self.units_header is None else 2, self.data.shape[0]))
 
         # Star objects creation
         i = 1
-        self.stars = []
         for line in self.lines:
-            self.stars.append(self.Star(self, i,
-                {label: self.data_array[line, column] for label, column in self.columns.items()}))
+            self.append(self.Star(self, i,
+                {label: self.data[line, column] for label, column in self.columns.items()}))
             i += 1
 
     class Star:
-        """ Contains the data for an individual star.
+        """ Contains the data for an individual star, including name, type, id, position and
+            velocity.
         """
 
         def __init__(self, data, i, line):
@@ -269,5 +336,3 @@ class Data:
                 tuple(data.units[label] for label in data.velocity_labels),
                 tuple(line[label] for label in data.velocity_error_labels)
             )
-
-            print(self.name, ':', self.type, self.id, self.position, self.velocity)

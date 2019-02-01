@@ -31,7 +31,7 @@ velocity_units = ('km/s', 'km/s', 'km/s') # ('km/s', 'mas/yr', 'mas/yr')
 
 # Traceback parameters (used in simulation or data)
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups = 1000
+number_of_groups = 10
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 number_of_steps = 200
@@ -74,10 +74,17 @@ avg_velocity_error = (1.0112, 0.30754, 0.26432)
 avg_velocity_scatter = (1.382, 1.382, 1.382)
 # avg_velocity_scatter = (2.2, 1.2, 1.0)
 
+# Representation of the data (e.g. 'observables', 'spherical', 'cartesian')
+representation = 'observables'
+
+# Coordinates system of the data (e.g. 'equatorial', 'galactic')
+system = 'equatorial'
 
 # Path to CSV data file or Python dictionary with data.
-data = {
-    'beta_pictoris_1': [
+data = 'bpic.csv'
+
+data =  {'beta_pictoris': [
+        [    'p',        'δ',       'α',    'rv',     'μδ',     'μα'],
         [25.0250, -23.107737, 1.7091324, 6.50000, -47.1210,  96.7760],
         [27.1700, -66.753496, 4.3491739, 8.75000, -16.8740,  103.039],
         [28.6590, -32.551949, 6.9598490, 8.80000, -47.3890,  109.817],
@@ -128,6 +135,4 @@ data = {
         [47.9420, -33.250998, 341.24241, 1.10000, -123.103,  179.904],
         [28.6070, -2.7445471, 352.93747, -5.4400, -71.9370,  94.1380],
         [36.5320, -12.264637, 353.12918, 1.38000, -81.8890,  139.260]
-    ]
-}
-data = 'bpic.csv'
+]}

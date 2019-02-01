@@ -14,6 +14,29 @@ from init import info
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
+class Series(list):
+    """ Contains a series of Groups and their embedded Star objects and the methods requiered to
+        initialize a series from a Config object.
+    """
+    def __init__(self, config):
+        """ Initializes a series of Groups from a Config object and updates a 'series' dictionary
+            in __main__ with itself. This dictionary is created if necessary (e.i. if this is the
+            first Series object to be created).
+        """
+        # Group objects creation
+        self.name = config.series
+        for name in config.groups:
+            message = 'Tracing back {}.'.format(name.replace('_', ' '))
+            info(message)
+            print(message)
+            self.append(Group(name, config))
+
+        # 'series' dictionary creation and update with self
+        import __main__ as main
+        if 'series' not in vars(main):
+            vars(main)['series'] = {}
+        main.series.update({self.name: self})
+
 class Group:
     """ Contains the values and related methods of a moving group and a list of Star objets that
         are part of it. Data can be obtained from the database or calculated from a raw data file.
@@ -95,7 +118,8 @@ class Group:
         for star in data[self.name]:
             equatorial, equatorial_error = observables_equatorial(*star, *(0.0, 0.0, 0.0), *(0.0, 0.0, 0.0))
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(*equatorial[:3], *equatorial_error[:3])
-            velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(*equatorial[:3], equatorial[3] + 0.5, *equatorial[4:], *equatorial_error)
+            velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(*equatorial[:3], equatorial[3], *equatorial[4:], *equatorial_error)
+            print(position_xyz.tolist() + velocity_uvw.tolist())
             # position_xyz = position_xyz + velocity_uvw * (un.km/un.s).to(un.pc/un.Myr) * equatorial[0] / (299792458 * (un.m/un.s).to(un.pc/un.Myr))
             stars.append(
                 Star('Star_{}'.format(i), self.time,
@@ -123,7 +147,7 @@ class Group:
                 np.array(config.avg_position), np.array(config.avg_position_scatter))
             # Scrambles the velocity and position based on errors in spherical coordinates
             velocity_rvμδμα = uvw_to_rvμδμα(*position_xyz, * (velocity_xyz * (un.pc/un.Myr).to(un.km/un.s)))[0]
-            velocity_rvμδμα = velocity_rvμδμα - np.array((5, 0.0, 0.0))
+            # velocity_rvμδμα = velocity_rvμδμα - np.array((5, 0.0, 0.0))
             position_rδα = xyz_to_rδα(*position_xyz)[0]
             velocity_uvw = rvμδμα_to_uvw(
                 *position_rδα,
@@ -162,17 +186,7 @@ class Group:
         self.scatter_error = np.sum(
             (self.scatter_xyz * self.scatter_xyz_error)**2, axis=1)**0.5 / self.scatter
 
-    def create(config):
-        """ Creates a series of groups in a dictionary from a config object.
-        """
-        groups = []
-        for name in config.groups:
-            message = 'Tracing back {}.'.format(name.replace('_', ' '))
-            info(message)
-            print(message)
-            groups.append(Group(name, config))
-        return groups
-
+# ??? Make it a subclass of group ???
 class Star:
     """ Contains the values and related methods of a star.
     """
