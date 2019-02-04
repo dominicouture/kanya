@@ -10,6 +10,9 @@ from astropy import units as un
 from math import cos, sin, asin, atan2, pi as π, degrees, radians
 from init import info
 
+__author__ = 'Dominic Couture'
+__email__ = 'dominic.couture.1@umontreal.ca'
+
 class Coordinates:
     """ Contains the values and related methods of coordinates, including its position, velocity,
         their errors and units, in both cartesian and spherical coordinates systems, as well as
@@ -330,7 +333,7 @@ def galactic_equatorial_rvμδμα(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δ�
         r, δ, α, rv, μδ, μα, Δr, Δδ, Δα, Δrv, Δμδ, Δμα)
     return uvw_to_rvμδμα(*position_values, *velocity_values, *position_errors, *velocity_errors)
 
-def observables_equatorial(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα_cos_δ=0):
+def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα_cos_δ=0):
     """ Converts observations (paralax (p; mas), declination (δ, DEC; deg) and right ascension
         (α, RA; deg)), radial velocity (rv; km/s), declination proper motion (µδ; mas/yr) and
         and right ascension proper motion * cos(δ) (μα_cos_δ; mas/yr)) into equatorial spherical
@@ -342,16 +345,17 @@ def observables_equatorial(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα
     cos_δ = cos(radians(δ))
 
     # Values calculation
-    values = np.array((un.arcsec.to(un.mas) / p, δ, α, rv, μδ, μα_cos_δ / cos_δ))
+    position = np.array((un.arcsec.to(un.mas) / p, δ, α))
+    velocity = np.array((rv, μδ, μα_cos_δ / cos_δ))
 
     # Errors calculation
     if not np.array((Δp, Δδ, Δα, Δrv, Δμδ, Δμα_cos_δ)).any():
-        return values, np.zeros(6)
+        return position, velocity, np.zeros(3), np.zeros(3)
     else:
-        return values, np.array(
-            (Δp * un.arcsec.to(un.mas) / p**2, Δδ, Δα, Δrv, Δμδ, Δμα_cos_δ / cos_δ))
+        return position, velocity, np.array((Δp * un.arcsec.to(un.mas) / p**2, Δδ, Δα)), \
+            np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ))
 
-def equatorial_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
+def spherical_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
     """ Converts equatorial spherical coordinates (distance (r; pc), declination (δ, DEC; deg)
         and right ascension (α, RA; deg)), radial velocity (rv; km/s), declination proper motion
         (µδ; mas/yr) and right ascension proper motion (μα_cos_δ; mas/yr)) into observations
@@ -363,11 +367,12 @@ def equatorial_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δr
     cos_δ = cos(radians(δ))
 
     # Values calculation
-    values = np.array((un.arcsec.to(un.mas) / r, δ, α, rv, μδ, μα * cos_δ))
+    position = np.array((un.arcsec.to(un.mas) / r, δ, α))
+    velocity = np.array((rv, μδ, μα * cos_δ))
 
     # Errors calculation
     if not np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα)).any():
-        return values, np.zeros(6)
+        return position, velocity, np.zeros(3), np.zeros(3)
     else:
-        return values, np.array(
-            (Δr * (un.arcsec.to(un.mas) / r**2, Δδ, Δα, Δrv, Δμδ, Δμα * cos_δ)))
+        return position, velocity, np.array((Δr * un.arcsec.to(un.mas) / r**2, Δδ, Δα)), \
+            np.array((Δrv, Δμδ, ((Δμα / μα)**2 + (Δδ / δ)**2)**0.5 * μα * cos_δ))

@@ -26,24 +26,24 @@ def create_graph(x, y):
     plt.title('Scatter of a moving group over time\n')
     plt.savefig(path.join(output_dir, 'Scatter of a moving group over time.pdf'))
 
-def create_scatter_graph(groups, name):
+def create_scatter_graph(series):
     """ Creates a graph of scatter over time.
     """
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     i = 0
-    plot_i = np.arange(0, len(groups), 20)
-    for group in groups:
+    plot_i = np.arange(0, len(series), 20)
+    for group in series:
         if i in plot_i:
             plt.plot(group.time, group.scatter, '-', color='0.7', linewidth=0.5)
         i += 1
-    mean = np.mean([group.scatter for group in groups], axis=0)
-    # print(groups[0].time)
+    mean = np.mean([group.scatter for group in series], axis=0)
+    # print(series[0].time)
     # print(mean)
-    plt.plot(groups[0].time, mean, 'k-', linewidth=2.0)
-    ages = [group.scatter_age for group in groups]
+    plt.plot(series[0].time, mean, 'k-', linewidth=2.0)
+    ages = [group.scatter_age for group in series]
     plt.title(
-        'Scatter of a simulation over time of 1000 groups \nwith measurement errors (rv: - 5 km/s). Average age: ({} ± {}) Myr\n'.format(
+        'Scatter of a simulation over time of 1000 groups \nwith measurement errors (rv: + 0 km/s). Average age: ({} ± {}) Myr\n'.format(
             np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
         )
     )
@@ -52,7 +52,7 @@ def create_scatter_graph(groups, name):
 #    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
 #    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 #    plt.xlim(14, 34)
-#    plt.savefig(path.join(output_dir, '{}.pdf'.format(name)))
+#    plt.savefig(path.join(output_dir, '{}.pdf'.format(series.name)))
     plt.show()
 
 def create_scatter_graph2(groups):

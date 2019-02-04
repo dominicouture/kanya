@@ -16,8 +16,6 @@ from init import Config, info
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-print('marmalade')
-
 # Database object definition
 Database = SqliteDatabase(Config.db_path)
 
@@ -39,7 +37,7 @@ class GroupModel(BaseModel):
     """
     # Group parameters
     name = CharField(verbose_name='Name', unique=True)
-    series = CharField(verbose_name='Series')
+    series_name = CharField(verbose_name='Series')
     date = DateField(verbose_name='Date', default=strftime('%Y-%m-%d %H:%M:%S'))
     initial_time = FloatField(verbose_name='Initial Time', default=0.0)
     final_time = FloatField(verbose_name='Final Time', default=1.0)
@@ -47,20 +45,27 @@ class GroupModel(BaseModel):
     number_of_steps = IntegerField(verbose_name='Number of Steps', default=1)
     timestep = FloatField(verbose_name='Timestep', default=1.0)
     time = ArrayField(verbose_name='Time', default=np.array([]))
+
     # Star parameters
     number_of_stars = IntegerField(verbose_name='Number of Stars', default=0)
+
+    # Average velocity
     avg_velocity = ArrayField(verbose_name='Average Velocity', default=np.zeros((1, 3)))
     avg_velocity_error = ArrayField(
         verbose_name='Average Velocity Error', default=np.zeros((1, 3)))
+
+    # Barycenter
     barycenter = ArrayField(verbose_name='Barycenter', default=np.zeros((1, 3)))
     barycenter_error = ArrayField(verbose_name='Barycenter Error', default=np.zeros((1, 3)))
-    # Scatter parameters
+
+    # Scatter
     scatter_xyz = ArrayField(verbose_name='Scatter XYZ', default=np.zeros((1, 3)))
     scatter_xyz_error = ArrayField(verbose_name='Scatter XYZ Error', default=np.zeros((1, 3)))
     scatter = ArrayField(verbose_name='Scatter', default=np.zeros(1))
     scatter_error = ArrayField(verbose_name='Scatter Error', default=np.zeros(1))
     scatter_age = FloatField(verbose_name='Scatter Age', default=0.0)
     scatter_age_error = FloatField(verbose_name='Scatter Age Error', default=0.0)
+
     # Minimum spanning tree parameters
     minimum_spanning_tree = ArrayField(verbose_name='Minimum Spanning Tree', default=np.zeros(1))
     minimum_spanning_tree_error = ArrayField(
@@ -74,15 +79,18 @@ class GroupModel(BaseModel):
     def initialize_from_database(self, group, model):
         """ Initializes Group object from an existing entry in the database.
         """
+        # Group parameters retrival
         database_values = vars(model)['_data']
         del database_values['id']
         vars(group).update(database_values)
-        group.stars = [StarModel.initialize_from_database(StarModel, group, star)
-            for star in StarModel.select().where(StarModel.group == model)]
+
+        # Stars creation
+        for star in StarModel.select().where(StarModel.group == model):
+            StarModel.initialize_from_database(StarModel, group, star)
 
     def save_to_database(self, group):
-        """ Saves all parameters to the database, including all Star objects within the Group object.
-            Previous entries are deleted if necessary and new entries are added.
+        """ Saves all parameters to the database, including all Star objects within the Group
+            object. Previous entries are deleted if necessary and new entries are added.
         """
         # Previous GroupModel and StarModel entries deletion
         group.model.delete_instance(recursive=True)
@@ -97,21 +105,24 @@ class GroupModel(BaseModel):
         group.model = self.create(**group_values)
 
         # StarModel entries creation
-        for star in group.stars:
-            StarModel.save_to_database(StarModel, star, group.model)
+        for star in group:
+            StarModel.save_to_database(StarModel, star)
 
 class StarModel(BaseModel):
     """ Time-independent and time-dependent (ArrayField) parameters of a star in a local group.
         Distances are in pc and velocities in pc/Myr.
     """
+    # Star parameters
     group = ForeignKeyField(GroupModel)
-    # Time-independent parameters
     name = CharField(verbose_name='Name')
+
+    # Velocity and position
     velocity = ArrayField(verbose_name='Velocity')
     velocity_error = ArrayField(verbose_name='Velocity Error')
-    # Time-dependent parameters
     position = ArrayField(verbose_name='Position')
     position_error = ArrayField(verbose_name='Position Error')
+
+    # Relative position and distance
     relative_position = ArrayField(verbose_name='Relative Position')
     relative_position_error = ArrayField(verbose_name='Relative Position Error')
     distance = ArrayField(verbose_name='Distance')
@@ -120,17 +131,18 @@ class StarModel(BaseModel):
     def initialize_from_database(self, group, model):
         """ Initializes Star object from an existing instance in the database.
         """
-        from group import Star
-        star = Star(group=group)
+        # Star parameters retrieval
         database_values = vars(model)['_data']
         del database_values['id']
-        vars(star).update(database_values)
-        return star
+        group.append(group.Star(group, **database_values))
 
-    def save_to_database(self, star, group):
+    def save_to_database(self, star):
         """ Saves all parameters to the database in a new StarModel entry.
         """
-        self.create(group=group, **vars(star))
+        # StarModel entry creation
+        star_values = vars(star).copy()
+        del star_values['group']
+        self.create(group=star.group.model, **vars(star))
 
 # GroupModel and StarModel tables creation if they don't already exists.
 GroupModel.create_table(fail_silently=True)
