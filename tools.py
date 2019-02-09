@@ -8,7 +8,7 @@
 import numpy as np
 from astropy import units as un
 from math import cos, sin, asin, atan2, pi as π, degrees, radians
-from init import info
+from series import info
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'

@@ -56,8 +56,8 @@ avg_position = (0.0, 0.0, 0.0)
 # avg_position = (258.0, 258.0, 258.0)
 
 # Average measurment error on the position of the simulated sample of stars (mas, mas, mas)
-# avg_position_error = (0.19846, 0.0, 0.0)
-avg_position_error = (0.3, 0.0, 0.0)
+avg_position_error = (0.19846, 0.0, 0.0)
+# avg_position_error = (0.0, 0.0, 0.0)
 
 # Average position scatter of the simulated sample of stars (pc, pc, pc)
 avg_position_scatter = (5.0, 5.0, 5.0)
@@ -75,11 +75,11 @@ avg_velocity_error = (1.0112, 0.30754, 0.26432)
 avg_velocity_scatter = (1.382, 1.382, 1.382)
 # avg_velocity_scatter = (2.2, 1.2, 1.0)
 
-# Representation of the data (e.g. 'observables', 'spherical', 'cartesian')
-representation = 'observables'
+# Coordinate system (e.g. 'observables', 'spherical', 'cartesian')
+system = 'observables'
 
-# Coordinates system of the data (e.g. 'equatorial', 'galactic')
-system = 'equatorial'
+# Axis of the coordinate system (e.g. 'equatorial', 'galactic')
+axis = 'equatorial'
 
 # Path to CSV data file or Python dictionary with data.
 data = 'bpic.csv'

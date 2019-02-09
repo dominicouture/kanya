@@ -9,7 +9,7 @@ from matplotlib import rcParams, pyplot as plt
 from scipy.interpolate import griddata
 from time import strftime
 from os import path
-from init import info
+from series import info
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -35,20 +35,23 @@ def create_scatter_graph(series):
     plot_i = np.arange(0, len(series), 20)
     for group in series:
         if i in plot_i:
-            plt.plot(group.time, group.scatter, '-', color='0.7', linewidth=0.5)
+            plt.plot(series.time, group.mad, '-', color='0.7', linewidth=0.5)
         i += 1
-    mean = np.mean([group.scatter for group in series], axis=0)
+    mean = np.mean([group.mad for group in series], axis=0)
     # print(series[0].time)
     # print(mean)
-    plt.plot(series[0].time, mean, 'k-', linewidth=2.0)
-    ages = [group.scatter_age for group in series]
+    plt.plot(series.time, mean, 'k-', linewidth=2.0)
+    ages = [group.mad_age for group in series]
+    # plt.title(
+    #     'Scatter of a simulation over time of 1000 groups \n"
+    #     "with measurement errors (rv: + 1.0 km/s). Average age: ({} ± {}) Myr\n'.format(
+    #         np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
     plt.title(
-        'Scatter of a simulation over time of 1000 groups \nwith measurement errors (rv: + 0 km/s). Average age: ({} ± {}) Myr\n'.format(
-            np.round(np.mean(ages), 3), np.round(np.std(ages), 3)
-        )
-    )
+        "Median absolute deviation (MAD) of beta-pictoris\n"
+        "over time. Average age: ({} ± {}) Myr.\n".format(
+            np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
     plt.xlabel('Time (Myr)')
-    plt.ylabel('Scatter (pc)')
+    plt.ylabel('MAD (pc)')
 #    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
 #    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 #    plt.xlim(14, 34)

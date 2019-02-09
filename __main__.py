@@ -3,22 +3,24 @@
 
 """ __main__.py: Main pipeline of the Traceback algorithm. It executes the following steps:
 
-        Configuration:  arguments, parameters, data and database import, format and check.
-        Traceback: data import or simulation, traceback, scatter calculation.
-        Output: figures creation.
+        Series configuration:  arguments, parameters, data and database import, format and check.
+        Group creation: data import or simulation, traceback, scatter calculation.
+        Output export: figures creation.
 """
+
+from init import *
+from series import *
+from output import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Configuration
-from init import *
+# Series configuration
 Series(Config('config.py', args=True))
 
-# Traceback
-groups.traceback()
+# Groups creation
+groups.create()
 
-# Output
-from output import *
-for series in groups.keys():
-    create_scatter_graph(groups[series])
+# Output export
+for name, series in groups.items():
+    create_scatter_graph(series)

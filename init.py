@@ -1,17 +1,13 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" init.py: Imports information from config.py, handles exceptions (type, value, shape), handles
-    unit conversions, checks for the presence of output and logs directories and creates them if
-    necessary, recursively creates a list of configurations to be executed by the main Traceback
-    algorithm. This script must be run first before the rest of the package.
+""" init.py: Imports information from config.py, command line arguments and parameters into a
+    Config object. This script must be run first to create a Series object. It also defines
+    variables and their default units and values.
 """
 
-import numpy as np
 from astropy import units as un
-from time import strftime
-from os import path, makedirs, remove, getcwd, chdir
-from logging import basicConfig, info, warning, INFO
+from os import path
 from importlib.util import spec_from_file_location, module_from_spec
 from argparse import ArgumentParser
 
@@ -21,11 +17,14 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 class Config():
     """ Contains the parameters imported from a 'config.py' file (which must be a Python file), a
         dictionary of values or another Config objects, and related methods and a dictionary of
-        default values.
+        default values. A config object can then be used as the input of a Series object. The
+        default units are:
 
-        A config object can then be used as the input of a series of Group objects. The number
-        of groups defines how many objects are in a series in which all groups have the same
-        Config object as their progenitor.
+            time: million year (Myr)
+            position: parsec (pc)
+            velocity: parsec per million year (pc/Myr)
+            angle: radian (rad)
+            angular velocity: (rad/Myr)
     """
     # Parameters default values
     default_parameters = {
@@ -48,11 +47,49 @@ class Config():
         'avg_velocity': None,
         'avg_velocity_error': (0.0, 0.0, 0.0),
         'avg_velocity_scatter': None,
-        'data': None,
-        'representation': None,
-        'system': None
+        'system': None,
+        'axis': None,
+        'data': None
     }
 
+    # !!! Label names, physical types and Coordinate system labels should create error label automatically instead of line 180 to 182 in data.py. !!!
+    # Label names
+    names = {
+        'r': 'distance',
+        'p': 'paralax',
+        'δ': 'declination',
+        'α': 'right ascension',
+        'rv': 'radial velocity',
+        'μδ': 'declination proper motion',
+        'μα': 'right ascension proper motion',
+        'μα_cos_δ': 'right ascension proper motion * cos(declination)',
+        'x': 'x position',
+        'y': 'y position',
+        'z': 'z position',
+        'u': 'u velocity',
+        'v': 'v velocity',
+        'w': 'w velocity'
+    }
+
+    # Label physical types
+    physical_types = {
+        'r': 'length',
+        'p': 'angle',
+        'δ': 'angle',
+        'α': 'angle',
+        'rv': 'speed',
+        'μδ': 'angular speed',
+        'μα': 'angular speed',
+        'μα_cos_δ': 'angular speed',
+        'x': 'length',
+        'y': 'length',
+        'z': 'length',
+        'u': 'speed',
+        'v': 'speed',
+        'w': 'speed'
+    }
+
+    # Default units: speed and angular speed must match time, lengh and angle values
     default_units = {
         'time': un.Myr,
         'length': un.pc,
@@ -61,11 +98,25 @@ class Config():
         'angular speed': (un.rad/un.Myr)
     }
 
+    # Coordinates system labels
+    systems = {
+        'observables': (('p', 'δ', 'α'), ('rv', 'μδ', 'μα_cos_δ')),
+        'spherical':   (('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
+        'cartesian':   (('x', 'y', 'z'), ('u', 'v', 'w'))
+    }
+
+    # Coordinate system axis
+    axis = [
+        'equatorial',
+        'cartesian'
+    ]
+
     def __init__(self, path=None, args=False, **parameters):
         """ Initializes a Config object from a configuration file, command line arguments and
-            parameters, in that order. 'path' must be a string and 'args' a boolean value. Only
-            values that match a key in self.default_parameters are used. If no value are given
-            the default parameter is used instead.
+            parameters, in that order. 'path' must be a string and 'args' a boolean value that
+            causes arguments in command line to be imported if true. Only values that match a
+            key in self.default_parameters are used. If no value are given the default parameter
+            is used instead.
         """
         # Parameters import
         if path is not None:
@@ -82,7 +133,8 @@ class Config():
 
     def initialize_from_path(self, config_path):
         """ Initializes a Config object from a configuration file located at 'config_path', and
-            checks for NameError, TypeError and ValueError exceptions.
+            checks for NameError, TypeError and ValueError exceptions. 'config_path' can be an
+            absolute path or relative to the current working directory.
         """
         # Check the type of config_path
         if type(config_path) != str:
@@ -154,277 +206,14 @@ class Config():
         """
         return Config(vars(config).copy())
 
-class Series(list):
-    """ Contains a series of Groups and their embedded Star objects and the methods required to
-        initialize a series from a Config object. Values and data in the Config object are,
-        copied, checked and converted into Quantity objects and default units:
-
-            time: million year (Myr)
-            position: parsec (pc)
-            velocity: parsec per million year (pc/Myr)
-            angle: radian (rad)
-            angular velocity: (rad/Myr)
+class Variable():
+    """ Defines the parameters of a variable.
     """
+    def __init_(self, name, value, unit, type, error):
+        pass
 
-    def __init__(self, config):
-        """ Configures a Config object from database, data or simulation, and creates output and
-            Logs directory if necessary.
-        """
-        # Copy of config values
-        vars(self).update(vars(config).copy())
 
-        # Check 'name' parameter
-        if self.name is None:
-            raise NameError("Required parameter 'name' is missing.")
-        if type(self.name) != str:
-            raise TypeError("'name' must be a string ('{}' given).".format(type(self.name)))
-
-        # Output directory creation
-        self.output_dir = self.create_directory(
-            path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')),
-                self.output_dir, 'output_dir')
-
-        # Logs configuration
-        self.configure_logs()
-
-        # Check mode
-        for argument in ('to_database', 'from_data', 'from_simulation'):
-            if type(vars(self)[argument]) != bool:
-                self.stop("'{}' must be a boolean value ({} given).",
-                    'TypeError', argument, type(vars(self)[argument]))
-        # Check if traceback and output from both data and simulation
-        if self.from_data and self.from_simulation:
-            self.stop("Either traceback series '{}' from data or a simulation, not both.",
-                'ValueError', self.name)
-        # Set 'from_database' parameter
-        self.from_database = True if not self.from_data and not self.from_simulation else False
-        if self.from_database and self.to_database:
-            info("Output of '{}' from and to database. "
-                "The database will not be updated with its own data.".format(self.name))
-            self.to_database = False
-
-        # Database configuration
-        if self.from_database or self.to_database:
-            self.configure_database()
-
-        # Traceback configuration
-        if self.from_data or self.from_simulation:
-            self.configure_traceback()
-            # Data configuration
-            if self.from_data:
-                self.configure_data()
-            # Simulation configuration
-            if self.from_simulation:
-                self.configure_simulation()
-
-        # groups dictionary creation if necessary
-        import __main__ as main
-        if 'name' not in vars(main):
-            vars(main)['groups'] = Groups()
-        # Preivous entry deleted if it already exists
-        elif self.name in main.groups.keys():
-            info("Existing series '{}' deleted and replaced.".format(self.name))
-        # Self addition to groups dictionary
-        main.groups[self.name] = self
-        info("Series '{}' ready for traceback.".format(self.name))
-
-    def configure_logs(self):
-        """ Checks if the logs directory already exists, creates it if necessary and configures
-            the Logs file. 'logs_dir' is redefined as the absolution logs directory
-        """
-        # Logs directory creation
-        self.logs_dir = self.create_directory(self.output_dir, self.logs_dir, 'logs_dir')
-
-        # Logs configuration
-        basicConfig(
-            filename=path.join(
-                self.logs_dir, '{}_{}.log'.format(self.name, strftime('%Y-%m-%d_%H-%M-%S'))),
-            format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
-
-    def configure_database(self):
-        """ Checks if the database directory and the database file itself exist and creates them
-            if necessary. 'database_path' is redefined as the absolute path. The database Model
-            is initiated and errors handled based on whether the input or output from and to the
-            database is required.
-        """
-        # Creation or import of database
-        if self.db_path is None:
-            self.db_path = '{}.db'.format(self.name)
-        self.db_name = '{}.db'.format(self.name) if path.basename(self.db_path) == '' \
-            else path.basename(self.db_path)
-        self.db_dir = self.create_directory(self.output_dir, path.dirname(self.db_path), 'db_path')
-        self.db_path = path.join(self.db_dir, self.db_name) # Absolute path
-        # Check if a database exists
-        if self.from_database and not path.exists(self.db_path):
-            self.stop("No existing database located at '{}'.", 'NameError', self.db_path)
-
-        # Check if output from database is possible
-        Config.db_path = self.db_path # Necessary for Database object definition
-        from model import GroupModel
-        if self.from_database:
-            # Group names creation
-            info("Output of '{}' from database.".format(self.name))
-            self.groups = [group.name
-                for group in GroupModel.select().where(GroupModel.series == self.name)]
-
-            # Check if data is present in the database
-            if len(self.groups) == 0:
-                self.stop("No existing series '{}' in the database '{}'.",
-                    'ValueError', self.name, self.db_name)
-
-    def configure_traceback(self):
-        """ Check configuration parameters for traceback and output from data or simulation.
-        """
-        # Check if all the necessary parameters are present
-        for parameter in ('number_of_groups', 'number_of_steps', 'initial_time', 'final_time'):
-            if vars(self)[parameter] is None:
-                self.stop("Required traceback parameter '{}' is missing in the configuration.",
-                    'NameError', parameter)
-
-        # Check number_of_groups parameter
-        if type(self.number_of_groups) not in (int, float):
-            self.stop("'number_of_groups' must be an integer or a float ({} given).",
-                'TypeError', type(self.number_of_groups))
-        if self.number_of_groups % 1 != 0:
-            self.stop("'number_of_groups' must be convertible to an integer ({} given).",
-                'ValueError', self.number_of_groups)
-        if not self.number_of_groups > 0:
-            self.stop("'number_of_groups' must be greater than 0 ({} given).",
-                'ValueError', self.number_of_groups)
-        self.number_of_groups = int(self.number_of_groups)
-
-        # Check number_of_steps parameter
-        if type(self.number_of_steps) not in (int, float):
-            self.stop("'number_of_steps' must be an integer or a float ({} given).",
-                'TypeError', type(self.number_of_steps))
-        if self.number_of_steps % 1 != 0:
-            self.stop("'number_of_steps' must be convertible to an integer ({} given).",
-                'ValueError', self.number_of_steps)
-        if not self.number_of_steps > 0:
-            self.stop("'number_of_steps' must be greater than 0 ({} given).",
-                'ValueError', self.number_of_steps)
-        self.number_of_steps = int(self.number_of_steps)
-
-        # Check initial_time parameter
-        if type(self.initial_time) not in (int, float):
-            self.stop("'initial_time' must be an integer or a float ({} given).",
-                'TypeError', type(initial_time))
-
-        # Check final_time parameter
-        if type(self.final_time) not in (int, float):
-            self.stop("'final_time' must be an integer or a float ({} given).",
-                'TypeError', type(self.final_time))
-        if not self.final_time > self.initial_time:
-            self.stop("'final_time' must be greater than initial_time ({} and {} given).",
-             'ValueError', self.final_time, self.initial_time)
-
-        # Group names creation
-        self.groups = ['{}_{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]
-
-    def configure_data(self):
-        """ Check if traceback and output from data is possible and creates a Data object from a
-            CSV file, or a Python dictionary, list, tuple or np.ndarray.
-        """
-        info("Traceback and output of '{}' from data.".format(self.name))
-
-        # Check if data is present
-        if self.data is None:
-            self.stop("No data provided for traceback '{}'.", 'NameError', self.name)
-
-        # Data import
-        from data import Data
-        self.stars = Data(self.name, self.representation, self.data)
-
-    def configure_simulation(self):
-        """ Check if traceback and output from simulation is possible.
-        """
-        info("Traceback and output of '{}' from simulation.".format(self.name))
-
-        # Check if all the necessary parameters are present
-        for parameter in (
-                'number_of_stars', 'age',
-                'avg_position', 'avg_position_error', 'avg_position_scatter',
-                'avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
-            if vars(self)[parameter] is None:
-                self.stop("Required simulation parameter '{}' is missing in the configuration.",
-                    'NameError', parameter)
-
-        # Check number_of_stars parameter
-        if type(self.number_of_stars) not in (int, float):
-            self.stop("'number_of_stars' must be an integer or a float ({} given).",
-                'TypeError', type(self.number_of_stars))
-        if self.number_of_stars % 1 != 0:
-            self.stop("'number_of_stars' must be convertible to an integer ({} given).",
-                'ValueError', self.number_of_stars)
-        if not self.number_of_stars > 0:
-            self.stop("'number_of_stars' must be greater than 0 ({} given).",
-                'ValueError', self.number_of_stars)
-        self.number_of_stars = int(self.number_of_stars)
-
-        # Check age parameter
-        if type(self.age) not in (int, float):
-            self.stop("'age' must be an integer or a float ({} given).",
-                'TypeError', type(self.age))
-        if not self.age >= 0.0:
-            self.stop("'age' must be greater than or equal to 0.0 ({} given).",
-                'ValueError', self.age)
-
-        # !!! Add check for 'avg_position', 'avg_position_error', 'avg_position_scatter', !!!
-        # !!! 'avg_velocity', 'avg_velocity_error' and 'avg_velocity_scatter' here !!!
-
-    def traceback(self):
-        """ Creates Group and embeded Star objects for all group names in self.groups.
-        """
-        from group import Group
-        for name in self.groups:
-            message = "Tracing back {}.".format(name.replace('_', ' '))
-            info(message)
-            print(message)
-            self.append(Group(name, self))
-
-    def create_directory(self, base, directory, name):
-        """ Checks for type errors, checks if the directory already exists, creates it if
-            necessary and returns the absolute directory path. The directory can either be
-            relative the base or an absolute.
-        """
-        # Check the type of directory
-        if type(directory) is not str:
-            raise TypeError("'{}' parameter must be a string ({} given).".format(
-                name, type(directory)))
-        # Output directory formatting
-        working_dir = getcwd()
-        chdir(path.abspath(base))
-        abs_dir = path.abspath(directory)
-        chdir(working_dir)
-        # Output directory creation
-        if not path.exists(abs_dir):
-            makedirs(abs_dir)
-        return abs_dir
-
-    def stop(self, message, error, *values):
-        """ Raises an exception and logs it into the log file and stops the execution.
-        """
-        message = message.format(*values)
-        warning('{}: {}'.format(error, message))
-        exec("""raise {}("{}")""".format(error, message))
-
-class Groups(dict):
-    """ Contains a dictionary of series created from a configuration as well a traceback method
-        that computes a traceback for all or selected series.
+class System():
+    """ Define what variable are needed for a given represenation
     """
-
-    def traceback(self, *series):
-        """ Creates a series of Groups object for all series in self if no series name is given
-            or selected series given in argument.
-        """
-        # Selects all series if none are provided
-        selected_series = list(self.keys()) if len(series) == 0 else series
-
-        # Computes a traceback for every groups in every selected series
-        for series in selected_series:
-            if series not in self.keys():
-                Series.stop("Series '{}' does not exist.", "NameError", series)
-            elif len(self[series]) == self[series].number_of_groups:
-                info("Series '{}' has already been tracebacked.".format(series))
-            else:
-                self[series].traceback()
+    pass

@@ -7,7 +7,7 @@
 import numpy as np
 from astropy import units as un
 from matplotlib import rcParams, pyplot as plt
-from init import info
+from series import info
 from tools import *
 from output import *
 
