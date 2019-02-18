@@ -79,8 +79,8 @@ class SeriesModel(BaseModel):
             "Previous database entry '{}' deleted and replaced.".format(series.name))
 
         # SeriesModel entry creation
-        series.model.create(**{key: vars(series)[key] for key in set(
-            vars(series).keys()).intersection(set(vars(self).keys()))})
+        series.model.create(**{key: vars(series)[key] for key in filter(
+            lambda key: key in vars(self).keys(), vars(series).keys())})
 
         # GroupModel entries creation
         for group in series:
@@ -148,8 +148,8 @@ class GroupModel(BaseModel):
             object. Previous entries are deleted if necessary and new entries are added.
         """
         # GroupModel entry creation
-        values = {key: vars(group)[key] for key in set(
-            vars(group).keys()).intersection(set(vars(self).keys()))}
+        values = {key: vars(group)[key] for key in filter(
+            lambda key: key in vars(self).keys(), vars(group).keys())}
         del values['series']
         group.model = self.create(series=group.series.model, **values)
 
@@ -193,12 +193,12 @@ class StarModel(BaseModel):
         """ Saves all parameters to the database in a new StarModel entry.
         """
         # StarModel entry creation
-        values = {key: vars(star)[key] for key in set(
-            vars(star).keys()).intersection(set(vars(self).keys()))}
+        values = {key: vars(star)[key] for key in filter(
+            lambda key: key in vars(self).keys(), vars(star).keys())}
         del values['group']
         star.model = self.create(group=star.group.model, **values)
 
-# ??? Put this part in a function so that it can be reused if need be.
+# ??? Put this part in a function so that it can be reused if need be. ???
 # GroupModel and StarModel tables creation if they don't already exists.
 SeriesModel.create_table(fail_silently=True)
 GroupModel.create_table(fail_silently=True)

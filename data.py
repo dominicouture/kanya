@@ -177,6 +177,7 @@ class Data(list):
         self.velocity_error_labels = tuple('Δ' + label for label in self.velocity_labels)
         self.error_labels = {
             'Δ' + label: name + ' error' for label, name in self.value_labels.items()}
+        # !!! Replace these lines !!!
         for label, name in self.error_labels.items():
             Config.physical_types[label] = Config.physical_types[label[1:]]
             Config.names[label] = name

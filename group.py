@@ -94,25 +94,24 @@ class Group(list):
             and scatter. The sample is then moved forward in time for the given age.
         """
         # Velocity array creation and conversions
-        avg_velocity = np.array(self.series.avg_velocity) * (un.km/un.s).to(un.pc/un.Myr)
-        avg_velocity_error = np.array(self.series.avg_velocity_error)
-        avg_velocity_scatter = np.array(self.series.avg_velocity_scatter) * (un.km/un.s).to(un.pc/un.Myr)
+        avg_velocity = self.series.avg_velocity.values
+        avg_velocity_error = self.series.avg_velocity_error.values
+        avg_velocity_scatter = self.series.avg_velocity_scatter.values
 
         # Position array creation
-        avg_position = np.array(self.series.avg_position)
-        avg_position_error = np.array(self.series.avg_position_error)
-        avg_position_scatter = np.array(self.series.avg_position_scatter)
+        avg_position = self.series.avg_position.values
+        avg_position_error = self.series.avg_position_error.values
+        avg_position_scatter = self.series.avg_position_scatter.values
 
         for star in range(1, self.series.number_of_stars + 1):
             # Velocity and a position based average values and scatters
             velocity_uvw = np.random.normal(avg_velocity, avg_velocity_scatter)
             position_xyz = velocity_uvw * self.series.age + np.random.normal(
                 avg_position, avg_position_scatter) - (avg_velocity * self.series.age + avg_position)
-            velocity_uvw  *= (un.pc/un.Myr).to(un.km/un.s)
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array((1.0, 0.0, 0.0))
+            velocity_rvμδμα = velocity_rvμδμα + np.array((0.0, 0.0, 0.0))
             position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
 
             # Velocity and position conversion to observables
@@ -135,8 +134,8 @@ class Group(list):
             # Star creation
             self.append(self.Star(
                 self, name='star_{}'.format(star),
-                velocity=velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
-                velocity_error=velocity_uvw_error * (un.km/un.s).to(un.pc/un.Myr),
+                velocity=velocity_uvw,
+                velocity_error=velocity_uvw_error,
                 position=position_xyz, position_error=position_xyz_error))
 
     def scatter(self):
@@ -153,9 +152,12 @@ class Group(list):
         self.scatter_xyz_error = self.avg_position_error
 
         # 3D scatter
-        self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
+        # self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
+        #     self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
+        #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1)**0.5
+        self.scatter = (np.sum(self.scatter_xyz**2, axis=1) - np.sum(
             self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
-            * np.expand_dims(self.series.time, axis=0).T**2, axis=1)**0.5
+            * np.expand_dims(self.series.time, axis=0).T**2, axis=1))**0.5
         self.scatter_error = np.sum(
             (self.scatter_xyz * self.scatter_xyz_error)**2, axis=1)**0.5 / self.scatter
         # !!! Add recursive function to filters stars farther than 3σ from the avg_position here !!!

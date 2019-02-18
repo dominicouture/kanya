@@ -35,21 +35,20 @@ def create_scatter_graph(series):
     plot_i = np.arange(0, len(series), 20)
     for group in series:
         if i in plot_i:
-            plt.plot(series.time, group.mad, '-', color='0.7', linewidth=0.5)
+            plt.plot(series.time, group.scatter, '-', color='0.7', linewidth=0.5)
         i += 1
-    mean = np.mean([group.mad for group in series], axis=0)
-    # print(series[0].time)
-    # print(mean)
-    plt.plot(series.time, mean, 'k-', linewidth=2.0)
-    ages = [group.mad_age for group in series]
-    # plt.title(
-    #     'Scatter of a simulation over time of 1000 groups \n"
-    #     "with measurement errors (rv: + 1.0 km/s). Average age: ({} ± {}) Myr\n'.format(
-    #         np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
+    mean_mad = np.mean([group.mad for group in series], axis=0)
+    mean_scatter = np.mean([group.scatter for group in series], axis=0)
+    plt.plot(series.time, mean_scatter, 'k-', linewidth=2.0)
+    ages = [group.scatter_age for group in series]
     plt.title(
-        "Median absolute deviation (MAD) of beta-pictoris\n"
-        "over time. Average age: ({} ± {}) Myr.\n".format(
+        "Scatter of a simulation over time of 1000 groups \n"
+        "without measurement errors (rv: + 0.5 km/s). Average age: ({} ± {}) Myr\n".format(
             np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
+    # plt.title(
+    #     "Median absolute deviation (MAD) of beta-pictoris\n"
+    #     "over time. Average age: ({} ± {}) Myr.\n".format(
+    #         np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
     plt.xlabel('Time (Myr)')
     plt.ylabel('MAD (pc)')
 #    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
@@ -138,6 +137,38 @@ def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_gro
         'and the number of stars ({} groups, {} Myr)'.format(number_of_groups, age)
     )
     plt.savefig(path.join(output_dir, 'Scatter on age ({} Myr).png').format(age))
+
+def plot_age_error():
+    """ Creates a graph of scatter over time.
+    """
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+    plt.errorbar(
+        [0.0, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0],
+        [22.789, 22.747, 22.660, 22.010, 19.984, 14.808, 7.630],
+        yerr=[0.481, 0.497, 0.548, 0.722, 1.072, 1.414, 1.278], fmt='o', color='0.0')
+    plt.title(
+        "Measured age of a simulation of 1000 24 Myr-old groups \n"
+        "over the measurement error on RV (other errors typical of Gaia DR2)\n")
+    plt.xlabel('Error on RV (km/s)')
+    plt.ylabel('Age (Myr)')
+    plt.show()
+
+def create_scatter_plot(group, age):
+    """ Creates a scatter plot of star positions in X and Z space.
+    """
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+    plt.errorbar(
+        [star.position[age, 0] for star in group],
+        [star.position[age, 2] for star in group],
+        xerr=[star.position_error[age, 0] for star in group],
+        yerr=[star.position_error[age, 2] for star in group], fmt='o', color='0.0')
+    plt.title(
+        "X and Z positions of stars in β-Pictoris at 15 Myr.\n")
+    plt.xlabel('X (pc)')
+    plt.ylabel('Z (pc)')
+    plt.show()
 
 if __name__ == '__main__':
     a5 = np.array(

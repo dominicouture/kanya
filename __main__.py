@@ -23,4 +23,5 @@ groups.create()
 
 # Output export
 for name, series in groups.items():
+    # create_scatter_plot(series[0], 100)
     create_scatter_graph(series)

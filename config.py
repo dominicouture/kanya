@@ -31,7 +31,7 @@ velocity_units = ('km/s', 'km/s', 'km/s') # ('km/s', 'mas/yr', 'mas/yr')
 
 # Traceback parameters (used in simulation or data)
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups = 1
+number_of_groups = 100
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 number_of_steps = 200
@@ -51,34 +51,37 @@ number_of_stars = 50
 age = 24.0
 
 # Average position of the simulated sample of stars (pc, pc, pc)
-avg_position = (0.0, 0.0, 0.0)
+avg_position = ((0.0, 0.0, 0.0), 'pc', 'cartesian', 'galactic')
 # avg_position = (15.19443946, -4.93616248, -17.07422231)
-# avg_position = (258.0, 258.0, 258.0)
+# avg_position.values = (0.0, 1.0, 1.0)
+# avg_position.units = 'pc'
+# avg_position.system = 'cartesian'
+# avg_position.axis = 'galactic'
 
 # Average measurment error on the position of the simulated sample of stars (mas, mas, mas)
-avg_position_error = (0.19846, 0.0, 0.0)
+avg_position_error = ((0.19846, 0.0, 0.0), 'mas')
 # avg_position_error = (0.0, 0.0, 0.0)
 
 # Average position scatter of the simulated sample of stars (pc, pc, pc)
-avg_position_scatter = (5.0, 5.0, 5.0)
+avg_position_scatter = ((5.0, 5.0, 5.0), 'pc', 'cartesian', 'galactic')
 # avg_position_scatter = (29.3, 14.0, 9.0)
 
-# Average velocity of the simulated sample of stars (pc/Myr, pc/Myr, pc/Myr)
-avg_velocity = (-10.77829 -16.24734  -8.90923)
-# avg_velocity = (-11.622, -11.622, -11.622)
+# Average velocity of the simulated sample of stars (km/s, km/s, km/s)
+avg_velocity = ((-10.54893, -15.88653,  -8.71138), 'km/s', 'cartesian', 'galactic')
+# avg_velocity = (-11.3442, -11.3442, -11.3442)
 
 # Average measurement error on the velocity of the simulated sample of stars (km/s, mas/yr, mas/yr)
-avg_velocity_error = (1.0112, 0.30754, 0.26432)
+avg_velocity_error = ((1.0112, 0.30754, 0.26432), ('km/s', 'mas/yr', 'mas/yr'))
 # avg_velocity_error = (0.0, 0.0, 0.0)
 
-# Average velocity scatter of the simulated sample of stars (pc/Myr, pc/Myr, pc/Myr)
-avg_velocity_scatter = (1.382, 1.382, 1.382)
-# avg_velocity_scatter = (2.2, 1.2, 1.0)
+# Average velocity scatter of the simulated sample of stars (km/s, km/s, km/s)
+avg_velocity_scatter = ((1.68050, 1.68050, 1.68050), 'km/s', 'cartesian', 'galactic')
+# avg_velocity_scatter = (2.21753, 1.36009, 1.57355)
 
-# Coordinate system (e.g. 'observables', 'spherical', 'cartesian')
+# Coordinate system (e.g. 'observables', 'spherical' or 'cartesian')
 system = 'observables'
 
-# Axis of the coordinate system (e.g. 'equatorial', 'galactic')
+# Axis of the coordinate system (e.g. 'equatorial' or 'galactic')
 axis = 'equatorial'
 
 # Path to CSV data file or Python dictionary with data.

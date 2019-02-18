@@ -12,6 +12,7 @@ from astropy import units as un
 from time import strftime
 from os import path, makedirs, remove, getcwd, chdir
 from logging import basicConfig, info, warning, INFO
+from tools import Quantity
 from init import *
 
 __author__ = 'Dominic Couture'
@@ -224,7 +225,7 @@ class Series(list):
         self.stop(type(self.axis) != str, 'TypeError',
             "'axis' must be a string ({} given).", type(self.axis))
         self.axis = self.axis.lower()
-        self.stop(self.axis not in Config.axis, 'ValueError',
+        self.stop(self.axis not in System.axis, 'ValueError',
             "'{}' is not a valid system value.", self.axis)
 
         # Data configuration
@@ -285,31 +286,157 @@ class Series(list):
             "'age' must be greater than or equal to 0.0 ({} given).", self.age)
 
         # avg_position parameter
+        self.avg_position = self.quantify(self.avg_position, 'avg_position')
 
         # avg_position_error parameter
+        self.avg_position_error = self.quantify(self.avg_position_error, 'avg_position_error')
 
         # avg_position_scatter parameter
+        self.avg_position_scatter = self.quantify(self.avg_position_scatter, 'avg_position_scatter')
 
         # avg_velocity parameter
+        self.avg_velocity = self.quantify(self.avg_velocity, 'avg_velocity')
 
         # avg_velocity_error parameter
+        self.avg_velocity_error = self.quantify(self.avg_velocity_error, 'avg_velocity_error')
 
         # avg_velocity_scatter parameter
-
-        # !!! Last dimension = 3, First dimension = self.number_of_stars !!!
+        self.avg_velocity_scatter = self.quantify(self.avg_velocity_scatter, 'avg_velocity_scatter')
 
         # Stars set to None because stars are simulated
         self.stars = None
 
-    def convert(self, value):
+    def quantify(self, parameter, name):
         """ Converts a variable into a Quantity object and raises an error if an exception occurs
             in that process. Returns a value converted into the correct units for the physical
             type defined in by a variable object.
         """
+        def identify(value, name):
+            """ Identify the type of a parameter and calls itself recursively if it finds a tuple
+                or a list. If it finds a strings, it identifies whether the strings represents a
+                unit, system of axis.
+            """
+            # Units, systems and axis values identification and check
+            if type(value) == str:
+                try:
+                    un.Unit(value)
+                    variable_type = 'units'
+                except:
+                    if value.lower() in systems.keys():
+                        variable_type = 'system'
+                    elif value.lower() in System.axis:
+                        variable_type = 'axis'
+                    else:
+                        self.stop(True, 'ValueError',
+                            "The value '{}' in '{}' could not be identified.", value, name)
+
+            # Identify position and velocity values
+            elif type(value) in (int, float):
+                variable_type = 'values'
+
+            # Recursive call if the value is an iterable
+            elif type(value) in (tuple, list):
+                variable_types = set(identify(i, name) for i in value)
+
+                # Check if there's more than one type
+                self.stop(len(variable_types) > 1, 'ValueError'
+                    "Elements in tuples or lists in '{}' must all have the same type ({} given).",
+                    name, list(variable_types))
+                variable_type = tuple(variable_types)[0]
+
+            # Unsupported types handling
+            else:
+                self.stop(True, 'TypeError'
+                    "'{}' can use strings, integer, float, tuple or list types ({} given).",
+                    name, type(value))
+
+            return variable_type
+
+        # Values from a tuple or list
+        if type(parameter) in (tuple, list):
+            # Types identification
+            variable_types = [identify(value, name) for value in parameter]
+
+            # Identify whether all types are values, or if units, systems or axis are present
+            if all([variable_type == 'values' for variable_type in variable_types]):
+                values = {'values': parameter}
+            else:
+                values = {key: parameter[i] for i, key in enumerate(variable_types)}
+
+        # Values from a dictionary
+        elif type(parameter) == dict:
+            # Values definition
+            values = {key.lower(): parameter[key] for key in parameter.keys()}
+
+            # Check if keys in the dictionary are all supported.
+            for key in values.keys():
+                self.stop(key not in ('values', 'units', 'system', 'axis'), 'ValueError',
+                    "'{}' in {} is not a supported value ('values', 'units', 'system' or 'axis').",
+                    key, name)
+
+            # Check if all values are identified correctly
+            variable_types = {key: identify(values[key], name) for key in values.keys()}
+            for key in variable_types.keys():
+                self.stop(key != variable_types[key], 'ValueError', "'{}' in {} was identified as '{}'.",
+                    key, name, variable_types[key])
+
+        # Unsupported types handling
+        else:
+            self.stop(True, 'TypeError' "'{}' must be a tuple, list or dictionary ({} given).",
+                name, type(parameter))
+
+        # Check if a numerical value is present
+        self.stop('values' not in values.keys(), 'NameError'
+            "'{}' must contain a numerical value.", name)
+
+        # Default system
+        if 'system' not in values.keys():
+            values['system'] = self.system
+        system = systems[values['system']]
+
+        # Default axis
+        if 'axis' not in values.keys():
+            values['axis'] = self.axis
+
+        # Variables
+        if name in ('avg_position', 'avg_position_error', 'avg_position_scatter'):
+            variables = system.position
+        elif name in ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
+            variables = system.velocity
+        else:
+            self.stop(True, 'NameError', "'{}' is not a supported name.", name)
+
+        # Default units
+        if 'units' not in values.keys():
+            values['units'] = [variable.unit.unit for variable in variables]
+
+        # Dimensions
+        shape = np.array(values['values']).shape
+        ndim = len(shape)
+        self.stop(ndim > 2, 'ValueError', "'{}' must have 1 or 2 dimensions ({} given).",
+            name, ndim)
+        self.stop(shape[-1] != 3, 'ValueError',
+            "'{}' last dimension must have a size of 3 ({} given).", name, shape[-1])
+        self.stop(ndim == 2 and shape[0] not in (1, self.number_of_stars),
+            'ValueError',  "'{}' first dimension ({} given) must have a size of 1 or equal to the number of stars ({} given).",
+            name, shape[0], self.number_of_stars)
+
+        # Quantity object creation
         try:
-            return None
+            quantity = Quantity(**values)
         except:
-            self.stop(True, 'ValueError', 'message', value)
+            self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.", name)
+
+        # Physical types
+        physical_types = [variable.physical_type for variable in variables]
+        self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
+            "Units in '{}' do not have the correct physical type ({} given, {} required for '{}' system.)",
+            name, quantity.physical_types.tolist(), physical_types, quantity.system)
+
+        # Units conversion
+        quantity = quantity.to([variable.unit.unit for variable in variables])
+
+        return quantity
 
     def create(self):
         """ Creates a Group and embeded Star objects for all group names in self.groups either
