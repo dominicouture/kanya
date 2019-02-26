@@ -1,8 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" output.py: Provides the necesary functions to output data in table, graph or video form.
-"""
+""" output.py: Provides the necesary functions to output data in table, graph or video form. """
 
 import numpy as np
 from matplotlib import rcParams, pyplot as plt
@@ -15,8 +14,8 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 def create_graph(x, y):
-    """ Creates a graph of scatter over time.
-    """
+    """ Creates a graph of scatter over time. """
+
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
     plt.figure(figsize=(12, 8), facecolor='w')
     plt.plot(x, y,  'k.-')
@@ -27,23 +26,23 @@ def create_graph(x, y):
     plt.savefig(path.join(output_dir, 'Scatter of a moving group over time.pdf'))
 
 def create_scatter_graph(series):
-    """ Creates a graph of scatter over time.
-    """
+    """ Creates a graph of scatter or median absolute deviation over time. """
+
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     i = 0
     plot_i = np.arange(0, len(series), 20)
     for group in series:
         if i in plot_i:
-            plt.plot(series.time, group.scatter, '-', color='0.7', linewidth=0.5)
+            plt.plot(series.time, group.mad, '-', color='0.7', linewidth=0.5)
         i += 1
     mean_mad = np.mean([group.mad for group in series], axis=0)
     mean_scatter = np.mean([group.scatter for group in series], axis=0)
-    plt.plot(series.time, mean_scatter, 'k-', linewidth=2.0)
-    ages = [group.scatter_age for group in series]
+    plt.plot(series.time, mean_mad, 'k-', linewidth=2.0)
+    ages = [group.mad_age for group in series]
     plt.title(
-        "Scatter of a simulation over time of 1000 groups \n"
-        "without measurement errors (rv: + 0.5 km/s). Average age: ({} ± {}) Myr\n".format(
+        "MAD of a β-Pictoris over time with outliers \n"
+        "(+ 0.0 km/s) Average age: ({} ± {}) Myr\n".format(
             np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
     # plt.title(
     #     "Median absolute deviation (MAD) of beta-pictoris\n"
@@ -58,8 +57,8 @@ def create_scatter_graph(series):
     plt.show()
 
 def create_scatter_graph2(groups):
-    """ Creates a graph of scatter over time.
-    """
+    """ Creates a graph of scatter over time. """
+
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     mean = np.mean([group.scatter for group in groups], axis =0)
@@ -69,8 +68,8 @@ def create_scatter_graph2(groups):
     plt.xlim(0, 30)
 
 def create_histogram_ages(groups):
-    """ Creates an histogram of ages computed by multiple tracebacks.
-    """
+    """ Creates a histogram of ages computed by multiple tracebacks. """
+
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     ages = [group.scatter_age for group in groups]
@@ -85,8 +84,8 @@ def create_histogram_ages(groups):
     plt.show()
 
 def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, age):
-    """ Creates an histogram of ages computed by multiple tracebacks.
-    """
+    """ Creates an histogram of ages computed by multiple tracebacks. """
+
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
     plt.figure(figsize=(12, 8), facecolor='w')
     hist, bin_edges = np.histogram(ages, density=True)
@@ -139,8 +138,8 @@ def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_gro
     plt.savefig(path.join(output_dir, 'Scatter on age ({} Myr).png').format(age))
 
 def plot_age_error():
-    """ Creates a graph of scatter over time.
-    """
+    """ Creates a graph of scatter over time. """
+
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     plt.errorbar(
@@ -155,19 +154,25 @@ def plot_age_error():
     plt.show()
 
 def create_scatter_plot(group, age):
-    """ Creates a scatter plot of star positions in X and Z space.
-    """
+    """ Creates a scatter plot of star positions in X and Y space. """
+
+    x, y, z = (0, 1, 2)
+    i, j = (x, z)
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
     plt.errorbar(
-        [star.position[age, 0] for star in group],
-        [star.position[age, 2] for star in group],
-        xerr=[star.position_error[age, 0] for star in group],
-        yerr=[star.position_error[age, 2] for star in group], fmt='o', color='0.0')
+        [star.position[age, i] for star in group],
+        [star.position[age, j] for star in group],
+        xerr=[star.position_error[age, i] for star in group],
+        yerr=[star.position_error[age, j] for star in group], fmt='o', color='0.0')
+    for star in group:
+        plt.text(star.position[age, i] + 2, star.position[age, j] + 4, star.name,
+        horizontalalignment='left', fontsize=8)
+
     plt.title(
-        "X and Z positions of stars in β-Pictoris at 15 Myr.\n")
+        "Y and Z positions of stars in β-Pictoris at 15 Myr.\n")
     plt.xlabel('X (pc)')
-    plt.ylabel('Z (pc)')
+    plt.ylabel('Y (pc)')
     plt.show()
 
 if __name__ == '__main__':

@@ -23,12 +23,13 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 Database = SqliteDatabase(Config.db_path)
 
 class BaseModel(Model):
+
     class Meta:
         database = Database
 
 class ArrayField(Field):
-    """ Defines a database field for numpy arrays.
-    """
+    """ Defines a database field for numpy arrays. """
+
     db_field = 'text'
     field_type = 'array'
     db_value = lambda self, array: dumps(array.tolist())
@@ -38,6 +39,7 @@ class SeriesModel(BaseModel):
     """ Defines the fields of a series of kinematic moving groups and functions to initialize from
         or save to the database.
     """
+
     # Series parameters
     name = CharField(verbose_name='Name', unique=True)
     date = DateField(verbose_name='Date', default=strftime('%Y-%m-%d %H:%M:%S'))
@@ -56,6 +58,7 @@ class SeriesModel(BaseModel):
         """ Initializes Series object and embeded Group objects from an existing instance in the
             database, defined as the 'series.model' parameter.
         """
+
         # Series parameters retrieval
         values = vars(series.model)['_data'].copy()
         del values['id']
@@ -69,8 +72,8 @@ class SeriesModel(BaseModel):
             GroupModel.load_from_database(GroupModel, series, group)
 
     def save_to_database(self, series):
-        """ Saves all parameters to the database in a new SeriesModel entry.
-        """
+        """ Saves all parameters to the database in a new SeriesModel entry. """
+
         # Previous SeriesModel, GroupModel and StarModel entries deletion
         series.model.delete_instance(recursive=True)
 
@@ -90,6 +93,7 @@ class GroupModel(BaseModel):
     """ Defines the fields of a kinematic moving group and functions to initialize from or save to
         the database.
     """
+
     # Group parameters
     series = ForeignKeyField(SeriesModel)
     name = CharField(verbose_name='Name')
@@ -128,8 +132,8 @@ class GroupModel(BaseModel):
         verbose_name='Minimum Spanning Tree Age Error', default=0.0)
 
     def load_from_database(self, series, model):
-        """ Initializes Group object from an existing entry in the database.
-        """
+        """ Initializes Group object from an existing entry in the database. """
+
         # Group parameters retrival
         values = vars(model)['_data'].copy()
         del values['id'], values['series']
@@ -161,6 +165,7 @@ class StarModel(BaseModel):
     """ Defines the fields of a star in a kinematic moving group and functions to initialize from
         or save to the database.
     """
+
     # Star parameters
     group = ForeignKeyField(GroupModel)
     name = CharField(verbose_name='Name')
@@ -178,8 +183,8 @@ class StarModel(BaseModel):
     distance_error = ArrayField(verbose_name='Distance Error')
 
     def load_from_database(self, group, model):
-        """ Initializes Star object from an existing instance in the database.
-        """
+        """ Initializes Star object from an existing instance in the database. """
+
         # Star parameters retrieval
         values = vars(model)['_data'].copy()
         del values['id'], values['group']
@@ -190,8 +195,8 @@ class StarModel(BaseModel):
         group.append(star)
 
     def save_to_database(self, star):
-        """ Saves all parameters to the database in a new StarModel entry.
-        """
+        """ Saves all parameters to the database in a new StarModel entry. """
+        
         # StarModel entry creation
         values = {key: vars(star)[key] for key in filter(
             lambda key: key in vars(self).keys(), vars(star).keys())}

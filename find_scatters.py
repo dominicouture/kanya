@@ -44,8 +44,8 @@ def find_scatters(
     return (final_scatter3, final_scatter_xyz)
 
 def create_graph(x, y, y_ans):
-    """ Create a graph of the scatter with a linear regression curve.
-    """
+    """ Create a graph of the scatter with a linear regression curve. """
+
     m, b = np.polyfit(x, y, 1)
     print('{}*m + {}'.format(m, b))
     x_ans = (y_ans - b)/m

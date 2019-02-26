@@ -13,7 +13,7 @@ import numpy as np
 from astropy import units as un
 from os import path, getcwd, chdir
 from csv import reader, Sniffer
-from init import Config
+from init import Config, System
 from series import info, Series
 from tools import *
 
@@ -21,6 +21,7 @@ class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.
         Data is converted into a Quantity object and units are converted to default units.
     """
+
     # Label permutations
     permutations = {
         '-': '',
@@ -49,20 +50,37 @@ class Data(list):
     def __init__(self, series):
         """ Initizalizes a Data object from a CSV file or a Python dictionary, list, tuple or
             np.ndarray. The first row must be a header and the second row may be a units row.
-            If no units row is speficied, default units are used.
+            Units specified by series.config.data.units will override the units row. If no units,
+            are given default units are used, based on the value of series.config. data.system.
         """
+
         # Initialization
         self.series = series
 
-        # Initialize from a CSV file
-        if type(series.data) == str:
+        # Initialize Data from a CSV file
+        if type(self.series.config.data.values) == str:
             self.initialize_from_CSV()
-        # Initialize from data
-        elif type(series.data) in (dict, list, tuple, np.ndarray):
+        # Initialize Data from Python object
+        elif type(self.series.config.data.values) in (dict, list, tuple, np.ndarray):
             self.initialize_from_data()
         else:
-            Series.stop(Series, True, 'TypeError', "'data' parameter must be a path to CSV file, "
-                "or a Python dictionary, list, tuple or np.ndarray. ({} given).", type(series.data))
+            Series.stop(Series, True, 'TypeError', "'data.values' parameter must be a path to "
+                "a CSV fileor a Python dictionary, list, tuple or np.ndarray. ({} given).",
+                type(self.series.config.data.values))
+
+        # Coordinates system
+        Series.stop(Series, type(self.series.config.data.system) != str, 'TypeError',
+            "'data.system' must be a string ({} given).", type(self.series.config.data.system))
+        self.system = self.series.config.data.system.lower()
+        Series.stop(Series, self.system not in Config.systems.keys(), 'ValueError',
+            "'{}' is not a valid system value.", self.system)
+
+        # Coordinates system axis
+        Series.stop(Series, type(self.series.config.data.axis) != str, 'TypeError',
+            "'data.axis' must be a string ({} given).", type(self.series.config.data.axis))
+        self.axis = self.series.config.data.axis.lower()
+        Series.stop(Series, self.axis not in System.axis, 'ValueError',
+            "'{}' is not a valid axis value.", self.axis)
 
         # Data configuration
         self.configure_data()
@@ -73,24 +91,25 @@ class Data(list):
             its type must be one of the other 3 possible types. If a list, tuple or np.ndarray is
             used, all data is imported.
         """
+
         # Data origin
         self.from_data = True
         self.from_CSV = False
 
         # Data import and group filtering
-        if type(self.series.data) == dict:
-            if self.series.name in self.series.data.keys():
-                if type(self.series.data[self.series.name]) in (list, tuple, np.ndarray):
-                    self.data = np.array(self.series.data[self.series.name], dtype=object)
+        if type(self.series.config.data.values) == dict:
+            if self.series.name in self.series.config.data.values.keys():
+                if type(self.series.config.data.values[self.series.name]) in (list, tuple, np.ndarray):
+                    self.data = np.array(self.series.config.data.values[self.series.name], dtype=object)
                 else:
                     Series.stop(Series, True, 'TypeError', "Data '{}' in the Python dictionary "
                         "must be a list, tuple or np.ndarray. ('{}' given).",
-                        self.series.name, type(self.series.data[self.series.name]))
+                        self.series.name, type(self.series.config.data.values[self.series.name]))
             else:
                 Series.stop(Series, True, 'ValueError' "Group '{}' is not in the data dictionary.",
                     self.series.name)
-        if type(self.series.data) in (list, tuple, np.ndarray):
-            self.data = np.array(self.series.data, dtype=object)
+        if type(self.series.config.data.values) in (list, tuple, np.ndarray):
+            self.data = np.array(self.series.config.data.values, dtype=object)
 
         # Check if self.data has been converted a 2D array
         Series.stop(Series, self.data.ndim != 2, 'ValueError',
@@ -99,7 +118,7 @@ class Data(list):
 
         # String conversion
         try:
-            self.data = np.vectorize(lambda x: str(x))(self.data)
+            self.data = np.vectorize(lambda value: str(value))(self.data)
         except ValueError:
             Series.stop(Series, True, 'ValueError', "Data could not be converted to string.")
 
@@ -108,6 +127,7 @@ class Data(list):
             file doesn't specify a series or group column, all data is used. The file name must
             have a '.csv' extension.
         """
+
         # Data origin
         self.from_CSV = True
         self.from_data = False
@@ -115,7 +135,7 @@ class Data(list):
         # CSV file absolute path
         working_dir = getcwd()
         chdir(path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')))
-        self.data_path = path.abspath(self.series.data)
+        self.data_path = path.abspath(self.series.config.data.values)
         chdir(working_dir)
         # Check if the path exists
         Series.stop(Series, not path.exists(self.data_path), 'NameError',
@@ -142,6 +162,7 @@ class Data(list):
             specified, default units are used. The first row must be a header and the second row
             is an can be used as a units row. A star object is then created from each line.
         """
+
         # Header identification
         self.header = np.array([label.lower() for label in self.data[0]], dtype=object)
 
@@ -155,12 +176,12 @@ class Data(list):
                 label = 'Δ' + label[:-1]
             if label[0] == 'e':
                 label = 'Δ' + label[1:]
-            if self.series.system == 'observables' and label[-2:] == 'μα':
+            if self.system == 'observables' and label[-2:] == 'μα':
                 label = label + '_cos_δ'
             self.columns[label] = i
 
         # Value labels identification
-        self.position_labels, self.velocity_labels = Config.systems[self.series.system]
+        self.position_labels, self.velocity_labels = Config.systems[self.system]
         self.value_labels = {
             label: Config.names[label] for label in self.position_labels + self.velocity_labels}
         for label in self.value_labels.keys():

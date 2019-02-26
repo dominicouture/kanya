@@ -1,93 +1,83 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" config.py: Configuration of a traceback from a simulated sample of stars or data.
+""" config.py: Configuration of a traceback from a simulated sample of stars or data. A 'system'
+    refers to a coordinate system (e.g. 'observables', 'spherical' or 'cartesian') and an 'axis'
+    to the direction of a coordinate system axis (e.g. 'equatorial' or 'galactic'). 'units' must
+    be a string convertible to a Astropy.Unit object. The default units are:
+
+        -   Time: Myr
+        -   Length: pc
+        -   Speed: pc/Myr
+        -   Angle: rad
+        -   Angular speed: rad/Myr
 """
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Output directory relative to the directory where the Traceback Package is located. If left blank
-# (i.e. '') or absent, output files will be created in the same directory as the Traceback Package.
-output_dir = 'Output'
+# Output directory relative to the directory where the Traceback Package is located (str). If left
+# blank (i.e. '') or absent, output files will be created in the same directory as the Package.
+output_dir.values = 'Output'
 
-# Logs directory relative to the output directory. If left blank (i.e. '') or absent, logs files
-# will be created in the output directory.
-logs_dir = 'Logs'
+# Logs directory relative to the output directory (str). If left blank (i.e. '') or absent, logs
+# files will be created in the output directory.
+logs_dir.values = 'Logs'
 
-# Path to the database file used as input or output in the output directory. If it doesn't
-# exist, it will be created. By default, the database is created in the output directory.
-db_path = ''
+# Path to the database file used as input or output relative the output directory (str). If left
+# blank (i.e. '') or absent, the database is created in the output directory as 'name.db'. If the
+# file doesn't exist, it will be created.
+db_path.values = ''
 
-# Time units ('Myr' by default)
-time_unit = 'Myr'
-
-# Position units ('pc' by default, XYZ or rδα)
-position_units = ('pc', 'pc', 'pc') # ('pc', 'deg', 'deg')
-
-# Velocity units ('km/s' by default, UVW or rvμδμα)
-velocity_units = ('km/s', 'km/s', 'km/s') # ('km/s', 'mas/yr', 'mas/yr')
-
-
-# Traceback parameters (used in simulation or data)
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups = 100
+number_of_groups.values = 100
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-number_of_steps = 200
+number_of_steps.values = 200
 
-# Initial age of the traceback (inclusive, float, Myr)
-initial_time = 0.0
-
-# Final age of the traceback (inclusive, float, > initial_time, Myr)
-final_time = 30.0
-
-
-# Simulation parameters (used only in simulation)
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars = 50
+number_of_stars.values = 50
 
-# Age of the simulated groups of stars (float, ≥ 0.0, Myr)
-age = 24.0
+# Initial age of the traceback (float, inclusive)
+initial_time.values = 0.0
 
-# Average position of the simulated sample of stars (pc, pc, pc)
-avg_position = ((0.0, 0.0, 0.0), 'pc', 'cartesian', 'galactic')
-# avg_position = (15.19443946, -4.93616248, -17.07422231)
-# avg_position.values = (0.0, 1.0, 1.0)
-# avg_position.units = 'pc'
-# avg_position.system = 'cartesian'
-# avg_position.axis = 'galactic'
+# Final age of the traceback (float, > initial_time, inclusive)
+final_time.values = 30.0
 
-# Average measurment error on the position of the simulated sample of stars (mas, mas, mas)
-avg_position_error = ((0.19846, 0.0, 0.0), 'mas')
-# avg_position_error = (0.0, 0.0, 0.0)
+# Age of simulated groups of stars (float, ≥ 0.0)
+age.values = 24.0
 
-# Average position scatter of the simulated sample of stars (pc, pc, pc)
-avg_position_scatter = ((5.0, 5.0, 5.0), 'pc', 'cartesian', 'galactic')
-# avg_position_scatter = (29.3, 14.0, 9.0)
+# Average position of the simulated sample of stars (tuple)
+avg_position.values = (0.0, 0.0, 0.0) # (15.19443946, -4.93616248, -17.07422231)
 
-# Average velocity of the simulated sample of stars (km/s, km/s, km/s)
-avg_velocity = ((-10.54893, -15.88653,  -8.71138), 'km/s', 'cartesian', 'galactic')
-# avg_velocity = (-11.3442, -11.3442, -11.3442)
+# Average position error of the simulated sample of stars (tuple)
+avg_position_error.values = (0.19846, 0.0, 0.0) # (0.0, 0.0, 0.0)
+avg_position_error.units = 'mas'
+avg_position_error.system = 'observables'
+avg_position_error.axis = 'equatorial'
 
-# Average measurement error on the velocity of the simulated sample of stars (km/s, mas/yr, mas/yr)
-avg_velocity_error = ((1.0112, 0.30754, 0.26432), ('km/s', 'mas/yr', 'mas/yr'))
-# avg_velocity_error = (0.0, 0.0, 0.0)
+# Average position scatter of the simulated sample of stars (tuple)
+avg_position_scatter.values = (5.0, 5.0, 5.0) # (29.3, 14.0, 9.0)
 
-# Average velocity scatter of the simulated sample of stars (km/s, km/s, km/s)
-avg_velocity_scatter = ((1.68050, 1.68050, 1.68050), 'km/s', 'cartesian', 'galactic')
-# avg_velocity_scatter = (2.21753, 1.36009, 1.57355)
+# Average velocity of the simulated sample of stars (tuple)
+avg_velocity.values = (-10.54893, -15.88653,  -8.71138) # (-11.3442, -11.3442, -11.3442)
+avg_velocity.units = 'km/s'
 
-# Coordinate system (e.g. 'observables', 'spherical' or 'cartesian')
-system = 'observables'
+# Average velocity error of the simulated sample of stars (tuple)
+avg_velocity_error.values = (1.0112, 0.30754, 0.26432) # (0.0, 0.0, 0.0)
+avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
+avg_velocity_error.system = 'observables'
+avg_velocity_error.axis = 'equatorial'
 
-# Axis of the coordinate system (e.g. 'equatorial' or 'galactic')
-axis = 'equatorial'
+# Average velocity scatter of the simulated sample of stars (tuple)
+avg_velocity_scatter.values = (1.68050, 1.68050, 1.68050) # (2.21753, 1.36009, 1.57355)
+avg_velocity_scatter.units = 'km/s'
 
-# Path to CSV data file or Python dictionary with data.
-data = 'bpic.csv'
-
-# data =  {'beta_pictoris': [
+# Path to CSV data file (str) or Python dictionary with the data (dict)
+data.values = 'bpic.csv'
+data.system = 'observables'
+data.axis = 'equatorial'
+# data.values =  {'beta_pictoris': [
 #         [    'p',        'δ',       'α',    'rv',     'μδ',     'μα'],
 #         [25.0250, -23.107737, 1.7091324, 6.50000, -47.1210,  96.7760],
 #         [27.1700, -66.753496, 4.3491739, 8.75000, -16.8740,  103.039],
