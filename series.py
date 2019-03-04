@@ -33,14 +33,33 @@ class Series(list):
 
         # Inilialization
         self.config = config
-        # vars(self).update(vars(config).copy())
+        self.logs_configured = False
+
+        # Check if all parameters are present, are Parameter objects and have their all components
+        for parameter in Config.default_parameters.keys():
+            self.stop(parameter not in vars(self.config), 'NameError',
+                "Required parameter '{}' is missing in the configuration.", parameter)
+            self.stop(type(vars(self.config)[parameter]) != Config.Parameter, 'TypeError',
+                "'{}' must be a Config.Parameter object ({} given).", parameter, type(parameter))
+            for component in Config.Parameter.default_components.keys():
+                self.stop(component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
+                    "Required component '{}' is missing from the '{}' parameter "
+                    "in the configuraiton.", component, parameter)
+
+        # Check for invalid parameters and components
+        for parameter in vars(self.config).keys():
+            self.stop(parameter not in Config.default_parameters.keys(), 'NameError',
+                "Parameter '{}' in the configuration is invalid.", parameter)
+            for component in vars(vars(self.config)[parameter]).keys():
+                self.stop(component not in Config.Parameter.default_components.keys(), 'NameError',
+                    "Parameter component '{}' in '{}' is invalid.", component, parameter)
 
         # Series name
         self.name = config.name.values
-        if self.name is None:
-            raise NameError("Required parameter 'name' is missing.")
-        if type(self.name) != str:
-            raise TypeError("'name' must be a string ('{}' given).".format(type(self.name)))
+        self.stop(self.name is None, 'NameError',
+            "Required parameter 'name' is missing in the configuration.")
+        self.stop(type(self.name) != str, 'TypeError', "'name' must be a string ('{}' given).",
+            type(self.name))
 
         # Present date and time
         self.date = strftime('%Y-%m-%d %H:%M:%S')
@@ -58,7 +77,7 @@ class Series(list):
         # Database configuration
         self.configure_database()
 
-        # Traceback configuration
+        # Traceback configuration if needed
         if self.from_data or self.from_simulation:
             self.configure_traceback()
 
@@ -72,9 +91,8 @@ class Series(list):
         """
 
         # Check the type of directory
-        if type(directory) is not str:
-            raise TypeError("'{}' parameter must be a string ({} given).".format(
-                name, type(directory)))
+        self.stop(type(directory) is not str, 'TypeError',
+            "'{}' parameter must be a string ({} given).", name, type(directory))
 
         # Output directory formatting
         working_dir = getcwd()
@@ -88,13 +106,18 @@ class Series(list):
         return abs_dir
 
     def stop(self, condition, error, message, *words):
-        """ If condition is True, raises an exception and logs it into the log file and stops the
-            execution.
+        """ If condition is True, raises an exception, logs it into the log file if logs have
+            been configured and stops the execution.
         """
-
+        from sys import exc_info # Return (None, None, None) if no exception is being handled.
         if condition:
+            # ??? Add self.name to the message if it exists. ???
+            # Error message creation
             message = message.format(*words)
-            warning('{}: {}'.format(error, message))
+            # Loggging only if logs have been configured
+            if self.logs_configured:
+                warning('{}: {}'.format(error, message))
+            # Error raised and execution stopped
             exec("""raise {}("{}")""".format(error, message))
 
     def configure_logs(self):
@@ -102,7 +125,13 @@ class Series(list):
             the Logs file. 'logs_dir' is defined as the absolute logs directory.
         """
 
-        # Logs directory creation
+        # Logs directory parameter
+        self.logs_dir = 'Logs' if self.config.logs_dir.values is None \
+            else self.config.logs_dir.values
+        self.stop(type(self.logs_dir) != str, 'TypeError', "'logs_dir' must be a string "
+            "({} given).", type(self.logs_dir))
+
+        # Logs direction creation logs_dir parameter redefinied as the absolute path
         self.logs_dir = self.directory(self.output_dir, self.config.logs_dir.values, 'logs_dir')
 
         # Logs configuration
@@ -111,17 +140,22 @@ class Series(list):
                 self.logs_dir, '{}_{}.log'.format(self.name, strftime('%Y-%m-%d_%H-%M-%S'))),
             format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
+        # Set logs_configured as True
+        self.logs_configured = True
+
     def configure_arguments(self):
         """ Checks for the type of the arguments provided in the configuration and check if
             their values are compatible. from_database is defined based on the values of
             from_data and from simulation.
         """
+
         # from_data, from_simulation and to_database parameters
         for argument in ('to_database', 'from_data', 'from_simulation'):
-            self.stop(type(vars(self.config)[argument].values) != bool, 'TypeError'
-                "'{}' must be a boolean value ({} given).",
-                argument, type(vars(self.config)[argument].values))
             vars(self)[argument] = vars(self.config)[argument].values
+            self.stop(type(vars(self)[argument]) is None, 'NameError'
+                "Required parameter '{}' is missing in the configuration.", argument)
+            self.stop(type(vars(self)[argument]) != bool, 'TypeError'
+                "'{}' must be a boolean value ({} given).", argument, type(vars(self)[argument]))
 
         # Check if traceback and output from both data and simulation
         self.stop(self.from_data and self.from_simulation, 'ValueError',
@@ -143,14 +177,20 @@ class Series(list):
             database is required.
         """
 
-        # Database absolute directory and name
+        # db_path parameter
         self.db_path = '{}.db'.format(self.name) if self.config.db_path.values is None \
             else self.config.db_path.values
+        self.stop(type(self.db_path) != str, 'TypeError', "'db_path' must be a string ({} given).",
+            type(self.db_path))
+
+        # Database absolute name and director
         self.db_name = '{}.db'.format(self.name) if path.basename(self.db_path) == '' \
             else path.basename(self.db_path)
         self.db_dir = self.directory(self.output_dir, path.dirname(self.db_path), 'db_path',
             create=self.from_database or self.to_database)
-        self.db_path = path.join(self.db_dir, self.db_name) # Absolute path
+
+        # db_path parameter redefinition as the absolute path
+        self.db_path = path.join(self.db_dir, self.db_name)
         Config.db_path = self.db_path # Necessary for Database object definition
 
         if self.from_database or self.to_database:
@@ -178,29 +218,17 @@ class Series(list):
     def configure_traceback(self):
         """ Check configuration parameters for traceback and output from data or simulation. """
 
-        # Check if all the traceback parameters are present in the configuration
-        for parameter in (
-                'number_of_groups', 'number_of_steps', 'initial_time', 'final_time'):
-            self.stop(vars(self.config)[parameter].values is None, 'NameError',
-                "Required traceback parameter '{}' is missing in the configuration.", parameter)
-
         # number_of_groups parameter
-        self.number_of_groups = self.integer(self.config.number_of_groups, 'number_of_groups')
+        self.number_of_groups = self.configure_integer(self.config.number_of_groups)
 
         # number_of_steps parameter: one more step to account for t = 0
-        self.number_of_steps = self.integer(self.config.number_of_steps, 'number_of_steps') + 1
+        self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
 
         # initial_time parameter
-        self.stop(type(self.config.initial_time.values) not in (int, float), 'TypeError',
-            "'initial_time' must be an integer or a float ({} given).",
-            type(self.config.initial_time.values))
-        self.initial_time = float(self.config.initial_time.values)
+        self.initial_time = self.configure_value(self.config.initial_time)
 
         # final_time parameter
-        self.stop(type(self.config.final_time.values) not in (int, float), 'TypeError',
-            "'final_time' must be an integer or a float ({} given).",
-            type(self.config.final_time.values))
-        self.final_time = float(self.config.final_time.values)
+        self.final_time = self.configure_value(self.config.final_time)
         self.stop(not self.final_time > self.initial_time, 'ValueError',
             "'final_time' must be greater than initial_time ({} and {} given).",
             self.final_time, self.initial_time)
@@ -227,7 +255,7 @@ class Series(list):
 
         # Check if data is present
         self.stop(self.config.data is None, 'NameError',
-            "No data provided for traceback '{}'.", self.name)
+            "Required traceback parameter 'data' is missing in the configuration.")
 
         # Stars creation from data
         from data import Data
@@ -250,118 +278,135 @@ class Series(list):
 
         # Check if all the necessary parameters are present
         for parameter in (
-                'number_of_stars', 'age', 'avg_position', 'avg_velocity', 'avg_position_error',
-                'avg_velocity_error', 'avg_position_scatter', 'avg_velocity_scatter'):
+                'number_of_stars', 'age', 'avg_position', 'avg_position_error',
+                'avg_position_scatter', 'avg_velocity', 'avg_velocity_error',
+                'avg_velocity_scatter'):
             self.stop(vars(self.config)[parameter].values is None, 'NameError',
                 "Required simulation parameter '{}' is missing in the configuration.", parameter)
 
         # number_of_stars parameter
-        self.number_of_stars = self.integer(self.config.number_of_stars, 'number_of_stars')
+        self.number_of_stars = self.configure_integer(self.config.number_of_stars)
 
         # age parameter
-        self.stop(type(self.config.age.values) not in (int, float), 'TypeError',
-            "'age' must be an integer or a float ({} given).", type(self.config.age.values))
-        self.age = float(self.config.age.values)
+        self.age = self.configure_value(self.config.age)
         self.stop(not self.age >= 0.0, 'ValueError',
             "'age' must be greater than or equal to 0.0 ({} given).", self.age)
 
         # avg_position parameter
-        self.avg_position = self.quantify('avg_position', self.config.avg_position)
+        self.avg_position = self.configure_vector(self.config.avg_position)
 
         # avg_position_error parameter
-        self.avg_position_error = self.quantify(
-            'avg_position_error', self.config.avg_position_error)
+        self.avg_position_error = self.configure_vector(self.config.avg_position_error)
 
         # avg_position_scatter parameter
-        self.avg_position_scatter = self.quantify(
-            'avg_position_scatter', self.config.avg_position_scatter)
+        self.avg_position_scatter = self.configure_vector(self.config.avg_position_scatter)
 
         # avg_velocity parameter
-        self.avg_velocity = self.quantify('avg_velocity', self.config.avg_velocity)
+        self.avg_velocity = self.configure_vector(self.config.avg_velocity)
 
         # avg_velocity_error parameter
-        self.avg_velocity_error = self.quantify(
-            'avg_velocity_error', self.config.avg_velocity_error)
+        self.avg_velocity_error = self.configure_vector(self.config.avg_velocity_error)
 
         # avg_velocity_scatter parameter
-        self.avg_velocity_scatter = self.quantify(
-            'avg_velocity_scatter', self.config.avg_velocity_scatter)
+        self.avg_velocity_scatter = self.configure_vector(self.config.avg_velocity_scatter)
 
         # Data set to None because stars are simulated
         self.data = None
 
-    def integer(self, number, name):
+    def configure_integer(self, parameter):
         """ Checks if an integer value is valid and converts it if needed. """
 
-        # Type check
-        self.stop(type(number.values) not in (int, float), 'TypeError',
-            "'{}' must be an integer or a float ({} given).", name, type(number.values))
+        # Check the presence and type of values component
+        self.stop(parameter.values is None, 'NameError',
+            "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
+        self.stop(type(parameter.values) not in (int, float), 'TypeError', "'{}' must be "
+            "an integer or a float ({} given).", parameter.label, type(parameter.values))
 
-        # Check if the value is convertible to an integer and greater than equal to 1
-        self.stop(number.values % 1 != 0, 'ValueError',
-            "'{}' must be convertible to an integer ({} given).", name, number.values)
-        self.stop(number.values < 1, 'ValueError',
-            "'{}' must be greater than or equal to 1 ({} given).", name, number.values)
+        # Check if the value is convertible to an integer and greater than or equal to 1
+        self.stop(parameter.values % 1 != 0, 'ValueError', "'{}' must be convertible "
+            "to an integer ({} given).", parameter.label, parameter.values)
+        self.stop(parameter.values < 1, 'ValueError', "'{}' must be "
+            "greater than or equal to 1 ({} given).", parameter.label, parameter.values)
 
         # Conversion to integer
-        return int(number.values)
+        return int(parameter.values)
 
-    def float(self):
-        """ Checks if a float value is valid and converts it if needed. """
+    def configure_value(self, parameter):
+        """ Checks if a value is valid and converts it to default units if needed. """
 
-        pass
+        # Check the presence and type of values component
+        self.stop(parameter.values is None, 'NameError',
+            "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
+        self.stop(type(parameter.values) not in (int, float), 'TypeError', "'{}' must be "
+            " an integer or a float ({} given).", parameter.label, type(parameter.values))
 
-    def quantify(self, name, parameter):
+        # Default units component
+        if parameter.units is None:
+            parameter.units = self.config.default_parameter[parameter.label].units
+        self.stop(type(parameter.units) != str, 'TypeError', "'units' component of '{}' "
+            "must be a string ({} given).", parameter.label, type(parameter.values))
+
+        # Check if units component can be converted to un.Units
+        try:
+            un.Unit(parameter.units)
+        except:
+            self.stop(True, 'ValueError',
+                "'units' component of '{}' must represent a unit.", parameter.label)
+
+        # Quantity object creation
+        try:
+            quantity = Quantity(**vars(parameter))
+        except:
+            self.stop(True, 'ValueError',
+                "'{}' could not be converted to a Quantity object.", parameter.label)
+
+        # Check if the physical type is valid
+        physical_type = un.Unit(self.config.default_parameters[parameter.label].units).physical_type
+        self.stop(quantity.physical_types.flatten()[0] != physical_type, 'ValueError',
+            "Unit of '{}' does not have the correct physical type ('{}' given, '{}' required).",
+            parameter.label, quantity.physical_types.flatten()[0], physical_type)
+
+        # Unit conversion
+        return float(quantity.to().values.flatten()[0])
+
+    def configure_vector(self, parameter):
         """ Converts a Parameter into a Quantity object and raises an error if an exception
-            occurs in the process. Returns a value converted into the correct units for the
+            occurs in the process. Returns a vector converted into the correct units for the
             physical type defined by a Variable object.
         """
 
-        # Check the type of parameter
-        self.stop(type(parameter) != Config.Parameter, 'TypeError',
-            "'{}' must be a Config.Parameter object ({} given).", name, type(parameter))
-
-        # Check if all necessary components are present
-        for component in ('values', 'units', 'system', 'axis'):
-            self.stop(component not in vars(parameter).keys(), 'NameError'
-                "Component '{}' is missing in '{}' parameter.", component, name)
-        # Check for invalid components
-        for component in vars(parameter).keys():
-            self.stop(component not in ('name', 'label', 'values', 'units', 'system', 'axis'),
-                'NameError', "Component '{}' is an invalid parameter for '{}'.", component, name)
-
         # Default system component
         if parameter.system is None:
-            parameter.system = self.system
+            parameter.system = 'cartesian'
         # Check the type of system component
         self.stop(type(parameter.system) != str, 'TypeError',
-            "'system' component of '{}' must be a string ({}).", name, type(parameter.system))
+            "'system' component of '{}' must be a string ({}).", parameter.label, type(parameter.system))
         # Check the value of system component
         parameter.system = parameter.system.lower()
         self.stop(parameter.system not in systems.keys(), 'ValueError',
             "'system' component of '{}' is not a valid ({} required, {} given).",
-            name, list(systems.keys()), parameter.system)
+            parameter.label, list(systems.keys()), parameter.system)
         system = systems[parameter.system]
 
         # Default axis component
         if parameter.axis is None:
-            parameter.axis = self.axis
+            parameter.axis = 'galactic'
         # Check the type of axis component
-        self.stop(type(parameter.axis) != str, 'TypeError',
-            "'axis' component of '{}' must be a string ({}).", name, type(parameter.axis))
+        self.stop(type(parameter.axis) != str, 'TypeError', "'axis' component of '{}' must be "
+            "a string ({}).", parameter.label, type(parameter.axis))
         # Check the value of axis component
         parameter.axis = parameter.axis.lower()
         self.stop(parameter.axis not in system.axis.keys(), 'ValueError',
             "'axis' component of '{}' is not a valid ({} required, {} given).",
-            name, list(system.axis.keys()), parameter.axis)
+            parameter.label, list(system.axis.keys()), parameter.axis)
 
         # Variables from name
-        if name in ('avg_position', 'avg_position_error', 'avg_position_scatter'):
+        if parameter.label in ('avg_position', 'avg_position_error', 'avg_position_scatter'):
             variables = system.position
-        elif name in ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
+        elif parameter.label in ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
             variables = system.velocity
         else:
-            self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.name())
+            self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.label)
 
         # Default units component
         if parameter.units is None:
@@ -371,51 +416,53 @@ class Series(list):
             parameter.units = [parameter.units]
         self.stop(type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
             "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
-                name, type(parameter.values))
+                parameter.label, type(parameter.values))
 
         # Check if all elements in units component can be converted to un.Units
         try:
             np.vectorize(un.Unit)(parameter.units)
         except:
             self.stop(True, 'ValueError',
-                "'units' components of '{}' must all represent a unit.", name)
+                "'units' components of '{}' must all represent a unit.", parameter.label)
 
-        # Check the type of values component
+        # Check the presence and type of values component
         self.stop(parameter.values is None, 'TypeError',
-            "'values' component of '{}' cannot be None ({} given.)", name, parameter.values)
+            "Required simulation parameter '{}' is missing in the configuration.", parameter.label)
         self.stop(type(parameter.values) not in (tuple, list, np.ndarray), 'TypeError',
-            "'values' compoent of '{}' must be a tuple, list or np.ndarray ({} given).'",
-                name, type(parameter.values))
+            "'values' component of '{}' must be a tuple, list or np.ndarray ({} given).'",
+                parameter.label, type(parameter.values))
 
         # Check if all elements in values component are numerical
         try:
             np.vectorize(float)(parameter.values)
         except:
             self.stop(True, 'ValueError',
-                "'values' component of '{}' contains non-numerical elements.'", name)
+                "'values' component of '{}' contains non-numerical elements.'", parameter.label)
 
-        # Check dimensions of values component
+        # Check the dimensions of values component
         shape = np.array(parameter.values).shape
         ndim = len(shape)
         self.stop(ndim > 2, 'ValueError', "'{}' must have 1 or 2 dimensions ({} given).",
-            name, ndim)
+            parameter.label, ndim)
         self.stop(shape[-1] != 3, 'ValueError',
-            "'{}' last dimension must have a size of 3 ({} given).", name, shape[-1])
+            "'{}' last dimension must have a size of 3 ({} given).", parameter.label, shape[-1])
         self.stop(ndim == 2 and shape[0] not in (1, self.number_of_stars),
-            'ValueError',  "'{}' first dimension ({} given) must have a size of 1 "
-            "or equal to the number of stars ({} given).", name, shape[0], self.number_of_stars)
+            'ValueError',  "'{}' first dimension ({} given) must have a size of 1 or equal "
+            "to the number of stars ({} given).", parameter.label, shape[0], self.number_of_stars)
 
         # Quantity object creation
         try:
             quantity = Quantity(**vars(parameter))
         except:
-            self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.", name)
+            self.stop(True, 'ValueError',
+                "'{}' could not be converted to a Quantity object.", parameter.label)
 
         # Physical types
         physical_types = [variable.physical_type for variable in variables]
         self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
-            "Units in '{}' do not have the correct physical type ({} given, {} required for '{}' "
-            "system.)", name, quantity.physical_types.tolist(), physical_types, quantity.system)
+            "Units in '{}' do not have the correct physical "
+            "type ({} given, {} required for '{}' system.)",
+            parameter.label, quantity.physical_types.tolist(), physical_types, quantity.system)
 
         # Units conversion
         return quantity

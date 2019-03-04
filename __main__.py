@@ -16,7 +16,9 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Series configuration
-Series(Config('config.py', args=True))
+a = Config('config.py', args=True)
+
+Series(a)
 
 # Groups creation
 groups.create()

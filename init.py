@@ -17,14 +17,13 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 
 class System():
-    """ Defines a Coordinate system object with Variable objects.
-    """
-    def __init__(self, name: str, index: int, position: tuple, velocity: tuple):
+    """ Defines a Coordinates system object with Variable objects. """
+    
+    def __init__(self, name: str, position: tuple, velocity: tuple):
         """ Initializes a System from position and velocity tuples with 3 Variables objects. """
 
         # Name and index
         self.name = name
-        self.index = index
 
         # Values
         self.position = [self.variables[label] for label in position]
@@ -54,21 +53,20 @@ class System():
         'angular_speed': Unit('rad/Myr', 'radian per megayear', un.rad/un.Myr)}
 
     class Axis():
-        """Defines a Coordinate system axis."""
+        """ Defines a Coordinate system axis."""
 
-        def __init__(self, name, index):
-            """Initializes an Axis object."""
+        def __init__(self, name):
+            """ Initializes an Axis object. """
 
             # Name and index
             self.name = name
-            self.index = index
 
     # Coordinate system axis
-    axis = {axis.name: axis for axis in (Axis('galactic', 0), Axis('equatorial', 1))}
+    axis = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
 
     class Variable():
+        """ Defines a Variable object and required variables from all systems. """
 
-        """ Defines a Variable object and required variables and default units per physical type. """
         def __init__(self, label, name, unit):
             """ Initializes a Variable from a name, label and Unit object. """
 
@@ -106,9 +104,9 @@ class System():
 
 # Coordinates system variables !!! Put in Config !!!
 systems = {system.name: system for system in (
-    System('cartesian', 0, ('x', 'y', 'z'), ('u', 'v', 'w')),
-    System('spherical', 1, ('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
-    System('observables', 2, ('p', 'δ', 'α'), ('rv', 'μδ', 'μα_cos_δ')))}
+    System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
+    System('spherical', ('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
+    System('observables', ('p', 'δ', 'α'), ('rv', 'μδ', 'μα_cos_δ')))}
 
 class Config():
     """ Contains the parameters imported from a configuration file (which must be a Python file),
@@ -120,35 +118,38 @@ class Config():
     class Parameter():
         """ Contains the components of a given configuration parameter. """
 
-        # Possible components of a parameter
-        components = ('label', 'name', 'values', 'units', 'system', 'axis')
+        # Default components
+        default_components = {component: None for component in
+            ('label', 'name', 'values', 'units', 'system', 'origin', 'axis')}
 
         def __init__(self, **components):
             """ Initializes a Parameter object with the given components. """
 
             # Initialization
+            vars(self).update(deepcopy(self.default_components))
+
+            # Update
             self.update(components.copy())
 
-            # Remaining components set to None if not specified
-            for key in filter(lambda key: key not in vars(self), self.components):
-                vars(self)[key] = None
+        def update(self, parameter):
+            """ Updates the components of self with those of another parameter or a dictionary
+                of components, only if those new components are part of the components tuple.
+            """
+
+            # Parameter conversion into a dictionary
+            if type(parameter) == type(self):
+                parameter = vars(parameter)
+
+            # Parameter update if present in self.default_components
+            if type(parameter) == dict:
+                vars(self).update({key: component for key, component in parameter.items() \
+                    if key in self.default_components})
 
         def __repr__(self):
             """ Returns a string with all the components of the parameter. """
 
             return '({})'.format(', '.join(
                 ['{}: {}'.format(key, value) for key, value in vars(self).items()]))
-
-        def update(self, parameter):
-            """ Updates the components of self with those of another parameter or a dictionary of
-                components, only if those new components are part of the components tuple.
-            """
-
-            if type(parameter) == type(self):
-                parameter = vars(parameter)
-            if type(parameter) == dict:
-                vars(self).update({key: component for key, component in parameter.items() \
-                    if key in self.components})
 
     # Null parameters
     null_position = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic',
@@ -321,7 +322,7 @@ class Config():
             help='name of the series of tracebacks, used in the database and output.')
         args = parser.parse_args()
 
-        # Series name import, if given
+        # Series name import
         self.name.values = args.name
 
         # Mode import, overwrites any value imported from a path
@@ -343,7 +344,7 @@ class Config():
             if key in vars(self).keys() and type(vars(self)[key]) == Config.Parameter:
                 vars(self)[key].update(parameter)
 
-            # Parameter object import
+            # Parameter object import from default parameters or parent configuration
             elif type(parameter) == Config.Parameter:
                 vars(self)[key] = parameter
 

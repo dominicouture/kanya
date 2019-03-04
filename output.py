@@ -34,22 +34,22 @@ def create_scatter_graph(series):
     plot_i = np.arange(0, len(series), 20)
     for group in series:
         if i in plot_i:
-            plt.plot(series.time, group.mad, '-', color='0.7', linewidth=0.5)
+            plt.plot(series.time, group.scatter, '-', color='0.7', linewidth=0.5)
         i += 1
     mean_mad = np.mean([group.mad for group in series], axis=0)
     mean_scatter = np.mean([group.scatter for group in series], axis=0)
-    plt.plot(series.time, mean_mad, 'k-', linewidth=2.0)
-    ages = [group.mad_age for group in series]
+    plt.plot(series.time, mean_scatter, 'k-', linewidth=2.0)
+    ages = [group.scatter_age for group in series]
     plt.title(
-        "MAD of a β-Pictoris over time with outliers \n"
-        "(+ 0.0 km/s) Average age: ({} ± {}) Myr\n".format(
-            np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
+        "Scatter of a {} simulation overtime \n"
+        "(+ 0.5 km/s) Average age: ({} ± {}) Myr\n".format(
+            series.number_of_groups, np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
     # plt.title(
     #     "Median absolute deviation (MAD) of beta-pictoris\n"
     #     "over time. Average age: ({} ± {}) Myr.\n".format(
     #         np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
     plt.xlabel('Time (Myr)')
-    plt.ylabel('MAD (pc)')
+    plt.ylabel('Scatter (pc)')
 #    plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
 #    plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 #    plt.xlim(14, 34)
@@ -142,15 +142,30 @@ def plot_age_error():
 
     rcParams.update({'font.family': 'serif', 'font.size': '14'})
     plt.figure(figsize=(12, 8), facecolor='w')
-    plt.errorbar(
+    plt.errorbar( # + 0.0 km/s
         [0.0, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0],
-        [22.789, 22.747, 22.660, 22.010, 19.984, 14.808, 7.630],
-        yerr=[0.481, 0.497, 0.548, 0.722, 1.072, 1.414, 1.278], fmt='o', color='0.0')
+        [23.805, 23.786, 23.696, 23.159, 21.458, 16.370, 8.410],
+        yerr=[0.265, 0.284, 0.359, 0.550, 1.023, 1.426, 1.511], fmt='o', color='0.0', label='+ 0.0 km/s')
+    plt.errorbar( # 0.5 km/s
+        [0.0, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0],
+        [20.573, 20.539, 20.499, 20.154, 19.004, 15.423, 8.804],
+        yerr=[0.254, 0.292, 0.314, 0.504, 0.789, 1.143, 1.319], fmt='D', color='0.2', label='+ 0.5 km/s')
+    plt.errorbar( # 1.0 km/s
+        [0.0, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0],
+        [18.01, 18.00, 17.992, 17.731, 16.892, 14.337, 8.932],
+        yerr=[0.315, 0.326, 0.343, 0.504, 0.685, 1.044, 1.116], fmt='^', color='0.4', label='+ 1.0 km/s')
+    plt.axvline(x=1.0112, ymin=0.0, ymax = 25, linewidth=1, color='k', ls='dashed')
+    plt.text(1.05, 24, 'β-Pictoris typical RV error.', horizontalalignment='left', fontsize=8)
     plt.title(
         "Measured age of a simulation of 1000 24 Myr-old groups \n"
         "over the measurement error on RV (other errors typical of Gaia DR2)\n")
     plt.xlabel('Error on RV (km/s)')
     plt.ylabel('Age (Myr)')
+    plt.xticks([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
+    plt.yticks([6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0])
+    plt.xlim(-0.1, 4.1)
+    plt.ylim(6, 24.5)
+    plt.legend(loc='upper right')
     plt.show()
 
 def create_scatter_plot(group, age):

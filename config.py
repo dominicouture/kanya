@@ -30,7 +30,7 @@ logs_dir.values = 'Logs'
 db_path.values = ''
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.values = 100
+number_of_groups.values = 10
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 number_of_steps.values = 200
@@ -60,11 +60,12 @@ avg_position_error.axis = 'equatorial'
 avg_position_scatter.values = (5.0, 5.0, 5.0) # (29.3, 14.0, 9.0)
 
 # Average velocity of the simulated sample of stars (tuple)
-avg_velocity.values = (-10.54893, -15.88653,  -8.71138) # (-11.3442, -11.3442, -11.3442)
+avg_velocity.values =  (-11.3442, -11.3442, -11.3442) # (-10.54893, -15.88653,  -8.71138)
 avg_velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-avg_velocity_error.values = (1.0112, 0.30754, 0.26432) # (0.0, 0.0, 0.0)
+avg_velocity_error.values = (1.0112, 0.30754, 0.26432)
+# avg_velocity_error.values = (4.0, 0.30754, 0.26432)
 avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 avg_velocity_error.system = 'observables'
 avg_velocity_error.axis = 'equatorial'

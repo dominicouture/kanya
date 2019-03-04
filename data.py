@@ -64,8 +64,8 @@ class Data(list):
         elif type(self.series.config.data.values) in (dict, list, tuple, np.ndarray):
             self.initialize_from_data()
         else:
-            Series.stop(Series, True, 'TypeError', "'data.values' parameter must be a path to "
-                "a CSV fileor a Python dictionary, list, tuple or np.ndarray. ({} given).",
+            Series.stop(Series, True, 'TypeError', "'data.values' component must be a path to "
+                "a CSV file or a Python dictionary, list, tuple or np.ndarray. ({} given).",
                 type(self.series.config.data.values))
 
         # Coordinates system

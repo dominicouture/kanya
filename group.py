@@ -74,7 +74,7 @@ class Group(list):
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα,
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
-                    *star.position[0], *star.velocity[0] + np.array([0.0, 0.0, 0.0]), *star.position[2], *star.velocity[2])
+                    *star.position[0], *star.velocity[0] + np.array([0.5, 0.0, 0.0]), *star.position[2], *star.velocity[2])
             # Equatorial spherical coordinates conversion into galactic cartesian coordinates
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
                 *position_rδα, *position_rδα_error)
@@ -118,7 +118,7 @@ class Group(list):
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array((0.0, 0.0, 0.0))
+            velocity_rvμδμα = velocity_rvμδμα + np.array((1.0, 0.0, 0.0))
             position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
 
             # Velocity and position conversion to observables
