@@ -11,15 +11,19 @@ import fileinput
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
+# Loop over age, average position scatter and number of stars
 for age in  [5.0, 10.0, 50.0, 100.0] :
     for avg_position_scatter in [5.0, 10.0, 15.0, 20.0, 25.0]:
         avg_position_scatter = (avg_position_scatter,) * 3
         for number_of_stars in [30, 40, 50, 60, 100, 200]:
-            # Modification of config.py
+
+            # Import of old config.py
             config = open('config.py', 'r')
             lines = [line for line in config.readlines()]
             config.close()
             os.remove('config.py')
+
+            # Creation of new config.py
             config = open('config.py', 'w')
             for line in lines:
                 if line.startswith('number_of_stars'):
@@ -36,12 +40,16 @@ for age in  [5.0, 10.0, 50.0, 100.0] :
                     config.write(line)
             config.close()
 
+# Loop over average velocity error
 for avg_velocity_error in  [0.05, 0.1, 0.15]:
-    # Modification of config.py
+
+    # Import config.py
     config = open('config.py', 'r')
     lines = [line for line in config.readlines()]
     config.close()
     os.remove('config.py')
+
+    # Creation of new config.py
     config = open('config.py', 'w')
     for line in lines:
         if line.startswith('avg_velocity_error'):

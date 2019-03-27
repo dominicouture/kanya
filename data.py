@@ -64,23 +64,9 @@ class Data(list):
         elif type(self.series.config.data.values) in (dict, list, tuple, np.ndarray):
             self.initialize_from_data()
         else:
-            Series.stop(Series, True, 'TypeError', "'data.values' component must be a path to "
+            self.series.stop(True, 'TypeError', "'data.values' component must be a path to "
                 "a CSV file or a Python dictionary, list, tuple or np.ndarray. ({} given).",
                 type(self.series.config.data.values))
-
-        # Coordinates system
-        Series.stop(Series, type(self.series.config.data.system) != str, 'TypeError',
-            "'data.system' must be a string ({} given).", type(self.series.config.data.system))
-        self.system = self.series.config.data.system.lower()
-        Series.stop(Series, self.system not in Config.systems.keys(), 'ValueError',
-            "'{}' is not a valid system value.", self.system)
-
-        # Coordinates system axis
-        Series.stop(Series, type(self.series.config.data.axis) != str, 'TypeError',
-            "'data.axis' must be a string ({} given).", type(self.series.config.data.axis))
-        self.axis = self.series.config.data.axis.lower()
-        Series.stop(Series, self.axis not in System.axis, 'ValueError',
-            "'{}' is not a valid axis value.", self.axis)
 
         # Data configuration
         self.configure_data()
@@ -102,17 +88,17 @@ class Data(list):
                 if type(self.series.config.data.values[self.series.name]) in (list, tuple, np.ndarray):
                     self.data = np.array(self.series.config.data.values[self.series.name], dtype=object)
                 else:
-                    Series.stop(Series, True, 'TypeError', "Data '{}' in the Python dictionary "
+                    self.series.stop(True, 'TypeError', "Data '{}' in the Python dictionary "
                         "must be a list, tuple or np.ndarray. ('{}' given).",
                         self.series.name, type(self.series.config.data.values[self.series.name]))
             else:
-                Series.stop(Series, True, 'ValueError' "Group '{}' is not in the data dictionary.",
+                self.series.stop(True, 'ValueError' "Group '{}' is not in the data dictionary.",
                     self.series.name)
         if type(self.series.config.data.values) in (list, tuple, np.ndarray):
             self.data = np.array(self.series.config.data.values, dtype=object)
 
         # Check if self.data has been converted a 2D array
-        Series.stop(Series, self.data.ndim != 2, 'ValueError',
+        self.series.stop(self.data.ndim != 2, 'ValueError',
             "'data' parameter must represent a 2D array ({} dimensions in the given data).",
             self.data.ndim)
 
@@ -120,7 +106,7 @@ class Data(list):
         try:
             self.data = np.vectorize(lambda value: str(value))(self.data)
         except ValueError:
-            Series.stop(Series, True, 'ValueError', "Data could not be converted to string.")
+            self.series.stop(True, 'ValueError', "Data could not be converted to string.")
 
     def initialize_from_CSV(self):
         """ Initializes a Data object from the data 'series.name' in a CSV file. If the the CSV
@@ -138,10 +124,10 @@ class Data(list):
         self.data_path = path.abspath(self.series.config.data.values)
         chdir(working_dir)
         # Check if the path exists
-        Series.stop(Series, not path.exists(self.data_path), 'NameError',
+        self.series.stop(not path.exists(self.data_path), 'NameError',
             "'{}' does not exist.", self.data_path)
         # Check if the path links to a CSV file.
-        Series.stop(Series, path.splitext(self.data_path)[1] != '.csv', 'TypeError',
+        self.series.stop(path.splitext(self.data_path)[1] != '.csv', 'TypeError',
             "'{}' is not a CSV data file.", self.data_path)
 
         # Reading of CSV file.
@@ -149,7 +135,7 @@ class Data(list):
         dialect = Sniffer().sniff(data_csv.read(2048))
         data_csv.seek(0)
         # Check if the file has a header
-        Series.stop(Series, not Sniffer().has_header(data_csv.read(2048)), 'ValueError',
+        self.series.stop(not Sniffer().has_header(data_csv.read(2048)), 'ValueError',
             "The CSV data file located at '{}' doesn't have a header.", self.data_path)
         data_csv.seek(0)
         # Data import
@@ -176,20 +162,21 @@ class Data(list):
                 label = 'Δ' + label[:-1]
             if label[0] == 'e':
                 label = 'Δ' + label[1:]
-            if self.system == 'observables' and label[-2:] == 'μα':
-                label = label + '_cos_δ'
+            if self.series.config.data.system.name == 'observables' and label[-2:] == 'μα':
+                label = label + 'cosδ'
             self.columns[label] = i
 
         # Value labels identification
-        self.position_labels, self.velocity_labels = Config.systems[self.system]
-        self.value_labels = {
-            label: Config.names[label] for label in self.position_labels + self.velocity_labels}
+        self.position_labels = [variable.label for variable in self.series.config.data.system.position]
+        self.velocity_labels = [variable.label for variable in self.series.config.data.system.velocity]
+        self.value_labels = {label: self.series.config.data.system.variables[label].name \
+            for label in self.position_labels + self.velocity_labels}
         for label in self.value_labels.keys():
             if label not in self.columns.keys():
-                Series.stop(Series, self.from_CSV, 'NameError',
+                self.series.stop(self.from_CSV, 'NameError',
                     "The column '{}' ('{}') is missing from the CSV data file located at '{}'.",
                     self.value_labels[label], label, self.data_path)
-                Series.stop(Series, self.from_data, 'NameError',
+                self.series.stop(self.from_data, 'NameError',
                     "The column '{}' ('{}') is missing from the data.",
                     self.value_labels[label], label)
 
@@ -198,10 +185,10 @@ class Data(list):
         self.velocity_error_labels = tuple('Δ' + label for label in self.velocity_labels)
         self.error_labels = {
             'Δ' + label: name + ' error' for label, name in self.value_labels.items()}
-        # !!! Replace these lines !!!
-        for label, name in self.error_labels.items():
-            Config.physical_types[label] = Config.physical_types[label[1:]]
-            Config.names[label] = name
+        # !!! Remove these lines !!!
+        # for label, name in self.error_labels.items():
+        #     Config.physical_types[label] = Config.physical_types[label[1:]]
+        #     Config.names[label] = name
         self.labels = {**self.value_labels, **self.error_labels}
 
         # Units header identification
@@ -218,21 +205,27 @@ class Data(list):
             if label in self.columns and self.units_header is not None and \
                     self.units_header[self.columns[label]] != '':
                 try:
-                    self.units[label] = un.Unit(self.units_header[self.columns[label]])
+                    self.units[label] = self.series.config.data.system.Unit(
+                        self.units_header[self.columns[label]])
                 except ValueError:
-                    Series.stop(Series, True, 'ValueError',
+                    self.series.stop(True, 'ValueError',
                         "Unit '{}' used for column '{}' is not valid.",
                         self.units_header[self.columns[label]], self.header(self.columns[label]))
             else:
-                self.units[label] = Config.default_units[Config.physical_types[label]]
+                # !!! Add check for data.units here !!!
+                self.units[label] = self.series.config.data.system.default_units[
+                    self.series.config.data.system.variables[label].physical_type].unit
+
         # Check for units physical types
         for label in self.columns.keys():
             if label in self.labels:
-                Series.stop(Series, self.units[label].physical_type != Config.physical_types[label],
+                self.series.stop(self.units[label].physical_type \
+                    != self.series.config.data.system.variables[label].physical_type,
                     'ValueError', "The unit used for the '{}' ('{}') column, '{}', has "
-                        "an incorrect physical type ('{}' required, '{}' given)",
-                    Config.names[label], label, str(self.units[label]),
-                    Config.physical_types[label], self.units[label].physical_type)
+                    "an incorrect physical type ('{}' required, '{}' given)",
+                    self.labels[label], label, str(self.units[label]),
+                    self.series.config.data.system.variables[label].physical_type,
+                    self.units[label].physical_type)
 
         # Lines identification and group filtering
         if 'group' in self.columns:
@@ -241,10 +234,10 @@ class Data(list):
                 if self.data[self.columns['group'], line] == self.series.name:
                     self.lines.append(i)
             if len(self.lines) == 0:
-                Series.stop(Series, self.from_CSV, 'ValueError',
+                self.series.stop(self.from_CSV, 'ValueError',
                     "No data for the group '{}' in the CSV data file located at '{}'.",
                     self.series.name, self.data_path)
-                Series.stop(Series, self.from_data, 'ValueError',
+                self.series.stop(self.from_data, 'ValueError',
                     "No information for the group '{}' in the data.",
                     self.series.name, self.data_path)
         else:
@@ -268,6 +261,7 @@ class Data(list):
                 dictionary containing the information found on one line of a dictionary or CSV
                 file. Default values are given if
             """
+
             # Name column
             self.name = line['name'] if 'name' in data.columns and line['name'] != '' \
                 else 'Star_{}'.format(str(i))
@@ -289,10 +283,11 @@ class Data(list):
                     try:
                         line[label] = float(line[label].replace(',', '.'))
                     except ValueError:
-                        Series.stop(Series, True, 'ValueError',
+                        self.series.stop(True, 'ValueError',
                             "'{}' value could not be converted to float in '{}' column.",
                             line[label], label)
 
+            # Convert into Quantity objects.
             # Position columns
             self.position = (
                 np.array([line[label] for label in data.position_labels]),

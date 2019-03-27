@@ -16,14 +16,13 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Series configuration
-a = Config('config.py', args=True)
-
-Series(a)
+a = Series(Config('config.py', args=True))
 
 # Groups creation
 groups.create()
 
 # Output export
 for name, series in groups.items():
-    # create_scatter_plot(series[0], 100)
     create_scatter_graph(series)
+    # for group in series:
+    #     # create_scatter_plot(series[0], 100)

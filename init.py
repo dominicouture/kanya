@@ -15,10 +15,9 @@ from copy import deepcopy
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-
 class System():
     """ Defines a Coordinates system object with Variable objects. """
-    
+
     def __init__(self, name: str, position: tuple, velocity: tuple):
         """ Initializes a System from position and velocity tuples with 3 Variables objects. """
 
@@ -36,21 +35,27 @@ class System():
     class Unit():
         """ Defines default units per physical type, and their label and name. """
 
-        def __init__(self, label, name, unit):
-            """ Initializes a Unit from name, label and an Astropy Units object. """
+        def __init__(self, label, name=None):
+            """ Initializes a Unit from name, label and an Astropy Units object.
+                !!!System.Unit class must be used during unit conversion instead of unit
+                label (input of Quantity ?) and un.Unit() calls. !!!
+            """
 
+            # Initialization
             self.label = label
-            self.name = name
-            self.unit = unit
-            self.physical_type = unit.physical_type
+            self.unit = un.Unit(label)
+            self.physical_type = self.unit.physical_type
+
+            # Unit name
+            self.name = name if name is not None and type(name) == str else self.unit.to_string()
 
     # Default units per physical type dictionary
     default_units = {
-        'time': Unit('Myr', 'megayear', un.Myr),
-        'length': Unit('pc', 'parsec', un.pc),
-        'speed': Unit('pc/Myr', 'parsec per megayear', un.pc/un.Myr),
-        'angle': Unit('rad', 'radian', un.rad),
-        'angular_speed': Unit('rad/Myr', 'radian per megayear', un.rad/un.Myr)}
+        'time': Unit('Myr', 'megayear'),
+        'length': Unit('pc', 'parsec'),
+        'speed': Unit('pc/Myr', 'parsec per megayear'),
+        'angle': Unit('rad', 'radian'),
+        'angular speed': Unit('rad/Myr', 'radian per megayear')}
 
     class Axis():
         """ Defines a Coordinate system axis."""
@@ -58,11 +63,19 @@ class System():
         def __init__(self, name):
             """ Initializes an Axis object. """
 
-            # Name and index
+            # Initialization
             self.name = name
 
     # Coordinate system axis
     axis = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
+
+    class Origin(Axis):
+        """ Defines a Coordinate system origin."""
+
+        pass
+
+    # Coordinate system axis
+    origins = {origin.name: origin for origin in (Origin('sun'), Axis('galaxy'))}
 
     class Variable():
         """ Defines a Variable object and required variables from all systems. """
@@ -70,6 +83,7 @@ class System():
         def __init__(self, label, name, unit):
             """ Initializes a Variable from a name, label and Unit object. """
 
+            # Initialization
             self.label = label
             self.name = name
             self.unit = unit
@@ -77,6 +91,7 @@ class System():
 
     # Variables dictionary
     variables = {variable.label: variable for variable in (
+
         # Castesian coordinate system variables
         Variable('x', 'y position', default_units['length']),
         Variable('y', 'y position', default_units['length']),
@@ -84,29 +99,24 @@ class System():
         Variable('u', 'u velocity', default_units['speed']),
         Variable('v', 'v velocity', default_units['speed']),
         Variable('w', 'w velocity', default_units['speed']),
+
         # Spherical coordinates system variables
         Variable('r', 'distance', default_units['length']),
         Variable('δ', 'declination', default_units['angle']),
         Variable('α', 'right ascension', default_units['angle']),
         Variable('rv', 'radial velocity', default_units['speed']),
-        Variable('μδ', 'declination proper motion', default_units['angular_speed']),
-        Variable('μα', 'right ascension proper motion', default_units['angular_speed']),
+        Variable('μδ', 'declination proper motion', default_units['angular speed']),
+        Variable('μα', 'right ascension proper motion', default_units['angular speed']),
+
         # Observable coordinates system variables
         Variable('p', 'paralax', default_units['angle']),
-        Variable('μα_cos_δ', 'right ascension proper motion * cos(declination)',
-            default_units['angular_speed'])
-    )}
+        Variable('μαcosδ', 'right ascension proper motion * cos(declination)',
+            default_units['angular speed']))}
 
     # Error variables creation
     for label, variable in variables.copy().items():
         variables['Δ' + label] = Variable(
             'Δ' + label, variable.name + ' error', variable.unit)
-
-# Coordinates system variables !!! Put in Config !!!
-systems = {system.name: system for system in (
-    System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
-    System('spherical', ('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
-    System('observables', ('p', 'δ', 'α'), ('rv', 'μδ', 'μα_cos_δ')))}
 
 class Config():
     """ Contains the parameters imported from a configuration file (which must be a Python file),
@@ -115,12 +125,18 @@ class Config():
         object can then be used as the input of a Series object.
     """
 
+    # Coordinates systems
+    systems = {system.name: system for system in (
+        System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
+        System('spherical', ('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
+        System('observables', ('p', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ')))}
+
     class Parameter():
         """ Contains the components of a given configuration parameter. """
 
         # Default components
         default_components = {component: None for component in
-            ('label', 'name', 'values', 'units', 'system', 'origin', 'axis')}
+            ('label', 'name', 'values', 'units', 'system', 'axis', 'origin')}
 
         def __init__(self, **components):
             """ Initializes a Parameter object with the given components. """
@@ -152,10 +168,11 @@ class Config():
                 ['{}: {}'.format(key, value) for key, value in vars(self).items()]))
 
     # Null parameters
-    null_position = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic',
+    null_position = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
         units=tuple(variable.unit.label for variable in systems['cartesian'].position))
-    null_velocity = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic',
+    null_velocity = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
         units=tuple(variable.unit.label for variable in systems['cartesian'].velocity))
+    null_time = dict(units=System.default_units['time'].label, system='cartesian')
 
     # Default parameters
     default_parameters = {parameter.label: parameter for parameter in (
@@ -169,70 +186,16 @@ class Config():
         Parameter(label='number_of_groups', name='Number of groups', values=1),
         Parameter(label='number_of_steps', name='Number of steps', values=1),
         Parameter(label='number_of_stars', name='Number of star'),
-        Parameter(label='initial_time', name='Initial time', values=0.0,
-            units=System.default_units['time'].label),
-        Parameter(label='final_time', name='Final time', units=System.default_units['time'].label),
-        Parameter(label='age', name='Age', units=System.default_units['time'].label),
+        Parameter(label='initial_time', name='Initial time', values=0.0, **null_time),
+        Parameter(label='final_time', name='Final time', **null_time),
+        Parameter(label='age', name='Age', **null_time),
         Parameter(label='avg_position', name='Average position', **null_position),
         Parameter(label='avg_position_error', name='Average position error', **null_position),
         Parameter(label='avg_position_scatter', name='Average position scatter', **null_position),
         Parameter(label='avg_velocity', name='Average velocity', **null_velocity),
         Parameter(label='avg_velocity_error', name='Average velocity error', **null_velocity),
         Parameter(label='avg_velocity_scatter', name='Average velocity scatter', **null_velocity),
-        Parameter(label='data', name='Data', system='cartesian', axis='galactic')
-    )}
-
-    # Label names
-    names = {
-        'r': 'distance',
-        'p': 'paralax',
-        'δ': 'declination',
-        'α': 'right ascension',
-        'rv': 'radial velocity',
-        'μδ': 'declination proper motion',
-        'μα': 'right ascension proper motion',
-        'μα_cos_δ': 'right ascension proper motion * cos(declination)',
-        'x': 'x position',
-        'y': 'y position',
-        'z': 'z position',
-        'u': 'u velocity',
-        'v': 'v velocity',
-        'w': 'w velocity'
-    }
-
-    # Label physical types
-    physical_types = {
-        'r': 'length',
-        'p': 'angle',
-        'δ': 'angle',
-        'α': 'angle',
-        'rv': 'speed',
-        'μδ': 'angular speed',
-        'μα': 'angular speed',
-        'μα_cos_δ': 'angular speed',
-        'x': 'length',
-        'y': 'length',
-        'z': 'length',
-        'u': 'speed',
-        'v': 'speed',
-        'w': 'speed'
-    }
-
-    # Default units per physical type: speed and angular speed must match time, lengh and angle
-    default_units = {
-        'time': un.Myr,
-        'length': un.pc,
-        'speed': (un.pc/un.Myr),
-        'angle': un.rad,
-        'angular speed': (un.rad/un.Myr)
-    }
-
-    # Coordinates system labels
-    systems = {
-        'cartesian':   (('x', 'y', 'z'), ('u', 'v', 'w')),
-        'spherical':   (('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
-        'observables': (('p', 'δ', 'α'), ('rv', 'μδ', 'μα_cos_δ'))
-    }
+        Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'))}
 
     def __init__(self, path=None, args=False, parent=None, **parameters):
         """ Initializes a Config object from a configuration file, command line arguments

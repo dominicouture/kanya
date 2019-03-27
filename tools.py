@@ -633,8 +633,7 @@ class Quantity:
         rounded_values = np.round(self.values, n)
 
         return Quantity(
-            rounded_values, self.units, np.round(self.errors * rounded_values / self.values, n)
-        )
+            rounded_values, self.units, np.round(self.errors * rounded_values / self.values, n))
 
     def __floor__(self):
         """ Computes the floor of a Quantity. """
@@ -697,8 +696,7 @@ class Quantity:
 
         return Quantity(
             self.values + other.values * factors, np.full(shape, self.units),
-            np.vectorize(lambda x, y: np.linalg.norm((x, y)))(self.errors, other.errors * factors)
-        )
+            np.vectorize(lambda x, y: np.linalg.norm((x, y)))(self.errors, other.errors * factors))
 
     def __sub__(self, other):
         """ Computes the substraction for a Quantity. Both arguments have to be Quantities. """
@@ -727,8 +725,8 @@ class Quantity:
         factors = np.vectorize(
             lambda self_unit, other_unit: other_unit.to(self_unit) \
                 if self_unit.physical_type == other_unit.physical_type else 1.0)(
-                self_units, other_units
-            )
+                self_units, other_units)
+
         # Calculation of multiplication values
         mul_values = self.values * (other.values * factors)
 
@@ -829,8 +827,8 @@ class Quantity:
         return self
 
     def __contains__(self, other):
-        """ Determines whether other is in self.
-        """
+        """ Determines whether other is in self. """
+        
         return True
 
     def count(self, other):
@@ -890,14 +888,15 @@ class Quantity:
             raise TypeError('Can only index with integer, not {}.'.format(type(index)))
         if type(item) != type(self):
             item = Quantity(item, self.units[index], self.errors[index])
+
         try:
             self.values[index] = item.values
             self.units[index] = item.units
             self.errors[index] = item.errors
         except IndexError:
             raise IndexError(
-                'Index {} is out of range of axis of size {}.'.format(index, len(self.values))
-            )
+                'Index {} is out of range of axis of size {}.'.format(index, len(self.values)))
+
         if self.parent is not None:
             self.parent[self.index] = self
 
@@ -961,9 +960,8 @@ class Quantity:
                         "Units with shapes {} and {} cannot be broadcast together.".format(
                             self.values.shape, units.shape))
             else:
-                raise TypeError(
-                    "{} is not a supported type (str, *Unit, tuple, list or ndarray) for units.".format(
-                        type(units)))
+                raise TypeError("{} is not a supported type "
+                    "(str, *Unit, tuple, list or ndarray) for units.".format(type(units)))
 
             # Check if physical types of self and units match
             units_physical_types = np.vectorize(lambda unit: unit.physical_type)(units)

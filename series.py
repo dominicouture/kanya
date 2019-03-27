@@ -1,14 +1,13 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" series.py: Defines the class Series which uses a Config object to create a series of traceback
+""" series.py: Defines the class Series which uses a Config object to create a series of tracebacks
     either from a database, data or simulation. First, it handles exceptions (name, type, value,
     shape) of all parameters, creates or import the database, if needed, handles unit conversions,
     checks for the presence of output and logs directories and creates them if necessary.
 """
 
 import numpy as np
-from astropy import units as un
 from time import strftime
 from os import path, makedirs, remove, getcwd, chdir
 from logging import basicConfig, info, warning, INFO
@@ -27,32 +26,14 @@ class Series(list):
     """
 
     def __init__(self, config):
-        """ Configures a Config object from database, data or simulation, and creates output and
-            Logs directory if necessary.
-        """
+        """ Configures a Config object from database, data or simulation. """
 
         # Inilialization
-        self.config = config
-        self.logs_configured = False
+        self.config = Config(parent=config)
+        self.logs_dir = None
 
-        # Check if all parameters are present, are Parameter objects and have their all components
-        for parameter in Config.default_parameters.keys():
-            self.stop(parameter not in vars(self.config), 'NameError',
-                "Required parameter '{}' is missing in the configuration.", parameter)
-            self.stop(type(vars(self.config)[parameter]) != Config.Parameter, 'TypeError',
-                "'{}' must be a Config.Parameter object ({} given).", parameter, type(parameter))
-            for component in Config.Parameter.default_components.keys():
-                self.stop(component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
-                    "Required component '{}' is missing from the '{}' parameter "
-                    "in the configuraiton.", component, parameter)
-
-        # Check for invalid parameters and components
-        for parameter in vars(self.config).keys():
-            self.stop(parameter not in Config.default_parameters.keys(), 'NameError',
-                "Parameter '{}' in the configuration is invalid.", parameter)
-            for component in vars(vars(self.config)[parameter]).keys():
-                self.stop(component not in Config.Parameter.default_components.keys(), 'NameError',
-                    "Parameter component '{}' in '{}' is invalid.", component, parameter)
+        # Parameters configuration
+        self.configure_parameters()
 
         # Series name
         self.name = config.name.values
@@ -84,44 +65,79 @@ class Series(list):
         # Groups dictionary creation
         Groups(self)
 
-    def directory(self, base, directory, name, create=True):
-        """ Checks for type errors, checks if the directory already exists, creates it if
-            necessary and returns the absolute directory path. The directory can either be
-            relative the base or an absolute.
+    def configure_parameters(self):
+        """ Checks if all parameters are present and are Config.Parameter objects with all their
+            components and checks for invalid parameters and components. The type of 'label',
+            'name', 'system', 'axis' and 'origin' components is checked (str), and 'system',
+            'axis' and 'origin' components are converted to their respective classes if they are
+            not None.
         """
 
-        # Check the type of directory
-        self.stop(type(directory) is not str, 'TypeError',
-            "'{}' parameter must be a string ({} given).", name, type(directory))
+        # Check if all parameters are present and are Config.Parameter objects with all components
+        for parameter in self.config.default_parameters.keys():
+            self.stop(parameter not in vars(self.config), 'NameError',
+                "Required parameter '{}' is missing in the configuration.", parameter)
+            self.stop(type(vars(self.config)[parameter]) != self.config.Parameter, 'TypeError',
+                "'{}' must be a Config.Parameter object ({} given).", parameter,
+                type(vars(self.config)[parameter]))
+            for component in self.config.Parameter.default_components.keys():
+                self.stop(component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
+                    "Required component '{}' is missing from the '{}' parameter "
+                    "in the configuration.", component, parameter)
 
-        # Output directory formatting
-        working_dir = getcwd()
-        chdir(path.abspath(base))
-        abs_dir = path.abspath(directory)
-        chdir(working_dir)
+        # Check for invalid parameters and components
+        for parameter_label, parameter in vars(self.config).items():
+            self.stop(parameter_label not in self.config.default_parameters.keys(), 'NameError',
+                "Parameter '{}' in the configuration is invalid.", parameter_label)
+            for component_label, component in vars(parameter).items():
+                self.stop(component_label not in self.config.Parameter.default_components.keys(),
+                    'NameError', "Parameter's component '{}' in '{}' is invalid.", component_label,
+                     parameter_label)
 
-        # Output directory creation
-        if create and not path.exists(abs_dir):
-            makedirs(abs_dir)
-        return abs_dir
+                # Checks whether all component, but 'values' and 'units' are strings or None
+                if component_label not in ('values', 'units'):
+                    self.stop(component is not None and type(component) != str, 'TypeError',
+                        "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
+                        component_label, parameter_label, type(component))
 
-    def stop(self, condition, error, message, *words):
-        """ If condition is True, raises an exception, logs it into the log file if logs have
-            been configured and stops the execution.
-        """
-        from sys import exc_info # Return (None, None, None) if no exception is being handled.
-        if condition:
-            # ??? Add self.name to the message if it exists. ???
-            # Error message creation
-            message = message.format(*words)
-            # Loggging only if logs have been configured
-            if self.logs_configured:
-                warning('{}: {}'.format(error, message))
-            # Error raised and execution stopped
-            exec("""raise {}("{}")""".format(error, message))
+            # Default parameter
+            default_parameter = self.config.default_parameters[parameter_label]
+
+            # Checks if parameter.label and parameter.name were changed
+            if parameter.label != parameter_label:
+                parameter.label = parameter_label
+            if parameter.name != default_parameter.name:
+                parameter.name = default_parameter.name
+
+            # Checks if parameter.system is valid and converts it into a System object
+            if parameter.system is not None:
+                self.stop(parameter.system.lower() not in self.config.systems.keys(), 'ValueError',
+                    "'system' component of '{}' is invalid ({} required, {} given).",
+                    parameter.label, list(self.config.systems.keys()), parameter.system)
+                parameter.system = self.config.systems[parameter.system.lower()]
+            elif default_parameter.system is not None:
+                parameter.system = self.config.systems[default_parameter.system]
+
+            # Checks if parameter.axis is valid and converts it into a System.Axis object
+            if parameter.axis is not None:
+                self.stop(parameter.axis.lower() not in parameter.system.axis.keys(), 'ValueError',
+                    "'axis' component of '{}' is not a valid ({} required, {} given).",
+                    parameter.label, list(parameter.system.axis.keys()), parameter.axis)
+                parameter.axis = parameter.system.axis[parameter.axis.lower()]
+            elif default_parameter.axis is not None:
+                parameter.axis = parameter.system.axis[default_parameter.axis]
+
+            # Checks if parameter.origin is valid and converts it into a System.origin object
+            if parameter.origin is not None:
+                self.stop(parameter.origin.lower() not in parameter.system.origins.keys(), 'Value'
+                    'Error', "'origin' component of '{}' is not a valid ({} required, {} given).",
+                    parameter.label, list(parameter.system.origins.keys()), parameter.origin)
+                parameter.origin = parameter.system.origins[parameter.origin.lower()]
+            elif default_parameter.origin is not None:
+                parameter.origin = parameter.system.origins[default_parameter.origin]
 
     def configure_logs(self):
-        """ Checks if the logs directory already exists, creates it if necessary and configures
+        """ Checks if the logs directory already exists, creates it if needed and configures
             the Logs file. 'logs_dir' is defined as the absolute logs directory.
         """
 
@@ -172,7 +188,7 @@ class Series(list):
 
     def configure_database(self):
         """ Checks if the database directory and the database file itself exist and creates them
-            if necessary. 'database_path' is redefined as the absolute path. The database Model
+            if needed. 'database_path' is redefined as the absolute path. The database Model
             is initiated and errors handled based on whether the input or output from and to the
             database is required.
         """
@@ -334,6 +350,9 @@ class Series(list):
     def configure_value(self, parameter):
         """ Checks if a value is valid and converts it to default units if needed. """
 
+        # Default parameter
+        default_parameter = self.config.default_parameters[parameter.label]
+
         # Check the presence and type of values component
         self.stop(parameter.values is None, 'NameError',
             "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
@@ -342,29 +361,30 @@ class Series(list):
 
         # Default units component
         if parameter.units is None:
-            parameter.units = self.config.default_parameter[parameter.label].units
+            parameter.units = default_parameter.units
         self.stop(type(parameter.units) != str, 'TypeError', "'units' component of '{}' "
             "must be a string ({} given).", parameter.label, type(parameter.values))
 
-        # Check if units component can be converted to un.Units
+        # Check if units component can be converted to System.Unit
         try:
-            un.Unit(parameter.units)
+            self.config.systems[default_parameter.system].Unit(parameter.units)
         except:
-            self.stop(True, 'ValueError',
-                "'units' component of '{}' must represent a unit.", parameter.label)
+            self.stop(True, 'ValueError', "'units' component of '{}' must represent a unit.",
+                parameter.label)
 
         # Quantity object creation
         try:
             quantity = Quantity(**vars(parameter))
         except:
-            self.stop(True, 'ValueError',
-                "'{}' could not be converted to a Quantity object.", parameter.label)
+            self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.",
+                parameter.label)
 
         # Check if the physical type is valid
-        physical_type = un.Unit(self.config.default_parameters[parameter.label].units).physical_type
-        self.stop(quantity.physical_types.flatten()[0] != physical_type, 'ValueError',
+        default_physical_type = self.config.systems[default_parameter.system].Unit(
+            default_parameter.units).physical_type
+        self.stop(quantity.physical_types.flatten()[0] != default_physical_type, 'ValueError',
             "Unit of '{}' does not have the correct physical type ('{}' given, '{}' required).",
-            parameter.label, quantity.physical_types.flatten()[0], physical_type)
+            parameter.label, quantity.physical_types.flatten()[0], default_physical_type)
 
         # Unit conversion
         return float(quantity.to().values.flatten()[0])
@@ -375,42 +395,18 @@ class Series(list):
             physical type defined by a Variable object.
         """
 
-        # Default system component
-        if parameter.system is None:
-            parameter.system = 'cartesian'
-        # Check the type of system component
-        self.stop(type(parameter.system) != str, 'TypeError',
-            "'system' component of '{}' must be a string ({}).", parameter.label, type(parameter.system))
-        # Check the value of system component
-        parameter.system = parameter.system.lower()
-        self.stop(parameter.system not in systems.keys(), 'ValueError',
-            "'system' component of '{}' is not a valid ({} required, {} given).",
-            parameter.label, list(systems.keys()), parameter.system)
-        system = systems[parameter.system]
-
-        # Default axis component
-        if parameter.axis is None:
-            parameter.axis = 'galactic'
-        # Check the type of axis component
-        self.stop(type(parameter.axis) != str, 'TypeError', "'axis' component of '{}' must be "
-            "a string ({}).", parameter.label, type(parameter.axis))
-        # Check the value of axis component
-        parameter.axis = parameter.axis.lower()
-        self.stop(parameter.axis not in system.axis.keys(), 'ValueError',
-            "'axis' component of '{}' is not a valid ({} required, {} given).",
-            parameter.label, list(system.axis.keys()), parameter.axis)
-
-        # Variables from name
+        # Variables from label
         if parameter.label in ('avg_position', 'avg_position_error', 'avg_position_scatter'):
-            variables = system.position
+            variables = parameter.system.position
         elif parameter.label in ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
-            variables = system.velocity
+            variables = parameter.system.velocity
         else:
             self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.label)
 
         # Default units component
         if parameter.units is None:
-            parameter.units = [variable.unit.unit for variable in variables]
+            parameter.units = [variable.unit.label for variable in variables]
+
         # Check the type of units component
         if type(parameter.units) == str:
             parameter.units = [parameter.units]
@@ -418,9 +414,9 @@ class Series(list):
             "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
                 parameter.label, type(parameter.values))
 
-        # Check if all elements in units component can be converted to un.Units
+        # Check if all elements in 'units' component can be converted to System.Unit
         try:
-            np.vectorize(un.Unit)(parameter.units)
+            np.vectorize(parameter.system.Unit)(parameter.units)
         except:
             self.stop(True, 'ValueError',
                 "'units' components of '{}' must all represent a unit.", parameter.label)
@@ -437,7 +433,7 @@ class Series(list):
             np.vectorize(float)(parameter.values)
         except:
             self.stop(True, 'ValueError',
-                "'values' component of '{}' contains non-numerical elements.'", parameter.label)
+                "'values' component of '{}' contains non-numerical elements.", parameter.label)
 
         # Check the dimensions of values component
         shape = np.array(parameter.values).shape
@@ -454,19 +450,78 @@ class Series(list):
         try:
             quantity = Quantity(**vars(parameter))
         except:
-            self.stop(True, 'ValueError',
-                "'{}' could not be converted to a Quantity object.", parameter.label)
+            self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.",
+                parameter.label)
 
         # Physical types
-        physical_types = [variable.physical_type for variable in variables]
+        physical_types = np.array([variable.physical_type for variable in variables])
         self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
-            "Units in '{}' do not have the correct physical "
-            "type ({} given, {} required for '{}' system.)",
-            parameter.label, quantity.physical_types.tolist(), physical_types, quantity.system)
+            "Units in '{}' do not have the correct physical type "
+            "({} given, {} required for '{}' system.)", parameter.label,
+             quantity.physical_types.tolist(), physical_types, quantity.system.label)
 
         # Units conversion
         return quantity
         # return quantity.to([variable.unit.unit for variable in variables])
+
+    def directory(self, base, directory, name, create=True):
+        """ Checks for type errors, checks if the directory already exists, creates it if
+            needed and returns the absolute directory path. The directory can either be
+            relative the base or an absolute.
+        """
+
+        # Check the type of directory
+        self.stop(type(directory) is not str, 'TypeError',
+            "'{}' parameter must be a string ({} given).", name, type(directory))
+
+        # Output directory formatting
+        working_dir = getcwd()
+        chdir(path.abspath(base))
+        abs_dir = path.abspath(directory)
+        chdir(working_dir)
+
+        # Output directory creation
+        if create and not path.exists(abs_dir):
+            makedirs(abs_dir)
+        return abs_dir
+
+    def stop(self, condition, error, message, *words, extra=1):
+        """ Raises an exception if 'condition' is True, logs it into the log file if logs have
+            been configured and stops the execution. 'error' is a string representing an exception
+            class, 'message' is the error message to be displayed, 'words' is a list of words to
+            be inserted into 'message' and 'extra' is the number of superfluous lines in the
+            traceback stack. If an exception isn't being handled, the function is recursively
+            called within an except statement.
+        """
+
+        # Exception information extraction
+        from sys import exc_info, exit
+        exc_type, exc_value = exc_info()[:2]
+
+        # If no exception is being handled, one is raised if 'conidition' is True
+        if exc_type is None and exc_value is None:
+            try:
+                if condition:
+                    exec("raise {}".format(error))
+            except:
+                self.stop(True, error, message, *words, extra=2)
+
+        # If an exception is being handled, it is raised after its traceback has been formatted
+        else:
+            # Traceback message creation
+            tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
+                if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))
+
+            # Traceback stack formatting
+            from traceback import format_stack
+            tb_stack = ''.join(
+                ['An exception has been raised: \n'] + format_stack()[:-extra] + [tb_message])
+
+            # Exception logging only if logs have been configured and code termination
+            if self.logs_dir is not None:
+                warning(tb_stack)
+            print(tb_stack)
+            exit()
 
     def create(self):
         """ Creates a Group and embeded Star objects for all group names in self.groups either

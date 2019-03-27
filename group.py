@@ -71,10 +71,12 @@ class Group(list):
 
         # From observables
         for star in self.series.data:
+
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα,
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
-                    *star.position[0], *star.velocity[0] + np.array([0.5, 0.0, 0.0]), *star.position[2], *star.velocity[2])
+                    *star.position[0], *star.velocity[0] + np.array([0.0, 0.0, 0.0]), *star.position[2], *star.velocity[2])
+
             # Equatorial spherical coordinates conversion into galactic cartesian coordinates
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
                 *position_rδα, *position_rδα_error)
@@ -112,13 +114,15 @@ class Group(list):
 
             # Velocity and a position based average values and scatters
             velocity_uvw = np.random.normal(avg_velocity, avg_velocity_scatter)
-            position_xyz = velocity_uvw * self.series.age + np.random.normal(
-                avg_position, avg_position_scatter) - (avg_velocity * self.series.age + avg_position)
+            position_xyz = velocity_uvw * self.series.age + (
+                np.random.normal(avg_position, avg_position_scatter) -
+                (avg_velocity * self.series.age + avg_position) + # Normalisation
+                (15.19444, -4.93612, -1.70742223)) # beta-pictoris current average position
             velocity_uvw  *= (un.pc/un.Myr).to(un.km/un.s)
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array((1.0, 0.0, 0.0))
+            velocity_rvμδμα = velocity_rvμδμα + np.array((0.0, 0.0, 0.0))
             position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
 
             # Velocity and position conversion to observables
@@ -180,9 +184,9 @@ class Group(list):
         """
 
         # XYZ median absolute deviation
-        self.median = np.median(np.array([star.position for star in self]), axis=0)
+        self.median_xyz = np.median(np.array([star.position for star in self]), axis=0)
         self.mad_xyz = np.median(
-            np.abs(np.array([star.position for star in self]) - self.median), axis=0)
+            np.abs(np.array([star.position for star in self]) - self.median_xyz), axis=0)
 
         # XYZ median absolute deviation
         self.mad = np.sum(self.mad_xyz**2, axis=1)**0.5
@@ -192,24 +196,99 @@ class Group(list):
         self.mad_age_error = 0.0
 
     def minimum_spanning_tree(self):
-        """ Computes the minimal spanning tree (MST) of a group and related errors. """
+        """ Builds the minimal spanning tree (MST) of a group for all timseteps using a Kruskal
+            algorithm and related errors and computes the total (size) of all branches, the median
+            absolute deviation of the branch length and the age of the group.
+        """
 
-        # Minimum spanning tree
-        self.minimum_spanning_tree = np.zeros([self.series.number_of_steps])
-        self.minimum_spanning_tree_error = np.zeros([self.series.number_of_steps])
-        self.minimum_spanning_tree_points = np.zeros([self.series.number_of_steps, 2, 3])
+        # Branches creation
+        self.branches = []
+        for start in range(self.series.number_of_stars - 1):
+            for end in range(start + 1, self.series.number_of_stars):
+                self.branches.append(self.Branch(self[start], self[end]))
 
-        # Age calculation
-        self.minimum_spanning_tree_age = 0.0
-        self.minimum_spanning_tree_age_error = 0.0
+        # Minimum spanning tree initialization
+        self.mst = np.empty(
+            (self.series.number_of_steps, self.series.number_of_stars - 1), dtype=object)
+        self.mst_branches = np.zeros(self.mst.shape)
+
+        # Minimum spanning tree computation for every timestep
+        for step in range(self.series.number_of_steps):
+
+            # Sorting with regards to length
+            self.branches.sort(key = lambda branch: branch.length[step])
+
+            # Nodes, tree and branch number initialization
+            for star in self:
+                star.node = self.Node()
+            i = 0
+            j = 0
+
+            # Branches verification and addition to tree
+            while j < self.series.number_of_stars - 1:
+                branch = self.branches[i]
+                i += 1
+
+                # Replaces branch start and end stars current nodes with their largest parent node
+                while branch.start.node.parent != None: branch.start.node = branch.start.node.parent
+                while branch.end.node.parent != None: branch.end.node = branch.end.node.parent
+
+                # Branch confirmation if both stars have different parent nodes
+                if branch.start.node != branch.end.node:
+                    branch.start.node.parent = branch.end.node.parent = self.Node()
+                    self.mst[step, j] = branch
+                    j += 1
+
+            # Minimum spanning tree branches length
+            self.mst_branches[step] = np.vectorize(
+                lambda branch: branch.length[step])(self.mst[step])
+
+        # Minimum spanning tree size and age computation
+        self.mst_mean = np.mean(self.mst_branches, axis=1)
+        self.mst_mean_error = np.zeros([self.series.number_of_steps])
+        self.mst_mean_age = self.series.time[np.argmin(self.mst_mean)]
+        self.mst_mean_error = 0.0
+
+        # Minimum spanning tree median absolute deviation branch length
+        self.mst_median = np.median(self.mst_branches, axis=1)
+        self.mst_mad = np.median(
+            np.abs(self.mst_branches - np.expand_dims(self.mst_median, axis=0).T), axis=1)
+        self.mst_mad_error = np.zeros([self.series.number_of_steps])
+        self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
+        self.mst_mad_age_error = np.zeros([self.series.number_of_steps])
+    
+    class Branch:
+        """ Connects two stars, used for the calculation of the minimum spanning tree. """
+
+        def __init__(self, start, end):
+            """ Initializes a branch and computes the distance between two Star objects,
+                'start' and 'end' for all timestep.
+            """
+
+            self.start = start
+            self.end = end
+            self.length = np.sum((self.start.position - self.end.position)**2, axis=1)**0.5
+
+        def __repr__(self):
+            """ Returns a string of name of the branch. """
+
+            return "'{}' to '{}' branch".format(self.start.name, self.end.name)
+
+    class Node(object):
+        """ Node of a star. """
+
+        def __init__(self):
+            """ Set the parent node of a star as None. """
+
+            self.parent = None
 
     class Star:
         """ Contains the values and related methods of a star in a kinematic group. """
 
         def __init__(self, group, **values):
-            """ Initializes a Star objects with at least a name, velocity, velocity error, and
-                intial position and position error. More values can be added (when initializing
-                from a database for instance).
+            """ Initializes a Star objects with at least a name, velocity, velocity error, intial
+                position and position error. More values can be added (when initializing from a
+                database for instance).
             """
 
             # Initialization
