@@ -185,10 +185,6 @@ class Data(list):
         self.velocity_error_labels = tuple('Δ' + label for label in self.velocity_labels)
         self.error_labels = {
             'Δ' + label: name + ' error' for label, name in self.value_labels.items()}
-        # !!! Remove these lines !!!
-        # for label, name in self.error_labels.items():
-        #     Config.physical_types[label] = Config.physical_types[label[1:]]
-        #     Config.names[label] = name
         self.labels = {**self.value_labels, **self.error_labels}
 
         # Units header identification
@@ -202,7 +198,14 @@ class Data(list):
         # Units identification
         self.units = {}
         for label in self.labels.keys():
-            if label in self.columns and self.units_header is not None and \
+
+            # !!! Units specified in data.units !!!
+            # Traduire le numéro de colonne (self.columns) selon l'ordre 0, 1, 3, 6, 9 devient 0, 1, 2, 3, 4, 5
+            if False:
+                pass
+
+            # Units specified in CSV
+            elif label in self.columns and self.units_header is not None and \
                     self.units_header[self.columns[label]] != '':
                 try:
                     self.units[label] = self.series.config.data.system.Unit(
@@ -211,8 +214,11 @@ class Data(list):
                     self.series.stop(True, 'ValueError',
                         "Unit '{}' used for column '{}' is not valid.",
                         self.units_header[self.columns[label]], self.header(self.columns[label]))
+
+
+            # Default units based on physical type
+            # S'il n'y pas d'unité pour l'erreur, mais qu'il y en a une pour la valeur, on assume que l'erreur a la même unité que la valeur
             else:
-                # !!! Add check for data.units here !!!
                 self.units[label] = self.series.config.data.system.default_units[
                     self.series.config.data.system.variables[label].physical_type].unit
 
@@ -287,7 +293,7 @@ class Data(list):
                             "'{}' value could not be converted to float in '{}' column.",
                             line[label], label)
 
-            # Convert into Quantity objects.
+            # !!! Conversion into Quantity objects and unit conversion here !!!
             # Position columns
             self.position = (
                 np.array([line[label] for label in data.position_labels]),

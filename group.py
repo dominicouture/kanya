@@ -75,7 +75,9 @@ class Group(list):
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα,
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
-                    *star.position[0], *star.velocity[0] + np.array([0.0, 0.0, 0.0]), *star.position[2], *star.velocity[2])
+                    *star.position[0], *star.velocity[0] + np.array(
+                        [self.series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 0.0, 0.0]),
+                    *star.position[2], *star.velocity[2])
 
             # Equatorial spherical coordinates conversion into galactic cartesian coordinates
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
@@ -122,7 +124,8 @@ class Group(list):
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array((0.0, 0.0, 0.0))
+            velocity_rvμδμα = velocity_rvμδμα + np.array(
+                (self.series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 0.0, 0.0))
             position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
 
             # Velocity and position conversion to observables
@@ -134,6 +137,8 @@ class Group(list):
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
                     *np.random.normal(position_obs, avg_position_error),
                     *np.random.normal(velocity_obs, avg_velocity_error),
+                    # *np.random.normal(position_obs, self.series.data[star].position[2]),
+                    # *np.random.normal(velocity_obs, self.series.data[star].velocity[2]),
                     *avg_position_error, *avg_velocity_error)
 
             # Velocity and position conversion back to galactic cartesian coordinates
@@ -256,7 +261,7 @@ class Group(list):
         self.mst_mad_error = np.zeros([self.series.number_of_steps])
         self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
         self.mst_mad_age_error = np.zeros([self.series.number_of_steps])
-    
+
     class Branch:
         """ Connects two stars, used for the calculation of the minimum spanning tree. """
 

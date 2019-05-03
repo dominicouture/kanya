@@ -3,8 +3,8 @@
 
 """ series.py: Defines the class Series which uses a Config object to create a series of tracebacks
     either from a database, data or simulation. First, it handles exceptions (name, type, value,
-    shape) of all parameters, creates or import the database, if needed, handles unit conversions,
-    checks for the presence of output and logs directories and creates them if necessary.
+    shape) of all parameters, creates or imports the database, if needed, handles unit conversions,
+    checks for the presence of output and logs directories and creates them, if needed.
 """
 
 import numpy as np
@@ -36,7 +36,7 @@ class Series(list):
         self.configure_parameters()
 
         # Series name
-        self.name = config.name.values
+        self.name = self.config.name.values
         self.stop(self.name is None, 'NameError',
             "Required parameter 'name' is missing in the configuration.")
         self.stop(type(self.name) != str, 'TypeError', "'name' must be a string ('{}' given).",
@@ -46,8 +46,8 @@ class Series(list):
         self.date = strftime('%Y-%m-%d %H:%M:%S')
 
         # Output directory creation
-        self.output_dir = self.directory(path.abspath(path.join(
-            path.dirname(path.realpath(__file__)), '..')), config.output_dir.values, 'output_dir')
+        self.output_dir = self.directory(path.abspath(path.join(path.dirname(
+            path.realpath(__file__)), '..')), self.config.output_dir.values, 'output_dir')
 
         # Logs configuration
         self.configure_logs()
@@ -67,7 +67,7 @@ class Series(list):
 
     def configure_parameters(self):
         """ Checks if all parameters are present and are Config.Parameter objects with all their
-            components and checks for invalid parameters and components. The type of 'label',
+            components, and checks for invalid parameters and components. The type of 'label',
             'name', 'system', 'axis' and 'origin' components is checked (str), and 'system',
             'axis' and 'origin' components are converted to their respective classes if they are
             not None.
@@ -255,11 +255,18 @@ class Series(list):
         self.time = np.linspace(self.initial_time, self.final_time, self.number_of_steps)
 
         # Data configuration
-        if self.from_data:
-            self.configure_data()
+        # if self.from_data:
+        #     self.configure_data()
+
+        # Data configuration for error inclusion in simulation
+        self.configure_data()
+
         # Simulation configuration
         if self.from_simulation:
             self.configure_simulation()
+
+        # Radial velocity offset
+        self.rv_offset = self.configure_value(self.config.rv_offset)
 
     def configure_data(self):
         """ Check if traceback and output from data is possible and creates a Data object from a
@@ -327,7 +334,7 @@ class Series(list):
         self.avg_velocity_scatter = self.configure_vector(self.config.avg_velocity_scatter)
 
         # Data set to None because stars are simulated
-        self.data = None
+        # self.data = None
 
     def configure_integer(self, parameter):
         """ Checks if an integer value is valid and converts it if needed. """
@@ -506,7 +513,7 @@ class Series(list):
             except:
                 self.stop(True, error, message, *words, extra=2)
 
-        # If an exception is being handled, it is raised after its traceback has been formatted
+        # If an exception is being handled, its traceback is formatted and execution is terminated
         else:
             # Traceback message creation
             tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \

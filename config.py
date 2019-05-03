@@ -30,13 +30,13 @@ logs_dir.values = 'Logs'
 db_path.values = ''
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.values = 1000
+number_of_groups.values = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 number_of_steps.values = 200
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.values = 50
+number_of_stars.values = 45
 
 # Initial age of the traceback (float, inclusive)
 initial_time.values = 0.0
@@ -51,8 +51,8 @@ age.values = 24.0
 avg_position.values = (0.0, 0.0, 0.0) # (15.19443946, -4.93616248, -17.07422231)
 
 # Average position error of the simulated sample of stars (tuple)
-# avg_position_error.values = (0.19846, 0.0, 0.0)
-avg_position_error.values = (0.0, 0.0, 0.0)
+avg_position_error.values = (0.19846, 0.0, 0.0)
+# avg_position_error.values = (0.0, 0.0, 0.0)
 avg_position_error.units = 'mas'
 avg_position_error.system = 'observables'
 avg_position_error.axis = 'equatorial'
@@ -65,8 +65,8 @@ avg_velocity.values =  (-11.3442, -11.3442, -11.3442) # (-10.54893, -15.88653,  
 avg_velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-# avg_velocity_error.values = (1.0112, 0.30754, 0.26432)
-avg_velocity_error.values = (0.0, 0.0, 0.0)
+avg_velocity_error.values = (1.0112, 0.30754, 0.26432)
+# avg_velocity_error.values = (0.0, 0.0, 0.0)
 avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 avg_velocity_error.system = 'observables'
 avg_velocity_error.axis = 'equatorial'
@@ -76,7 +76,7 @@ avg_velocity_scatter.values = (1.68050, 1.68050, 1.68050) # (2.21753, 1.36009, 1
 avg_velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dict)
-data.values = 'bpic.csv'
+data.values = 'bpic_updated.csv'
 data.system = 'observables'
 data.axis = 'equatorial'
 # data.values =  {'beta_pictoris': [
@@ -85,9 +85,7 @@ data.axis = 'equatorial'
 #         [27.1700, -66.753496, 4.3491739, 8.75000, -16.8740,  103.039],
 #         [28.6590, -32.551949, 6.9598490, 8.80000, -47.3890,  109.817],
 #         [45.7900,  15.439305, 17.855935, 4.00000, -120.000,  180.000],
-#         [41.7150, -6.7943063, 24.230632, 12.2000, -100.143,  173.469],
 #         [25.1340,  28.744731, 34.355775, 4.32000, -74.0690,  86.9240],
-#         [20.4070,  6.2923417, 36.568060, 3.80000, -50.5150,  88.0300],
 #         [24.3600,  30.973199, 36.872279, 4.85000, -72.0020,  79.6790],
 #         [19.5280,  23.709892, 53.758697, 15.5000, -62.9400,  50.3370],
 #         [33.5770, -2.4735640, 69.400543, 21.0000, -63.8330,  44.3520],
@@ -98,8 +96,8 @@ data.axis = 'equatorial'
 #         [50.3080, -21.585933, 76.708196, 20.7100, -15.5740,  47.1440],
 #         [37.2060, -11.901168, 81.769919, 20.6100, -49.3150,  17.0590],
 #         [50.6230, -51.066517, 86.821179, 20.0000,  82.5770,  2.49300],
-#         [30.5570, -27.701553, 93.305428, 22.5000, -5.62300, -13.1570],
 #         [25.4700, -72.044537, 94.617428, 10.9500,  74.2950, -7.90800],
+#         [30.5570, -27.701553, 93.305428, 22.5000, -5.62300, -13.1570],
 #         [51.0040, -53.907368, 154.36205, 14.8000, -4.93900, -173.099],
 #         [62.9440, -64.976145, 220.62479, 6.20000, -232.614, -190.466],
 #         [24.9340, -57.707982, 234.73939, 3.90000, -95.8810, -55.1970],
@@ -109,7 +107,6 @@ data.axis = 'equatorial'
 #         [15.2130, -50.724731, 265.45431, 2.40000, -65.8580, -2.02300],
 #         [12.9670, -53.103534, 267.14060, -0.2000, -56.1320, -1.92800],
 #         [20.1550, -51.649368, 270.76422, -0.0900, -86.0980,  2.34400],
-#         [22.4420, -43.425219, 271.70790, -7.8000, -105.742,  10.9900],
 #         [12.5970, -29.275979, 274.96757, -7.0000, -46.1960,  4.38100],
 #         [35.2890, -64.871254, 281.36214, 2.00000, -150.182,  32.0730],
 #         [19.7600, -62.230058, 282.02661, 2.36000, -80.0280,  13.0560],
@@ -129,6 +126,9 @@ data.axis = 'equatorial'
 #         [39.1880, -6.5556227, 337.82700, -7.9000, -75.6610,  145.605],
 #         [27.2770, -71.706107, 340.70515, 7.02000, -52.4640,  94.7980],
 #         [47.9420, -33.250998, 341.24241, 1.10000, -123.103,  179.904],
-#         [28.6070, -2.7445471, 352.93747, -5.4400, -71.9370,  94.1380],
 #         [36.5320, -12.264637, 353.12918, 1.38000, -81.8890,  139.260]
 # ]}
+
+# Radial velocity offset applied to all stars (float)
+rv_offset.values = 0.0
+rv_offset.units = 'km/s'

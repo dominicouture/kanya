@@ -37,7 +37,7 @@ class System():
 
         def __init__(self, label, name=None):
             """ Initializes a Unit from name, label and an Astropy Units object.
-                !!!System.Unit class must be used during unit conversion instead of unit
+                !!! System.Unit class must be used during unit conversion instead of unit
                 label (input of Quantity ?) and un.Unit() calls. !!!
             """
 
@@ -195,7 +195,9 @@ class Config():
         Parameter(label='avg_velocity', name='Average velocity', **null_velocity),
         Parameter(label='avg_velocity_error', name='Average velocity error', **null_velocity),
         Parameter(label='avg_velocity_scatter', name='Average velocity scatter', **null_velocity),
-        Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'))}
+        Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
+        Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
+            units=System.default_units['speed'].label, system='cartesian'))}
 
     def __init__(self, path=None, args=False, parent=None, **parameters):
         """ Initializes a Config object from a configuration file, command line arguments
