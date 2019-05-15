@@ -1,7 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" data.py: Defines the Data and embeded Star classes, which contains all the information from
+""" data.py: Defines the Data and embeded Row classes, which contains all the information from
     CSV file or a Python dictionary, list, tuple or np.ndarray that can then be used as an input
     for a Group object and all related methods to check and convert this data.
 """
@@ -11,8 +11,9 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
 from astropy import units as un
-from os import path, getcwd, chdir
-from csv import reader, Sniffer
+from time import strftime
+from os import path, getcwd, chdir, remove
+from csv import reader, writer, Sniffer
 from init import Config, System
 from series import info, Series
 from tools import *
@@ -21,31 +22,6 @@ class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.
         Data is converted into a Quantity object and units are converted to default units.
     """
-
-    # Label permutations
-    permutations = {
-        '-': '',
-        '_': '',
-        ' ': '',
-        'error': 'Δ',
-        'err': 'Δ',
-        'series': 'group',
-        'kinematic_group': 'group',
-        'association': 'group',
-        'spt': 'type',
-        'spectraltype': 'type',
-        'fixed': '',
-        'distance': 'r',
-        'plx': 'p',
-        'paralax': 'p',
-        'declination': 'δ',
-        'dec': 'δ',
-        'rightascension': 'α',
-        'ra': 'α',
-        'radialvelocity': 'rv',
-        'propermotion': 'μ',
-        'pm': 'μ'
-    }
 
     def __init__(self, series):
         """ Initizalizes a Data object from a CSV file or a Python dictionary, list, tuple or
@@ -56,57 +32,26 @@ class Data(list):
 
         # Initialization
         self.series = series
+        self.data = self.series.config.data
 
-        # Initialize Data from a CSV file
-        if type(self.series.config.data.values) == str:
+        # Initialize self from a CSV file
+        if type(self.data.values) == str:
             self.initialize_from_CSV()
-        # Initialize Data from Python object
-        elif type(self.series.config.data.values) in (dict, list, tuple, np.ndarray):
+
+        # Initialize self from a Python object
+        elif type(self.data.values) in (dict, list, tuple, np.ndarray):
             self.initialize_from_data()
         else:
-            self.series.stop(True, 'TypeError', "'data.values' component must be a path to "
-                "a CSV file or a Python dictionary, list, tuple or np.ndarray. ({} given).",
-                type(self.series.config.data.values))
+            self.series.stop(True, 'TypeError', "'data.values' component must be a string, "
+                "dictionary, list, tuple or np.ndarray. ({} given).",
+                type(self.data.values))
 
         # Data configuration
         self.configure_data()
 
-    def initialize_from_data(self):
-        """ Initializes a Data object from a Python dictionary, list, tuple or np.ndarray (2D). If
-            a dictionary is used, only the value with a key that matches 'series.name' is used and
-            its type must be one of the other 3 possible types. If a list, tuple or np.ndarray is
-            used, all data is imported.
-        """
-
-        # Data origin
-        self.from_data = True
-        self.from_CSV = False
-
-        # Data import and group filtering
-        if type(self.series.config.data.values) == dict:
-            if self.series.name in self.series.config.data.values.keys():
-                if type(self.series.config.data.values[self.series.name]) in (list, tuple, np.ndarray):
-                    self.data = np.array(self.series.config.data.values[self.series.name], dtype=object)
-                else:
-                    self.series.stop(True, 'TypeError', "Data '{}' in the Python dictionary "
-                        "must be a list, tuple or np.ndarray. ('{}' given).",
-                        self.series.name, type(self.series.config.data.values[self.series.name]))
-            else:
-                self.series.stop(True, 'ValueError' "Group '{}' is not in the data dictionary.",
-                    self.series.name)
-        if type(self.series.config.data.values) in (list, tuple, np.ndarray):
-            self.data = np.array(self.series.config.data.values, dtype=object)
-
-        # Check if self.data has been converted a 2D array
-        self.series.stop(self.data.ndim != 2, 'ValueError',
-            "'data' parameter must represent a 2D array ({} dimensions in the given data).",
-            self.data.ndim)
-
-        # String conversion
-        try:
-            self.data = np.vectorize(lambda value: str(value))(self.data)
-        except ValueError:
-            self.series.stop(True, 'ValueError', "Data could not be converted to string.")
+        # Columns and rows creation
+        self.create_columns()
+        self.create_rows()
 
     def initialize_from_CSV(self):
         """ Initializes a Data object from the data 'series.name' in a CSV file. If the the CSV
@@ -114,194 +59,335 @@ class Data(list):
             have a '.csv' extension.
         """
 
-        # Data origin
-        self.from_CSV = True
         self.from_data = False
+        self.from_CSV = True
 
         # CSV file absolute path
         working_dir = getcwd()
         chdir(path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')))
-        self.data_path = path.abspath(self.series.config.data.values)
+        self.data_path = path.abspath(self.data.values)
         chdir(working_dir)
+
         # Check if the path exists
         self.series.stop(not path.exists(self.data_path), 'NameError',
             "'{}' does not exist.", self.data_path)
         # Check if the path links to a CSV file.
-        self.series.stop(path.splitext(self.data_path)[1] != '.csv', 'TypeError',
-            "'{}' is not a CSV data file.", self.data_path)
+        self.series.stop(path.splitext(self.data_path)[1].lower() != '.csv', 'TypeError',
+            "'{}' is not a CSV data file (with a .csv extension).", self.data_path)
 
-        # Reading of CSV file.
-        data_csv = open(self.data_path, 'r')
-        dialect = Sniffer().sniff(data_csv.read(2048))
+        # Reading of CSV file
+        data_csv = open(self.data_path, 'r', encoding='utf-8')
+        data_csv_reader = data_csv.read(2048)
         data_csv.seek(0)
-        # Check if the file has a header
-        self.series.stop(not Sniffer().has_header(data_csv.read(2048)), 'ValueError',
-            "The CSV data file located at '{}' doesn't have a header.", self.data_path)
-        data_csv.seek(0)
-        # Data import
-        self.data = np.array([row for row in reader(data_csv, dialect)], dtype=object)
+
+        # Data import into a table and CSV file closing
+        self.table = np.array(
+            [row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))], dtype=object)
         data_csv.close()
 
-    def configure_data(self):
-        """ Configures data in a np.ndarray. Headers, columns, errors units and lines
-            identification. If no errors are specified, errors are set to 0.0 and if no units are
-            specified, default units are used. The first row must be a header and the second row
-            is an can be used as a units row. A star object is then created from each line.
+    def initialize_from_data(self):
+        """ Initializes a Data object from a Python dictionary, list, tuple or np.ndarray (2D). If
+            a dictionary is used, only the value with a key that matches 'series.name' is used and
+            its type must be one of the other 3 possible types. If a list, tuple or np.ndarray is
+            used, all data is imported. A temporary CSV file is created to check whether the array
+            has a header and then deleted.
         """
 
-        # Header identification
-        self.header = np.array([label.lower() for label in self.data[0]], dtype=object)
+        self.from_data = True
+        self.from_CSV = False
 
-        # Columns identification
-        self.columns = {}
-        for i in range(len(self.header)):
-            label = self.header[i]
-            for j, k in self.permutations.items():
-                label = label.replace(j, k)
-            if label[-1] in ('e', 'Δ') and label not in ('name', 'type'):
-                label = 'Δ' + label[:-1]
-            if label[0] == 'e':
-                label = 'Δ' + label[1:]
-            if self.series.config.data.system.name == 'observables' and label[-2:] == 'μα':
-                label = label + 'cosδ'
-            self.columns[label] = i
+        # Data import and group filtering of a dictionary
+        if type(self.data.values) == dict:
+            if self.series.name in self.data.values.keys():
+                if type(self.data.values[self.series.name]) in (list, tuple, np.ndarray):
+                    self.table = np.array(self.data.values[self.series.name], dtype=object)
+                else:
+                    self.series.stop(True, 'TypeError', "Data '{}' in the Python dictionary "
+                        "must be a list, tuple or np.ndarray. ('{}' given).",
+                        self.series.name, type(self.data.values[self.series.name]))
+            else:
+                self.series.stop(True, 'ValueError' "Group '{}' is not in the data dictionary.",
+                    self.series.name)
 
-        # Value labels identification
-        self.position_labels = [variable.label for variable in self.series.config.data.system.position]
-        self.velocity_labels = [variable.label for variable in self.series.config.data.system.velocity]
-        self.value_labels = {label: self.series.config.data.system.variables[label].name \
-            for label in self.position_labels + self.velocity_labels}
-        for label in self.value_labels.keys():
+        # Data import of a list, tuple or np.ndarray
+        if type(self.data.values) in (list, tuple, np.ndarray):
+            self.table = np.array(self.data.values, dtype=object)
+
+        # Check if self.table has been converted a 2D array
+        self.series.stop(self.table.ndim != 2, 'ValueError',
+            "'data' parameter must represent a 2D array ({} dimensions in the given data).",
+            self.table.ndim)
+
+        # Conversion of data into strings
+        try:
+            self.table = np.vectorize(str)(self.table)
+        except ValueError:
+            self.series.stop(True, 'ValueError', "Data could not be converted to string.")
+
+    def configure_data(self):
+        """ Configures data in a np.ndarray. Variables, units, errors and error units and
+            identification. If no errors are specified, errors are set to 0.0 and if no units are
+            specified, default units are used. The first row must be a header and the second row
+            is an can be used as a units row.
+        """
+
+        # Value variables
+        self.position_variables = {variable.label: variable for variable in self.data.system.position}
+        self.velocity_variables = {variable.label: variable for variable in self.data.system.velocity}
+        self.value_variables = {**self.position_variables, **self.velocity_variables}
+
+        # Error variables
+        self.position_error_variables = {
+            variable.label: variable for variable in self.data.system.position_error}
+        self.velocity_error_variables = {
+            variable.label: variable for variable in self.data.system.velocity_error}
+        self.error_variables = {**self.position_error_variables, **self.velocity_error_variables}
+        self.variables = {**self.value_variables, **self.error_variables}
+
+        # Checks for the presence of a header in self.table
+        self.header = np.vectorize(
+            lambda label: label.replace('.', '').replace(',', '').isdigit())(self.table[0]).any()
+        if self.from_CSV:
+            self.series.stop(self.header, 'ValueError',
+                "The CSV data file located at '{}' doesn't have a header.", self.data_path)
+        elif self.from_data:
+            self.series.stop(self.header, 'ValueError', "The data doesn't have a header.")
+
+        # Checks for the presence of a unit header in self.table
+        self.unit_header = True if True not in [
+            unit.replace('.', '').replace(',', '').isdigit() for unit in self.table[1]] else False
+
+        # Checks data.units component
+        if self.data.units is not None:
+            pass
+            # !!! Check if units component is valid (TypeError and Value Error) !!!
+            # !!! Units header creation from data.units component (either dict or tuple). !!!
+
+    def create_columns(self):
+        """ Creates a self.columns dictionary along with self.Column objects for every column
+            in self.table. Also checks for the presence of every required columns based on
+            self.variables.
+        """
+
+        # Columns creation
+        self.columns = {column.label: column for column in [
+            self.Column(self, column) for column in range(self.table.shape[1])]}
+
+        # Check if all required columns are present
+        for label in self.value_variables.keys():
             if label not in self.columns.keys():
                 self.series.stop(self.from_CSV, 'NameError',
                     "The column '{}' ('{}') is missing from the CSV data file located at '{}'.",
-                    self.value_labels[label], label, self.data_path)
+                    self.value_variables[label].name, label, self.data_path)
                 self.series.stop(self.from_data, 'NameError',
                     "The column '{}' ('{}') is missing from the data.",
-                    self.value_labels[label], label)
+                    self.value_variables[label].name, label)
 
-        # Error labels identification
-        self.position_error_labels = tuple('Δ' + label for label in self.position_labels)
-        self.velocity_error_labels = tuple('Δ' + label for label in self.velocity_labels)
-        self.error_labels = {
-            'Δ' + label: name + ' error' for label, name in self.value_labels.items()}
-        self.labels = {**self.value_labels, **self.error_labels}
+        # Missing error columns creation and unit set as None changed to the matching value unit
+        for label in self.error_variables.keys():
+            if label not in self.columns.keys():
+                self.columns[label] = self.Column(self, self.columns[label[1:]].column, True)
+            if self.columns[label].unit == None:
+                self.columns[label].unit = self.columns[label[1:]].unit
 
-        # Units header identification
-        self.units_header = np.array([label.lower() for label in self.data[1]], dtype=object)
-        # Check if there is a units header below the labels header
-        for label in self.value_labels.keys():
-            if self.units_header[self.columns[label]].replace('.', '').replace(',', '').isdigit():
-                self.units_header = None
-                break
-
-        # Units identification
-        self.units = {}
-        for label in self.labels.keys():
-
-            # !!! Units specified in data.units !!!
-            # Traduire le numéro de colonne (self.columns) selon l'ordre 0, 1, 3, 6, 9 devient 0, 1, 2, 3, 4, 5
-            if False:
-                pass
-
-            # Units specified in CSV
-            elif label in self.columns and self.units_header is not None and \
-                    self.units_header[self.columns[label]] != '':
-                try:
-                    self.units[label] = self.series.config.data.system.Unit(
-                        self.units_header[self.columns[label]])
-                except ValueError:
-                    self.series.stop(True, 'ValueError',
-                        "Unit '{}' used for column '{}' is not valid.",
-                        self.units_header[self.columns[label]], self.header(self.columns[label]))
-
-
-            # Default units based on physical type
-            # S'il n'y pas d'unité pour l'erreur, mais qu'il y en a une pour la valeur, on assume que l'erreur a la même unité que la valeur
-            else:
-                self.units[label] = self.series.config.data.system.default_units[
-                    self.series.config.data.system.variables[label].physical_type].unit
-
-        # Check for units physical types
-        for label in self.columns.keys():
-            if label in self.labels:
-                self.series.stop(self.units[label].physical_type \
-                    != self.series.config.data.system.variables[label].physical_type,
-                    'ValueError', "The unit used for the '{}' ('{}') column, '{}', has "
-                    "an incorrect physical type ('{}' required, '{}' given)",
-                    self.labels[label], label, str(self.units[label]),
-                    self.series.config.data.system.variables[label].physical_type,
-                    self.units[label].physical_type)
-
-        # Lines identification and group filtering
-        if 'group' in self.columns:
-            self.lines = []
-            for line in range(1 if self.units_header is None else 2, self.data.shape[0]):
-                if self.data[self.columns['group'], line] == self.series.name:
-                    self.lines.append(i)
-            if len(self.lines) == 0:
-                self.series.stop(self.from_CSV, 'ValueError',
-                    "No data for the group '{}' in the CSV data file located at '{}'.",
-                    self.series.name, self.data_path)
-                self.series.stop(self.from_data, 'ValueError',
-                    "No information for the group '{}' in the data.",
-                    self.series.name, self.data_path)
-        else:
-            self.lines = list(
-                range(1 if self.units_header is None else 2, self.data.shape[0]))
-
-        # Star objects creation
-        i = 1
-        for line in self.lines:
-            self.append(self.Star(self, i,
-                {label: self.data[line, column] for label, column in self.columns.items()}))
-            i += 1
-
-    class Star:
-        """ Contains the data for an individual star, including name, type, id, position and
-            velocity.
+    class Column:
+        """ Contains information on a column (parameter), including its index, label, name and
+            units.
         """
 
-        def __init__(self, data, i, line):
-            """ Initializes a Star object from a 'data' object, a number 'i' and a line with a
-                dictionary containing the information found on one line of a dictionary or CSV
-                file. Default values are given if
+        # Label permutations
+        permutations = {
+            '-': '',
+            '_': '',
+            ' ': '',
+            'none': '',
+            'fixed': '',
+            'error': 'Δ',
+            'err': 'Δ',
+            'series': 'group',
+            'movinggroup': 'group',
+            'kinematicgroup': 'group',
+            'association': 'group',
+            'spt': 'type',
+            'spectraltype': 'type',
+            'distance': 'r',
+            'plx': 'p',
+            'paralax': 'p',
+            'declination': 'δ',
+            'dec': 'δ',
+            'rightascension': 'α',
+            'ra': 'α',
+            'radialvelocity': 'rv',
+            'propermotion': 'μ',
+            'pm': 'μ'
+        }
+
+        def __init__(self, data, column, missing=False):
+            """ Initializes a Column object from a 'data' object and a number 'column' matching the
+                position of the corresponding column in 'data'. If 'error' is set as true, a 'Δ' is
+                added to self.label.
             """
 
-            # Name column
-            self.name = line['name'] if 'name' in data.columns and line['name'] != '' \
-                else 'Star_{}'.format(str(i))
-            # Type column
-            self.type = line['type'] if 'type' in data.columns and line['type'] != '' else None
-            # ID column
-            self.id = line['id'] if 'id' in data.columns and line['id'] != '' else str(i)
+            # Initialization
+            self.data = data
+            self.column = column
+            self.missing = missing
 
-            # Default errors if they're not present
-            for error_label in data.error_labels:
-                if error_label not in line:
-                    line[error_label] = ''
+            # Label identification and permutations
+            self.data_label = self.data.table[0, self.column]
+            self.label = self.data_label.lower()
+            for old, new in self.permutations.items():
+                self.label = self.label.replace(old, new)
 
-            # Float conversion
-            for label in data.labels:
-                if line[label] == '':
-                    line[label] = 0.0
-                else:
+            # Error label permutations
+            if self.label[-1] in ('e', 'Δ') and self.label not in ('name', 'type'):
+                self.label = 'Δ' + self.label[:-1]
+            if self.label[0] == 'e':
+                self.label = 'Δ' + self.label[1:]
+
+            # Assumption that μα stands for μαcosδ when importing observables system
+            if self.data.data.system.name == 'observables' and self.label[-2:] == 'μα':
+                self.label = self.label + 'cosδ'
+
+            # Error label addition
+            if self.missing:
+                self.label = 'Δ' + self.label
+
+            # Variable identification
+            if self.label in self.data.variables.keys():
+                self.variable = self.data.variables[self.label]
+
+                # Unit specified in data.units component
+                if self.data.data.units is not None:
+                    pass
+
+                # Unit specified in CSV
+                elif self.data.unit_header and self.data.table[1, self.column] != '':
                     try:
-                        line[label] = float(line[label].replace(',', '.'))
+                        self.unit = self.data.data.system.Unit(self.data.table[1, self.column])
                     except ValueError:
                         self.series.stop(True, 'ValueError',
+                            "Unit '{}' used for column '{}' is not valid.",
+                            self.data.table[1, self.column], self.data_label)
+
+                # Error unit temporaraly set as None
+                elif self.label[0] == 'Δ':
+                    self.unit = None
+
+                # Default unit per physical type
+                else:
+                    self.unit = self.data.data.system.default_units[self.variable.physical_type]
+
+                # Check unit physical type
+                if self.unit is not None:
+                    self.data.series.stop(self.unit.physical_type != self.variable.physical_type,
+                        'ValueError', "The unit used for '{}' ('{}') in column ('{}'), '{}', has "
+                            "an incorrect physical type ('{}' required, '{}' given)",
+                        self.variable.name, self.label, self.data_label, self.unit.label,
+                        self.variable.physical_type, self.unit.physical_type)
+
+            else:
+                self.variable = None
+                self.unit = None
+
+    def create_rows(self):
+        """ Filters what rows in self.table are part of the selected group definied by
+            self.series.name and adds a row object to self for every valid row.
+        """
+
+        # Rows identification
+        self.rows = list(range(2 if self.unit_header else 1, self.table.shape[0]))
+
+        # Check if there is at least one row
+        if len(self.rows) < 1:
+            self.series.stop(self.from_CSV, 'ValueError',
+                "No entry in the CSV data file located at '{}'.", self.data_path)
+            self.series.stop(self.from_data, 'ValueError',
+                "No entry for the group in the data.")
+
+        # Group filtering
+        if 'group' in self.columns.keys():
+            for row in range(2 if self.unit_header else 1, self.table.shape[0]):
+                if self.table[row, self.columns['group'].column] != self.series.name:
+                    del self.rows[row]
+
+            # Check if there is at least one row remaining
+            if len(self.rows) < 1:
+                self.series.stop(self.from_CSV, 'ValueError',
+                    "No entry for the group '{}' in the CSV data file located at '{}'.",
+                    self.series.name, self.data_path)
+                self.series.stop(self.from_data, 'ValueError',
+                    "No entry for the group '{}' in the data.", self.series.name)
+
+        # Rows creation
+        for row in self.rows:
+            self.append(self.Row(self, row))
+
+    class Row:
+        """ Contains the data for an individual row (star), including name, type, id, position
+            and velocity.
+        """
+
+        def __init__(self, data, row):
+            """ Initializes a Row object from a 'data' object, a 'row' number. Default values are
+                given if no value is given. Errors are set to 0.0 if no error column is present.
+            """
+
+            # Initialization
+            self.data = data
+            self.row = row
+
+            # Values dictionary creation
+            self.values = {}
+            for label in self.data.columns.keys():
+
+                # Values present in self.table
+                if not self.data.columns[label].missing:
+                    self.values[label] = self.data.table[
+                        self.row, self.data.columns[label].column]
+
+                # Error values missing from self.table
+                else:
+                    self.values[label] = ''
+
+            # Float conversion
+            for label in self.data.variables.keys():
+
+                # Empty '' values
+                if self.values[label] == '':
+                    self.values[label] = 0.0
+
+                # Numerical values
+                else:
+                    try:
+                        self.values[label] = float(self.values[label].replace(',', '.'))
+                    except ValueError:
+                        self.data.series.stop(True, 'ValueError',
                             "'{}' value could not be converted to float in '{}' column.",
-                            line[label], label)
+                            self.values[label], label)
 
-            # !!! Conversion into Quantity objects and unit conversion here !!!
-            # Position columns
-            self.position = (
-                np.array([line[label] for label in data.position_labels]),
-                np.array([data.units[label] for label in data.position_labels]),
-                np.array([line[label] for label in data.position_error_labels]))
+            # Name column
+            self.name = self.values['name'] if 'name' in self.data.columns \
+                and self.values['name'] != '' else 'Star_{}'.format(str(self.row))
 
-            # Velocity columns
-            self.velocity = (
-                np.array([line[label] for label in data.velocity_labels]),
-                np.array([data.units[label] for label in data.velocity_labels]),
-                np.array([line[label] for label in data.velocity_error_labels]))
+            # Type column
+            self.type = self.values['type'] if 'type' in self.data.columns \
+                and self.values['type'] != '' else None
+
+            # ID column
+            self.id = self.values['id'] if 'id' in self.data.columns \
+                and self.values['id'] != '' else str(self.row)
+
+            # Position columns and unit conversion
+            self.position = Quantity(
+                [self.values[label] for label in self.data.position_variables.keys()],
+                [self.data.columns[label].unit for label in self.data.position_variables.keys()],
+                [self.values[label] for label in self.data.position_error_variables.keys()],
+                [self.data.columns[label].unit for label in self.data.position_error_variables.keys()]).to()
+
+            # Velocity columns and unit conversion
+            self.velocity = Quantity(
+                [self.values[label] for label in self.data.velocity_variables.keys()],
+                [self.data.columns[label].unit for label in self.data.velocity_variables.keys()],
+                [self.values[label] for label in self.data.velocity_error_variables.keys()],
+                [self.data.columns[label].unit for label in self.data.velocity_error_variables.keys()]).to()

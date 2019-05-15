@@ -2,18 +2,20 @@
 # -*- coding: utf-8 -*-
 
 """ tools.py: Defines Quantity class to handle n dimension values with unit conversions and error
-    handling, and Coordinates class to handle coordinates transformation, and a montecarlo function.
+    handling, and Coordinate class to handle coordinates transformation, and a montecarlo function.
 """
 
 import numpy as np
 from astropy import units as un
 from math import cos, sin, asin, atan2, pi as π, degrees, radians
+from json import dumps
 from series import info
+from init import System
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-class Coordinates:
+class Coordinate:
     """ Contains the values and related methods of coordinates, including its position, velocity,
         their errors and units, in both cartesian and spherical coordinates systems, as well as
         method to convert between them.
@@ -37,8 +39,11 @@ class Coordinates:
     # J2000.0 Galactic longitude (l) of the Celestial North pole (δ = 90°) from Liu et al. (2018) 1010.3773
     l_north = radians(122.931925267)
 
+    # Paralax conversion from radians to parsecs constant
+    k = π / 648000
+
     def __init__(self, position, velocity=None):
-        """ Initializes a Coordinates object from a Quantity objects representing n positions
+        """ Initializes a Coordinate object from a Quantity objects representing n positions
             (shape = (n, 3)) and optionnally n corresponding velocities (shape = (n, 3)). Position
             and velocity must be broadcast together and can either be observables, cartesian
             coordiantes or spherical coordinates.
@@ -71,7 +76,7 @@ class Coordinates:
             raise ValueError(
                 "Position and velocity with shapes {} and {} cannot be broadcast together.".format(
                     position.shape, velocity.shape))
-        if position.shape != shape: # np.full() Doesn't work on quantity object !!!
+        if position.shape != shape: # !!! np.full() Doesn't work on quantity object !!!
             position = np.full(shape, position)
         if velocity.shape != shape:
             velocity = np.full(shape, velocity)
@@ -111,7 +116,7 @@ class Coordinates:
 
 def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Converts a XYZ cartesian coordinates position vector (pc) to a rδα (distance (r; pc),
-        declination (δ, DEC; deg) and right ascension (α, RA; deg)) spherical coordinates position
+        declination (δ, DEC; rad) and right ascension (α, RA; rad)) spherical coordinates position
         vector (observables), along with measurement errors. x, y and z can't all be null.
     """
 
@@ -120,9 +125,7 @@ def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     norm, norm_xy = norm_2**0.5, norm_xy_2**0.5
 
     # Distance and angles calculation
-    values = np.array(
-        (norm, asin(z / norm), atan2(y, x) + (2 * π if y < 0.0 else 0.0))
-    ) * np.array((1.0, un.rad.to(un.deg), un.rad.to(un.deg))) # Angle conversions from rad to deg
+    values = np.array((norm, asin(z / norm), atan2(y, x) + (2 * π if y < 0.0 else 0.0)))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
@@ -138,18 +141,16 @@ def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
                     (-y / norm_xy_2, x / norm_xy_2, 0.0)
                 )
             )**2,
-            np.array((Δx, Δy, Δz))**2 # Angle conversions from rad to deg
-        )**0.5 * np.array((1.0, un.rad.to(un.deg), un.rad.to(un.deg)))
+            np.array((Δx, Δy, Δz))**2
+        )**0.5
         return values, errors
 
 def rδα_to_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
-    """ Converts a rδα (distance (r; pc), declination (δ, DEC; deg) and right ascension (α, RA; deg))
+    """ Converts a rδα (distance (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad))
         spherical coordinates position vector (observables) to a XYZ cartesian coordinates position
         vector (pc), along with measurement errors.
     """
 
-    # Angle conversions from deg to rad
-    δ, α, Δδ, Δα = np.array((δ, α, Δδ, Δα)) * un.deg.to(un.rad)
     # Cosine and sine calculation
     cos_δ, sin_δ, cos_α, sin_α = cos(δ), sin(δ), cos(α), sin(α)
 
@@ -175,14 +176,12 @@ def rδα_to_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
         return values, errors
 
 def uvw_to_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0):
-    """ Converts a UVW cartesian coordinates velocity vector (km/s) to a rvµδµα (radial velocity
-        (rv; km/s), declination proper motion (μδ; mas/yr) and right ascension proper motion
-        (µα; mas/yr)) spherical coordinates velocity vector (observables), along with measurement
+    """ Converts a UVW cartesian coordinates velocity vector (pc/Myr) to a rvµδµα (radial velocity
+        (rv; pc/Myr), declination proper motion (μδ; rad/Myr) and right ascension proper motion
+        (µα; rad/Myr)) spherical coordinates velocity vector (observables), along with measurement
         errors. x, y and z (pc) can't all be null.
     """
 
-    # Distance conversions from pc to km
-    x, y, z, Δx, Δy, Δz = np.array((x, y, z, Δx, Δy, Δz)) * un.pc.to(un.km)
     # Norm calculation
     norm_2, norm_xy_2 = (x**2 + y**2 + z**2), (x**2 + y**2)
     norm, norm_xy = norm_2**0.5, norm_xy_2**0.5
@@ -193,8 +192,8 @@ def uvw_to_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0
             ((u * x) + (v * y) + (z * w)) / norm,
             (w * norm_xy - ((u * x * z) + (v * y * z)) / norm_xy) / norm_2,
             ((v * x) - (u * y)) / norm_xy_2
-        ) # Angular velocity conversions from rad/s to mas/yr
-    ) * np.array((1.0, (un.rad/un.s).to(un.mas/un.yr), (un.rad/un.s).to(un.mas/un.yr)))
+        )
+    )
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz, Δu, Δv, Δw)).any():
@@ -220,23 +219,17 @@ def uvw_to_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0
                     )
                 )
             )**2,
-            np.array((Δx, Δy, Δz, Δu, Δv, Δw))**2 # Angular velocity conversions from rad/s to mas/yr
-        )**0.5 * np.array((1.0, (un.rad/un.s).to(un.mas/un.yr), (un.rad/un.s).to(un.mas/un.yr)))
+            np.array((Δx, Δy, Δz, Δu, Δv, Δw))**2
+        )**0.5
         return values, errors
 
 def rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
-    """ Converts a rvµδµα (radial velocity (rv; km/s), declination proper motion (µδ; mas/yr)
-        and right ascension proper motion (µα; mas/yr)) spherical coordinates velocity vector
-        (observables) to a UVW cartesian coordinates velocity vector (km/s), along with measurement
-        errors.
+    """ Converts a rvµδµα (radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr)
+        and right ascension proper motion (µα; rad/Myr)) spherical coordinates velocity vector
+        (observables) to a UVW cartesian coordinates velocity vector (pc/Myr), along with
+        measurement errors.
     """
 
-    # Distance conversion from pc to km
-    r, Δr = np.array((r, Δr)) * un.pc.to(un.km)
-    # Angle conversions from deg to rad
-    δ, α, Δδ, Δα = np.array((δ, α, Δδ, Δα)) * un.deg.to(un.rad)
-    # Angular velocity conversion from mas/yr to rad/s
-    μδ, μα, Δμδ, Δμα = np.array((μδ, μα, Δμδ, Δμα)) * (un.mas/un.yr).to(un.rad/un.s)
     # Cosine and sine calculation
     cos_δ, sin_δ, cos_α, sin_α = cos(δ), sin(δ), cos(α), sin(α)
 
@@ -280,14 +273,14 @@ def equatorial_galactic_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
         equatorial plane. All arguments must have the same units.
     """
 
-    # Coordinates calculation
-    values = np.dot(Coordinates.germ, np.array((x, y, z)))
+    # Coordinate calculation
+    values = np.dot(Coordinate.germ, np.array((x, y, z)))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
         return values, np.zeros(3)
     else:
-        errors = np.dot(Coordinates.germ**2, np.array((Δx, Δy, Δz))**2)**0.5
+        errors = np.dot(Coordinate.germ**2, np.array((Δx, Δy, Δz))**2)**0.5
         return values, errors
 
 def galactic_equatorial_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
@@ -295,19 +288,19 @@ def galactic_equatorial_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
         galactic plane. All arguments must have the same units.
     """
 
-    # Coordinates calculation
-    values = np.dot(Coordinates.germ.T, np.array((x, y, z)))
+    # Coordinate calculation
+    values = np.dot(Coordinate.germ.T, np.array((x, y, z)))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
         return values, np.zeros(3)
     else:
-        errors = np.dot(Coordinates.germ.T**2, np.array((Δx, Δy, Δz))**2)**0.5
+        errors = np.dot(Coordinate.germ.T**2, np.array((Δx, Δy, Δz))**2)**0.5
         return values, errors
 
 def galactic_xyz_equatorial_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Converts a XYZ (pc) galactic cartesian coordinates position vector to a rδα (distance
-        (r; pc), declination (δ, DEC; deg) and right ascension (α, RA; deg)) equatorial spherical
+        (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad)) equatorial spherical
         coordinates position vector (observables), along with measurement errors. x, y and z can't
         all be null.
     """
@@ -316,7 +309,7 @@ def galactic_xyz_equatorial_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     return xyz_to_rδα(*values, *errors)
 
 def equatorial_rδα_galactic_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
-    """ Converts a rδα (distance (r; pc), declination (δ, DEC; deg) and right ascension (α, RA; deg))
+    """ Converts a rδα (distance (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad))
         equatorial spherical coordinates position vector to a XYZ (pc) galactic cartesian coordinates
         position vector, along with measurement errors.
     """
@@ -325,9 +318,9 @@ def equatorial_rδα_galactic_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
     return equatorial_galactic_xyz(*values, *errors)
 
 def galactic_uvw_equatorial_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0):
-    """ Converts a UVW (km/s) galactic cartesian coordinates velocity vector to a rvµδµα (radial
-        velocity (rv; km/s), declination proper motion (µδ; mas/yr) and right ascension proper
-        motion (μδ; mas/yr)) equatorial spherical coordinates velocity vector, along with
+    """ Converts a UVW (pc/Myr) galactic cartesian coordinates velocity vector to a rvµδµα (radial
+        velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and right ascension proper
+        motion (μδ; rad/Myr)) equatorial spherical coordinates velocity vector, along with
         measurement errors.
     """
 
@@ -336,9 +329,9 @@ def galactic_uvw_equatorial_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δ
     return uvw_to_rvμδμα(*position_values, *velocity_values, *position_errors, *velocity_errors)
 
 def equatorial_rvμδμα_galactic_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
-    """ Converts a rvµδµα (radial velocity (rv; km/s), declination proper motion (µδ; mas/yr)
-        and right ascension proper motion (µα; mas/yr)) equatorial spherical coordinates velocity
-        vector to a UVW (km/s) galactic cartesian coordinates velocity vector, along with
+    """ Converts a rvµδµα (radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr)
+        and right ascension proper motion (µα; rad/Myr)) equatorial spherical coordinates velocity
+        vector to a UVW (pc/Myr) galactic cartesian coordinates velocity vector, along with
         measurement errors.
     """
 
@@ -347,7 +340,7 @@ def equatorial_rvμδμα_galactic_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0,
 
 def equatorial_xyz_galactic_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Converts a XYZ (pc) equatorial cartesian coordinates position vector to a rδα (distance
-        (r; pc), declination (δ, DEC; deg) and right ascension (α, RA; deg)) galactic spherical
+        (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad)) galactic spherical
         coordinates position vector, along with measurement errors. x, y and z can't all be null.
     """
 
@@ -355,7 +348,7 @@ def equatorial_xyz_galactic_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     return xyz_to_rδα(*values, *errors)
 
 def galactic_rδα_equatorial_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
-    """ Converts a rδα (distance (r; pc), declination (δ, DEC; deg) and right ascension (α, RA; deg))
+    """ Converts a rδα (distance (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad))
         galactic spherical coordinates position vector to a XYZ (pc) equatorial cartesian coordinates
         position vector, along with measurement errors.
     """
@@ -364,9 +357,9 @@ def galactic_rδα_equatorial_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
     return galactic_equatorial_xyz(*values, *errors)
 
 def equatorial_uvw_galactic_rvµδµα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0):
-    """ Converts a UVW (km/s) equatorial cartesian coordinates velocity vector to a rvµδµα (radial
-        velocity (rv; km/s), declination proper motion (µδ; mas/yr) and right ascension proper
-        motion (μδ; mas/yr)) galactic spherical coordinates velocity vector, along with measurement
+    """ Converts a UVW (pc/Myr) equatorial cartesian coordinates velocity vector to a rvµδµα (radial
+        velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and right ascension proper
+        motion (μδ; rad/Myr)) galactic spherical coordinates velocity vector, along with measurement
         errors.
     """
 
@@ -375,9 +368,9 @@ def equatorial_uvw_galactic_rvµδµα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δ
     return uvw_to_rvμδμα(*position_values, *velocity_values, *position_errors, *velocity_errors)
 
 def galactic_rvµδµα_equatorial_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
-    """ Converts a rvµδµα (radial velocity (rv; km/s), declination proper motion (µδ; mas/yr)
-        and right ascension proper motion (μα; mas/yr)) equatorial spherical coordinates velocity
-        vector to a UVW (km/s) galactic cartesian coordinates velocity vector, along with
+    """ Converts a rvµδµα (radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr)
+        and right ascension proper motion (μα; rad/Myr)) equatorial spherical coordinates velocity
+        vector to a UVW (pc/Myr) galactic cartesian coordinates velocity vector, along with
         measurement errors.
     """
 
@@ -421,49 +414,49 @@ def galactic_equatorial_rvμδμα(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δ�
     return uvw_to_rvμδμα(*position_values, *velocity_values, *position_errors, *velocity_errors)
 
 def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα_cos_δ=0):
-    """ Converts observations (paralax (p; mas), declination (δ, DEC; deg) and right ascension
-        (α, RA; deg)), radial velocity (rv; km/s), declination proper motion (µδ; mas/yr) and
-        and right ascension proper motion * cos(δ) (μα_cos_δ; mas/yr)) into equatorial spherical
-        coordinates (distance (r; pc), declination (δ, DEC; deg) and right ascension (α, RA; deg)),
-        radial velocity (rv; km/s), declination proper motion (µδ; mas/yr) and right ascension
-        proper motion (μα_cos_δ; mas/yr)), along with measurement errors.
+    """ Converts observations (paralax (p; rad), declination (δ, DEC; rad) and right ascension
+        (α, RA; rad)), radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and
+        and right ascension proper motion * cos(δ) (μα_cos_δ; rad/Myr)) into equatorial spherical
+        coordinates (distance (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad)),
+        radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and right ascension
+        proper motion (μα_cos_δ; rad/Myr)), along with measurement errors.
     """
 
     # Cosine calculation
-    cos_δ = cos(radians(δ))
+    cos_δ = cos(δ)
 
     # Values calculation
-    position = np.array((un.arcsec.to(un.mas) / p, δ, α))
+    position = np.array((Coordinate.k / p, δ, α))
     velocity = np.array((rv, μδ, μα_cos_δ / cos_δ))
 
     # Errors calculation
     if not np.array((Δp, Δδ, Δα, Δrv, Δμδ, Δμα_cos_δ)).any():
         return position, velocity, np.zeros(3), np.zeros(3)
     else:
-        return position, velocity, np.array((Δp * un.arcsec.to(un.mas) / p**2, Δδ, Δα)), \
+        return position, velocity, np.array((Δp * Coordinate.k / p**2, Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ))
 
 def spherical_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
-    """ Converts equatorial spherical coordinates (distance (r; pc), declination (δ, DEC; deg)
-        and right ascension (α, RA; deg)), radial velocity (rv; km/s), declination proper motion
-        (µδ; mas/yr) and right ascension proper motion (μα_cos_δ; mas/yr)) into observations
-        (paralax (p; mas), declination (δ, DEC; deg) and right ascension (α, RA; deg)), radial
-        velocity (rv; km/s), declination proper motion (µδ; mas/yr) and and right ascension proper
-        motion * cos(δ) (μα_cos_δ; mas/yr)), along with measurement errors.
+    """ Converts equatorial spherical coordinates (distance (r; pc), declination (δ, DEC; rad)
+        and right ascension (α, RA; rad)), radial velocity (rv; pc/Myr), declination proper motion
+        (µδ; rad/Myr) and right ascension proper motion (μα_cos_δ; rad/Myr)) into observations
+        (paralax (p; rad), declination (δ, DEC; rad) and right ascension (α, RA; rad)), radial
+        velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and and right ascension
+        proper motion * cos(δ) (μα_cos_δ; rad/Myr)), along with measurement errors.
     """
 
     # Cosine calculation
-    cos_δ = cos(radians(δ))
+    cos_δ = cos(δ)
 
     # Values calculation
-    position = np.array((un.arcsec.to(un.mas) / r, δ, α))
+    position = np.array((Coordinate.k / r, δ, α))
     velocity = np.array((rv, μδ, μα * cos_δ))
 
     # Errors calculation
     if not np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα)).any():
         return position, velocity, np.zeros(3), np.zeros(3)
     else:
-        return position, velocity, np.array((Δr * un.arcsec.to(un.mas) / r**2, Δδ, Δα)), \
+        return position, velocity, np.array((Δr * Coordinate.k / r**2, Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα / μα)**2 + (Δδ / δ)**2)**0.5 * μα * cos_δ))
 
 class Quantity:
@@ -492,11 +485,11 @@ class Quantity:
             units = ['']
         elif type(units) in (
                 str, un.core.PrefixUnit, un.core.CompositeUnit,
-                un.core.IrreducibleUnit, un.core.Unit):
+                un.core.IrreducibleUnit, un.core.Unit, System.Unit):
             units = [units]
         if type(units) in (tuple, list, np.ndarray):
             try:
-                self.units = np.full(self.shape, np.squeeze(np.vectorize(un.Unit)(units)))
+                self.units = np.full(self.shape, np.squeeze(np.vectorize(System.Unit.get)(units)))
             except ValueError:
                 raise ValueError(
                     "Units ({}) cannot be broadcast to the shape of values ({}).".format(
@@ -526,12 +519,11 @@ class Quantity:
             error_units = units
         elif type(error_units) in (
                 str, un.core.PrefixUnit, un.core.CompositeUnit,
-                un.core.IrreducibleUnit, un.core.Unit):
+                un.core.IrreducibleUnit, un.core.Unit, System.Unit):
             error_units = [error_units]
         if type(error_units) in (tuple, list, np.ndarray):
             try:
-                self.error_units = np.full(
-                    self.shape, np.squeeze(np.vectorize(un.Unit)(error_units)))
+                self.error_units = np.full(self.shape, np.squeeze(np.vectorize(System.Unit.get)(error_units)))
             except ValueError:
                 raise ValueError(
                     "Error units ({}) cannot be broadcast to the shape of values ({}).".format(
@@ -542,6 +534,7 @@ class Quantity:
         self.error_physical_types = np.vectorize(lambda unit: unit.physical_type)(self.error_units)
 
         # Conversion of errors into value units
+        # !!! Check for physical type first, then convert, like in self.to())
         if not np.equal(self.units, self.error_units).all():
             try:
                 self.errors = np.vectorize(
@@ -583,7 +576,7 @@ class Quantity:
             """ Returns the value of single-value arrays or a list version. """
 
             return array.flatten()[0] if np.equal(np.array(array.shape), 1).all() \
-                else array.tolist()
+                else dumps(array.tolist()).replace('"', '').replace(' ', '').replace(',', ', ')
 
         return '({} ± {}) {}'.format(
             flatten(self.values),
@@ -828,7 +821,7 @@ class Quantity:
 
     def __contains__(self, other):
         """ Determines whether other is in self. """
-        
+
         return True
 
     def count(self, other):
@@ -934,6 +927,7 @@ class Quantity:
         """ Converts Quantity object into new units or default units if none are given. """
 
         # Default units for physical types if no units are given.
+        # !!! Remove this part and use System.default_units instead !!!
         if units is None:
             default_units = {
                 'time': un.Myr,
@@ -950,11 +944,11 @@ class Quantity:
             # Import of units
             if type(units) in (
                     str, un.core.PrefixUnit, un.core.CompositeUnit,
-                    un.core.IrreducibleUnit, un.core.Unit):
+                    un.core.IrreducibleUnit, un.core.Unit, System.Unit):
                 units = [units]
             if type(units) in (tuple, list, np.ndarray):
                 try:
-                    units = np.full(self.units.shape, np.vectorize(un.Unit)(units))
+                    units = np.full(self.units.shape, np.vectorize(System.Unit.get)(units))
                 except ValueError:
                     raise ValueError(
                         "Units with shapes {} and {} cannot be broadcast together.".format(
@@ -971,9 +965,8 @@ class Quantity:
                         self.physical_types, units_physical_types))
 
             # Conversion factors between self and other
-            factors = np.vectorize(
-                lambda self_unit, unit: self_unit.to(unit)
-            )(np.full(units.shape, self.units), units)
+            factors = np.vectorize(lambda self_unit, unit: self_unit.to(unit))(
+                np.full(units.shape, self.units), units)
 
         return self.new(Quantity(self.values * factors, units, self.errors * factors))
 
@@ -985,6 +978,13 @@ class Quantity:
         vars(new).update(optional)
 
         return new
+
+    def import_units(self, units):
+        """ Imports units into from a NoneType, string, tuple, list, np.ndarray, astropy
+            un.core.PrefixUnit, un.core.CompositeUnit, un.core.IrreducibleUnit, un.core.Unit or
+            System.Unit into a System.Unit object.
+        """
+        pass
 
 def montecarlo(function, values, errors, n=200):
     """ Wraps a function to output both its value and errors, calculated with Monte Carlo

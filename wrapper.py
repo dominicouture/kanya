@@ -18,13 +18,13 @@ for age in  [5.0, 10.0, 50.0, 100.0] :
         for number_of_stars in [30, 40, 50, 60, 100, 200]:
 
             # Import of old config.py
-            config = open('config.py', 'r')
+            config = open('config.py', 'r', encoding='utf-8')
             lines = [line for line in config.readlines()]
             config.close()
             os.remove('config.py')
 
             # Creation of new config.py
-            config = open('config.py', 'w')
+            config = open('config.py', 'w', encoding='utf-8')
             for line in lines:
                 if line.startswith('number_of_stars'):
                     config.write('number_of_stars = {} # 42\n'.format(number_of_stars))
@@ -44,13 +44,13 @@ for age in  [5.0, 10.0, 50.0, 100.0] :
 for avg_velocity_error in  [0.05, 0.1, 0.15]:
 
     # Import config.py
-    config = open('config.py', 'r')
+    config = open('config.py', 'r', encoding='utf-8')
     lines = [line for line in config.readlines()]
     config.close()
     os.remove('config.py')
 
     # Creation of new config.py
-    config = open('config.py', 'w')
+    config = open('config.py', 'w', encoding='utf-8')
     for line in lines:
         if line.startswith('avg_velocity_error'):
             config.write('avg_velocity_error = ({}, {}, {})\n'.format(avg_velocity_error, avg_velocity_error, avg_velocity_error))

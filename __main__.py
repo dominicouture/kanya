@@ -23,6 +23,8 @@ groups.create()
 
 # Output creation
 for name, series in groups.items():
-    for group in series:
-        create_2D_scatter(group, 'x', 'y', age=12, errors=True, labels=True, mst=True)
-        create_3D_scatter(group, age=12, errors=False, labels=False, mst=True)
+    create_size_indicators_plot(series)
+    # for group in series:
+        # for frame in [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]:
+            # create_2D_scatter(group, 'x', 'z', age=frame, errors=True, labels=True, mst=True)
+            # create_3D_scatter(group, step=frame, errors=False, labels=False, mst=True)

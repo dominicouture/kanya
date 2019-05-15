@@ -37,7 +37,7 @@ class System():
 
         def __init__(self, label, name=None):
             """ Initializes a Unit from name, label and an Astropy Units object.
-                !!! System.Unit class must be used during unit conversion instead of unit
+                !!! System.Unit class should be used during unit conversion instead of unit
                 label (input of Quantity ?) and un.Unit() calls. !!!
             """
 
@@ -49,7 +49,19 @@ class System():
             # Unit name
             self.name = name if name is not None and type(name) == str else self.unit.to_string()
 
-    # Default units per physical type dictionary
+        def __repr__(self):
+
+            return self.label
+
+        def get(self):
+            """ Allow for handling of System.Unit type. """
+
+            if type(self) == System.Unit:
+                return self.unit
+            else:
+                return un.Unit(self)
+
+    # Default units per physical type
     default_units = {
         'time': Unit('Myr', 'megayear'),
         'length': Unit('pc', 'parsec'),
@@ -121,8 +133,8 @@ class System():
 class Config():
     """ Contains the parameters imported from a configuration file (which must be a Python file),
         command line arguments, parameters in the __init__() function call or another Config
-        object, related methods, a Parameter class and a dictionary of default values. A config
-        object can then be used as the input of a Series object.
+        object, as well as related methods, a Parameter class and a dictionary of default values.
+        A config object can then be used as the input of a Series object.
     """
 
     # Coordinates systems

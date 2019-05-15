@@ -69,12 +69,12 @@ def create_size_indicators_plot(series, secondary=False):
             i += 1
 
     # Title, legend and axis formatting
-    plt.title("Average size indicators of {} moving group simulations with kinematics similar\n"
-        "to β Pictoris over {} Myr and typical measurement errors of Gaia DR2\n".format(
-        series.number_of_groups, series.duration))
-    # plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
-    #     "with {} km/s redshift correction (real errors)".format(
-    #         series.duration, round(series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 2)))
+    # plt.title("Average size indicators of {} moving group simulations with kinematics similar\n"
+    #     "to β Pictoris over {} Myr and typical measurement errors of Gaia DR2\n".format(
+    #     series.number_of_groups, series.duration))
+    plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
+        "with {} km/s redshift correction (real errors)".format(
+            series.duration, round(series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 2)))
     plt.legend()
     plt.xlabel('Time (Myr)')
     plt.ylabel('Scatter, MAD, MST mean and MST MAD (pc)')
@@ -115,7 +115,7 @@ def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=Fal
         [star.position[step, i] for star in group],
         [star.position[step, j] for star in group], marker='o', color='0.0')
 
-    # Errors
+    # Error bars
     if errors:
         for star in group:
             position = star.position[step]
@@ -147,7 +147,10 @@ def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=Fal
     plt.ylabel('{} (pc)'.format(keys[j].upper()))
 
     # Show figure
-    plt.show()
+    # plt.show()
+
+    # Show figure
+    plt.savefig(path.join("/Users/Dominic/Desktop/beta_pic_frames", 'beta_pictoris_xz_{}.pdf'.format(age)))
 
 def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, mst=False):
     """ Creates a scatter plot of star positions in x, y and z at a given 'step' or 'age' in Myr.
@@ -164,20 +167,20 @@ def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, ms
 
     # Figure initialization
     rcParams.update({'font.family': 'serif', 'font.size': '14', 'lines.markersize': 4})
-    fig = plt.figure(figsize=(12, 8), facecolor='w')
+    fig = plt.figure(figsize=(12, 8), facecolor='w', dpi=200)
     ax = fig.add_subplot(111, projection='3d')
 
     # Scatter
     ax.scatter(
-        [star.position[step, 0] for star in group],
-        [star.position[step, 1] for star in group],
-        [star.position[step, 2] for star in group], marker='o', c='0.0')
+        [star.relative_position[step, 0] for star in group],
+        [star.relative_position[step, 1] for star in group],
+        [star.relative_position[step, 2] for star in group], marker='o', c='0.0')
 
     # Error bars
     if errors:
         for star in group:
-            position = star.position[step]
-            error = star.position_error[step]
+            position = star.relative_position[step]
+            error = star.relative_position_error[step]
             ax.plot(
                 (position[0] - error[0], position[0] + error[0]),
                 (position[1], position[1]), (position[2], position[2]), c='0.1', linewidth=0.7)
@@ -199,18 +202,21 @@ def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, ms
     if mst:
         for branch in group.mst[step]:
             ax.plot(
-                (branch.start.position[step, 0], branch.end.position[step, 0]),
-                (branch.start.position[step, 1], branch.end.position[step, 1]),
-                (branch.start.position[step, 2], branch.end.position[step, 2]), c='b')
+                (branch.start.relative_position[step, 0], branch.end.relative_position[step, 0]),
+                (branch.start.relative_position[step, 1], branch.end.relative_position[step, 1]),
+                (branch.start.relative_position[step, 2], branch.end.relative_position[step, 2]), c='b')
 
     # Title and axis formatting
     plt.title("Minimum spanning tree of stars in β Pictoris at {} Myr.\n".format(age))
     ax.set_xlabel('\n X (pc)')
     ax.set_ylabel('\n Y (pc)')
     ax.set_zlabel('\n Z (pc)')
+    ax.set_xlim3d(-70, 70)
+    ax.set_ylim3d(-30, 30)
+    ax.set_zlim3d(-30, 30)
 
     # Show figure
-    plt.show()
+    plt.savefig(path.join("/Users/Dominic/Desktop/beta_pic_frames", 'beta_pic_{}.png'.format(step)))
 
 def plot_age_error():
     """ Creates a graph of ages obtained for diffrent measurement errors on RV and offset

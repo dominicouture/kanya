@@ -144,8 +144,6 @@ class Series(list):
         # Logs directory parameter
         self.logs_dir = 'Logs' if self.config.logs_dir.values is None \
             else self.config.logs_dir.values
-        self.stop(type(self.logs_dir) != str, 'TypeError', "'logs_dir' must be a string "
-            "({} given).", type(self.logs_dir))
 
         # Logs direction creation logs_dir parameter redefinied as the absolute path
         self.logs_dir = self.directory(self.output_dir, self.config.logs_dir.values, 'logs_dir')
@@ -196,6 +194,8 @@ class Series(list):
         # db_path parameter
         self.db_path = '{}.db'.format(self.name) if self.config.db_path.values is None \
             else self.config.db_path.values
+
+        # Check if db_path parameter is a string, witch must be done before self.directory call
         self.stop(type(self.db_path) != str, 'TypeError', "'db_path' must be a string ({} given).",
             type(self.db_path))
 
@@ -208,6 +208,10 @@ class Series(list):
         # db_path parameter redefinition as the absolute path
         self.db_path = path.join(self.db_dir, self.db_name)
         Config.db_path = self.db_path # Necessary for Database object definition
+
+        # Check if the path links to a database file.
+        self.stop(path.splitext(self.db_path)[1].lower() != '.db', 'TypeError',
+            "'{}' is not a database file (with a .db extension).", self.db_path)
 
         if self.from_database or self.to_database:
             # Check if a database exists
@@ -468,7 +472,7 @@ class Series(list):
              quantity.physical_types.tolist(), physical_types, quantity.system.label)
 
         # Units conversion
-        return quantity
+        return quantity.to()
         # return quantity.to([variable.unit.unit for variable in variables])
 
     def directory(self, base, directory, name, create=True):
@@ -478,8 +482,8 @@ class Series(list):
         """
 
         # Check the type of directory
-        self.stop(type(directory) is not str, 'TypeError',
-            "'{}' parameter must be a string ({} given).", name, type(directory))
+        self.stop(type(directory) is not str, 'TypeError', "'{}' must be a string ({} given).",
+            name, type(directory))
 
         # Output directory formatting
         working_dir = getcwd()

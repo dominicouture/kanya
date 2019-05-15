@@ -6,7 +6,6 @@
 """
 
 import numpy as np
-from astropy import units as un
 from series import info
 from data import Data
 from tools import *
@@ -59,15 +58,15 @@ class Group(list):
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
             parameters including the name of the stars, their position (XYZ) and velocity (UVW),
-            and the respective errors.
+            and the respective errors. Radial velocity offset is also added.
         """
 
-        # No conversion
+        # From cartesian coordinates
         # for star in self.series.data:
         #     # Stars creation
         #     self.append(self.Star(name=star.name,
-        #         velocity=star.velocity[0], velocity_error=star.velocity[2],
-        #         position=star.position[0], position_error=star.position[2]))
+        #         velocity=star.velocity.values, velocity_error=star.velocity.values,
+        #         position=star.position.values, position_error=star.position.values))
 
         # From observables
         for star in self.series.data:
@@ -75,24 +74,27 @@ class Group(list):
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα,
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
-                    *star.position[0], *star.velocity[0] + np.array(
-                        [self.series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 0.0, 0.0]),
-                    *star.position[2], *star.velocity[2])
+                    *star.position.values,
+                    *star.velocity.values + np.array([self.series.rv_offset, 0.0, 0.0]),
+                    *star.position.errors,
+                    *star.velocity.errors)
 
             # Equatorial spherical coordinates conversion into galactic cartesian coordinates
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
                 *position_rδα, *position_rδα_error)
             velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(
                 *position_rδα, *velocity_rvμδμα, *position_rδα_error, *velocity_rvμδμα_error)
+
             # Speed of light correction
+            # from astropy import units as un
             # position_xyz = position_xyz + velocity_uvw * (un.km/un.s).to(un.pc/un.Myr) * \
             #     position_rδα[0] / (299792458 * (un.m/un.s).to(un.pc/un.Myr))
 
             # Star creation
             self.append(self.Star(
                 self, name=star.name,
-                velocity=velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
-                velocity_error=velocity_uvw_error * (un.km/un.s).to(un.pc/un.Myr),
+                velocity=velocity_uvw,
+                velocity_error=velocity_uvw_error,
                 position=position_xyz,
                 position_error=position_xyz_error))
 
@@ -103,9 +105,9 @@ class Group(list):
         """
 
         # Velocity array creation and conversions
-        avg_velocity = self.series.avg_velocity.values * (un.km/un.s).to(un.pc/un.Myr)
+        avg_velocity = self.series.avg_velocity.values
         avg_velocity_error = self.series.avg_velocity_error.values
-        avg_velocity_scatter = self.series.avg_velocity_scatter.values * (un.km/un.s).to(un.pc/un.Myr)
+        avg_velocity_scatter = self.series.avg_velocity_scatter.values
 
         # Position array creation
         avg_position = self.series.avg_position.values
@@ -119,13 +121,11 @@ class Group(list):
             position_xyz = velocity_uvw * self.series.age + (
                 np.random.normal(avg_position, avg_position_scatter) -
                 (avg_velocity * self.series.age + avg_position) + # Normalisation
-                (15.19444, -4.93612, -1.70742223)) # beta-pictoris current average position
-            velocity_uvw  *= (un.pc/un.Myr).to(un.km/un.s)
+                (15.19444, -4.93612, -1.70742223)) # Beta Pictoris current average position
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array(
-                (self.series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 0.0, 0.0))
+            velocity_rvμδμα = velocity_rvμδμα + np.array((self.series.rv_offset, 0.0, 0.0))
             position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
 
             # Velocity and position conversion to observables
@@ -139,20 +139,22 @@ class Group(list):
                     *np.random.normal(velocity_obs, avg_velocity_error),
                     # *np.random.normal(position_obs, self.series.data[star].position[2]),
                     # *np.random.normal(velocity_obs, self.series.data[star].velocity[2]),
-                    *avg_position_error, *avg_velocity_error)
+                    *avg_position_error,
+                    *avg_velocity_error)
 
             # Velocity and position conversion back to galactic cartesian coordinates
-            velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(
-                *position_rδα, *velocity_rvμδμα, *position_rδα_error, *velocity_rvμδμα_error)
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
                 *position_rδα, *position_rδα_error)
+            velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(
+                *position_rδα, *velocity_rvμδμα, *position_rδα_error, *velocity_rvμδμα_error)
 
             # Star creation
             self.append(self.Star(
                 self, name='star_{}'.format(star),
-                velocity=velocity_uvw * (un.km/un.s).to(un.pc/un.Myr),
-                velocity_error=velocity_uvw_error * (un.km/un.s).to(un.pc/un.Myr),
-                position=position_xyz, position_error=position_xyz_error))
+                velocity=velocity_uvw,
+                velocity_error=velocity_uvw_error,
+                position=position_xyz,
+                position_error=position_xyz_error))
 
     def scatter(self):
         """ Computes the xyz and total scatter of a group and their respective errors for all
