@@ -7,7 +7,6 @@ import numpy as np
 from matplotlib import rcParams, pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
-from astropy import units as un
 from os import path
 from series import info
 
@@ -72,6 +71,8 @@ def create_size_indicators_plot(series, secondary=False):
     # plt.title("Average size indicators of {} moving group simulations with kinematics similar\n"
     #     "to β Pictoris over {} Myr and typical measurement errors of Gaia DR2\n".format(
     #     series.number_of_groups, series.duration))
+    # !!! Rewrite this part with Quantity objects !!!
+    from astropy import units as un
     plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
         "with {} km/s redshift correction (real errors)".format(
             series.duration, round(series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 2)))

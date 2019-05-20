@@ -11,124 +11,10 @@ from os import path
 from importlib.util import spec_from_file_location, module_from_spec
 from argparse import ArgumentParser
 from copy import deepcopy
+from coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
-
-class System():
-    """ Defines a Coordinates system object with Variable objects. """
-
-    def __init__(self, name: str, position: tuple, velocity: tuple):
-        """ Initializes a System from position and velocity tuples with 3 Variables objects. """
-
-        # Name and index
-        self.name = name
-
-        # Values
-        self.position = [self.variables[label] for label in position]
-        self.velocity = [self.variables[label] for label in velocity]
-
-        # Errors
-        self.position_error = [self.variables['Δ' + label] for label in position]
-        self.velocity_error = [self.variables['Δ' + label] for label in velocity]
-
-    class Unit():
-        """ Defines default units per physical type, and their label and name. """
-
-        def __init__(self, label, name=None):
-            """ Initializes a Unit from name, label and an Astropy Units object.
-                !!! System.Unit class should be used during unit conversion instead of unit
-                label (input of Quantity ?) and un.Unit() calls. !!!
-            """
-
-            # Initialization
-            self.label = label
-            self.unit = un.Unit(label)
-            self.physical_type = self.unit.physical_type
-
-            # Unit name
-            self.name = name if name is not None and type(name) == str else self.unit.to_string()
-
-        def __repr__(self):
-
-            return self.label
-
-        def get(self):
-            """ Allow for handling of System.Unit type. """
-
-            if type(self) == System.Unit:
-                return self.unit
-            else:
-                return un.Unit(self)
-
-    # Default units per physical type
-    default_units = {
-        'time': Unit('Myr', 'megayear'),
-        'length': Unit('pc', 'parsec'),
-        'speed': Unit('pc/Myr', 'parsec per megayear'),
-        'angle': Unit('rad', 'radian'),
-        'angular speed': Unit('rad/Myr', 'radian per megayear')}
-
-    class Axis():
-        """ Defines a Coordinate system axis."""
-
-        def __init__(self, name):
-            """ Initializes an Axis object. """
-
-            # Initialization
-            self.name = name
-
-    # Coordinate system axis
-    axis = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
-
-    class Origin(Axis):
-        """ Defines a Coordinate system origin."""
-
-        pass
-
-    # Coordinate system axis
-    origins = {origin.name: origin for origin in (Origin('sun'), Axis('galaxy'))}
-
-    class Variable():
-        """ Defines a Variable object and required variables from all systems. """
-
-        def __init__(self, label, name, unit):
-            """ Initializes a Variable from a name, label and Unit object. """
-
-            # Initialization
-            self.label = label
-            self.name = name
-            self.unit = unit
-            self.physical_type = unit.physical_type
-
-    # Variables dictionary
-    variables = {variable.label: variable for variable in (
-
-        # Castesian coordinate system variables
-        Variable('x', 'y position', default_units['length']),
-        Variable('y', 'y position', default_units['length']),
-        Variable('z', 'z position', default_units['length']),
-        Variable('u', 'u velocity', default_units['speed']),
-        Variable('v', 'v velocity', default_units['speed']),
-        Variable('w', 'w velocity', default_units['speed']),
-
-        # Spherical coordinates system variables
-        Variable('r', 'distance', default_units['length']),
-        Variable('δ', 'declination', default_units['angle']),
-        Variable('α', 'right ascension', default_units['angle']),
-        Variable('rv', 'radial velocity', default_units['speed']),
-        Variable('μδ', 'declination proper motion', default_units['angular speed']),
-        Variable('μα', 'right ascension proper motion', default_units['angular speed']),
-
-        # Observable coordinates system variables
-        Variable('p', 'paralax', default_units['angle']),
-        Variable('μαcosδ', 'right ascension proper motion * cos(declination)',
-            default_units['angular speed']))}
-
-    # Error variables creation
-    for label, variable in variables.copy().items():
-        variables['Δ' + label] = Variable(
-            'Δ' + label, variable.name + ' error', variable.unit)
 
 class Config():
     """ Contains the parameters imported from a configuration file (which must be a Python file),
@@ -136,12 +22,6 @@ class Config():
         object, as well as related methods, a Parameter class and a dictionary of default values.
         A config object can then be used as the input of a Series object.
     """
-
-    # Coordinates systems
-    systems = {system.name: system for system in (
-        System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
-        System('spherical', ('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
-        System('observables', ('p', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ')))}
 
     class Parameter():
         """ Contains the components of a given configuration parameter. """
@@ -161,12 +41,28 @@ class Config():
 
         def update(self, parameter):
             """ Updates the components of self with those of another parameter or a dictionary
-                of components, only if those new components are part of the components tuple.
+                of components, only if those new components are part of the default components
+                tuple or singular forms of default components.
             """
 
             # Parameter conversion into a dictionary
             if type(parameter) == type(self):
                 parameter = vars(parameter)
+
+            # Component conversion from singular to plural form
+            for component in ('value', 'unit'):
+                components = component + 's'
+                if component in parameter.keys():
+                    parameter[components] = parameter[component]
+                    parameter.pop(component)
+
+            # Component conversion from observables to standard form
+            if 'axis' in parameter.keys() and parameter['axis'] is not None:
+                if type(parameter['axis']) == str and parameter['axis'].lower() == 'observables':
+                    parameter['axis'] = 'equatorial'
+            if 'origin' in parameter.keys() and parameter['axis'] is not None:
+                if type(parameter['axis']) == str and parameter['origin'].lower() == 'observables':
+                    parameter['origin'] = 'sun'
 
             # Parameter update if present in self.default_components
             if type(parameter) == dict:

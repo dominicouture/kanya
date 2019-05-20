@@ -11,7 +11,8 @@ import numpy as np
 from time import strftime
 from os import path, makedirs, remove, getcwd, chdir
 from logging import basicConfig, info, warning, INFO
-from tools import Quantity
+from coordinate import *
+from quantity import *
 from init import *
 
 __author__ = 'Dominic Couture'
@@ -111,12 +112,12 @@ class Series(list):
 
             # Checks if parameter.system is valid and converts it into a System object
             if parameter.system is not None:
-                self.stop(parameter.system.lower() not in self.config.systems.keys(), 'ValueError',
+                self.stop(parameter.system.lower() not in systems.keys(), 'ValueError',
                     "'system' component of '{}' is invalid ({} required, {} given).",
-                    parameter.label, list(self.config.systems.keys()), parameter.system)
-                parameter.system = self.config.systems[parameter.system.lower()]
+                    parameter.label, list(systems.keys()), parameter.system)
+                parameter.system = systems[parameter.system.lower()]
             elif default_parameter.system is not None:
-                parameter.system = self.config.systems[default_parameter.system]
+                parameter.system = systems[default_parameter.system]
 
             # Checks if parameter.axis is valid and converts it into a System.Axis object
             if parameter.axis is not None:
@@ -245,10 +246,10 @@ class Series(list):
         self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
 
         # initial_time parameter
-        self.initial_time = self.configure_value(self.config.initial_time)
+        self.initial_time = self.configure_quantity(self.config.initial_time)
 
         # final_time parameter
-        self.final_time = self.configure_value(self.config.final_time)
+        self.final_time = self.configure_quantity(self.config.final_time)
         self.stop(not self.final_time > self.initial_time, 'ValueError',
             "'final_time' must be greater than initial_time ({} and {} given).",
             self.final_time, self.initial_time)
@@ -270,7 +271,7 @@ class Series(list):
             self.configure_simulation()
 
         # Radial velocity offset
-        self.rv_offset = self.configure_value(self.config.rv_offset)
+        self.rv_offset = self.configure_quantity(self.config.rv_offset)
 
     def configure_data(self):
         """ Check if traceback and output from data is possible and creates a Data object from a
@@ -315,27 +316,27 @@ class Series(list):
         self.number_of_stars = self.configure_integer(self.config.number_of_stars)
 
         # age parameter
-        self.age = self.configure_value(self.config.age)
+        self.age = self.configure_quantity(self.config.age)
         self.stop(not self.age >= 0.0, 'ValueError',
             "'age' must be greater than or equal to 0.0 ({} given).", self.age)
 
         # avg_position parameter
-        self.avg_position = self.configure_vector(self.config.avg_position)
+        self.avg_position = self.configure_coordinate(self.config.avg_position)
 
         # avg_position_error parameter
-        self.avg_position_error = self.configure_vector(self.config.avg_position_error)
+        self.avg_position_error = self.configure_coordinate(self.config.avg_position_error)
 
         # avg_position_scatter parameter
-        self.avg_position_scatter = self.configure_vector(self.config.avg_position_scatter)
+        self.avg_position_scatter = self.configure_coordinate(self.config.avg_position_scatter)
 
         # avg_velocity parameter
-        self.avg_velocity = self.configure_vector(self.config.avg_velocity)
+        self.avg_velocity = self.configure_coordinate(self.config.avg_velocity)
 
         # avg_velocity_error parameter
-        self.avg_velocity_error = self.configure_vector(self.config.avg_velocity_error)
+        self.avg_velocity_error = self.configure_coordinate(self.config.avg_velocity_error)
 
         # avg_velocity_scatter parameter
-        self.avg_velocity_scatter = self.configure_vector(self.config.avg_velocity_scatter)
+        self.avg_velocity_scatter = self.configure_coordinate(self.config.avg_velocity_scatter)
 
         # Data set to None because stars are simulated
         # self.data = None
@@ -358,13 +359,10 @@ class Series(list):
         # Conversion to integer
         return int(parameter.values)
 
-    def configure_value(self, parameter):
+    def configure_quantity(self, parameter):
         """ Checks if a value is valid and converts it to default units if needed. """
 
-        # Default parameter
-        default_parameter = self.config.default_parameters[parameter.label]
-
-        # Check the presence and type of values component
+        # Check the presence and type of parameter.values component
         self.stop(parameter.values is None, 'NameError',
             "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
         self.stop(type(parameter.values) not in (int, float), 'TypeError', "'{}' must be "
@@ -372,13 +370,15 @@ class Series(list):
 
         # Default units component
         if parameter.units is None:
-            parameter.units = default_parameter.units
+            parameter.units = self.config.default_parameters[parameter.label].units
+
+        # Check the type of parameter.units component
         self.stop(type(parameter.units) != str, 'TypeError', "'units' component of '{}' "
             "must be a string ({} given).", parameter.label, type(parameter.values))
 
-        # Check if units component can be converted to System.Unit
+        # Check if parameter.units component can be converted to Unit
         try:
-            self.config.systems[default_parameter.system].Unit(parameter.units)
+            Unit(parameter.units)
         except:
             self.stop(True, 'ValueError', "'units' component of '{}' must represent a unit.",
                 parameter.label)
@@ -391,22 +391,22 @@ class Series(list):
                 parameter.label)
 
         # Check if the physical type is valid
-        default_physical_type = self.config.systems[default_parameter.system].Unit(
-            default_parameter.units).physical_type
+        default_physical_type = Unit(self.config.default_parameters[parameter.label].units).physical_type
         self.stop(quantity.physical_types.flatten()[0] != default_physical_type, 'ValueError',
             "Unit of '{}' does not have the correct physical type ('{}' given, '{}' required).",
             parameter.label, quantity.physical_types.flatten()[0], default_physical_type)
 
         # Unit conversion
+        # !!! No need to convert to float !!!
         return float(quantity.to().values.flatten()[0])
 
-    def configure_vector(self, parameter):
+    def configure_coordinate(self, parameter):
         """ Converts a Parameter into a Quantity object and raises an error if an exception
             occurs in the process. Returns a vector converted into the correct units for the
             physical type defined by a Variable object.
         """
 
-        # Variables from label
+        # Variables from label and check for invalid label
         if parameter.label in ('avg_position', 'avg_position_error', 'avg_position_scatter'):
             variables = parameter.system.position
         elif parameter.label in ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
@@ -414,39 +414,21 @@ class Series(list):
         else:
             self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.label)
 
-        # Default units component
-        if parameter.units is None:
-            parameter.units = [variable.unit.label for variable in variables]
-
-        # Check the type of units component
-        if type(parameter.units) == str:
-            parameter.units = [parameter.units]
-        self.stop(type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
-            "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
-                parameter.label, type(parameter.values))
-
-        # Check if all elements in 'units' component can be converted to System.Unit
-        try:
-            np.vectorize(parameter.system.Unit)(parameter.units)
-        except:
-            self.stop(True, 'ValueError',
-                "'units' components of '{}' must all represent a unit.", parameter.label)
-
-        # Check the presence and type of values component
-        self.stop(parameter.values is None, 'TypeError',
+        # Check the presence and type of parameter.values component
+        self.stop(parameter.values is None, 'NameError',
             "Required simulation parameter '{}' is missing in the configuration.", parameter.label)
         self.stop(type(parameter.values) not in (tuple, list, np.ndarray), 'TypeError',
             "'values' component of '{}' must be a tuple, list or np.ndarray ({} given).'",
                 parameter.label, type(parameter.values))
 
-        # Check if all elements in values component are numerical
+        # Check if all elements in parameter.values component are numerical
         try:
             np.vectorize(float)(parameter.values)
         except:
             self.stop(True, 'ValueError',
                 "'values' component of '{}' contains non-numerical elements.", parameter.label)
 
-        # Check the dimensions of values component
+        # Check the dimensions of parameter.values component
         shape = np.array(parameter.values).shape
         ndim = len(shape)
         self.stop(ndim > 2, 'ValueError', "'{}' must have 1 or 2 dimensions ({} given).",
@@ -457,6 +439,24 @@ class Series(list):
             'ValueError',  "'{}' first dimension ({} given) must have a size of 1 or equal "
             "to the number of stars ({} given).", parameter.label, shape[0], self.number_of_stars)
 
+        # Default units component
+        if parameter.units is None:
+            parameter.units = [variable.unit.label for variable in variables]
+
+        # Check the type of parameter.units component
+        if type(parameter.units) == str:
+            parameter.units = [parameter.units]
+        self.stop(type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
+            "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
+                parameter.label, type(parameter.values))
+
+        # Check if all elements in parameter.units component can be converted to Unit
+        try:
+            np.vectorize(Unit)(np.array(parameter.units, dtype=object))
+        except:
+            self.stop(True, 'ValueError',
+                "'units' components of '{}' must all represent units.", parameter.label)
+
         # Quantity object creation
         try:
             quantity = Quantity(**vars(parameter))
@@ -464,7 +464,7 @@ class Series(list):
             self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.",
                 parameter.label)
 
-        # Physical types
+        # Check if physical types are valid
         physical_types = np.array([variable.physical_type for variable in variables])
         self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
             "Units in '{}' do not have the correct physical type "
@@ -473,7 +473,6 @@ class Series(list):
 
         # Units conversion
         return quantity.to()
-        # return quantity.to([variable.unit.unit for variable in variables])
 
     def directory(self, base, directory, name, create=True):
         """ Checks for type errors, checks if the directory already exists, creates it if
@@ -519,6 +518,7 @@ class Series(list):
 
         # If an exception is being handled, its traceback is formatted and execution is terminated
         else:
+            raise
             # Traceback message creation
             tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
                 if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))

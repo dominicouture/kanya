@@ -8,7 +8,7 @@
 import numpy as np
 from series import info
 from data import Data
-from tools import *
+from coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'

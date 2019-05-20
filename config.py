@@ -18,34 +18,34 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Output directory relative to the directory where the Traceback Package is located (str). If left
 # blank (i.e. '') or absent, output files will be created in the same directory as the Package.
-output_dir.values = 'Output'
+output_dir.value = 'Output'
 
 # Logs directory relative to the output directory (str). If left blank (i.e. '') or absent, logs
 # files will be created in the output directory.
-logs_dir.values = 'Logs'
+logs_dir.value = 'Logs'
 
 # Path to the database file used as input or output relative the output directory (str). If left
 # blank (i.e. '') or absent, the database is created in the output directory as 'name.db'. If the
 # file doesn't exist, it will be created.
-db_path.values = ''
+db_path.value = ''
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.values = 10
+number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-number_of_steps.values = 200
+number_of_steps.value = 200
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.values = 45
+number_of_stars.value = 45
 
 # Initial age of the traceback (float, inclusive)
-initial_time.values = 0.0
+initial_time.value = 0.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
-final_time.values = 30.0
+final_time.value = 30.0
 
 # Age of simulated groups of stars (float, ≥ 0.0)
-age.values = 24.0
+age.value = 24.0
 
 # Average position of the simulated sample of stars (tuple)
 avg_position.values = (0.0, 0.0, 0.0) # (15.19443946, -4.93616248, -17.07422231)
@@ -76,12 +76,13 @@ avg_velocity_scatter.values = (1.68050, 1.68050, 1.68050) # (2.21753, 1.36009, 1
 avg_velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dict)
-data.values = 'bpic_updated_with_units.csv'
-# data.units = 'observalbes' Default units per coordinates system ? e.i. cartesian : pc and km/s ?
+data.value = 'bpic_updated.csv'
+data.units = 'observables'
 data.system = 'observables'
-data.axis = 'equatorial' # Observables = equatorial
+data.axis = 'observables'
 # data.values =  {'beta_pictoris': [
 #     [    'p',        'δ',       'α',    'rv',     'μδ',     'μα'],
+#     [  'mas',      'deg',     'deg',  'km/s', 'mas/yr', 'mas/yr'],
 #     [25.0250, -23.107737, 1.7091324, 6.50000, -47.1210,  96.7760],
 #     [27.1700, -66.753496, 4.3491739, 8.75000, -16.8740,  103.039],
 #     [28.6590, -32.551949, 6.9598490, 8.80000, -47.3890,  109.817],
@@ -131,5 +132,5 @@ data.axis = 'equatorial' # Observables = equatorial
 # ]}
 
 # Radial velocity offset applied to all stars (float)
-rv_offset.values = 0.0
-rv_offset.units = 'km/s'
+rv_offset.value = 0.0
+rv_offset.unit = 'km/s'

@@ -10,13 +10,12 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
-from astropy import units as un
-from time import strftime
 from os import path, getcwd, chdir, remove
 from csv import reader, writer, Sniffer
-from init import Config, System
+from init import Config
 from series import info, Series
-from tools import *
+from coordinate import *
+from quantity import *
 
 class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.
@@ -41,10 +40,11 @@ class Data(list):
         # Initialize self from a Python object
         elif type(self.data.values) in (dict, list, tuple, np.ndarray):
             self.initialize_from_data()
+
+        # Non-valid 'data.values' types
         else:
             self.series.stop(True, 'TypeError', "'data.values' component must be a string, "
-                "dictionary, list, tuple or np.ndarray. ({} given).",
-                type(self.data.values))
+                "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.values))
 
         # Data configuration
         self.configure_data()
@@ -95,6 +95,7 @@ class Data(list):
 
         self.from_data = True
         self.from_CSV = False
+        self.data_path = None
 
         # Data import and group filtering of a dictionary
         if type(self.data.values) == dict:
@@ -157,11 +158,62 @@ class Data(list):
         self.unit_header = True if True not in [
             unit.replace('.', '').replace(',', '').isdigit() for unit in self.table[1]] else False
 
-        # Checks data.units component
-        if self.data.units is not None:
-            pass
-            # !!! Check if units component is valid (TypeError and Value Error) !!!
-            # !!! Units header creation from data.units component (either dict or tuple). !!!
+        # Check data.units component is None
+        if self.data.units is None:
+            self.data.units = self.table[1] if self.unit_header else None
+        else:
+
+            # Units from a string representing a coordinates system
+            if type(self.data.units) == str:
+                self.series.stop(self.data.units.lower() not in systems.keys(), 'ValueError',
+                    "'{}' is not a valid coordinates system (use {} instead).",
+                    self.data.units, list(systems.keys()))
+
+                # Usual units of system retrieval
+                self.data.units = {
+                    **{variable.label: variable.usual_unit.label \
+                        for variable in systems[self.data.units.lower()].position},
+                    **{variable.label: variable.usual_unit.label \
+                        for variable in systems[self.data.units.lower()].velocity}}
+
+            # Units from a dictionary
+            elif type(self.data.units) == dict:
+
+                # Check if all labels can be matched to a data.system variable.
+                self.data.units = {self.Column.configure_label(self.Column, label, self.data.system):
+                    self.data.units[label] for label in self.data.units.keys()}
+
+                self.series.stop(not np.vectorize(lambda label: label in self.variables.keys()) \
+                    (tuple(self.data.units.keys())).all(), 'ValueError',
+                    "All labels in 'data.units' couldn't be matched to a variable of '{}' system.",
+                    self.data.system.name)
+
+                # Check if all values in self.data.units are strings
+                self.series.stop(not np.vectorize(lambda label: type(self.data.units[label]) == str) \
+                    (tuple(self.data.units.keys())).all(), 'TypeError',
+                    "All elements in 'data.units' component must be strings.")
+
+            # Units from an array mimicking a unit header
+            elif type(self.data.units) in (tuple, list, np.ndarray):
+                self.data.units = np.squeeze(np.array(self.data.units, dtype=object))
+
+                # Check if all values in self.data.units array are strings
+                self.series.stop(not np.vectorize(lambda unit: type(unit) == str) \
+                    (self.data.units).all(), 'TypeError',
+                    "All elements in 'data.units' component must be strings.")
+
+                # Check if self.data.units array has valid dimensions
+                self.series.stop(self.data.units.ndim != 1, 'ValueError', "'data.units' component "
+                    "must have 1 dimension ({} given).", self.data.units.ndim)
+                self.series.stop(len(self.data.units) != self.table.shape[1], 'ValueError',
+                    "'data.units' component must be as long as the number of columns in "
+                        "'data.values' component. ({} required, {} given).",
+                    self.table[1], len(self.data.units))
+
+            # Non-valid 'data.units' types
+            else:
+                self.series.stop(True, 'TypeError', "'data.units' component must be a string, "
+                    "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units))
 
     def create_columns(self):
         """ Creates a self.columns dictionary along with self.Column objects for every column
@@ -212,7 +264,7 @@ class Data(list):
             'spectraltype': 'type',
             'distance': 'r',
             'plx': 'p',
-            'paralax': 'p',
+            'parallax': 'p',
             'declination': 'δ',
             'dec': 'δ',
             'rightascension': 'α',
@@ -253,42 +305,67 @@ class Data(list):
             if self.missing:
                 self.label = 'Δ' + self.label
 
-            # Variable identification
+            # Variable and units identification
             if self.label in self.data.variables.keys():
                 self.variable = self.data.variables[self.label]
+                self.units = self.data.data.units
 
-                # Unit specified in data.units component
-                if self.data.data.units is not None:
-                    pass
+                # Unit specified in an array (CSV unit header or data.units component)
+                if type(self.units) == np.ndarray and self.units[self.column] != '':
+                    self.unit = self.units[self.column]
 
-                # Unit specified in CSV
-                elif self.data.unit_header and self.data.table[1, self.column] != '':
-                    try:
-                        self.unit = self.data.data.system.Unit(self.data.table[1, self.column])
-                    except ValueError:
-                        self.series.stop(True, 'ValueError',
-                            "Unit '{}' used for column '{}' is not valid.",
-                            self.data.table[1, self.column], self.data_label)
+                # Unit specified in a dictionary (data.units component)
+                elif type(self.units) == dict and self.label in self.units.keys():
+                    self.unit = self.units[self.label]
 
-                # Error unit temporaraly set as None
+                # Error unit set temporarily as None
                 elif self.label[0] == 'Δ':
                     self.unit = None
 
-                # Default unit per physical type
+                # Value unit set as the default unit per physical type
                 else:
                     self.unit = self.data.data.system.default_units[self.variable.physical_type]
 
-                # Check unit physical type
+                # Conversion into Unit object
                 if self.unit is not None:
+                    try:
+                        self.unit = Unit(self.unit)
+                    except ValueError:
+                        self.series.stop(True, 'ValueError',
+                            "Unit '{}' used for column '{}' is not valid.",
+                            self.unit, self.data_label)
+
+                    # Check unit physical type
                     self.data.series.stop(self.unit.physical_type != self.variable.physical_type,
                         'ValueError', "The unit used for '{}' ('{}') in column ('{}'), '{}', has "
                             "an incorrect physical type ('{}' required, '{}' given)",
                         self.variable.name, self.label, self.data_label, self.unit.label,
                         self.variable.physical_type, self.unit.physical_type)
 
+            # Non-variable columns
             else:
                 self.variable = None
                 self.unit = None
+
+        def configure_label(self, label, system):
+            """ Takes a label and returns a reformated version matching those used in System class.
+            """
+
+            # Label permutations
+            for old, new in self.permutations.items():
+                label = label.replace(old, new)
+
+            # Error label permutations
+            if label[-1] in ('e', 'Δ') and label not in ('name', 'type'):
+                label = 'Δ' + label[:-1]
+            if label[0] == 'e':
+                label = 'Δ' + label[1:]
+
+            # Assumption that μα stands for μαcosδ when importing observables system
+            if system == 'observables' and label[-2:] == 'μα':
+                label = label + 'cosδ'
+
+            return label
 
     def create_rows(self):
         """ Filters what rows in self.table are part of the selected group definied by
