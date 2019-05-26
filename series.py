@@ -121,12 +121,12 @@ class Series(list):
 
             # Checks if parameter.axis is valid and converts it into a System.Axis object
             if parameter.axis is not None:
-                self.stop(parameter.axis.lower() not in parameter.system.axis.keys(), 'ValueError',
+                self.stop(parameter.axis.lower() not in parameter.system.axes.keys(), 'ValueError',
                     "'axis' component of '{}' is not a valid ({} required, {} given).",
-                    parameter.label, list(parameter.system.axis.keys()), parameter.axis)
-                parameter.axis = parameter.system.axis[parameter.axis.lower()]
+                    parameter.label, list(parameter.system.axes.keys()), parameter.axis)
+                parameter.axis = parameter.system.axes[parameter.axis.lower()]
             elif default_parameter.axis is not None:
-                parameter.axis = parameter.system.axis[default_parameter.axis]
+                parameter.axis = parameter.system.axes[default_parameter.axis]
 
             # Checks if parameter.origin is valid and converts it into a System.origin object
             if parameter.origin is not None:
@@ -257,7 +257,8 @@ class Series(list):
         # duration, timesteps and time parameters
         self.duration = self.final_time - self.initial_time
         self.timestep = self.duration / (self.number_of_steps - 1)
-        self.time = np.linspace(self.initial_time, self.final_time, self.number_of_steps)
+        self.time = np.linspace(
+            self.initial_time.values, self.final_time.values, self.number_of_steps)
 
         # Data configuration
         # if self.from_data:
@@ -317,8 +318,8 @@ class Series(list):
 
         # age parameter
         self.age = self.configure_quantity(self.config.age)
-        self.stop(not self.age >= 0.0, 'ValueError',
-            "'age' must be greater than or equal to 0.0 ({} given).", self.age)
+        self.stop(not self.age.value >= 0.0, 'ValueError',
+            "'age' must be greater than or equal to 0.0 Myr ({} given).", self.age)
 
         # avg_position parameter
         self.avg_position = self.configure_coordinate(self.config.avg_position)
@@ -374,7 +375,7 @@ class Series(list):
 
         # Check the type of parameter.units component
         self.stop(type(parameter.units) != str, 'TypeError', "'units' component of '{}' "
-            "must be a string ({} given).", parameter.label, type(parameter.values))
+            "must be a string ({} given).", parameter.label, type(parameter.units))
 
         # Check if parameter.units component can be converted to Unit
         try:
@@ -397,8 +398,7 @@ class Series(list):
             parameter.label, quantity.physical_types.flatten()[0], default_physical_type)
 
         # Unit conversion
-        # !!! No need to convert to float !!!
-        return float(quantity.to().values.flatten()[0])
+        return quantity.to()
 
     def configure_coordinate(self, parameter):
         """ Converts a Parameter into a Quantity object and raises an error if an exception
@@ -518,7 +518,6 @@ class Series(list):
 
         # If an exception is being handled, its traceback is formatted and execution is terminated
         else:
-            raise
             # Traceback message creation
             tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
                 if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))

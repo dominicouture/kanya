@@ -55,8 +55,8 @@ class System():
             # Initialization
             self.name = name
 
-    # Coordinate system axis
-    axis = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
+    # Coordinate system axes
+    axes = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
 
     class Origin(Axis):
         """ Defines a Coordinate system origin."""

@@ -331,9 +331,8 @@ class Data(list):
                     try:
                         self.unit = Unit(self.unit)
                     except ValueError:
-                        self.series.stop(True, 'ValueError',
-                            "Unit '{}' used for column '{}' is not valid.",
-                            self.unit, self.data_label)
+                        self.series.stop(True, 'ValueError', "Unit '{}' used for column '{}' "
+                            "is not valid.", self.unit, self.data_label)
 
                     # Check unit physical type
                     self.data.series.stop(self.unit.physical_type != self.variable.physical_type,

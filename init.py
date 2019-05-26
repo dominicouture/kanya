@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """ init.py: Imports information from config.py, command line arguments and parameters into a
-    Config object. This script must be run first to create a Series object. It also defines
-    variables and their default units and values.
+    Config object. This script must be run first to create a Series object.
 """
 
 from astropy import units as un

@@ -53,6 +53,7 @@ class Group(list):
             # Age calculation
             self.scatter()
             self.median_absolute_deviation()
+            self.covariance()
             self.minimum_spanning_tree()
 
     def stars_from_data(self):
@@ -75,7 +76,7 @@ class Group(list):
             (position_rδα, velocity_rvμδμα,
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
                     *star.position.values,
-                    *star.velocity.values + np.array([self.series.rv_offset, 0.0, 0.0]),
+                    *star.velocity.values + np.array([self.series.rv_offset.value, 0.0, 0.0]),
                     *star.position.errors,
                     *star.velocity.errors)
 
@@ -118,14 +119,14 @@ class Group(list):
 
             # Velocity and a position based average values and scatters
             velocity_uvw = np.random.normal(avg_velocity, avg_velocity_scatter)
-            position_xyz = velocity_uvw * self.series.age + (
+            position_xyz = velocity_uvw * self.series.age.values + (
                 np.random.normal(avg_position, avg_position_scatter) -
-                (avg_velocity * self.series.age + avg_position) + # Normalisation
+                (avg_velocity * self.series.age.values + avg_position) + # Normalisation
                 (15.19444, -4.93612, -1.70742223)) # Beta Pictoris current average position
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array((self.series.rv_offset, 0.0, 0.0))
+            velocity_rvμδμα = velocity_rvμδμα + np.array([self.series.rv_offset.value, 0.0, 0.0])
             position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
 
             # Velocity and position conversion to observables
@@ -137,8 +138,8 @@ class Group(list):
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
                     *np.random.normal(position_obs, avg_position_error),
                     *np.random.normal(velocity_obs, avg_velocity_error),
-                    # *np.random.normal(position_obs, self.series.data[star].position[2]),
-                    # *np.random.normal(velocity_obs, self.series.data[star].velocity[2]),
+                    # *np.random.normal(position_obs, self.series.data[star].position.errors),
+                    # *np.random.normal(velocity_obs, self.series.data[star].velocity.errors),
                     *avg_position_error,
                     *avg_velocity_error)
 
@@ -187,7 +188,7 @@ class Group(list):
 
     def median_absolute_deviation(self):
         """ Computes the xyz and total median absolute deviation (MAD) of a group and their
-            respective errors for all timestep.
+            respective errors for all timesteps.
         """
 
         # XYZ median absolute deviation
@@ -201,6 +202,16 @@ class Group(list):
         # Age calculation
         self.mad_age = self.series.time[np.argmin(self.mad)]
         self.mad_age_error = 0.0
+
+    def covariance(self):
+        """ Computes the x-u, y-v and z-w covariance of a group and their respective errors for
+            all timesteps.
+        """
+
+        self.covariance = np.sum(np.swapaxes(
+            np.array([star.position for star in self]) - self.avg_position, 0, 1) \
+            * (np.array([star.velocity for star in self]) - self.avg_velocity), axis=1) \
+            / self.series.number_of_stars
 
     def minimum_spanning_tree(self):
         """ Builds the minimal spanning tree (MST) of a group for all timseteps using a Kruskal

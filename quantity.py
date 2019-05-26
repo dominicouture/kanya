@@ -1,102 +1,72 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" quantity.py: Defines Quantity class to handle n dimension values with unit conversions and error
-    handling, and Coordinate class to handle coordinates transformation, and a montecarlo function.
+""" quantity.py: Defines Quantity class to handle n dimension values with unit conversions and
+    error handling, and a Unit class.
 """
 
 import numpy as np
-from astropy import units as un
+from astropy import units as u
+from tools import squeeze, broadcast, full
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 class Quantity:
     """ Contains a value and unit, its associated error and unit if needed. Error is converted
-        to value's unit is error unit don't match with value unit.
+        to value's unit if error unit don't match with value unit.
     """
 
-    def __init__(
-            self, values, units=None, errors=None, error_units=None,
+    def __init__(self, values, units=None, errors=None, error_units=None,
             parent=None, index=None, **optional):
-        """ Initializes a Quantity object with its values, errors and their units. """
+        """ Initializes a Quantity object with its values, errors and their respective units.
+            Errors are converted into the units of values.
+        """
 
-        # Import of values
+        # Values import
         if type(values) in (int, float, np.float64):
             values = [values]
         if type(values) in (tuple, list, np.ndarray):
-            self.values = np.squeeze(np.array(values, dtype=float))
+            self.values = squeeze(np.array(values, dtype=float))
         else:
             raise TypeError("{} is not a supported type "
                 "('int, float, tuple, list or ndarray') for values.".format(type(values)))
         self.shape = self.values.shape
-        self.ndim = len(self.shape)
+        self.ndim = self.values.ndim
 
-        # Import of units
-        if units is None:
-            units = ['']
-        elif type(units) in (
-                str, un.core.PrefixUnit, un.core.CompositeUnit,
-                un.core.IrreducibleUnit, un.core.Unit, Unit):
-            units = [units]
-        if type(units) in (tuple, list, np.ndarray):
-            try:
-                self.units = np.full(self.shape, np.squeeze(np.vectorize(Unit.get)(units)))
-            except ValueError:
-                raise ValueError(
-                    "Units ({}) cannot be broadcast to the shape of values ({}).".format(
-                        units, self.values.shape))
-        else:
-            raise TypeError("{} is not a supported type "
-                "(str, *Unit, tuple, list or ndarray) for units.".format(type(units)))
-        self.physical_types = np.vectorize(lambda unit: unit.physical_type)(self.units)
+        # Units import
+        self.units = Unit(units, shape=self.shape)
+        self.physical_types = self.units.physical_types
 
-        # Import of errors
+        # Errors import
         if errors is None:
             errors = [0.0]
         elif type(errors) in (int, float, np.float64):
             errors = [errors]
         if type(errors) in (tuple, list, np.ndarray):
-            try:
-                self.errors = np.full(self.shape, np.squeeze(errors), dtype=float)
-            except ValueError:
-                raise ValueError("Errors ({}) cannot be broadcast "
-                    "to the shape of values ({}).".format(errors, self.values.shape))
+            self.errors = np.array(full('Errors', self.shape, squeeze(errors)), dtype=float)
         else:
             raise TypeError("{} is not a supported type "
                 "(int, float, tuple, list or ndarray) for errors.".format(type(errors)))
 
-        # Import of error units
-        if error_units is None:
-            error_units = units
-        elif type(error_units) in (
-                str, un.core.PrefixUnit, un.core.CompositeUnit,
-                un.core.IrreducibleUnit, un.core.Unit, Unit):
-            error_units = [error_units]
-        if type(error_units) in (tuple, list, np.ndarray):
-            try:
-                self.error_units = np.full(self.shape, np.squeeze(np.vectorize(Unit.get)(error_units)))
-            except ValueError:
-                raise ValueError(
-                    "Error units ({}) cannot be broadcast to the shape of values ({}).".format(
-                        units, self.values.shape))
-        else:
-            raise TypeError("{} is not a supported type "
-                "(str, *Unit, tuple, list or ndarray) for error units.".format(type(error_units)))
-        self.error_physical_types = np.vectorize(lambda unit: unit.physical_type)(self.error_units)
+        # Error units import
+        self.error_units = self.units if error_units is None else Unit(error_units, shape=self.shape)
+        self.error_physical_types = self.error_units.physical_types
 
         # Conversion of errors into value units
-        # !!! Check for physical type first, then convert, like in self.to())
-        if not np.equal(self.units, self.error_units).all():
-            try:
-                self.errors = np.vectorize(
-                    lambda errors, units, error_units: errors * error_units.to(units)
-                )(self.errors, self.units, self.error_units)
-                self.error_units = self.units
-            except un.core.UnitConversionError:
-                raise un.core.UnitConversionError(
-                    "Value units and error units have incompatible physical types: "
-                    " {} and {}.".format(self.physical_types, self.error_physical_types))
+        if not np.equal(self.units.units, self.error_units.units).all():
+            factors = self.error_units.compare(self.units)
+            self.errors *= factors
+            self.error_units = self.units
+
+        # Singular values if only one value is present
+        if self.shape == (1,):
+            self.value = float(self.values[0])
+            self.unit = self.units.units[0]
+            self.physical_type = str(self.physical_types[0])
+            self.error = float(self.values[0])
+            self.error_unit = self.unit
+            self.error_physical_type = self.physical_type
 
         # Optional parameters
         vars(self).update(optional.copy())
@@ -134,7 +104,8 @@ class Quantity:
         return '({} ± {}) {}'.format(
             flatten(self.values),
             flatten(reduce(self.errors)),
-            flatten(reduce(np.vectorize(lambda unit: unit.to_string())(self.units))))
+            flatten(reduce(np.vectorize(
+                lambda unit: unit.to_string().replace(' ', ''))(self.units.units))))
 
     def __bool__(self):
         if len(self) == 1:
@@ -241,7 +212,7 @@ class Quantity:
         shape, factors = self.compare(other)
 
         return Quantity(
-            self.values + other.values * factors, np.full(shape, self.units),
+            self.values + other.values * factors, self.units,
             np.vectorize(lambda x, y: np.linalg.norm((x, y)))(self.errors, other.errors * factors))
 
     def __sub__(self, other):
@@ -259,32 +230,22 @@ class Quantity:
             other = Quantity(other)
 
         # Check the shape of self and other can be broadcast together
-        try:
-            shape = np.broadcast(self.values, other.values).shape
-        except ValueError:
-            raise ValueError("Quantities with shapes {} and {} cannot be "
-                "broadcast together.".format(self.shape, other.shape))
+        shape = broadcast('Quantities', self.values, other.values)
 
         # Conversion factors between self and other
-        self_units = np.full(shape, self.units)
-        other_units = np.full(shape, other.units)
-        factors = np.vectorize(
-            lambda self_unit, other_unit: other_unit.to(self_unit) \
-                if self_unit.physical_type == other_unit.physical_type else 1.0)(
-                self_units, other_units)
+        factors = other.units.compare(self.units, shape, False)
 
-        # Calculation of multiplication values
-        mul_values = self.values * (other.values * factors)
+        # Values computation
+        values = self.values * other.values * factors
 
+        # Units and errors computation
         return Quantity(
-            mul_values,
-            self_units * np.vectorize(
-                lambda self_unit, other_unit: self_unit \
-                    if self_unit.physical_type == other_unit.physical_type else other_unit
-            )(self_units, other_units),
-            np.vectorize(
-                lambda x, y: np.linalg.norm((x, y))
-            )(self.errors / self.values, (other.errors / other.values)) * mul_values)
+            values,
+            self.units.units * np.vectorize(lambda self_unit, other_unit: self_unit \
+                if self_unit.physical_type == other_unit.physical_type else other_unit)(
+                    self.units.units, other.units.units),
+            np.vectorize(lambda x, y: np.linalg.norm((x, y)))(
+                self.errors / self.values, (other.errors / other.values)) * values)
 
     def __truediv__(self, other):
         """ Computes the division for a Quantity. The second argument can be an int or a
@@ -296,32 +257,22 @@ class Quantity:
             other = Quantity(other)
 
         # Check the shape of self and other can be broadcast together
-        try:
-            shape = np.broadcast(self.values, other.values).shape
-        except ValueError:
-            raise ValueError("Quantities with shapes {} and {} "
-                "cannot be broadcast together.".format(self.shape, other.shape))
+        shape = broadcast('Quantities', self.values, other.values)
 
         # Conversion factors between self and other
-        self_units = np.full(shape, self.units)
-        other_units = np.full(shape, other.units)
-        factors = np.vectorize(
-            lambda self_unit, other_unit: other_unit.to(self_unit) \
-                if self_unit.physical_type == other_unit.physical_type else 1.0)(
-                self_units, other_units)
+        factors = other.units.compare(self.units, shape, False)
 
-        # Calculation of division values
-        div_values = self.values / (other.values * factors)
+        # Values computation
+        values = self.values / (other.values * factors)
 
+        # Units and errors computation
         return Quantity(
-            div_values,
-            self_units / np.vectorize(
-                lambda self_unit, other_unit: self_unit \
-                    if self_unit.physical_type == other_unit.physical_type else other_unit
-            )(self_units, other_units),
-            np.vectorize(
-                lambda x, y: np.linalg.norm((x, y))
-            )(self.errors / self.values, (other.errors / other.values)) * div_values)
+            values,
+            self.units.units / np.vectorize(lambda self_unit, other_unit: self_unit \
+                if self_unit.physical_type == other_unit.physical_type else other_unit)(
+                    self.units.units, other.units.units),
+            np.vectorize(lambda x, y: np.linalg.norm((x, y)))(
+                self.errors / self.values, (other.errors / other.values)) * values)
 
     def __floordiv__(self, other):
         """ Computes the floor division of a Quantity. """
@@ -349,23 +300,18 @@ class Quantity:
             other = Quantity(other)
 
         # Check if exponant is dimensionless
-        elif not np.equal(other.units, u.Unit('')).all():
+        elif not np.equal(other.units.units, u.Unit('')).all():
             raise ValueError("Exponant must be dimensionless.")
 
         # Check the shape of self and other can be broadcast together
-        try:
-            shape = np.broadcast(self.values, other.values).shape
-        except ValueError:
-            raise ValueError("Terms with shapes {} and {} cannot be broadcast together.".format(
-                self.shape, other.shape))
+        shape = broadcast('Quantities', self.values, other.values)
 
-        # Fix error calculation !!!
         return Quantity(
             self.values**other.values,
-            self.units**other.values,
+            self.units.units**other.values,
             np.vectorize(lambda x, y: np.linalg.norm((x, y)))(
-                self.values * other.values * self.errors,
-                (self.values**other.values) * np.log(self.values)))
+                self.values**(other.values - 1) * other.values * self.errors,
+                self.values**other.values * np.log(self.values) * other.errors))
 
     def __matmul__(self, other):
         """ Computes the scalar of matrix product of self and other. """
@@ -378,9 +324,9 @@ class Quantity:
         return True
 
     def count(self, other):
-        """ Counts the number of occurrences of other in a. """
+        """ Counts the number of occurrences of other in self. """
 
-        return 0.0
+        return 0
 
     def where(self, other):
         """ Determines the index of the occurrences of other in self. """
@@ -388,7 +334,7 @@ class Quantity:
         return 0
 
     def concatenate(self, other):
-        """ Concatenates two Quantites together. """
+        """ Concatenates self and other together. """
 
         return self
 
@@ -420,7 +366,8 @@ class Quantity:
             raise TypeError('Can only index with integer, not {}.'.format(type(index)))
         try:
             return Quantity(
-                self.values[index], self.units[index], self.errors[index], parent=self, index=index)
+                self.values[index], self.units.units[index],
+                self.errors[index], parent=self, index=index)
         except IndexError:
             raise IndexError(
                 'Index {} is out of range of axis of size {}.'.format(index, len(self.values)))
@@ -431,24 +378,24 @@ class Quantity:
         """
 
         if type(index) != int:
-            raise TypeError('Can only index with integer, not {}.'.format(type(index)))
+            raise TypeError("Can only index with integer, not {}.".format(type(index)))
         if type(item) != type(self):
-            item = Quantity(item, self.units[index], self.errors[index])
+            item = Quantity(item, self.units.units[index], self.errors[index])
 
         try:
             self.values[index] = item.values
-            self.units[index] = item.units
+            self.units.units[index] = item.units
             self.errors[index] = item.errors
         except IndexError:
-            raise IndexError(
-                'Index {} is out of range of axis of size {}.'.format(index, len(self.values)))
+            raise IndexError("Index {} is out of range of axis of size {}.".format(
+                index, len(self.values)))
 
         if self.parent is not None:
             self.parent[self.index] = self
 
     def compare(self, other):
-        """ Determines the shape of the broadcast array and conversion factors to compare
-            Quantities.
+        """ Determines the shape of the broadcast array, whether the physical types are
+            compatible and conversion factors to compare Quantities.
         """
 
         # Check if other is a Quantity object
@@ -456,64 +403,28 @@ class Quantity:
             raise TypeError("Cannot compare {} to {}.".format(type(other), type(self)))
 
         # Check the shape of self and other can be broadcast together
-        try:
-            shape = np.broadcast(self.values, other.values).shape
-        except ValueError:
-            raise ValueError(
-                "Quantities with shapes {} and {} cannot be broadcast together.".format(
-                    self.shape, other.shape))
+        shape = broadcast('Quantities', self.values, other.values)
 
-        # Check if physical types of self and other match
-        if not (self.physical_types == other.physical_types).all():
-            raise ValueError(
-                "Quantities have incompatible physical types: {} and {}.".format(
-                    self.physical_types, other.physical_types))
-
-        # Conversion factors between self and other
-        factors = np.vectorize(
-            lambda self_unit, other_unit: other_unit.to(self_unit))(
-                np.full(shape, self.units), np.full(shape, other.units))
-
-        return shape, factors
+        # Shape and conversion factors
+        return shape, self.units.compare(other.units, shape)
 
     def to(self, units=None):
         """ Converts Quantity object into new units or default units if none are given. """
 
-        # Default units for physical types if no units are given.
+        # Default units per physical types if no units are given.
         if units is None:
             from coordinate import System
-            units = np.vectorize(lambda unit: System.default_units[unit.physical_type].unit \
-                if unit.physical_type in System.default_units.keys() else unit)(self.units)
-            factors = np.vectorize(lambda self_unit, unit: self_unit.to(unit))(self.units, units)
+            units = Unit(np.vectorize(lambda unit: System.default_units[unit.physical_type].unit \
+                if unit.physical_type in System.default_units.keys() else unit)(self.units.units))
 
-        # Import of units
+        # Units import if given
         else:
-            if type(units) in (
-                    str, un.core.PrefixUnit, un.core.CompositeUnit,
-                    un.core.IrreducibleUnit, un.core.Unit, Unit):
-                units = [units]
-            if type(units) in (tuple, list, np.ndarray):
-                try:
-                    units = np.full(self.units.shape, np.vectorize(Unit.get)(units))
-                except ValueError:
-                    raise ValueError(
-                        "Units with shapes {} and {} cannot be broadcast together.".format(
-                            self.values.shape, units.shape))
-            else:
-                raise TypeError("{} is not a supported type "
-                    "(str, *Unit, tuple, list or ndarray) for units.".format(type(units)))
+            units = Unit(units, shape=self.shape)
 
-            # Check if physical types of self and units match
-            units_physical_types = np.vectorize(lambda unit: unit.physical_type)(units)
-            if not (self.physical_types == units_physical_types).all():
-                raise ValueError(
-                    "Units have incompatible physical types: {} and {}.".format(
-                        self.physical_types, units_physical_types))
+        # Conversion factors between self and other
+        factors = self.units.compare(units, self.shape)
 
-            # Conversion factors between self and other
-            factors = np.vectorize(lambda self_unit, unit: self_unit.to(unit))(
-                np.full(units.shape, self.units), units)
-
+        # Quantity object initialization
         return self.new(Quantity(self.values * factors, units, self.errors * factors))
 
     def new(self, new):
@@ -530,64 +441,87 @@ class Unit():
         A Unit also has a unique label and name, and physical type.
     """
 
-    def __init__(self, unit, name=None):
-        """ Initializes a Unit from a NoneType, string, tuple, list, np.ndarray, astropy
-            un.core.PrefixUnit, un.core.CompositeUnit, un.core.IrreducibleUnit, un.core.Unit or
-            Unit.
+    def __init__(self, units, names=None, shape=None):
+        """ Initializes a Unit from a string, Unit, NoneType, or astropy units.core.PrefixUnit,
+            units.core.CompositeUnit, units.core.IrreducibleUnit, units.core units.core.Unit into
+            a Unit object. 'names' can also be used to define the names of units in the array and
+            'shape' to define the shape of the array.
         """
 
-        # Initialization from a string
-        if type(unit) == str:
-            self.label = unit
+        # Units import
+        if type(units) in (str, type(None), u.core.PrefixUnit, u.core.CompositeUnit,
+                u.core.IrreducibleUnit, u.core.NamedUnit, u.core.Unit):
+            units = [units]
+        if type(units) == Unit:
+            vars(self).update(vars(units))
+        elif type(units) in (tuple, list, np.ndarray):
+            self.units = squeeze(np.array(np.vectorize(self.to)(units), dtype=object))
+        else:
+            raise TypeError("{} is not a supported type (str, NoneType, astropy units, "
+                "tuple, list, np.ndarray or Unit) for units.".format(type(units)))
 
-        # Initialization from a Unit object
-        elif type(unit) == self:
-            self.label = unit.label
+        # Shape broadcast
+        if shape is not None:
+            self.units = full('Units', shape, self.units)
+        self.shape = self.units.shape
+        self.ndim = self.units.ndim
 
-        # un.Unit object and physical type
-        self.unit = un.Unit(self.label)
-        self.physical_type = self.unit.physical_type
+        # Physical types
+        self.physical_types = np.vectorize(lambda unit: unit.physical_type)(self.units)
 
-        # Unit name
-        self.name = name if name is not None and type(name) == str else self.unit.to_string()
+        # Labels
+        self.labels = np.vectorize(lambda unit: unit.to_string().replace(' ', ''))(self.units)
+
+        # Names
+        if type(names) == str:
+            names = [names]
+        self.names = full('Names', self.shape, squeeze(np.array(names))) if names is not None \
+            else self.labels
+
+        # Singular values if only one unit is present
+        if self.shape == (1,):
+            self.unit = self.units[0]
+            self.physical_type = str(self.physical_types[0])
+            self.label = str(self.labels[0])
+            self.name = str(self.names[0])
 
     def __repr__(self):
+        """ Returns the correct label of Unit. """
 
-        return self.label
+        return self.label if self.shape == (1,) else self.labels
 
-    def get(self):
-        """ Allow for handling of Unit type. """
+    def compare(self, other, shape=None, types=True):
+        """ Compare two Unit objects for compatible shape and physical types and returns
+            conversion factors.
+        """
 
-        if type(self) == Unit:
-            return self.unit
+        # Check the shape of self and other can be broadcast together
+        if shape is None:
+            shape = broadcast('Units', self.units, other.units)
+
+        # Check if physical types of self and other match if needed
+        if types:
+            if not (self.physical_types == other.physical_types).all():
+                raise ValueError("Units have incompatible physical types: {} and {}.".format(
+                    self.physical_types, other.physical_types))
+
+        # Conversion factors from self to other with matching physical types
+            return np.vectorize(lambda self_unit, other_unit: self_unit.to(other_unit))(
+                self.units, other.units)
+
+        # Conversion factors from other to self without matching physical types
         else:
-            return un.Unit(self)
+            return np.vectorize(lambda self_unit, other_unit: self_unit.to(other_unit) \
+                if self_unit.physical_type == other_unit.physical_type else 1.0)(
+                    self.units, other.units)
 
-def montecarlo(function, values, errors, n=200):
-    """ Wraps a function to output both its value and errors, calculated with Monte Carlo
-        algorithm with n iterations. The inputs and outputs are Quantity objects with values,
-         units and errors.
-    """
+    def to(self, unit):
+        """ Uses astropy units.Unit function to convert 'unit' into an astropy.units object. """
 
-    values, errors = [i if type(i) in (tuple, list, np.ndarray) else [i] for i in (values, errors)]
-    outputs = function(*values)
-    output_errors = np.std(
-        np.array([function(*arguments) for arguments in np.random.normal(
-            values, errors, (n, len(values)))]),
-        axis=0)
-
-    return (outputs, output_errors)
-
-def montecarlo2(function, values, errors, n=10000):
-    """ Wraps a function to output both its value and errors, calculated with Monte Carlo
-        algorithm with n iterations. The inputs and outputs are Quantity objects with values,
-        units and errors.
-    """
-
-    outputs = function(values)
-    output_errors = np.std(
-        np.array([function(arguments) for arguments in np.random.normal(
-            values, errors, (n, len(values)))]),
-        axis=0)
-
-    return (outputs, output_errors)
+        if type(unit) == Unit:
+            unit = unit.unit
+        try:
+            return u.Unit('' if unit is None else unit)
+        except Exception as error:
+            error.args = ("'{}' could not be converted to an astropy.units object.".format(unit),)
+            raise

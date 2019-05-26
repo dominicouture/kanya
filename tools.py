@@ -4,10 +4,35 @@
 """ tools.py: Defines various useful functions. """
 
 import numpy as np
-from series import info
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
+
+def squeeze(array):
+    """ Squeezes an np.ndarray and adds one dimension if the resulting array has no dimension. """
+
+    array = np.squeeze(array)
+
+    return array if array.ndim > 0 else np.expand_dims(array, 0)
+
+def broadcast(name, array1, array2):
+    """ Returns the resulting of two arrays that can be broacast together or raises an error. """
+
+    try:
+        return np.broadcast(array1, array2).shape
+    except Exception as error:
+        error.args = ("{} ({} and {})with shapes {} and {} cannot be broadcast together.".format(
+            name, array1, array2, array1.shape, array2.shape),)
+        raise
+
+def full(name, shape, array):
+    """ Broadcasts an array to a specified shape or raises an error. """
+
+    try:
+        return np.full(shape, array)
+    except Exception as error:
+        error.args = ("{} ({}) cannot be broadcast to the shape {}.".format(name, array, shape),)
+        raise
 
 def montecarlo(function, values, errors, n=200):
     """ Wraps a function to output both its value and errors, calculated with Monte Carlo
@@ -19,8 +44,7 @@ def montecarlo(function, values, errors, n=200):
     outputs = function(*values)
     output_errors = np.std(
         np.array([function(*arguments) for arguments in np.random.normal(
-            values, errors, (n, len(values)))]),
-        axis=0)
+            values, errors, (n, len(values)))]), axis=0)
 
     return (outputs, output_errors)
 
@@ -33,7 +57,6 @@ def montecarlo2(function, values, errors, n=10000):
     outputs = function(values)
     output_errors = np.std(
         np.array([function(arguments) for arguments in np.random.normal(
-            values, errors, (n, len(values)))]),
-        axis=0)
+            values, errors, (n, len(values)))]), axis=0)
 
     return (outputs, output_errors)

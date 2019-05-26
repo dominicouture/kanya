@@ -71,14 +71,12 @@ def create_size_indicators_plot(series, secondary=False):
     # plt.title("Average size indicators of {} moving group simulations with kinematics similar\n"
     #     "to β Pictoris over {} Myr and typical measurement errors of Gaia DR2\n".format(
     #     series.number_of_groups, series.duration))
-    # !!! Rewrite this part with Quantity objects !!!
-    from astropy import units as un
     plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
         "with {} km/s redshift correction (real errors)".format(
-            series.duration, round(series.rv_offset * (un.pc/un.Myr).to(un.km/un.s), 2)))
+            series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
     plt.legend()
     plt.xlabel('Time (Myr)')
-    plt.ylabel('Scatter, MAD, MST mean and MST MAD (pc)')
+    plt.ylabel('Relative Scatter, MAD, MST mean and MST MAD')
     plt.xlim(0, 30)
     plt.ylim(0, 2)
     # plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
@@ -86,6 +84,32 @@ def create_size_indicators_plot(series, secondary=False):
 
     # Save and show figure
     # plt.savefig(path.join(series.output_dir, '{}.pdf'.format(series.name)))
+    plt.show()
+
+def create_covariance_plot(series):
+    """ Creates a plot of x-u, y-v and z-w covariance.
+    """
+
+    # Figure initialization
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+
+    # Covariances
+    mean_covariance = np.mean([group.covariance for group in series], axis=0)
+    mean_covariance = mean_covariance / mean_covariance[0]
+    plt.plot(series.time, mean_covariance[:,0], '-', color='0.0', linewidth=2.0, label='X-U Covariance')
+    plt.plot(series.time, mean_covariance[:,1], '-.', color='0.2', linewidth=2.0, label='Y-V Covariance')
+    plt.plot(series.time, mean_covariance[:,2], '--', color='0.4', linewidth=2.0, label='Z-W Covariance')
+
+    plt.title("Position-Velocity covariances of β-Pictoris (without outliners) over {} Myr\n"
+        "with {} km/s redshift correction (real errors)".format(
+            series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
+    plt.legend()
+    plt.xlabel('Time (Myr)')
+    plt.ylabel('Covariance')
+    plt.xlim(0, 30)
+    plt.ylim(-2, 2)
+
     plt.show()
 
 def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=False, mst=False):
@@ -102,7 +126,7 @@ def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=Fal
 
     # Step or age calculation
     if age is not None:
-        step = round(age / group.series.timestep)
+        step = int(round(age / group.series.timestep.value))
         age = round(group.series.time[step], 2)
     else:
         age = round(step * group.series.timestep, 2)
@@ -148,10 +172,8 @@ def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=Fal
     plt.ylabel('{} (pc)'.format(keys[j].upper()))
 
     # Show figure
-    # plt.show()
-
-    # Show figure
-    plt.savefig(path.join("/Users/Dominic/Desktop/beta_pic_frames", 'beta_pictoris_xz_{}.pdf'.format(age)))
+    plt.show()
+    # plt.savefig(path.join("/Users/Dominic/Desktop/beta_pic_frames", 'beta_pictoris_xz_{}.pdf'.format(age)))
 
 def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, mst=False):
     """ Creates a scatter plot of star positions in x, y and z at a given 'step' or 'age' in Myr.
@@ -161,14 +183,15 @@ def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, ms
 
     # Step or age calculation
     if age is not None:
-        step = round(age / group.series.timestep)
+        step = int(round(age / group.series.timestep.value))
         age = round(group.series.time[step], 2)
     else:
-        age = round(step * group.series.timestep, 2)
+        step = int(step)
+        age = round(step * group.series.timestep.value, 2)
 
     # Figure initialization
     rcParams.update({'font.family': 'serif', 'font.size': '14', 'lines.markersize': 4})
-    fig = plt.figure(figsize=(12, 8), facecolor='w', dpi=200)
+    fig = plt.figure(figsize=(12, 8), facecolor='w')
     ax = fig.add_subplot(111, projection='3d')
 
     # Scatter
@@ -212,12 +235,13 @@ def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, ms
     ax.set_xlabel('\n X (pc)')
     ax.set_ylabel('\n Y (pc)')
     ax.set_zlabel('\n Z (pc)')
-    ax.set_xlim3d(-70, 70)
-    ax.set_ylim3d(-30, 30)
-    ax.set_zlim3d(-30, 30)
+    # ax.set_xlim3d(-70, 70)
+    # ax.set_ylim3d(-30, 30)
+    # ax.set_zlim3d(-30, 30)
 
     # Show figure
-    plt.savefig(path.join("/Users/Dominic/Desktop/beta_pic_frames", 'beta_pic_{}.png'.format(step)))
+    plt.show()
+    # plt.savefig(path.join("/Users/Dominic/Desktop/beta_pic_frames", 'beta_pic_{}.png'.format(step)))
 
 def plot_age_error():
     """ Creates a graph of ages obtained for diffrent measurement errors on RV and offset

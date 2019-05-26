@@ -11,6 +11,7 @@
 from init import *
 from series import *
 from output import *
+from quantity import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -24,7 +25,7 @@ groups.create()
 # Output creation
 for name, series in groups.items():
     create_size_indicators_plot(series)
-    # for group in series:
-        # for frame in [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]:
-            # create_2D_scatter(group, 'x', 'z', age=frame, errors=True, labels=True, mst=True)
-            # create_3D_scatter(group, step=frame, errors=False, labels=False, mst=True)
+    create_covariance_plot(series)
+    for group in series:
+        create_2D_scatter(group, 'x', 'y', age=15.0, errors=True, labels=True, mst=False)
+        create_3D_scatter(group, age=15.0, errors=False, labels=False, mst=True)

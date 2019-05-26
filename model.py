@@ -19,7 +19,7 @@ from series import info
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Database object definition ??? Add to series ???
+# Database object definition ??? Add to Series ???
 Database = SqliteDatabase(Config.db_path)
 
 class BaseModel(Model):
@@ -196,7 +196,7 @@ class StarModel(BaseModel):
 
     def save_to_database(self, star):
         """ Saves all parameters to the database in a new StarModel entry. """
-        
+
         # StarModel entry creation
         values = {key: vars(star)[key] for key in filter(
             lambda key: key in vars(self).keys(), vars(star).keys())}
