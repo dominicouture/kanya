@@ -1,8 +1,8 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" quantity.py: Defines Quantity class to handle n dimension values with unit conversions and
-    error handling, and a Unit class.
+""" quantity.py: Defines Quantity and Unit classes to handle n dimension values with unit
+    conversions and error handling,
 """
 
 import numpy as np
@@ -80,11 +80,11 @@ class Quantity:
             self.index = None
 
     def __repr__(self):
-        """ Create a string with the value, error and unit of the Quantity object. """
+        """ Creates a string with the values, errors and units of the Quantity object. """
 
         def reduce(array):
-            """ Remove all but one value of all dimension if all values a given dimension are
-                the same.
+            """ Removes all but one value in an 'array' for all dimension if all values in a given
+                dimension are the same.
             """
 
             for i in range(array.ndim):
@@ -95,7 +95,7 @@ class Quantity:
             return array
 
         def flatten(array):
-            """ Returns the value of single-value arrays or a list version. """
+            """ Returns the value of single-value 'array' or a list version. """
 
             from json import dumps
             return array.flatten()[0] if np.equal(np.array(array.shape), 1).all() \
@@ -173,17 +173,17 @@ class Quantity:
         return np.prod(self.shape)
 
     def __lt__(self, other):
-        """ Tests whether values in self are lower than values in other. """
+        """ Tests whether values in self are lower than values in 'other'. """
 
         return self.values < other.values * self.compare(other)[1]
 
     def __le__(self, other):
-        """ Tests whether values in self are lower than or equal to values in other. """
+        """ Tests whether values in self are lower than or equal to values in 'other'. """
 
         return self.values <= other.values * self.compare(other)[1]
 
     def __eq__(self, other):
-        """ Tests whether values in self are equal to values in other (values and errors). """
+        """ Tests whether values in self are equal to values in 'other' (values and errors). """
 
         shape, factors = self.compare(other)
 
@@ -192,22 +192,22 @@ class Quantity:
         )(self.values == other.values * factors, self.errors == other.errors * factors)
 
     def __ne__(self, other):
-        """ Tests whether values in self are not equal to values in other (values and errors). """
+        """ Tests whether values in self are not equal to values in 'other' (values and errors). """
 
         return ~(self == other)
 
     def __ge__(self, other):
-        """ Tests whether values in self are greater than or equal to values in other. """
+        """ Tests whether values in self are greater than or equal to values in 'other'. """
 
         return self.values >= other.values * self.compare(other)[1]
 
     def __gt__(self, other):
-        """ Tests whether values in self are greater than or equal to values in other. """
+        """ Tests whether values in self are greater than or equal to values in 'other'. """
 
         return self.values > other.values * self.compare(other)[1]
 
     def __add__(self, other):
-        """ Defines the addition for a Quantity. Both arguments have to be Quantities. """
+        """ Computes the addition for a Quantity. Both 'self' and 'other' have to be Quantities. """
 
         shape, factors = self.compare(other)
 
@@ -216,23 +216,25 @@ class Quantity:
             np.vectorize(lambda x, y: np.linalg.norm((x, y)))(self.errors, other.errors * factors))
 
     def __sub__(self, other):
-        """ Computes the substraction for a Quantity. Both arguments have to be Quantities. """
+        """ Computes the substraction for a Quantity. Both 'self' and 'other' have to be
+            Quantities.
+        """
 
         return self + -other
 
     def __mul__(self, other):
-        """ Computes the product for a Quantity. The second argument can be an int or
-            a float, or a nd.array or a Quantity of a shape that can be broadcast to self.
+        """ Computes the product for a Quantity. 'other' can be an int or a float, or a
+            np.ndarray or a Quantity of a shape that can be broadcast to 'self'.
         """
 
-        # Check if other is a Quantity object
+        # Check if 'other' is a Quantity object
         if type(other) != type(self):
             other = Quantity(other)
 
-        # Check the shape of self and other can be broadcast together
+        # Check the shape of 'self' and 'other' can be broadcast together
         shape = broadcast('Quantities', self.values, other.values)
 
-        # Conversion factors between self and other
+        # Conversion factors between 'self' and 'other'
         factors = other.units.compare(self.units, shape, False)
 
         # Values computation
@@ -248,18 +250,18 @@ class Quantity:
                 self.errors / self.values, (other.errors / other.values)) * values)
 
     def __truediv__(self, other):
-        """ Computes the division for a Quantity. The second argument can be an int or a
-            float, or nd.array or a Quantity of a shape that can be broadcast to self.
+        """ Computes the division for a Quantity. 'other' can be an int or a float, or np.ndarray
+            or a Quantity of a shape that can be broadcast to 'self'.
         """
 
-        # Check if other is a Quantity object
+        # Check if 'other' is a Quantity object
         if type(other) != type(self):
             other = Quantity(other)
 
-        # Check the shape of self and other can be broadcast together
+        # Check the shape of 'self' and 'other' can be broadcast together
         shape = broadcast('Quantities', self.values, other.values)
 
-        # Conversion factors between self and other
+        # Conversion factors between 'self' and 'other'
         factors = other.units.compare(self.units, shape, False)
 
         # Values computation
@@ -275,14 +277,18 @@ class Quantity:
                 self.errors / self.values, (other.errors / other.values)) * values)
 
     def __floordiv__(self, other):
-        """ Computes the floor division of a Quantity. """
+        """ Computes the floor division of a Quantity. 'other' can be an int or a float, or
+            np.ndarray or a Quantity of a shape that can be broadcast to 'self'.
+        """
 
         truediv = self / other
 
         return Quantity(np.floor(truediv.values), truediv.units, truediv.errors)
 
     def __mod__(self, other):
-        """ Computes the remain of the floor division. """
+        """ Computes the remain of the floor division. 'other' can be an int or a float, or
+            np.ndarray or a Quantity of a shape that can be broadcast to 'self'.
+        """
 
         truediv = self / other
         floordiv = self // other
@@ -290,22 +296,23 @@ class Quantity:
         return Quantity(truediv.values - floordiv.values, truediv.units, truediv.errors)
 
     def __pow__(self, other):
-        """ Computes the raise to the power for a Quantity object. The second argument can be an
-            integer or a float, or nd.array or a Quantity object of a shape that can be broadcast
-            to self.
+        """ Computes the raise to the power for a Quantity object. 'other' can be an integer
+            or a float, or np.ndarray or a Quantity object of a shape that can be broadcast
+            to 'self'.
         """
 
         # Check if other is a Quantity object
         if type(other) != type(self):
             other = Quantity(other)
 
-        # Check if exponant is dimensionless
+        # Check if 'other' exponant is dimensionless
         elif not np.equal(other.units.units, u.Unit('')).all():
             raise ValueError("Exponant must be dimensionless.")
 
-        # Check the shape of self and other can be broadcast together
+        # Check the shape of 'self' and 'other' can be broadcast together
         shape = broadcast('Quantities', self.values, other.values)
 
+        # Units and errors computation
         return Quantity(
             self.values**other.values,
             self.units.units**other.values,
@@ -314,32 +321,32 @@ class Quantity:
                 self.values**other.values * np.log(self.values) * other.errors))
 
     def __matmul__(self, other):
-        """ Computes the scalar of matrix product of self and other. """
+        """ Computes the scalar of matrix product of 'self' and 'other'. """
 
         return self
 
     def __contains__(self, other):
-        """ Determines whether other is in self. """
+        """ Determines whether 'other' is in 'self'. """
 
         return True
 
     def count(self, other):
-        """ Counts the number of occurrences of other in self. """
+        """ Counts the number of occurrences of 'other' in 'self'. """
 
         return 0
 
     def where(self, other):
-        """ Determines the index of the occurrences of other in self. """
+        """ Determines the index of the occurrences of 'other' in 'self'. """
 
         return 0
 
     def concatenate(self, other):
-        """ Concatenates self and other together. """
+        """ Concatenates 'self' and 'other' together. """
 
         return self
 
     def remove(self, other):
-        """ Removes other from self. """
+        """ Removes 'other' from 'self'. """
 
         return self
 
@@ -373,15 +380,18 @@ class Quantity:
                 'Index {} is out of range of axis of size {}.'.format(index, len(self.values)))
 
     def __setitem__(self, index, item):
-        """ Modify the specified value in a Quantity object with the item.
+        """ Modify the value located at 'index' in a Quantity object with the 'item', which can
+            be a Quantity object or a np.ndarray.
             !!! Add slicing support !!!
         """
 
+        # Check if the types of 'index' and 'item' are valid
         if type(index) != int:
             raise TypeError("Can only index with integer, not {}.".format(type(index)))
         if type(item) != type(self):
             item = Quantity(item, self.units.units[index], self.errors[index])
 
+        # Modify the values, units and errors at the specified 'index'
         try:
             self.values[index] = item.values
             self.units.units[index] = item.units
@@ -390,45 +400,46 @@ class Quantity:
             raise IndexError("Index {} is out of range of axis of size {}.".format(
                 index, len(self.values)))
 
+        # Set self.parent as self at the specified 'index'
         if self.parent is not None:
             self.parent[self.index] = self
 
     def compare(self, other):
-        """ Determines the shape of the broadcast array, whether the physical types are
-            compatible and conversion factors to compare Quantities.
+        """ Computes the shape of the broadcast array, assesses whether the physical types are
+            compatible and calculates conversion factors to compare Quantities.
         """
 
-        # Check if other is a Quantity object
+        # Check if 'other' is a Quantity object
         if type(other) != type(self):
             raise TypeError("Cannot compare {} to {}.".format(type(other), type(self)))
 
-        # Check the shape of self and other can be broadcast together
+        # Check the shape of 'self' and 'other' can be broadcast together
         shape = broadcast('Quantities', self.values, other.values)
 
         # Shape and conversion factors
         return shape, self.units.compare(other.units, shape)
 
     def to(self, units=None):
-        """ Converts Quantity object into new units or default units if none are given. """
+        """ Converts a Quantity object to new units or default units if none are given. """
 
-        # Default units per physical types if no units are given.
+        # Default units per physical types if 'units' is None.
         if units is None:
             from coordinate import System
             units = Unit(np.vectorize(lambda unit: System.default_units[unit.physical_type].unit \
                 if unit.physical_type in System.default_units.keys() else unit)(self.units.units))
 
-        # Units import if given
+        # Units import
         else:
             units = Unit(units, shape=self.shape)
 
-        # Conversion factors between self and other
+        # Conversion factors between 'self' and 'other'
         factors = self.units.compare(units, self.shape)
 
         # Quantity object initialization
         return self.new(Quantity(self.values * factors, units, self.errors * factors))
 
     def new(self, new):
-        """ Transferts all optional parameters from the old self and returns a new value. """
+        """ Transferts all optional parameters from the old 'self' and returns a 'new' value. """
 
         optional = {key: vars(self)[key] for key in filter(
             lambda key: key not in vars(new), vars(self).keys())}
@@ -438,14 +449,14 @@ class Quantity:
 
 class Unit():
     """ Defines a unit or array of units matching one or several Astropy units.Unit objects.
-        A Unit also has a unique label and name, and physical type.
+        A Unit also has unique labels and names, and physical types.
     """
 
     def __init__(self, units, names=None, shape=None):
         """ Initializes a Unit from a string, Unit, NoneType, or astropy units.core.PrefixUnit,
             units.core.CompositeUnit, units.core.IrreducibleUnit, units.core units.core.Unit into
             a Unit object. 'names' can also be used to define the names of units in the array and
-            'shape' to define the shape of the array.
+            'shape' to define the final shape of the array.
         """
 
         # Units import
@@ -486,37 +497,37 @@ class Unit():
             self.name = str(self.names[0])
 
     def __repr__(self):
-        """ Returns the correct label of Unit. """
+        """ Returns the label of a unit. """
 
         return self.label if self.shape == (1,) else self.labels
 
     def compare(self, other, shape=None, types=True):
-        """ Compare two Unit objects for compatible shape and physical types and returns
+        """ Compare two Unit objects for compatible shapes and physical types and returns
             conversion factors.
         """
 
-        # Check the shape of self and other can be broadcast together
+        # Check if the shape of 'self' and 'other' can be broadcast together
         if shape is None:
             shape = broadcast('Units', self.units, other.units)
 
-        # Check if physical types of self and other match if needed
+        # Check if physical types of 'self' and 'other' match, if needed
         if types:
             if not (self.physical_types == other.physical_types).all():
                 raise ValueError("Units have incompatible physical types: {} and {}.".format(
                     self.physical_types, other.physical_types))
 
-        # Conversion factors from self to other with matching physical types
+        # Conversion factors from 'self' to 'other' with matching physical types
             return np.vectorize(lambda self_unit, other_unit: self_unit.to(other_unit))(
                 self.units, other.units)
 
-        # Conversion factors from other to self without matching physical types
+        # Conversion factors from 'self' to 'other' without matching physical types
         else:
             return np.vectorize(lambda self_unit, other_unit: self_unit.to(other_unit) \
                 if self_unit.physical_type == other_unit.physical_type else 1.0)(
                     self.units, other.units)
 
     def to(self, unit):
-        """ Uses astropy units.Unit function to convert 'unit' into an astropy.units object. """
+        """ Uses the astropy units.Unit function to convert 'unit' into an astropy.units object. """
 
         if type(unit) == Unit:
             unit = unit.unit

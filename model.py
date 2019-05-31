@@ -1,11 +1,10 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" model.py: Model for the peewee database of stars and local moving groups. Time-dependent data
-    is stored in an np.ndarray for which axis 0 corresponds to the timestep. The database only
-    records coordinates and errors in the XYZ and UVW coordinates system. The database file is
-    located at the path defined by Config.db_path. Distances are in pc, durations in Myr and
-    velocities in pc/Myr.
+""" model.py: Model for the peewee database of stars and moving groups. Time-dependent data
+    is stored in an np.ndarray for which axis 0 is time. The database only records coordinates
+    and errors in the XYZ and UVW coordinates system. The database file is located at the path
+    defined by Config.db_path.
 """
 
 import numpy as np
@@ -28,7 +27,7 @@ class BaseModel(Model):
         database = Database
 
 class ArrayField(Field):
-    """ Defines a database field for numpy arrays. """
+    """ Defines a database field for np.ndarray objects. """
 
     db_field = 'text'
     field_type = 'array'
@@ -36,8 +35,8 @@ class ArrayField(Field):
     python_value = lambda self, string: np.array(loads(string))
 
 class SeriesModel(BaseModel):
-    """ Defines the fields of a series of kinematic moving groups and functions to initialize from
-        or save to the database.
+    """ Defines the fields of a series of moving groups and methods to initialize from or save
+        to the database.
     """
 
     # Series parameters
@@ -55,8 +54,8 @@ class SeriesModel(BaseModel):
     time = ArrayField(verbose_name='Time', default=np.array([]))
 
     def load_from_database(self, series):
-        """ Initializes Series object and embeded Group objects from an existing instance in the
-            database, defined as the 'series.model' parameter.
+        """ Initializes a Series object and embeded Group objects from an existing instance in the
+            database, defined as the series.model parameter.
         """
 
         # Series parameters retrieval
@@ -90,8 +89,8 @@ class SeriesModel(BaseModel):
             GroupModel.save_to_database(GroupModel, group)
 
 class GroupModel(BaseModel):
-    """ Defines the fields of a kinematic moving group and functions to initialize from or save to
-        the database.
+    """ Defines the fields of a moving group and methods to initialize from or save to the
+        database.
     """
 
     # Group parameters
@@ -115,7 +114,7 @@ class GroupModel(BaseModel):
     scatter_age_error = FloatField(verbose_name='Scatter Age Error', default=0.0)
 
     # Median Absolute Deviation
-    median = ArrayField(verbose_name='Median', default=np.zeros((1, 3)))
+    median_xyz = ArrayField(verbose_name='Median', default=np.zeros((1, 3)))
     mad_xyz = ArrayField(verbose_name='Median Absolute Deviation XYZ', default=np.zeros((1, 3)))
     mad = ArrayField(verbose_name='Median Absolute Deviation', default=np.zeros(1))
     mad_age = FloatField(verbose_name='Median Absolute Deviation Age', default=0.0)
@@ -132,7 +131,7 @@ class GroupModel(BaseModel):
         verbose_name='Minimum Spanning Tree Age Error', default=0.0)
 
     def load_from_database(self, series, model):
-        """ Initializes Group object from an existing entry in the database. """
+        """ Initializes a Group object from an existing entry in the database. """
 
         # Group parameters retrival
         values = vars(model)['_data'].copy()
@@ -149,8 +148,9 @@ class GroupModel(BaseModel):
 
     def save_to_database(self, group):
         """ Saves all parameters to the database, including all Star objects within the Group
-            object. Previous entries are deleted if necessary and new entries are added.
+            object. Previous entries are deleted, if needed, and new entries are added.
         """
+
         # GroupModel entry creation
         values = {key: vars(group)[key] for key in filter(
             lambda key: key in vars(self).keys(), vars(group).keys())}
@@ -162,8 +162,8 @@ class GroupModel(BaseModel):
             StarModel.save_to_database(StarModel, star)
 
 class StarModel(BaseModel):
-    """ Defines the fields of a star in a kinematic moving group and functions to initialize from
-        or save to the database.
+    """ Defines the fields of a star in a moving group and methods to initialize from or save
+        to the database.
     """
 
     # Star parameters

@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """ __main__.py: Defines the Group class and the embeded Star classes. These classes contain the
-    information and methods necessary to compute tracebacks of stars in a kinematic group.
+    information and methods necessary to compute tracebacks of stars in a moving group and
+    assess its age by minimizing: the 3D scatter, median absolute deviation, covariances and
+    minimum spanning tree mean branch length and median absolute deviation of branch length.
 """
 
 import numpy as np
@@ -20,9 +22,10 @@ class Group(list):
 
     def __init__(self, series, **values):
         """ Initializes a Group object and embedded Star objects from a simulated sample of stars
-            in a moving group, raw data in the form a Python dictionary or from a database. This
-            dataset is then moved backward in time from the initial to the final time. Distances
-            are in pc, durations in Myr and velocities in pc/Myr.
+            in a moving group, raw data in the form a Data object or from a database. This dataset
+            is then moved backward in time from the initial to the final time, and its age is
+            estimated by minimizing: the 3D scatter, median absolute deviation, covariances, and
+            the minimum spanning tree branch length mean and median absolute deviation.
         """
 
         # Initialization
@@ -50,15 +53,18 @@ class Group(list):
             self.avg_position_error = np.sum(np.array(
                 [star.position_error for star in self])**2, axis=0)**0.5 / series.number_of_stars
 
+            for star in self:
+                star.position -= self.avg_position[160]
+
             # Age calculation
             self.scatter()
             self.median_absolute_deviation()
-            self.covariance()
+            self.covariances()
             self.minimum_spanning_tree()
 
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
-            parameters including the name of the stars, their position (XYZ) and velocity (UVW),
+            parameters including the name of the stars, their XYZ position and UVW velocity,
             and the respective errors. Radial velocity offset is also added.
         """
 
@@ -101,16 +107,17 @@ class Group(list):
 
     def stars_from_simulation(self):
         """ Creates an artificial sample of star for a given number of stars and age based on
-            the intial average position (XYZ) and velocity (UVW), and their respective error
-            and scatter. The sample is then moved forward in time for the given age.
+            the intial average XYZ position and UVW velocity, and their respective errors
+            and scatters. The sample is then moved forward in time for the given age and radial
+            velocity offset is also added.
         """
 
-        # Velocity array creation and conversions
+        # Velocity arrays creation and conversion
         avg_velocity = self.series.avg_velocity.values
         avg_velocity_error = self.series.avg_velocity_error.values
         avg_velocity_scatter = self.series.avg_velocity_scatter.values
 
-        # Position array creation
+        # Position arrays creation
         avg_position = self.series.avg_position.values
         avg_position_error = self.series.avg_position_error.values
         avg_position_scatter = self.series.avg_position_scatter.values
@@ -122,7 +129,7 @@ class Group(list):
             position_xyz = velocity_uvw * self.series.age.values + (
                 np.random.normal(avg_position, avg_position_scatter) -
                 (avg_velocity * self.series.age.values + avg_position) + # Normalisation
-                (15.19444, -4.93612, -1.70742223)) # Beta Pictoris current average position
+                (15.19444, -4.93612, -1.70742223)) # β Pictoris current average position
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
@@ -132,7 +139,7 @@ class Group(list):
             # Velocity and position conversion to observables
             position_obs, velocity_obs = spherical_observables(*position_rδα, *velocity_rvμδμα)[:2]
 
-            # Velocity and position scrambling based on measurment errors and conversion back to
+            # Velocity and position scrambling based on measurement errors and conversion back to
             # equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα,
                 position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
@@ -158,9 +165,10 @@ class Group(list):
                 position_error=position_xyz_error))
 
     def scatter(self):
-        """ Computes the xyz and total scatter of a group and their respective errors for all
+        """ Computes the XYZ and total scatter of a group and their respective errors for all
             timesteps, filters stars farther than 3σ from the average position and compensates
-            for the drift in minimal scatter age due to measurement errors.
+            for the drift of the minimal scatter age due to measurement errors. The age of the
+            moving is then estimated by finding the time at which the scatter is minimal.
         """
 
         # Stars relative positions and distances
@@ -172,9 +180,6 @@ class Group(list):
         self.scatter_xyz_error = self.avg_position_error
 
         # 3D scatter
-        # self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
-        #     self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
-        #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1)**0.5
         self.scatter = (np.sum(self.scatter_xyz**2, axis=1) - np.sum(
             self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
             * np.expand_dims(self.series.time, axis=0).T**2, axis=1))**0.5
@@ -182,13 +187,19 @@ class Group(list):
             (self.scatter_xyz * self.scatter_xyz_error)**2, axis=1)**0.5 / self.scatter
         # !!! Add recursive function to filters stars farther than 3σ from the avg_position here !!!
 
+        # Alternative 3D scatter
+        # self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
+        #     self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
+        #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1)**0.5
+
         # Age calculation
         self.scatter_age = self.series.time[np.argmin(self.scatter)]
         self.scatter_age_error = 0.0
 
     def median_absolute_deviation(self):
-        """ Computes the xyz and total median absolute deviation (MAD) of a group and their
-            respective errors for all timesteps.
+        """ Computes the XYZ and total median absolute deviation (MAD) of a group and their
+            respective errors for all timesteps. The age of the moving is then estimated by
+            finding the time at which the median absolute deviation is minimal.
         """
 
         # XYZ median absolute deviation
@@ -203,20 +214,28 @@ class Group(list):
         self.mad_age = self.series.time[np.argmin(self.mad)]
         self.mad_age_error = 0.0
 
-    def covariance(self):
-        """ Computes the x-u, y-v and z-w covariance of a group and their respective errors for
-            all timesteps.
+    def covariances(self):
+        """ Computes the X-U, Y-V and Z-W absolute covariances of a group and their respective
+            errors for all timesteps. The age of the moving is then estimated by finding the time
+            at which the covariances is minimal.
         """
 
-        self.covariance = np.sum(np.swapaxes(
-            np.array([star.position for star in self]) - self.avg_position, 0, 1) \
-            * (np.array([star.velocity for star in self]) - self.avg_velocity), axis=1) \
-            / self.series.number_of_stars
+        # Covariance calculation
+        self.covariance = np.absolute(np.sum(
+            (np.array([star.position for star in self]) - self.avg_position) *
+            np.expand_dims(np.array([star.velocity for star in self]) - self.avg_velocity, axis=1),
+        axis=0) /self.series.number_of_stars)
+
+        # Age calculation
+        self.covariance_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.covariance, axis=0))
+        self.covariance_age_error = 0.0
 
     def minimum_spanning_tree(self):
         """ Builds the minimal spanning tree (MST) of a group for all timseteps using a Kruskal
-            algorithm and related errors and computes the total (size) of all branches, the median
-            absolute deviation of the branch length and the age of the group.
+            algorithm, and computes errors, and the average branch length and the branch length
+            median absolute absolute deviation. The age of the moving is then estimated by
+            finding the time at which these measures are minimal.
         """
 
         # Branches creation
@@ -247,7 +266,7 @@ class Group(list):
                 branch = self.branches[i]
                 i += 1
 
-                # Replaces branch start and end stars current nodes with their largest parent node
+                # Replace branch start and end stars current nodes with their largest parent node
                 while branch.start.node.parent != None: branch.start.node = branch.start.node.parent
                 while branch.end.node.parent != None: branch.end.node = branch.end.node.parent
 
@@ -261,13 +280,13 @@ class Group(list):
             self.mst_branches[step] = np.vectorize(
                 lambda branch: branch.length[step])(self.mst[step])
 
-        # Minimum spanning tree size and age computation
+        # Minimum spanning tree average branch length and age computation
         self.mst_mean = np.mean(self.mst_branches, axis=1)
         self.mst_mean_error = np.zeros([self.series.number_of_steps])
         self.mst_mean_age = self.series.time[np.argmin(self.mst_mean)]
         self.mst_mean_error = 0.0
 
-        # Minimum spanning tree median absolute deviation branch length
+        # Minimum spanning tree branch length median absolute deviation
         self.mst_median = np.median(self.mst_branches, axis=1)
         self.mst_mad = np.median(
             np.abs(self.mst_branches - np.expand_dims(self.mst_median, axis=0).T), axis=1)
@@ -276,11 +295,11 @@ class Group(list):
         self.mst_mad_age_error = np.zeros([self.series.number_of_steps])
 
     class Branch:
-        """ Connects two stars, used for the calculation of the minimum spanning tree. """
+        """ Line connecting two stars used for the calculation of the minimum spanning tree. """
 
         def __init__(self, start, end):
             """ Initializes a branch and computes the distance between two Star objects,
-                'start' and 'end' for all timestep.
+                'start' and 'end', for all timestep.
             """
 
             self.start = start
@@ -296,12 +315,17 @@ class Group(list):
         """ Node of a star. """
 
         def __init__(self):
-            """ Set the parent node of a star as None. """
+            """ Sets the parent node of a star as None. """
 
             self.parent = None
 
+        def __repr__(self):
+            """ Returns a string of name of the parent. """
+
+            return 'None' if self.parent is None else self.parent
+
     class Star:
-        """ Contains the values and related methods of a star in a kinematic group. """
+        """ Contains the values and related methods of a star in a moving group. """
 
         def __init__(self, group, **values):
             """ Initializes a Star objects with at least a name, velocity, velocity error, intial
@@ -323,8 +347,8 @@ class Group(list):
             return self.name
 
         def positions(self):
-            """ Computes the position and position error of the star and errors for all timesteps.
-                Both self.position and self.position_errro are redefined with these new values.
+            """ Computes the positions and position errors of the star for all timesteps.
+                Both self.position and self.position_error are redefined with these new values.
             """
 
             self.position = self.position - self.velocity * np.expand_dims(
@@ -333,7 +357,7 @@ class Group(list):
                 * np.expand_dims(self.group.series.time, axis=0).T)**2)**0.5
 
         def distances(self):
-            """ Computes the relative position and distance from the average position and their
+            """ Computes the relative positions and distances from the average position and their
                 respective errors for all timesteps.
             """
 

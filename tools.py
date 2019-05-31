@@ -9,7 +9,7 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 def squeeze(array):
-    """ Squeezes an np.ndarray and adds one dimension if the resulting array has no dimension. """
+    """ Squeezes a np.ndarray and adds one dimension if the resulting array has no dimension. """
 
     array = np.squeeze(array)
 
@@ -21,7 +21,7 @@ def broadcast(name, array1, array2):
     try:
         return np.broadcast(array1, array2).shape
     except Exception as error:
-        error.args = ("{} ({} and {})with shapes {} and {} cannot be broadcast together.".format(
+        error.args = ("{} ({} and {}) with shapes {} and {} cannot be broadcast together.".format(
             name, array1, array2, array1.shape, array2.shape),)
         raise
 

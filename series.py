@@ -3,8 +3,9 @@
 
 """ series.py: Defines the class Series which uses a Config object to create a series of tracebacks
     either from a database, data or simulation. First, it handles exceptions (name, type, value,
-    shape) of all parameters, creates or imports the database, if needed, handles unit conversions,
-    checks for the presence of output and logs directories and creates them, if needed.
+    shape) of all parameters, then creates or imports the database, if needed, handles unit,
+    conversions, and checks for the presence of output and logs directories and creates them, if
+    needed.
 """
 
 import numpy as np
@@ -21,9 +22,9 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 class Series(list):
     """ Contains a series of Groups and their embedded Star objects and the methods required to
         initialize a series from a Config object. Values and data in the Config object are, copied,
-        checked and converted into Quantity objects and default units. The number of groups defines
-        how many objects are in a series in which all groups have the same Config object as their
-        progenitor.
+        checked and converted into Quantity objects and to default units. The number of groups
+        defines how many objects are in a series in which all groups have the same Config object
+        as their progenitor.
     """
 
     def __init__(self, config):
@@ -95,7 +96,8 @@ class Series(list):
                     'NameError', "Parameter's component '{}' in '{}' is invalid.", component_label,
                      parameter_label)
 
-                # Checks whether all component, but 'values' and 'units' are strings or None
+                # Check whether all components, but parameter.values and parameter.units are
+                # strings or None
                 if component_label not in ('values', 'units'):
                     self.stop(component is not None and type(component) != str, 'TypeError',
                         "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
@@ -104,13 +106,13 @@ class Series(list):
             # Default parameter
             default_parameter = self.config.default_parameters[parameter_label]
 
-            # Checks if parameter.label and parameter.name were changed
+            # Check if parameter.label and parameter.name were changed
             if parameter.label != parameter_label:
                 parameter.label = parameter_label
             if parameter.name != default_parameter.name:
                 parameter.name = default_parameter.name
 
-            # Checks if parameter.system is valid and converts it into a System object
+            # Check if parameter.system is valid and converts it to a System object
             if parameter.system is not None:
                 self.stop(parameter.system.lower() not in systems.keys(), 'ValueError',
                     "'system' component of '{}' is invalid ({} required, {} given).",
@@ -119,7 +121,7 @@ class Series(list):
             elif default_parameter.system is not None:
                 parameter.system = systems[default_parameter.system]
 
-            # Checks if parameter.axis is valid and converts it into a System.Axis object
+            # Check if parameter.axis is valid and converts it to a System.Axis object
             if parameter.axis is not None:
                 self.stop(parameter.axis.lower() not in parameter.system.axes.keys(), 'ValueError',
                     "'axis' component of '{}' is not a valid ({} required, {} given).",
@@ -128,7 +130,7 @@ class Series(list):
             elif default_parameter.axis is not None:
                 parameter.axis = parameter.system.axes[default_parameter.axis]
 
-            # Checks if parameter.origin is valid and converts it into a System.origin object
+            # Check if parameter.origin is valid and converts it to a System.Origin object
             if parameter.origin is not None:
                 self.stop(parameter.origin.lower() not in parameter.system.origins.keys(), 'Value'
                     'Error', "'origin' component of '{}' is not a valid ({} required, {} given).",
@@ -139,14 +141,14 @@ class Series(list):
 
     def configure_logs(self):
         """ Checks if the logs directory already exists, creates it if needed and configures
-            the Logs file. 'logs_dir' is defined as the absolute logs directory.
+            the Logs file. 'logs_dir' is redefined as the absolute path to the logs directory.
         """
 
         # Logs directory parameter
         self.logs_dir = 'Logs' if self.config.logs_dir.values is None \
             else self.config.logs_dir.values
 
-        # Logs direction creation logs_dir parameter redefinied as the absolute path
+        # Logs direction creation self.logs_dir redefinied as the absolute path
         self.logs_dir = self.directory(self.output_dir, self.config.logs_dir.values, 'logs_dir')
 
         # Logs configuration
@@ -187,35 +189,35 @@ class Series(list):
 
     def configure_database(self):
         """ Checks if the database directory and the database file itself exist and creates them
-            if needed. 'database_path' is redefined as the absolute path. The database Model
-            is initiated and errors handled based on whether the input or output from and to the
-            database is required.
+            if needed. self.database_path is redefined as the absolute path to the database. The
+            database Model is initiated and errors handled based on whether the input or output
+            from and to the database is required.
         """
 
         # db_path parameter
         self.db_path = '{}.db'.format(self.name) if self.config.db_path.values is None \
             else self.config.db_path.values
 
-        # Check if db_path parameter is a string, witch must be done before self.directory call
+        # Check if db_path parameter is a string, which must be done before self.directory call
         self.stop(type(self.db_path) != str, 'TypeError', "'db_path' must be a string ({} given).",
             type(self.db_path))
 
-        # Database absolute name and director
+        # Database absolute name and directory
         self.db_name = '{}.db'.format(self.name) if path.basename(self.db_path) == '' \
             else path.basename(self.db_path)
         self.db_dir = self.directory(self.output_dir, path.dirname(self.db_path), 'db_path',
             create=self.from_database or self.to_database)
 
-        # db_path parameter redefinition as the absolute path
+        # self.db_path redefined as the absolute path
         self.db_path = path.join(self.db_dir, self.db_name)
-        Config.db_path = self.db_path # Necessary for Database object definition
+        Config.db_path = self.db_path # Needed for Database object definition
 
         # Check if the path links to a database file.
         self.stop(path.splitext(self.db_path)[1].lower() != '.db', 'TypeError',
             "'{}' is not a database file (with a .db extension).", self.db_path)
 
+        # Check if a database exists
         if self.from_database or self.to_database:
-            # Check if a database exists
             self.stop(self.from_database and not path.exists(self.db_path), 'NameError',
                 "No existing database located at '{}'.", self.db_path)
 
@@ -237,7 +239,7 @@ class Series(list):
             self.model, self.created = (None, False)
 
     def configure_traceback(self):
-        """ Check configuration parameters for traceback and output from data or simulation. """
+        """ Checks configuration parameters for traceback and output from data or simulation. """
 
         # number_of_groups parameter
         self.number_of_groups = self.configure_integer(self.config.number_of_groups)
@@ -275,7 +277,7 @@ class Series(list):
         self.rv_offset = self.configure_quantity(self.config.rv_offset)
 
     def configure_data(self):
-        """ Check if traceback and output from data is possible and creates a Data object from a
+        """ Checks if traceback and output from data is possible and creates a Data object from a
             CSV file, or a Python dictionary, list, tuple or np.ndarray.
         """
 
@@ -294,22 +296,19 @@ class Series(list):
         self.number_of_stars = len(self.data)
 
         # Simulation parameters set to None because stars are imported from data
-        for parameter in (
-                'age', 'avg_position', 'avg_position_error', 'avg_position_scatter',
-                'avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
+        for parameter in \
+                ('age',) + self.config.position_parameters + self.config.velocity_parameters:
             vars(self)[parameter] = None
 
     def configure_simulation(self):
-        """ Check if traceback and output from simulation is possible. """
+        """ Checks if traceback and output from simulation is possible. """
 
         # Logging
         info("Traceback and output of '{}' from simulation.".format(self.name))
 
         # Check if all the necessary parameters are present
-        for parameter in (
-                'number_of_stars', 'age', 'avg_position', 'avg_position_error',
-                'avg_position_scatter', 'avg_velocity', 'avg_velocity_error',
-                'avg_velocity_scatter'):
+        for parameter in \
+                ('age',) + self.config.position_parameters + self.config.velocity_parameters:
             self.stop(vars(self.config)[parameter].values is None, 'NameError',
                 "Required simulation parameter '{}' is missing in the configuration.", parameter)
 
@@ -345,19 +344,19 @@ class Series(list):
     def configure_integer(self, parameter):
         """ Checks if an integer value is valid and converts it if needed. """
 
-        # Check the presence and type of values component
+        # Check the presence and type of parameter.values
         self.stop(parameter.values is None, 'NameError',
             "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
         self.stop(type(parameter.values) not in (int, float), 'TypeError', "'{}' must be "
             "an integer or a float ({} given).", parameter.label, type(parameter.values))
 
-        # Check if the value is convertible to an integer and greater than or equal to 1
+        # Check if parameter.values is convertible to an integer and greater than or equal to 1
         self.stop(parameter.values % 1 != 0, 'ValueError', "'{}' must be convertible "
             "to an integer ({} given).", parameter.label, parameter.values)
         self.stop(parameter.values < 1, 'ValueError', "'{}' must be "
             "greater than or equal to 1 ({} given).", parameter.label, parameter.values)
 
-        # Conversion to integer
+        # Conversion to an integer
         return int(parameter.values)
 
     def configure_quantity(self, parameter):
@@ -373,11 +372,11 @@ class Series(list):
         if parameter.units is None:
             parameter.units = self.config.default_parameters[parameter.label].units
 
-        # Check the type of parameter.units component
+        # Check if parameter.units is a string
         self.stop(type(parameter.units) != str, 'TypeError', "'units' component of '{}' "
             "must be a string ({} given).", parameter.label, type(parameter.units))
 
-        # Check if parameter.units component can be converted to Unit
+        # Check if parameter.units can be converted to Unit
         try:
             Unit(parameter.units)
         except:
@@ -392,43 +391,44 @@ class Series(list):
                 parameter.label)
 
         # Check if the physical type is valid
-        default_physical_type = Unit(self.config.default_parameters[parameter.label].units).physical_type
+        default_physical_type = Unit(
+            self.config.default_parameters[parameter.label].units).physical_type
         self.stop(quantity.physical_types.flatten()[0] != default_physical_type, 'ValueError',
             "Unit of '{}' does not have the correct physical type ('{}' given, '{}' required).",
             parameter.label, quantity.physical_types.flatten()[0], default_physical_type)
 
-        # Unit conversion
+        # Unit conversion to default units
         return quantity.to()
 
     def configure_coordinate(self, parameter):
         """ Converts a Parameter into a Quantity object and raises an error if an exception
-            occurs in the process. Returns a vector converted into the correct units for the
-            physical type defined by a Variable object.
+            occurs in the process. Returns a vector converted to default units for the physical
+            type defined by a Variable object.
         """
 
         # Variables from label and check for invalid label
-        if parameter.label in ('avg_position', 'avg_position_error', 'avg_position_scatter'):
+        if parameter.label in self.config.position_parameters:
             variables = parameter.system.position
-        elif parameter.label in ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter'):
+        elif parameter.label in self.config.velocity_parameters:
             variables = parameter.system.velocity
         else:
             self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.label)
 
-        # Check the presence and type of parameter.values component
+        # Check the presence and type of parameter.values
         self.stop(parameter.values is None, 'NameError',
             "Required simulation parameter '{}' is missing in the configuration.", parameter.label)
         self.stop(type(parameter.values) not in (tuple, list, np.ndarray), 'TypeError',
             "'values' component of '{}' must be a tuple, list or np.ndarray ({} given).'",
                 parameter.label, type(parameter.values))
 
-        # Check if all elements in parameter.values component are numerical
+        # Check if all elements in parameter.values are numerical
         try:
             np.vectorize(float)(parameter.values)
         except:
             self.stop(True, 'ValueError',
                 "'values' component of '{}' contains non-numerical elements.", parameter.label)
 
-        # Check the dimensions of parameter.values component
+        # Check the dimensions of parameter.values
         shape = np.array(parameter.values).shape
         ndim = len(shape)
         self.stop(ndim > 2, 'ValueError', "'{}' must have 1 or 2 dimensions ({} given).",
@@ -439,20 +439,30 @@ class Series(list):
             'ValueError',  "'{}' first dimension ({} given) must have a size of 1 or equal "
             "to the number of stars ({} given).", parameter.label, shape[0], self.number_of_stars)
 
-        # Default units component
+        # Default parameter.units component
         if parameter.units is None:
             parameter.units = [variable.unit.label for variable in variables]
 
-        # Check the type of parameter.units component
+        # Check if parameter.units is a string representing a coordinate system
         if type(parameter.units) == str:
-            parameter.units = [parameter.units]
+            if parameter.units.lower() in systems.keys():
+                if parameter.label in self.config.position_parameters:
+                    parameter.units = [variable.usual_unit.unit \
+                        for variable in systems[parameter.units.lower()].position]
+                elif parameter.label in self.config.velocity_parameters:
+                    parameter.units = [variable.usual_unit.unit \
+                        for variable in systems[parameter.units.lower()].velocity]
+            else:
+                parameter.units = [parameter.units]
+
+        # Check the type of parameter.units component
         self.stop(type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
             "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
                 parameter.label, type(parameter.values))
 
         # Check if all elements in parameter.units component can be converted to Unit
         try:
-            np.vectorize(Unit)(np.array(parameter.units, dtype=object))
+            Unit(np.array(parameter.units, dtype=object))
         except:
             self.stop(True, 'ValueError',
                 "'units' components of '{}' must all represent units.", parameter.label)
@@ -464,20 +474,20 @@ class Series(list):
             self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.",
                 parameter.label)
 
-        # Check if physical types are valid
+        # Check if physical types are valid based on parameter.system
         physical_types = np.array([variable.physical_type for variable in variables])
         self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
             "Units in '{}' do not have the correct physical type "
             "({} given, {} required for '{}' system.)", parameter.label,
              quantity.physical_types.tolist(), physical_types, quantity.system.label)
 
-        # Units conversion
+        # Units conversion to default units
         return quantity.to()
 
     def directory(self, base, directory, name, create=True):
-        """ Checks for type errors, checks if the directory already exists, creates it if
+        """ Checks for type errors, checks if 'directory' already exists, creates it if
             needed and returns the absolute directory path. The directory can either be
-            relative the base or an absolute.
+            relative the 'base' or an absolute.
         """
 
         # Check the type of directory
@@ -518,6 +528,7 @@ class Series(list):
 
         # If an exception is being handled, its traceback is formatted and execution is terminated
         else:
+
             # Traceback message creation
             tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
                 if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))
@@ -554,7 +565,7 @@ class Series(list):
                 # Group object creation
                 self.append(Group(self, name=name))
 
-        # Save series to database, previous entry deleted if needed
+        # Save series to database, previous entry is deleted if needed
         if self.to_database:
             from model import SeriesModel
             SeriesModel.save_to_database(SeriesModel, self)
@@ -571,12 +582,12 @@ class Groups(dict):
             and series is already present in it, the previous entry is removed first.
         """
 
-        # Groups dictionary creation if necessary
+        # Groups dictionary creation if needed
         import __main__ as main
         if 'groups' not in vars(main):
             vars(main)['groups'] = self
 
-        # Previous entry deleted if it already exists
+        # Previous entry deletion if it already exists
         if series.name in main.groups.keys():
             info("Existing series '{}' deleted and replaced.".format(series.name))
             del main.groups[series.name]
@@ -585,7 +596,8 @@ class Groups(dict):
         main.groups[series.name] = series
         info("Series '{}' ready for traceback.".format(series.name))
 
-    # ??? Fonction pour sélectionner from_data ou from_simulation, override de la valeur dans series et le check si le traceback est déjà fait. ???
+    # ??? Fonction pour sélectionner from_data ou from_simulation, override de la valeur ???
+    # ??? dans series et le check si le traceback est déjà fait. ???
     def create(self, *series):
         """ Creates a series of Groups object for all series in self if no series name is given
             or selected series given in argument.

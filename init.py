@@ -30,7 +30,7 @@ class Config():
             ('label', 'name', 'values', 'units', 'system', 'axis', 'origin')}
 
         def __init__(self, **components):
-            """ Initializes a Parameter object with the given components. """
+            """ Initializes a Parameter object with the given 'components'. """
 
             # Initialization
             vars(self).update(deepcopy(self.default_components))
@@ -39,7 +39,7 @@ class Config():
             self.update(components.copy())
 
         def update(self, parameter):
-            """ Updates the components of self with those of another parameter or a dictionary
+            """ Updates the components of 'self' with those of another 'parameter' or a dictionary
                 of components, only if those new components are part of the default components
                 tuple or singular forms of default components.
             """
@@ -106,12 +106,16 @@ class Config():
         Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
             units=System.default_units['speed'].label, system='cartesian'))}
 
+    # Position and velocity paramaters
+    position_parameters = ('avg_position', 'avg_position_error', 'avg_position_scatter')
+    velocity_parameters = ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter')
+
     def __init__(self, path=None, args=False, parent=None, **parameters):
         """ Initializes a Config object from a configuration file, command line arguments
             and parameters, in that order. 'path' must be a string and 'args' a boolean value
-            that causes arguments in command line to be imported if true. Only values that
+            that causes arguments in command line to be imported if True. Only values that
             match a key in self.default_parameters are used. If no value are given the default
-            parameter is used instead. Items in'parameters' dictionary must be dictionaries or
+            parameter is used instead. Values in'parameters' dictionary must be dictionaries or
             Config.Parameter objects.
         """
 
@@ -138,7 +142,7 @@ class Config():
         # Check the type of config_path
         if type(config_path) != str:
             raise TypeError("The path to the configuration file must be a string "
-                "('{}' given.)".format(type(config_path)))
+                "('{}' given).".format(type(config_path)))
 
         # Check if the configuration file is present
         abs_config_path = path.abspath(config_path)
@@ -147,7 +151,7 @@ class Config():
             raise FileNotFoundError(
                 "No configuration file found at location '{}'.".format(abs_config_path))
 
-        # Check if the configuraiton is a Python file
+        # Check if the configuration is a Python file
         elif path.splitext(config_name)[1] != '.py':
             raise TypeError("'{}' is not a Python file.".format(config_name))
 
@@ -204,11 +208,11 @@ class Config():
 
     def initialize_from_parameters(self, parameters):
         """ Initializes a Config object from a parameters dictionary. Overwrites values given in
-            a configuration file or as arguments in command line. The values in the dictionary
-            can either be a Parameter object or a dictionary of components.
+            a configuration file or as arguments in command line. Values in the dictionary can
+            either be Parameter objects or dictionaries of components.
         """
 
-        # Import only if it matches a default parameter
+        # Filter parameters that don't match a default parameter
         for key, parameter in filter(
                 lambda item: item[0] in self.default_parameters.keys(), parameters.items()):
 

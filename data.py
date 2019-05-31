@@ -1,9 +1,10 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" data.py: Defines the Data and embeded Row classes, which contains all the information from
-    CSV file or a Python dictionary, list, tuple or np.ndarray that can then be used as an input
-    for a Group object and all related methods to check and convert this data.
+""" data.py: Defines Data, and embeded Column and Row classes, which contains all the information
+    from a CSV file or a Python dictionary, list, tuple or np.ndarray that can then be used as
+    an input for a Group object and all related methods to check and convert this data. Units are
+    identified and converted to default units.
 """
 
 __author__ = 'Dominic Couture'
@@ -23,10 +24,10 @@ class Data(list):
     """
 
     def __init__(self, series):
-        """ Initizalizes a Data object from a CSV file or a Python dictionary, list, tuple or
+        """ Initializes a Data object from a CSV file or a Python dictionary, list, tuple or
             np.ndarray. The first row must be a header and the second row may be a units row.
             Units specified by series.config.data.units will override the units row. If no units,
-            are given default units are used, based on the value of series.config. data.system.
+            are given default units are used, based on the value of series.config and data.system.
         """
 
         # Initialization
@@ -54,9 +55,9 @@ class Data(list):
         self.create_rows()
 
     def initialize_from_CSV(self):
-        """ Initializes a Data object from the data 'series.name' in a CSV file. If the the CSV
-            file doesn't specify a series or group column, all data is used. The file name must
-            have a '.csv' extension.
+        """ Initializes a Data object from the data self.series.name in a CSV file. If the the
+            CSV file doesn't specify a series or group column, all data is used. The file name
+            must have a '.csv' extension.
         """
 
         self.from_data = False
@@ -87,10 +88,9 @@ class Data(list):
 
     def initialize_from_data(self):
         """ Initializes a Data object from a Python dictionary, list, tuple or np.ndarray (2D). If
-            a dictionary is used, only the value with a key that matches 'series.name' is used and
-            its type must be one of the other 3 possible types. If a list, tuple or np.ndarray is
-            used, all data is imported. A temporary CSV file is created to check whether the array
-            has a header and then deleted.
+            a dictionary is used, only the value with a key that matches self.series.name is used
+            and its type must be one of the other 3 possible types. If a list, tuple or np.ndarray
+            is used, all data is imported.
         """
 
         self.from_data = True
@@ -126,15 +126,17 @@ class Data(list):
             self.series.stop(True, 'ValueError', "Data could not be converted to string.")
 
     def configure_data(self):
-        """ Configures data in a np.ndarray. Variables, units, errors and error units and
-            identification. If no errors are specified, errors are set to 0.0 and if no units are
-            specified, default units are used. The first row must be a header and the second row
-            is an can be used as a units row.
+        """ Configures data in a np.ndarray. Variables, units, errors and error units are
+            identified. If no errors are specified, errors are set to 0.0 and if no units are
+            specified, default units are used. The first row must be a header and the second
+            row can be used as a units row.
         """
 
         # Value variables
-        self.position_variables = {variable.label: variable for variable in self.data.system.position}
-        self.velocity_variables = {variable.label: variable for variable in self.data.system.velocity}
+        self.position_variables = {variable.label:
+            variable for variable in self.data.system.position}
+        self.velocity_variables = {variable.label:
+            variable for variable in self.data.system.velocity}
         self.value_variables = {**self.position_variables, **self.velocity_variables}
 
         # Error variables
@@ -158,12 +160,12 @@ class Data(list):
         self.unit_header = True if True not in [
             unit.replace('.', '').replace(',', '').isdigit() for unit in self.table[1]] else False
 
-        # Check data.units component is None
+        # Check if data.units component is None
         if self.data.units is None:
             self.data.units = self.table[1] if self.unit_header else None
         else:
 
-            # Units from a string representing a coordinates system
+            # Units from a string representing a coordinate system
             if type(self.data.units) == str:
                 self.series.stop(self.data.units.lower() not in systems.keys(), 'ValueError',
                     "'{}' is not a valid coordinates system (use {} instead).",
@@ -180,18 +182,19 @@ class Data(list):
             elif type(self.data.units) == dict:
 
                 # Check if all labels can be matched to a data.system variable.
-                self.data.units = {self.Column.configure_label(self.Column, label, self.data.system):
+                self.data.units = {self.Column.configure_label(
+                        self.Column, label, self.data.system):
                     self.data.units[label] for label in self.data.units.keys()}
-
                 self.series.stop(not np.vectorize(lambda label: label in self.variables.keys()) \
                     (tuple(self.data.units.keys())).all(), 'ValueError',
                     "All labels in 'data.units' couldn't be matched to a variable of '{}' system.",
                     self.data.system.name)
 
                 # Check if all values in self.data.units are strings
-                self.series.stop(not np.vectorize(lambda label: type(self.data.units[label]) == str) \
-                    (tuple(self.data.units.keys())).all(), 'TypeError',
-                    "All elements in 'data.units' component must be strings.")
+                self.series.stop(not np.vectorize(
+                        lambda label: type(self.data.units[label]) == str)(tuple(
+                            self.data.units.keys())).all(), 'TypeError',
+                            "All elements in 'data.units' component must be strings.")
 
             # Units from an array mimicking a unit header
             elif type(self.data.units) in (tuple, list, np.ndarray):
@@ -244,7 +247,7 @@ class Data(list):
 
     class Column:
         """ Contains information on a column (parameter), including its index, label, name and
-            units.
+            units and a permutations dictionary to identify labels.
         """
 
         # Label permutations
@@ -271,8 +274,7 @@ class Data(list):
             'ra': 'α',
             'radialvelocity': 'rv',
             'propermotion': 'μ',
-            'pm': 'μ'
-        }
+            'pm': 'μ'}
 
         def __init__(self, data, column, missing=False):
             """ Initializes a Column object from a 'data' object and a number 'column' matching the
@@ -305,7 +307,7 @@ class Data(list):
             if self.missing:
                 self.label = 'Δ' + self.label
 
-            # Variable and units identification
+            # Variables and units identification
             if self.label in self.data.variables.keys():
                 self.variable = self.data.variables[self.label]
                 self.units = self.data.data.units
@@ -347,8 +349,7 @@ class Data(list):
                 self.unit = None
 
         def configure_label(self, label, system):
-            """ Takes a label and returns a reformated version matching those used in System class.
-            """
+            """ Converts a 'label' into a reformatted version matching those used in 'system'. """
 
             # Label permutations
             for old, new in self.permutations.items():
@@ -368,7 +369,7 @@ class Data(list):
 
     def create_rows(self):
         """ Filters what rows in self.table are part of the selected group definied by
-            self.series.name and adds a row object to self for every valid row.
+            self.series.name and adds a self.Row object to self for every valid row.
         """
 
         # Rows identification
@@ -405,8 +406,8 @@ class Data(list):
         """
 
         def __init__(self, data, row):
-            """ Initializes a Row object from a 'data' object, a 'row' number. Default values are
-                given if no value is given. Errors are set to 0.0 if no error column is present.
+            """ Initializes a Row object from a 'data' object and a 'row' number. Default values
+                are used if no value is given. Errors are set to 0.0 if no error column is present.
             """
 
             # Initialization
@@ -459,11 +460,13 @@ class Data(list):
                 [self.values[label] for label in self.data.position_variables.keys()],
                 [self.data.columns[label].unit for label in self.data.position_variables.keys()],
                 [self.values[label] for label in self.data.position_error_variables.keys()],
-                [self.data.columns[label].unit for label in self.data.position_error_variables.keys()]).to()
+                [self.data.columns[label].unit
+                    for label in self.data.position_error_variables.keys()]).to()
 
             # Velocity columns and unit conversion
             self.velocity = Quantity(
                 [self.values[label] for label in self.data.velocity_variables.keys()],
                 [self.data.columns[label].unit for label in self.data.velocity_variables.keys()],
                 [self.values[label] for label in self.data.velocity_error_variables.keys()],
-                [self.data.columns[label].unit for label in self.data.velocity_error_variables.keys()]).to()
+                [self.data.columns[label].unit
+                    for label in self.data.velocity_error_variables.keys()]).to()

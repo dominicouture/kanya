@@ -1,8 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" find_scatter.py: Finds the original scatter of β-Pictoris.
-"""
+""" find_scatter.py: Finds the initial scatter of β Pictoris. """
 
 import numpy as np
 from astropy import units as un
@@ -14,11 +13,8 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 def find_scatters(
         number_of_stars: int, age: int, avg_position_xyz: tuple, avg_position_scatter_xyz: tuple,
-        avg_velocity_xyz: tuple, avg_velocity_scatter_xyz: tuple
-    ):
-    """ Cumputes the scatters of a simulated group after a given age. Positions are in pc,
-        velocities in pc/Myr and the age in Myr.
-    """
+        avg_velocity_xyz: tuple, avg_velocity_scatter_xyz: tuple):
+    """ Cumputes scatters of a simulated group after a given age. """
 
     # Initial and final positions
     intial_positions_xyz = np.random.normal(np.full((number_of_stars, 3), avg_position_xyz),
@@ -38,7 +34,7 @@ def find_scatters(
     return (final_scatter3, final_scatter_xyz)
 
 def create_graph(x, y, y_ans):
-    """ Create a graph of the scatter with a linear regression curve. """
+    """ Creates a plot of the scatter with a linear regression curve. """
 
     # Figure initialization
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
@@ -84,7 +80,6 @@ avg_velocity_scatter_xyz = np.full(
 # avg_velocity_xyz = np.array(avg_velocity) * (un.km/un.s).to(un.pc/un.Myr)
 # avg_velocity_scatter_xyz = np.array(avg_velocity_scatter) * (un.km/un.s).to(un.pc/un.Myr)
 
-
 # Final scatter over the initial scatter
 scatters_x = []
 scatters_xyz = []
@@ -98,7 +93,6 @@ for initial_avg_position_scatter_xyz in initial_avg_position_scatters_xyz:
 # y_ans = 3**0.5 * np.prod(avg_position_scatter)**(1/3)
 # initial_avg_position_scatters = np.sqrt(3)*avg_position_scatters_x
 create_graph(initial_avg_position_scatters_x, scatters_x, current_avg_position_scatter_x)
-
 
 # Final scatter over the age of the group
 scatters_x = []

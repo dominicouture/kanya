@@ -67,7 +67,8 @@ avg_velocity.units = 'km/s'
 # Average velocity error of the simulated sample of stars (tuple)
 avg_velocity_error.values = (1.0112, 0.30754, 0.26432)
 # avg_velocity_error.values = (0.0, 0.0, 0.0)
-avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
+# avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
+avg_velocity_error.units = 'observables'
 avg_velocity_error.system = 'observables'
 avg_velocity_error.axis = 'equatorial'
 
