@@ -73,14 +73,15 @@ def create_size_indicators_plot(series, secondary=False):
             "with {} km/s redshift correction and actual measurement errors\n".format(
                 series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
     elif series.from_simulation:
-        plt.title("Average size indicators of {} moving group simulations with kinematics similar\n"
-            "to β Pictoris over {} Myr and typical measurement errors of Gaia DR2\n".format(
-            series.number_of_groups, series.duration.value))
+        plt.title("Average size indicators of {} moving group simulations with kinematics similar "
+            "to β Pictoris\n over {} Myr with {} km/s redshift correction and actual measurement "
+            "errors of Gaia DR2\n".format(series.number_of_groups,
+                series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
     plt.legend()
     plt.xlabel('Time (Myr)')
     plt.ylabel('Relative Scatter, MAD, MST mean and MST MAD')
     plt.xlim(0, series.final_time.value)
-    plt.ylim(0, 2)
+    plt.ylim(0, 1.5)
     # plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
     # plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 
@@ -118,14 +119,14 @@ def create_covariances_plot(series):
                 series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
     elif series.from_simulation:
         plt.title("X-U, Y-V and Z-W covariances of {} moving group simulations with kinematics "
-            "similar to β Pictoris \n over {} Myr with {} km/s redshift correction and typical "
+            "similar to β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
             "measurement errors of Gaia DR2\n".format(series.number_of_groups,
                 series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
     plt.legend()
     plt.xlabel('Time (Myr)')
     plt.ylabel('Covariance')
     plt.xlim(0, series.final_time.value)
-    plt.ylim(0, 2)
+    plt.ylim(0, 1.5)
 
     # Show figure
     plt.show()
@@ -158,8 +159,8 @@ def create_covariance_scatter(group, i, j, step=None, age=None):
 
     # Scatter
     plt.scatter(
-        [star.position[step, i] for star in group],
-        [star.velocity[j] for star in group], marker='o', color='0.0')
+        [star.position[step, i] for star in group.stars],
+        [star.velocity[j] for star in group.stars], marker='o', color='0.0')
 
     # Title and axis formatting
     plt.title("{} and {} covariance of stars in β Pictoris at {} Myr wihtout outliers.\n".format(
@@ -196,12 +197,12 @@ def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=Fal
 
     # Scatter
     plt.scatter(
-        [star.position[step, i] for star in group],
-        [star.position[step, j] for star in group], marker='o', color='0.0')
+        [star.position[step, i] for star in group.stars],
+        [star.position[step, j] for star in group.stars], marker='o', color='0.0')
 
     # Error bars
     if errors:
-        for star in group:
+        for star in group.stars:
             position = star.position[step]
             error = star.position_error[step]
             plt.plot(
@@ -213,7 +214,7 @@ def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=Fal
 
     # Star labels
     if labels:
-        for star in group:
+        for star in group.stars:
             plt.text(star.position[step, i] + 1, star.position[step, j] + 1, star.name,
             horizontalalignment='left', fontsize=7)
 
@@ -257,13 +258,13 @@ def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, ms
 
     # Scatter
     ax.scatter(
-        [star.relative_position[step, 0] for star in group],
-        [star.relative_position[step, 1] for star in group],
-        [star.relative_position[step, 2] for star in group], marker='o', c='0.0')
+        [star.relative_position[step, 0] for star in group.stars],
+        [star.relative_position[step, 1] for star in group.stars],
+        [star.relative_position[step, 2] for star in group.stars], marker='o', c='0.0')
 
     # Error bars
     if errors:
-        for star in group:
+        for star in group.stars:
             position = star.relative_position[step]
             error = star.relative_position_error[step]
             ax.plot(
@@ -278,7 +279,7 @@ def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, ms
 
     # Star labels
     if labels:
-        for star in group:
+        for star in group.stars:
             ax.text(
                 star.position[step, 0] + 2, star.position[step, 1] + 2, star.position[step, 2] + 2,
                 star.name, horizontalalignment='left', fontsize=7)

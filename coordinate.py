@@ -337,7 +337,7 @@ def uvw_to_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0
         return values, errors
 
 def rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
-    """ Converts a rvµδµα (radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr)
+    """ Converts a rvµδµα, radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr)
         and right ascension proper motion (µα; rad/Myr), spherical coordinate velocity vector
         (observables) to an UVW cartesian coordinate velocity vector (pc/Myr), along with
         measurement errors.

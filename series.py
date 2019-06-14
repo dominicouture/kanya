@@ -60,7 +60,7 @@ class Series(list):
         # Database configuration
         self.configure_database()
 
-        # Traceback configuration if needed
+        # Traceback configuration, if needed
         if self.from_data or self.from_simulation:
             self.configure_traceback()
 
@@ -596,8 +596,6 @@ class Groups(dict):
         main.groups[series.name] = series
         info("Series '{}' ready for traceback.".format(series.name))
 
-    # ??? Fonction pour sélectionner from_data ou from_simulation, override de la valeur ???
-    # ??? dans series et le check si le traceback est déjà fait. ???
     def create(self, *series):
         """ Creates a series of Groups object for all series in self if no series name is given
             or selected series given in argument.
@@ -615,3 +613,6 @@ class Groups(dict):
                 info("Series '{}' has already been tracebacked.".format(name))
             else:
                 self[name].create()
+
+        # ??? Fonction pour sélectionner from_data ou from_simulation, override de la valeur ???
+        # ??? dans series et vérifier si le traceback est déjà fait. ???

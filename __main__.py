@@ -27,7 +27,7 @@ groups.create()
 for name, series in groups.items():
     create_size_indicators_plot(series)
     create_covariances_plot(series)
-    for group in series:
-        # create_covariance_scatter(group, 'x', 'u', age=0)
-        create_2D_scatter(group, 'x', 'y', age=15.0, errors=True, labels=True, mst=False)
+    # for group in series:
+        # create_covariances_scatter(group, 'x', 'u', age=0)
+        # create_2D_scatter(group, 'x', 'z', age=15.0, errors=True, labels=True, mst=False)
         # create_3D_scatter(group, age=15.0, errors=False, labels=False, mst=True)
