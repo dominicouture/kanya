@@ -84,9 +84,10 @@ class Config():
     # Default parameters
     default_parameters = {parameter.label: parameter for parameter in (
         Parameter(label='name', name='Name'),
-        Parameter(label='to_database', name='To database', values=False),
         Parameter(label='from_data', name='From data', values=False),
-        Parameter(label='from_simulation', name='From simulation', values=False),
+        Parameter(label='from_model', name='From model', values=False),
+        Parameter(label='from_database', name='From database', values=False),
+        Parameter(label='to_database', name='To database', values=False),
         Parameter(label='output_dir', name='Output directory', values=''),
         Parameter(label='logs_dir', name='Logs directory', values='Logs'),
         Parameter(label='db_path', name='Database path'),
@@ -185,26 +186,31 @@ class Config():
             prog='Traceback',
             description='traces given or simulated moving groups of stars back to their origin.')
         parser.add_argument(
-            '-b', '--to_database', action='store_true',
-            help='save the output data to a database file.')
+            '-n', '--name', action='store', type=str,
+            help='name of the series of tracebacks, used in the database and output.')
         parser.add_argument(
             '-d', '--data', action='store_true',
-            help='use data parameter in the configuration file as input.')
+            help='use the data parameter in the configuration file as input.')
         parser.add_argument(
-            '-s', '--simulation', action='store_true',
-            help='simulate an input based on parameters in the configuration file.')
+            '-m', '--model', action='store_true',
+            help='model an input based on simulation parameters in the configuration file.')
         parser.add_argument(
-            'name', action='store', type=str,
-            help='name of the series of tracebacks, used in the database and output.')
+            '-l', '--from_database', action='store_true',
+            help='load the input data from a database file.')
+        parser.add_argument(
+            '-s', '--to_database', action='store_true',
+            help='save the output data to a database file.')
         args = parser.parse_args()
 
-        # Series name import
-        self.name.values = args.name
+        # Series name import if not None
+        if args.name is not None:
+            self.name.values = args.name
 
         # Mode import, overwrites any value imported from a path
-        self.to_database.values = args.to_database
         self.from_data.values = args.data
-        self.from_simulation.values = args.simulation
+        self.from_model.values = args.model
+        self.from_database.values = args.from_database
+        self.to_database.values = args.to_database
 
     def initialize_from_parameters(self, parameters):
         """ Initializes a Config object from a parameters dictionary. Overwrites values given in

@@ -32,28 +32,25 @@ class Group(list):
         self.series = series
         vars(self).update(values)
 
-        # Group from traceback
-        if not series.from_database:
+        # Stars from data
+        if series.from_data:
+            self.stars_from_data()
 
-            # Stars from data
-            if series.from_data:
-                self.stars_from_data()
+        # Stars from model
+        elif series.from_model:
+            self.stars_from_model()
 
-            # Stars from simulation
-            elif series.from_simulation:
-                self.stars_from_simulation()
+        # Average velocity and position and scatter computation
+        self.get_scatter()
 
-            # Average velocity and position and scatter computation
-            self.get_scatter()
+        # Median absolute deviation computation
+        self.get_median_absolute_deviation()
 
-            # Median absolute deviation computation
-            self.get_median_absolute_deviation()
+        # X-U, Y-V and Z-W covariances computation
+        self.get_covariances()
 
-            # X-U, Y-V and Z-W covariances computation
-            self.get_covariances()
-
-            # Minimum spanning tree computation
-            self.get_minimum_spanning_tree()
+        # Minimum spanning tree computation
+        self.get_minimum_spanning_tree()
 
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
@@ -99,8 +96,8 @@ class Group(list):
                 position=position_xyz,
                 position_error=position_xyz_error))
 
-    def stars_from_simulation(self):
-        """ Creates an artificial sample of star for a given number of stars and age based on
+    def stars_from_model(self):
+        """ Creates an artificial model of star for a given number of stars and age based on
             the intial average XYZ position and UVW velocity, and their respective errors
             and scatters. The sample is then moved forward in time for the given age and radial
             velocity offset is also added.
@@ -384,11 +381,10 @@ class Group(list):
             vars(self).update(values)
 
             # Positions from traceback
-            if not group.series.from_database:
-                self.position = self.position - self.velocity * np.expand_dims(
-                    self.group.series.time, axis=0).T
-                self.position_error = (self.position_error**2 + (self.velocity_error
-                    * np.expand_dims(self.group.series.time, axis=0).T)**2)**0.5
+            self.position = self.position - self.velocity * np.expand_dims(
+                self.group.series.time, axis=0).T
+            self.position_error = (self.position_error**2 + (self.velocity_error
+                * np.expand_dims(self.group.series.time, axis=0).T)**2)**0.5
 
         def __repr__(self):
             """ Returns a string of name of the star. """

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """ series.py: Defines the class Series which uses a Config object to create a series of tracebacks
-    either from a database, data or simulation. First, it handles exceptions (name, type, value,
+    either from a database, data or a model. First, it handles exceptions (name, type, value,
     shape) of all parameters, then creates or imports the database, if needed, handles unit,
     conversions, and checks for the presence of output and logs directories and creates them, if
     needed.
@@ -14,6 +14,7 @@ from os import path, makedirs, remove, getcwd, chdir
 from logging import basicConfig, info, warning, INFO
 from coordinate import *
 from quantity import *
+from collection import *
 from init import *
 
 __author__ = 'Dominic Couture'
@@ -27,8 +28,8 @@ class Series(list):
         as their progenitor.
     """
 
-    def __init__(self, config):
-        """ Configures a Config object from database, data or simulation. """
+    def __init__(self, config=None):
+        """ Configures a Series from a configuration parameters in a Config object. """
 
         # Inilialization
         self.config = Config(parent=config)
@@ -37,35 +38,14 @@ class Series(list):
         # Parameters configuration
         self.configure_parameters()
 
-        # Series name
-        self.name = self.config.name.values
-        self.stop(self.name is None, 'NameError',
-            "Required parameter 'name' is missing in the configuration.")
-        self.stop(type(self.name) != str, 'TypeError', "'name' must be a string ('{}' given).",
-            type(self.name))
-
-        # Present date and time
-        self.date = strftime('%Y-%m-%d %H:%M:%S')
-
-        # Output directory creation
-        self.output_dir = self.directory(path.abspath(path.join(path.dirname(
-            path.realpath(__file__)), '..')), self.config.output_dir.values, 'output_dir')
+        # Series basic configuration
+        self.configure_series()
 
         # Logs configuration
         self.configure_logs()
 
-        # Arguments configuration
-        self.configure_arguments()
-
-        # Database configuration
-        self.configure_database()
-
-        # Traceback configuration, if needed
-        if self.from_data or self.from_simulation:
-            self.configure_traceback()
-
-        # Groups dictionary creation
-        Groups(self)
+        # Series addition to collection
+        collection.add(self)
 
     def configure_parameters(self):
         """ Checks if all parameters are present and are Config.Parameter objects with all their
@@ -139,6 +119,48 @@ class Series(list):
             elif default_parameter.origin is not None:
                 parameter.origin = parameter.system.origins[default_parameter.origin]
 
+    def configure_series(self):
+        """ Checks basic series parameters. Checks if self.name is a string and creates a default
+            value if needed. Checks the type of the modes provided in the configuration and checks
+            if their values are valid. self.to_database is set to False if self.from_database
+            is True. Moreover, self.date and self.output_dir are defined.
+        """
+
+        # Series name
+        self.name = collection.default('untitled') if self.config.name.values is None \
+            else self.config.name.values
+
+        # Current date and time
+        self.date = strftime('%Y-%m-%d %H:%M:%S')
+
+        # Check if series.name is a string
+        self.stop(type(self.name) != str, 'TypeError', "'name' must be a string ('{}' given).",
+            type(self.name))
+
+        # from_data, from_model, from_database and to_database parameters
+        for argument in ('from_data', 'from_model', 'from_database', 'to_database'):
+            vars(self)[argument] = vars(self.config)[argument].values
+            self.stop(vars(self)[argument] is None, 'NameError'
+                "Required parameter '{}' is missing in the configuration.", argument)
+            self.stop(type(vars(self)[argument]) != bool, 'TypeError'
+                "'{}' must be a boolean value ({} given).", argument, type(vars(self)[argument]))
+
+        # Check if no more than one mode has been selected
+        self.stop(self.from_data == True and self.from_model == True,
+            'ValueError', "No more than one mode ('from_data', 'from_model' or 'from_database') "
+            "can be selected for '{}'", self.name)
+
+        # self.to_database parameter set to False if self.from_database is True
+        if self.from_database and self.to_database:
+            info("Output of '{}' from and to database. "
+                "The database will not be updated with its own data.".format(self.name))
+            self.to_database = False
+
+        # Output directory creation
+        self.output_dir = self.directory(
+            path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')),
+            self.config.output_dir.values, 'output_dir', create=True)
+
     def configure_logs(self):
         """ Checks if the logs directory already exists, creates it if needed and configures
             the Logs file. 'logs_dir' is redefined as the absolute path to the logs directory.
@@ -149,7 +171,8 @@ class Series(list):
             else self.config.logs_dir.values
 
         # Logs direction creation self.logs_dir redefinied as the absolute path
-        self.logs_dir = self.directory(self.output_dir, self.config.logs_dir.values, 'logs_dir')
+        self.logs_dir = self.directory(
+            self.output_dir, self.config.logs_dir.values, 'logs_dir', create=True)
 
         # Logs configuration
         basicConfig(
@@ -160,45 +183,18 @@ class Series(list):
         # Set logs_configured as True
         self.logs_configured = True
 
-    def configure_arguments(self):
-        """ Checks for the type of the arguments provided in the configuration and check if
-            their values are compatible. from_database is defined based on the values of
-            from_data and from simulation.
-        """
-
-        # from_data, from_simulation and to_database parameters
-        for argument in ('to_database', 'from_data', 'from_simulation'):
-            vars(self)[argument] = vars(self.config)[argument].values
-            self.stop(type(vars(self)[argument]) is None, 'NameError'
-                "Required parameter '{}' is missing in the configuration.", argument)
-            self.stop(type(vars(self)[argument]) != bool, 'TypeError'
-                "'{}' must be a boolean value ({} given).", argument, type(vars(self)[argument]))
-
-        # Check if traceback and output from both data and simulation
-        self.stop(self.from_data and self.from_simulation, 'ValueError',
-            "Either traceback series '{}' from data or a simulation, not both.", self.name)
-
-        # from_database parameter
-        self.from_database = True if not self.from_data and not self.from_simulation else False
-
-        # Check if traceback and output from both data and simulation
-        if self.from_database and self.to_database:
-            info("Output of '{}' from and to database. "
-                "The database will not be updated with its own data.".format(self.name))
-            self.to_database = False
-
-    def configure_database(self):
+    def configure_database(self, db_path=None):
         """ Checks if the database directory and the database file itself exist and creates them
-            if needed. self.database_path is redefined as the absolute path to the database. The
-            database Model is initiated and errors handled based on whether the input or output
-            from and to the database is required.
+            if needed. self.db_path is redefined as the absolute path to the database. Errors are
+            handled based on whether the input or output from and to the database is required.
         """
 
         # db_path parameter
-        self.db_path = '{}.db'.format(self.name) if self.config.db_path.values is None \
-            else self.config.db_path.values
+        self.db_path = db_path if db_path is not None \
+            else self.config.db_path.values if self.config.db_path.values is not None \
+            else '{}.db'.format(self.name)
 
-        # Check if db_path parameter is a string, which must be done before self.directory call
+        # Check if db_path parameter is a string, which must be done before the self.directory call
         self.stop(type(self.db_path) != str, 'TypeError', "'db_path' must be a string ({} given).",
             type(self.db_path))
 
@@ -206,75 +202,55 @@ class Series(list):
         self.db_name = '{}.db'.format(self.name) if path.basename(self.db_path) == '' \
             else path.basename(self.db_path)
         self.db_dir = self.directory(self.output_dir, path.dirname(self.db_path), 'db_path',
-            create=self.from_database or self.to_database)
+            create=self.to_database)
 
         # self.db_path redefined as the absolute path
         self.db_path = path.join(self.db_dir, self.db_name)
-        Config.db_path = self.db_path # Needed for Database object definition
 
         # Check if the path links to a database file.
         self.stop(path.splitext(self.db_path)[1].lower() != '.db', 'TypeError',
             "'{}' is not a database file (with a .db extension).", self.db_path)
 
-        # Check if a database exists
-        if self.from_database or self.to_database:
-            self.stop(self.from_database and not path.exists(self.db_path), 'NameError',
-                "No existing database located at '{}'.", self.db_path)
-
-            # Database initialization
-            from model import SeriesModel, GroupModel
-            self.model, self.created = SeriesModel.get_or_create(name=self.name)
-
-            # Check if output from database is possible
-            if self.from_database:
-                # Logging
-                info("Output of '{}' from database.".format(self.name))
-
-                # Check if data is present in the database
-                self.stop(len(tuple(GroupModel.select().where(
-                    GroupModel.series == self.model))) == 0, 'ValueError',
-                    "No existing series '{}' in the database '{}'.", self.name, self.db_name)
-        else:
-            # Set model and created to None and False beacuse no database is needed
-            self.model, self.created = (None, False)
-
     def configure_traceback(self):
-        """ Checks configuration parameters for traceback and output from data or simulation. """
+        """ Checks traceback configuration parameters from data or a model. """
 
-        # number_of_groups parameter
-        self.number_of_groups = self.configure_integer(self.config.number_of_groups)
+        # Check whether a traceback is needed
+        if self.from_data or self.from_model:
 
-        # number_of_steps parameter: one more step to account for t = 0
-        self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
+            # number_of_groups parameter
+            self.number_of_groups = self.configure_integer(self.config.number_of_groups)
 
-        # initial_time parameter
-        self.initial_time = self.configure_quantity(self.config.initial_time)
+            # number_of_steps parameter: one more step to account for t = 0
+            self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
 
-        # final_time parameter
-        self.final_time = self.configure_quantity(self.config.final_time)
-        self.stop(not self.final_time > self.initial_time, 'ValueError',
-            "'final_time' must be greater than initial_time ({} and {} given).",
-            self.final_time, self.initial_time)
+            # initial_time parameter
+            self.initial_time = self.configure_quantity(self.config.initial_time)
 
-        # duration, timesteps and time parameters
-        self.duration = self.final_time - self.initial_time
-        self.timestep = self.duration / (self.number_of_steps - 1)
-        self.time = np.linspace(
-            self.initial_time.values, self.final_time.values, self.number_of_steps)
+            # final_time parameter
+            self.final_time = self.configure_quantity(self.config.final_time)
+            self.stop(not self.final_time > self.initial_time, 'ValueError',
+                "'final_time' must be greater than initial_time ({} and {} given).",
+                self.final_time, self.initial_time)
 
-        # Data configuration
-        # if self.from_data:
-        #     self.configure_data()
+            # duration, timesteps and time parameters
+            self.duration = self.final_time - self.initial_time
+            self.timestep = self.duration / (self.number_of_steps - 1)
+            self.time = np.linspace(
+                self.initial_time.values, self.final_time.values, self.number_of_steps)
 
-        # Data configuration for error inclusion in simulation
-        self.configure_data()
+            # Radial velocity offset paramaters
+            self.rv_offset = self.configure_quantity(self.config.rv_offset)
 
-        # Simulation configuration
-        if self.from_simulation:
-            self.configure_simulation()
+            # Data configuration for inclusion in a model
+            if self.from_data or True:
+                self.configure_data()
 
-        # Radial velocity offset
-        self.rv_offset = self.configure_quantity(self.config.rv_offset)
+            # Simulation configuration
+            if self.from_model:
+                self.configure_model()
+
+            # Logging
+            info("Series '{}' ready for traceback.".format(self.name))
 
     def configure_data(self):
         """ Checks if traceback and output from data is possible and creates a Data object from a
@@ -282,7 +258,7 @@ class Series(list):
         """
 
         # Logging
-        info("Traceback and output of '{}' from data.".format(self.name))
+        info("Initializing '{}' from data.".format(self.name))
 
         # Check if data is present
         self.stop(self.config.data is None, 'NameError',
@@ -296,19 +272,19 @@ class Series(list):
         self.number_of_stars = len(self.data)
 
         # Simulation parameters set to None because stars are imported from data
-        for parameter in \
-                ('age',) + self.config.position_parameters + self.config.velocity_parameters:
+        for parameter in ('age', *self.config.position_parameters,
+                *self.config.velocity_parameters):
             vars(self)[parameter] = None
 
-    def configure_simulation(self):
-        """ Checks if traceback and output from simulation is possible. """
+    def configure_model(self):
+        """ Checks if traceback and output from a model is possible. """
 
         # Logging
-        info("Traceback and output of '{}' from simulation.".format(self.name))
+        info("Initializing '{}' from a model.".format(self.name))
 
         # Check if all the necessary parameters are present
-        for parameter in \
-                ('age',) + self.config.position_parameters + self.config.velocity_parameters:
+        for parameter in ('number_of_stars', 'age', *self.config.position_parameters,
+                *self.config.velocity_parameters):
             self.stop(vars(self.config)[parameter].values is None, 'NameError',
                 "Required simulation parameter '{}' is missing in the configuration.", parameter)
 
@@ -487,7 +463,7 @@ class Series(list):
     def directory(self, base, directory, name, create=True):
         """ Checks for type errors, checks if 'directory' already exists, creates it if
             needed and returns the absolute directory path. The directory can either be
-            relative the 'base' or an absolute.
+            relative path to the 'base' or an absolute path.
         """
 
         # Check the type of directory
@@ -544,75 +520,128 @@ class Series(list):
             print(tb_stack)
             exit()
 
-    def create(self):
-        """ Creates a Group and embeded Star objects for all group names in self.groups either
-            from a database, or by tracing back stars imported from data or simulated stars.
+    def update(self, **parameters):
+        """ Updates the series by modifying its self.config configuration, re-initializing itself
+            and deleting existing groups. The groups are also traced back again if they had been
+            traced back before the update.
         """
 
-        # Creation from database
-        if self.from_database:
-            from model import SeriesModel
-            SeriesModel.load_from_database(SeriesModel, self)
+        pass
 
-        # Creation from data or simulation
+    def load(self, db_path=None):
+        """ Loads a series from the database binary file. self.db_path is defined as the actual
+            path to the file.
+        """
+
+        # Logging
+        info("Loading '{}' from a database file.".format(self.name))
+
+        # Database configuration
+        self.from_database = True
+        self.configure_database(db_path=db_path)
+
+        # Check if loading has already been done
+        if len(self) > 0:
+            info("Series '{}' has already been loaded".format(self.name))
+
+        # Check if a database file exists
+        else:
+            self.stop(not path.exists(self.db_path), 'NameError',
+                "No existing database located at '{}'.", self.db_path)
+
+            # Database file unpickling
+            from pickle import load
+            database = open(self.db_path, 'rb')
+            parameters, groups = load(database)
+            database.close()
+
+            # Parameters and groups import
+            vars(self).update(parameters)
+            for group in groups:
+                self.append(group)
+
+            # Logging
+            info("Series '{}' loaded from '{}'.".format(self.name, self.db_path))
+
+    def traceback(self):
+        """ Traces back Group and embeded Star objects using either imported data or by
+            modeling a group based on simulation parameters.
+        """
+
+        # Check if at least one mode has been selected
+        self.stop(self.from_data == False and self.from_model == False,
+            'ValueError', "Either traceback '{}' from data or a model (none selected).", self.name)
+
+        # Traceback configuration
+        self.configure_traceback()
+
+        # Check if traceback has already been done
+        if len(self) == self.number_of_groups:
+            info("Series '{}' has already been traced back.".format(self.name))
+
+        # Group name creation
         else:
             from group import Group
-            for name in ['{}_{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]:
+            for name in ['{}-{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]:
+
                 # Logging
-                message = "Tracing back {}.".format(name.replace('_', ' '))
+                message = "Tracing back '{}' from {}.".format(
+                    name, 'data' if self.from_data else 'a model')
                 info(message)
                 print(message)
-                # Group object creation
+
+                # Group traceback
                 self.append(Group(self, name=name))
 
-        # Save series to database, previous entry is deleted if needed
+            # Logging
+            info("Series '{}' succesfully traced back.".format(self.name))
+
+    def save(self, db_path=None):
+        """ Saves a series to a database binary file. self.db_path is defined as the actual path
+            to the file. If needed, the existing file is overwritten.
+        """
+
+        # Logging
+        info("Saving '{}' to a database file.".format(self.name))
+
+        # Database configuration
+        self.to_database = True
+        self.configure_database(db_path=db_path)
+
+        # Existing database file deletion, if needed
+        if path.exists(self.db_path):
+            remove(self.db_path)
+            info("Existing database file located at '{}' deleted.".format(self.db_path))
+
+        # Parameters export
+        parameters = {parameter: vars(self)[parameter] for parameter in vars(self).keys() \
+            if parameter not in (
+                'output_dir', 'logs_dir', 'logs_configured',
+                'db_path', 'db_name', 'db_dir',
+                'to_database', 'from_database')}
+
+        # Database file pickling
+        from pickle import dump
+        database = open(self.db_path, 'wb')
+        dump((parameters, tuple(group for group in self)), database)
+        database.close()
+
+        # Logging
+        info("Series '{}' saved at '{}'.".format(self.name, self.db_path))
+
+    def create(self):
+        """ Either load a series from a database file, or traces back a series from data or a
+            model. If needed, the series is also saved.
+        """
+
+        # Load from database
+        if self.from_database:
+            self.load()
+
+        # Traceback from data or a model
+        elif self.from_data or self.from_model:
+            self.traceback
+
+        # Save to database
         if self.to_database:
-            from model import SeriesModel
-            SeriesModel.save_to_database(SeriesModel, self)
-
-
-class Groups(dict):
-    """ Contains a dictionary of series created from a configuration as well a traceback method
-        that computes a traceback for all or selected series. Using this class is optional,
-        although it is initialized automaticaly when a Series object is created.
-    """
-
-    def __init__(self, series):
-        """ Initializes a Groups dictionary with a given series in main.py. If it already exists
-            and series is already present in it, the previous entry is removed first.
-        """
-
-        # Groups dictionary creation if needed
-        import __main__ as main
-        if 'groups' not in vars(main):
-            vars(main)['groups'] = self
-
-        # Previous entry deletion if it already exists
-        if series.name in main.groups.keys():
-            info("Existing series '{}' deleted and replaced.".format(series.name))
-            del main.groups[series.name]
-
-        # Addition of self to groups dictionary and logging
-        main.groups[series.name] = series
-        info("Series '{}' ready for traceback.".format(series.name))
-
-    def create(self, *series):
-        """ Creates a series of Groups object for all series in self if no series name is given
-            or selected series given in argument.
-        """
-
-        # Computes a traceback for every groups in every selected series
-        for name in list(self.keys()) if len(series) == 0 else series:
-
-            # Check if the series exists
-            Series.stop(Series, name not in self.keys(), "NameError",
-                "Series '{}' does not exist.", name)
-
-            # Traceback if it hasn't already been done
-            if len(self[name]) == self[name].number_of_groups:
-                info("Series '{}' has already been tracebacked.".format(name))
-            else:
-                self[name].create()
-
-        # ??? Fonction pour sélectionner from_data ou from_simulation, override de la valeur ???
-        # ??? dans series et vérifier si le traceback est déjà fait. ???
+            self.save()

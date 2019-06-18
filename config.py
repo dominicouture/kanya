@@ -16,18 +16,22 @@
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Output directory relative to the directory where the Traceback Package is located (str). If left
-# blank (i.e. '') or absent, output files will be created in the same directory as the Package.
+# Output directory relative to the directory where the Traceback package is located (str). If left
+# blank (i.e. '') or absent, output files will be created in the same directory as the package.
 output_dir.value = 'Output'
 
 # Logs directory relative to the output directory (str). If left blank (i.e. '') or absent, logs
 # files will be created in the output directory.
 logs_dir.value = 'Logs'
 
-# Path to the database file used as input or output relative the output directory (str). If left
-# blank (i.e. '') or absent, the database is created in the output directory as 'name.db'. If the
-# file doesn't exist, it will be created.
+# Path to the database file or directory used as input or output relative the output directory.
+# (str). If left blank (i.e. '') or absent, and data is loaded or dumped to a database, 'output_dir'
+# directory and 'name.db' will be used instead. The database created if needed and will override any
+# existing file.
 db_path.value = ''
+
+# Name of series of groups
+name.value = 'beta_pictoris'
 
 # Number of groups to be simulated in the series (integer, > 0)
 number_of_groups.value = 1

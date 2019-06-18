@@ -20,6 +20,8 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Database object definition
 Database = SqliteDatabase(Config.db_path)
+# Needed for Database object definition in Series.configure_database
+# Config.db_path = self.db_path
 
 class BaseModel(Model):
 
@@ -47,7 +49,6 @@ class SeriesModel(BaseModel):
     number_of_steps = IntegerField(verbose_name='Number of Steps', default=1)
 
     # Time parameters
-    # These parameters are quantity objects...
     initial_time = FloatField(verbose_name='Initial Time', default=0.0)
     final_time = FloatField(verbose_name='Final Time', default=1.0)
     duration = FloatField(verbose_name='Duration', default=1.0)

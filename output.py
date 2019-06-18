@@ -72,7 +72,7 @@ def create_size_indicators_plot(series, secondary=False):
         plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
             "with {} km/s redshift correction and actual measurement errors\n".format(
                 series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
-    elif series.from_simulation:
+    elif series.from_model:
         plt.title("Average size indicators of {} moving group simulations with kinematics similar "
             "to β Pictoris\n over {} Myr with {} km/s redshift correction and actual measurement "
             "errors of Gaia DR2\n".format(series.number_of_groups,
@@ -117,7 +117,7 @@ def create_covariances_plot(series):
         plt.title("X-U, Y-V and Z-W covariances of β Pictoris (without outliners) over {} Myr\n"
             "with {} km/s redshift correction and actual measurement errors\n".format(
                 series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
-    elif series.from_simulation:
+    elif series.from_model:
         plt.title("X-U, Y-V and Z-W covariances of {} moving group simulations with kinematics "
             "similar to β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
             "measurement errors of Gaia DR2\n".format(series.number_of_groups,
@@ -131,7 +131,7 @@ def create_covariances_plot(series):
     # Show figure
     plt.show()
 
-def create_covariance_scatter(group, i, j, step=None, age=None):
+def create_covariances_scatter(group, i, j, step=None, age=None):
     """ Creates a scatter plot of star positions in i and j at a given 'step' or 'age' in Myr.
         If 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'steps'
         if both are given. 'labels' adds the stars' name and 'mst' adds the minimum spanning tree
