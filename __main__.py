@@ -18,8 +18,7 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Series
-Series(Config('config.py', args=True))
-
+Series(path='config.py', args=True)
 
 # Groups
 collection.traceback()

@@ -48,6 +48,11 @@ class Config():
             if type(parameter) == type(self):
                 parameter = vars(parameter)
 
+            # Check if the parameter is a dictionary here
+            if type(parameter) != dict:
+                raise TypeError("A parameter must be a Config.Parameter object or a dictionary. "
+                    "('{}' given).".format(type(parameter)))
+
             # Component conversion from singular to plural form
             for component in ('value', 'unit'):
                 components = component + 's'
@@ -59,8 +64,8 @@ class Config():
             if 'axis' in parameter.keys() and parameter['axis'] is not None:
                 if type(parameter['axis']) == str and parameter['axis'].lower() == 'observables':
                     parameter['axis'] = 'equatorial'
-            if 'origin' in parameter.keys() and parameter['axis'] is not None:
-                if type(parameter['axis']) == str and parameter['origin'].lower() == 'observables':
+            if 'origin' in parameter.keys() and parameter['origin'] is not None:
+                if type(parameter['origin']) == str and parameter['origin'].lower() == 'observables':
                     parameter['origin'] = 'sun'
 
             # Parameter update if present in self.default_components
@@ -111,13 +116,13 @@ class Config():
     position_parameters = ('avg_position', 'avg_position_error', 'avg_position_scatter')
     velocity_parameters = ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter')
 
-    def __init__(self, path=None, args=False, parent=None, **parameters):
-        """ Initializes a Config object from a configuration file, command line arguments
-            and parameters, in that order. 'path' must be a string and 'args' a boolean value
-            that causes arguments in command line to be imported if True. Only values that
-            match a key in self.default_parameters are used. If no value are given the default
-            parameter is used instead. Values in'parameters' dictionary must be dictionaries or
-            Config.Parameter objects.
+    def __init__(self, parent=None, path=None, args=False, **parameters):
+        """ Configures a Config objects from, in order, 'parent', an existing Config object,
+            'path', a string representing a path to a configuration file, 'args' a boolean value
+            that sets whether command line arguments are used, and **parameters, a dictionary of
+            dictionaries or Config.Parameter objects. Only values that match a key in
+            self.default_parameters are used. If no value are given the default parameter is used
+            instead.
         """
 
         # Default or parent's parameters import

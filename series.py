@@ -23,16 +23,33 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 class Series(list):
     """ Contains a series of Groups and their embedded Star objects and the methods required to
         initialize a series from a Config object. Values and data in the Config object are, copied,
-        checked and converted into Quantity objects and to default units. The number of groups
-        defines how many objects are in a series in which all groups have the same Config object
-        as their progenitor.
+        checked for errors and converted to usable types such as Quantity objects, and values are
+        converted to default units. The number of groups defines how many objects are in a series
+        in which all groups have the same Config object as their progenitor.
     """
 
-    def __init__(self, config=None):
-        """ Configures a Series from a configuration parameters in a Config object. """
+    def __init__(self, parent=None, path=None, args=False, **parameters):
+        """ Initializes a Series object by first configuring it with 'parent', 'path', 'args' and
+            '**parameter' and then adding it to the collection.
+        """
+
+        # Configuration
+        self.configure(parent, path, args, **parameters)
+
+        # Series addition to the collection
+        self.add()
+
+    def configure(self, parent=None, path=None, args=False, **parameters):
+        """ Configures a Series objects from 'parent', an existing Config object, 'path', a string
+            representing a path to a configuration file, 'args' a boolean value that sets whether
+            command line arguments are used, and '**parameters', a dictionary of dictionarie or
+            Config.Parameter objects, in that order. If no value are given the default parameter is
+            used instead. Only values that match a key in self.default_parameters are used. Then,
+            parameters are copied, checked for errors and converted, and the series is configured.
+        """
 
         # Inilialization
-        self.config = Config(parent=config)
+        self.config = Config(parent, path, args, **parameters)
         self.logs_dir = None
 
         # Parameters configuration
@@ -43,9 +60,6 @@ class Series(list):
 
         # Logs configuration
         self.configure_logs()
-
-        # Series addition to collection
-        collection.add(self)
 
     def configure_parameters(self):
         """ Checks if all parameters are present and are Config.Parameter objects with all their
@@ -79,7 +93,8 @@ class Series(list):
                 # Check whether all components, but parameter.values and parameter.units are
                 # strings or None
                 if component_label not in ('values', 'units'):
-                    self.stop(component is not None and type(component) != str, 'TypeError',
+                    self.stop(component is not None and type(component) not in (
+                            str, System, System.Axis, System.Origin), 'TypeError',
                         "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
                         component_label, parameter_label, type(component))
 
@@ -93,7 +108,9 @@ class Series(list):
                 parameter.name = default_parameter.name
 
             # Check if parameter.system is valid and converts it to a System object
-            if parameter.system is not None:
+            if type(parameter.system) == System:
+                pass
+            elif parameter.system is not None:
                 self.stop(parameter.system.lower() not in systems.keys(), 'ValueError',
                     "'system' component of '{}' is invalid ({} required, {} given).",
                     parameter.label, list(systems.keys()), parameter.system)
@@ -102,7 +119,9 @@ class Series(list):
                 parameter.system = systems[default_parameter.system]
 
             # Check if parameter.axis is valid and converts it to a System.Axis object
-            if parameter.axis is not None:
+            if type(parameter.axis) == System.Axis:
+                pass
+            elif parameter.axis is not None:
                 self.stop(parameter.axis.lower() not in parameter.system.axes.keys(), 'ValueError',
                     "'axis' component of '{}' is not a valid ({} required, {} given).",
                     parameter.label, list(parameter.system.axes.keys()), parameter.axis)
@@ -111,7 +130,9 @@ class Series(list):
                 parameter.axis = parameter.system.axes[default_parameter.axis]
 
             # Check if parameter.origin is valid and converts it to a System.Origin object
-            if parameter.origin is not None:
+            if type(parameter.origin) == System.Origin:
+                pass
+            elif parameter.origin is not None:
                 self.stop(parameter.origin.lower() not in parameter.system.origins.keys(), 'Value'
                     'Error', "'origin' component of '{}' is not a valid ({} required, {} given).",
                     parameter.label, list(parameter.system.origins.keys()), parameter.origin)
@@ -147,8 +168,8 @@ class Series(list):
 
         # Check if no more than one mode has been selected
         self.stop(self.from_data == True and self.from_model == True,
-            'ValueError', "No more than one mode ('from_data', 'from_model' or 'from_database') "
-            "can be selected for '{}'", self.name)
+            'ValueError', "No more than one traceback mode ('from_data' or 'from_model') can be "
+            "selected for '{}'", self.name)
 
         # self.to_database parameter set to False if self.from_database is True
         if self.from_database and self.to_database:
@@ -207,7 +228,7 @@ class Series(list):
         # self.db_path redefined as the absolute path
         self.db_path = path.join(self.db_dir, self.db_name)
 
-        # Check if the path links to a database file.
+        # Check if the path links to a database file
         self.stop(path.splitext(self.db_path)[1].lower() != '.db', 'TypeError',
             "'{}' is not a database file (with a .db extension).", self.db_path)
 
@@ -460,73 +481,123 @@ class Series(list):
         # Units conversion to default units
         return quantity.to()
 
-    def directory(self, base, directory, name, create=True):
-        """ Checks for type errors, checks if 'directory' already exists, creates it if
-            needed and returns the absolute directory path. The directory can either be
-            relative path to the 'base' or an absolute path.
+    def add(self, forced=False, default=False, cancel=False):
+        """ Adds the series to the collection. If forced is True, any existing series with the
+            same name is overwritten, otherwise user input is required to proceed (overwrite, do
+            nothing or default). If default is True, then instead of asking for a input, a default
+            name is used and the series added to the collection.
         """
 
-        # Check the type of directory
-        self.stop(type(directory) is not str, 'TypeError', "'{}' must be a string ({} given).",
-            name, type(directory))
+        # Series addition and replacement, if needed
+        if self.name in collection.series.keys():
+            choice = ''
+            if not forced:
+                if not default:
+                    if not cancel:
 
-        # Output directory formatting
-        working_dir = getcwd()
-        chdir(path.abspath(base))
-        abs_dir = path.abspath(directory)
-        chdir(working_dir)
+                        # User input
+                        while choice == '':
+                            choice = input(
+                                "The series '{}' already exists. Do you wish to overwrite"
+                                "(Y), keep both (K) or cancel (N)? ".format(self.name))
 
-        # Output directory creation
-        if create and not path.exists(abs_dir):
-            makedirs(abs_dir)
-        return abs_dir
+                            # Loop over question if input could not be interpreted
+                            if choice.lower() not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
+                                print("Could not understand '{}'.".format(choice))
+                                choice = ''
 
-    def stop(self, condition, error, message, *words, extra=1):
-        """ Raises an exception if 'condition' is True, logs it into the log file if logs have
-            been configured and stops the execution. 'error' is a string representing an exception
-            class, 'message' is the error message to be displayed, 'words' is a list of words to
-            be inserted into 'message' and 'extra' is the number of superfluous lines in the
-            traceback stack. If an exception isn't being handled, the function is recursively
-            called within an except statement.
-        """
+                # Default name and series addition to the collection
+                if default or choice.lower() in ('k', 'keep'):
+                    self.name = collection.default(self.name)
+                    self.config.name.values = self.name
+                    collection.append(self)
 
-        # Exception information extraction
-        from sys import exc_info, exit
-        exc_type, exc_value = exc_info()[:2]
+                    # Logging
+                    info("Series renamed '{}' and added to the collection.".format(self.name))
 
-        # If no exception is being handled, one is raised if 'conidition' is True
-        if exc_type is None and exc_value is None:
-            try:
-                if condition:
-                    exec("raise {}".format(error))
-            except:
-                self.stop(True, error, message, *words, extra=2)
+            # Existing series deletion and series addition to the collection
+            if forced or choice.lower() in ('y', 'yes'):
+                del collection[collection.series[self.name]]
+                collection.append(self)
 
-        # If an exception is being handled, its traceback is formatted and execution is terminated
+                # Logging
+                info("Series '{}' deleted and replaced in the collection.".format(self.name))
+
+        # Series addition to the collection
         else:
+            collection.append(self)
 
-            # Traceback message creation
-            tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
-                if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))
+            # Logging
+            info("Series '{}' added to the collection.".format(self.name))
 
-            # Traceback stack formatting
-            from traceback import format_stack
-            tb_stack = ''.join(
-                ['An exception has been raised: \n'] + format_stack()[:-extra] + [tb_message])
+        # Collection re-initialization
+        collection.__init__()
 
-            # Exception logging only if logs have been configured and code termination
-            if self.logs_dir is not None:
-                warning(tb_stack)
-            print(tb_stack)
-            exit()
+    def remove(self):
+        """ Removes the series from the collection. """
 
-    def update(self, **parameters):
+        # Series deletion from the collection
+        if self.name in collection.series.keys():
+            del collection[collection.series[self.name]]
+
+        # Collection re-initialization
+        collection.__init__()
+
+        # Logging
+        info("Series '{}' removed from the collection.".format(self.name))
+
+    def update(self, parent=None, path=None, args=False, **parameters):
         """ Updates the series by modifying its self.config configuration, re-initializing itself
             and deleting existing groups. The groups are also traced back again if they had been
             traced back before the update.
         """
 
-        pass
+        # Initialization
+        parent = self.config if parent is None else parent
+        traceback = True if len(self) > 0 else False
+
+        # Removal of self from the collection, if it exists
+        if self.name in collection.series:
+            self.remove()
+
+        # Deletion of all parameters and groups and of self from the collection
+        vars(self).clear()
+        self.clear()
+
+        # Series re-initialization and traceback, if needed
+        self.configure(parent=parent, path=path, args=args, **parameters)
+        if traceback:
+            self.traceback()
+
+        # Series re-addition to self
+        self.add()
+
+        # Logging
+        info("Series '{}' updated.".format(self.name))
+
+        return self
+
+    def copy(self, parent=None, path=None, args=False, **parameters):
+        """ Copies the series under a new name. If 'parent', 'path', 'args' or '**parameters' are
+            provided, this new Series object is updated as well. If no new 'name' is provided,
+            a default name is used instead.
+        """
+
+        # Self cloning
+        from copy import deepcopy
+        clone = deepcopy(self)
+
+        # Clone addition to the collection
+        clone.add(default=True)
+
+        # Clone update, if needed
+        if parent is not None or path is not None or args == True or len(parameters) > 0:
+            clone.update(parent=parent, path=path, args=args, **parameters)
+
+        # Logging
+        info("Series '{}' copied.".format(self.name))
+
+        return clone
 
     def load(self, db_path=None):
         """ Loads a series from the database binary file. self.db_path is defined as the actual
@@ -542,7 +613,7 @@ class Series(list):
 
         # Check if loading has already been done
         if len(self) > 0:
-            info("Series '{}' has already been loaded".format(self.name))
+            info("Series '{}' has already been loaded.".format(self.name))
 
         # Check if a database file exists
         else:
@@ -596,9 +667,10 @@ class Series(list):
             # Logging
             info("Series '{}' succesfully traced back.".format(self.name))
 
-    def save(self, db_path=None):
+    def save(self, db_path=None, forced=False):
         """ Saves a series to a database binary file. self.db_path is defined as the actual path
-            to the file. If needed, the existing file is overwritten.
+            to the file. If forced, the existing file is overwritten and otherwise user input is
+            required to proceed.
         """
 
         # Logging
@@ -610,27 +682,40 @@ class Series(list):
 
         # Existing database file deletion, if needed
         if path.exists(self.db_path):
-            remove(self.db_path)
-            info("Existing database file located at '{}' deleted.".format(self.db_path))
+            if not forced:
+                forced = None
+                while forced is None:
+                    choice = input("The file located at '{}' already exists. "
+                        "Do you wish to overwrite? (Y/N) ".format(self.db_path))
+                    forced = True if choice.lower() in ('y', 'yes') \
+                        else False if choice.lower() in ('n', 'no') else None
+                    if forced is None:
+                        print("Could not understand '{}'.".format(choice))
+            if forced:
+                remove(self.db_path)
+                info("Existing database file located at '{}' deleted.".format(self.db_path))
+        else:
+            forced = True
 
         # Parameters export
-        parameters = {parameter: vars(self)[parameter] for parameter in vars(self).keys() \
-            if parameter not in (
-                'output_dir', 'logs_dir', 'logs_configured',
-                'db_path', 'db_name', 'db_dir',
-                'to_database', 'from_database')}
+        if forced:
+            parameters = {parameter: vars(self)[parameter] for parameter in vars(self).keys() \
+                if parameter not in (
+                    'output_dir', 'logs_dir', 'logs_configured',
+                    'db_path', 'db_name', 'db_dir',
+                    'to_database', 'from_database')}
 
-        # Database file pickling
-        from pickle import dump
-        database = open(self.db_path, 'wb')
-        dump((parameters, tuple(group for group in self)), database)
-        database.close()
+            # Database file pickling
+            from pickle import dump
+            database = open(self.db_path, 'wb')
+            dump((parameters, tuple(group for group in self)), database)
+            database.close()
 
-        # Logging
-        info("Series '{}' saved at '{}'.".format(self.name, self.db_path))
+            # Logging
+            info("Series '{}' saved at '{}'.".format(self.name, self.db_path))
 
     def create(self):
-        """ Either load a series from a database file, or traces back a series from data or a
+        """ Either loads a series from a database file, or traces a series back from data or a
             model. If needed, the series is also saved.
         """
 
@@ -640,8 +725,74 @@ class Series(list):
 
         # Traceback from data or a model
         elif self.from_data or self.from_model:
-            self.traceback
+            self.traceback()
 
         # Save to database
         if self.to_database:
             self.save()
+
+    def directory(self, base, directory, name, create=True):
+        """ Checks for type errors, checks if 'directory' already exists, creates it if
+            needed and returns the absolute directory path. The directory can either be
+            relative path to the 'base' or an absolute path.
+        """
+
+        # Check the type of directory
+        self.stop(type(directory) is not str, 'TypeError', "'{}' must be a string ({} given).",
+            name, type(directory))
+
+        # Output directory formatting
+        working_dir = getcwd()
+        chdir(path.abspath(base))
+        abs_dir = path.abspath(directory)
+        chdir(working_dir)
+
+        # Output directory creation
+        if create and not path.exists(abs_dir):
+            makedirs(abs_dir)
+        return abs_dir
+
+    def stop(self, condition, error, message, *words, extra=1, name=None):
+        """ Raises an exception if 'condition' is True, logs it into the log file if logs have
+            been configured and stops the execution. 'error' is a string representing an exception
+            class, 'message' is the error message to be displayed, 'words' is a list of words to
+            be inserted into 'message' and 'extra' is the number of superfluous lines in the
+            traceback stack. If an exception isn't being handled, the function is recursively
+            called within an except statement.
+        """
+
+        # Exception information extraction
+        from sys import exc_info, exit
+        exc_type, exc_value = exc_info()[:2]
+
+        # If no exception is being handled, one is raised if 'conidition' is True
+        if exc_type is None and exc_value is None:
+            try:
+                if condition:
+                    exec("raise {}".format(error))
+            except:
+                self.stop(True, error, message, *words, extra=2)
+
+        # If an exception is being handled, its traceback is formatted and execution is terminated
+        else:
+
+            # Traceback message creation
+            tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
+                if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))
+
+            # Traceback stack formatting
+            from traceback import format_stack
+            tb_stack = ''.join(
+                ['An exception has been raised: \n'] + format_stack()[:-extra] + [tb_message])
+
+            # Exception logging only if logs have been configured and code termination
+            if self.logs_dir is not None:
+                warning(tb_stack)
+            print(tb_stack)
+            exit()
+
+    def new_stop(self, condition, error, message, *words, extra=1):
+        """ Calls the stop function from tools with self.name if it has been set. """
+
+        stop(condition, error, message, *words, extra,
+            name=self.name if 'name' in vars(self) else None)

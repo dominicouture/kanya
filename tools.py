@@ -34,6 +34,11 @@ def full(name, shape, array):
         error.args = ("{} ({}) cannot be broadcast to the shape {}.".format(name, array, shape),)
         raise
 
+def stop():
+    """ New general stop function. """
+
+    pass
+
 def montecarlo(function, values, errors, n=200):
     """ Wraps a function to output both its value and errors, calculated with Monte Carlo
         algorithm with n iterations. The inputs and outputs are Quantity objects with values,
