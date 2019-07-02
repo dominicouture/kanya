@@ -11,10 +11,9 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
-from os import path, getcwd, chdir, remove
+from os import path
 from csv import reader, writer, Sniffer
-from init import Config
-from series import info, Series
+from collection import *
 from coordinate import *
 from quantity import *
 
@@ -60,21 +59,20 @@ class Data(list):
             must have a '.csv' extension.
         """
 
+        # Initialization
         self.from_data = False
         self.from_CSV = True
 
         # CSV file absolute path
-        working_dir = getcwd()
-        chdir(path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')))
-        self.data_path = path.abspath(self.data.values)
-        chdir(working_dir)
+        self.data_path = directory(collection.base_dir, self.data.values, 'data_path')
 
-        # Check if the path exists
-        self.series.stop(not path.exists(self.data_path), 'NameError',
-            "'{}' does not exist.", self.data_path)
+        # Check if the data file exists
+        self.series.stop(not path.exists(self.data_path), 'FileNotFoundError',
+            "No data file located at '{}'.", self.data_path)
+
         # Check if the path links to a CSV file.
         self.series.stop(path.splitext(self.data_path)[1].lower() != '.csv', 'TypeError',
-            "'{}' is not a CSV data file (with a .csv extension).", self.data_path)
+            "'{}' is not a CSV data file (with a .csv extension).", path.basename(self.data_path))
 
         # Reading of CSV file
         data_csv = open(self.data_path, 'r', encoding='utf-8')
@@ -93,6 +91,7 @@ class Data(list):
             is used, all data is imported.
         """
 
+        # Initialization
         self.from_data = True
         self.from_CSV = False
         self.data_path = None

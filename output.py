@@ -1,14 +1,16 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" output.py: Provides the necesary functions to output data in table, plot or video. """
+""" output.py: Defines functions to create data output such as plots of size indicators over time,
+    2D and 3D scatters at a given time, histograms, color mesh, etc.
+"""
 
 import numpy as np
+from os import path
 from matplotlib import rcParams, pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
-from os import path
-from series import info
+from collection import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -86,7 +88,7 @@ def create_size_indicators_plot(series, secondary=False):
     # plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 
     # Save and show figure
-    # plt.savefig(path.join(series.output_dir, '{}.pdf'.format(series.name)))
+    # plt.savefig(path.join(output(), '{}.pdf'.format(series.name)))
     plt.show()
 
 def create_covariances_plot(series):
@@ -399,7 +401,7 @@ def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, a
     plt.ylabel('Number of groups')
 
     # Save figure
-    plt.savefig(path.join(series.output_dir, '{}.pdf'.format(
+    plt.savefig(path.join(output(), '{}.pdf'.format(
         'Distribution of ages ({} groups, {} Myr, {} stars, initial scatter = {} pc)'.format(
             number_of_groups, age, number_of_stars, initial_scatter))))
 
@@ -421,7 +423,7 @@ def create_single_scatter_plot(groups):
     plt.xlim(0, 30)
 
     # Save and show figure
-    plt.savefig(path.join(series.output_dir, 'Scatter of a moving group over time.pdf'))
+    plt.savefig(path.join(output(), 'Scatter of a moving group over time.pdf'))
     plt.show()
 
 def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_groups):

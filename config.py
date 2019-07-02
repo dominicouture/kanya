@@ -1,37 +1,32 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" config.py: Configuration of a traceback from a simulated sample of stars or data. A 'system'
-    refers to a coordinate system (e.g. 'observables', 'spherical' or 'cartesian') and an 'axis'
-    to the direction of a coordinate system axis (e.g. 'equatorial' or 'galactic'). 'units' must
-    be a string convertible to a Astropy.Unit object. The default units are:
+""" config.py: Configuration of a traceback from a simulated group of stars or data. A 'system'
+    refers to a coordinate system (e.g. 'observables', 'spherical' or 'cartesian'), an 'axis' to
+    the orientation of a coordinate system axes (e.g. 'equatorial' or 'galactic') and 'origin' to
+    the origin of a coordinate system axes (e.g. 'sun' or 'galaxy'). 'units' must be a string
+    convertible to a Astropy.Unit object. The default units are:
 
         -   Time: Myr
         -   Length: pc
         -   Speed: pc/Myr
         -   Angle: rad
         -   Angular speed: rad/Myr
+
+    'value' or 'values' can a string, integer, float or tuple, list or dictionary based on the
+    parameter.
 """
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Output directory relative to the directory where the Traceback package is located (str). If left
-# blank (i.e. '') or absent, output files will be created in the same directory as the package.
-output_dir.value = 'Output'
-
-# Logs directory relative to the output directory (str). If left blank (i.e. '') or absent, logs
-# files will be created in the output directory.
-logs_dir.value = 'Logs'
-
-# Path to the database file or directory used as input or output relative the output directory.
-# (str). If left blank (i.e. '') or absent, and data is loaded or dumped to a database, 'output_dir'
-# directory and 'name.db' will be used instead. The database created if needed and will override any
-# existing file.
-db_path.value = ''
-
 # Name of series of groups
 name.value = 'beta_pictoris'
+
+# Path to the file or directory used as input or output relative the base directory (str). If the
+# is None or absent, by default, the  data is loaded or saved to a file in the output directory
+# named 'name.values'.series.
+series_path.value = None
 
 # Number of groups to be simulated in the series (integer, > 0)
 number_of_groups.value = 1

@@ -8,7 +8,6 @@
 """
 
 import numpy as np
-from series import info
 from data import Data
 from coordinate import *
 
@@ -17,13 +16,13 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 class Group(list):
     """ Contains the values and related methods of a moving group and a list of Star objets that
-        are part of it. Data can be obtained from the database or calculated from a raw data file.
+        are part of it. Stars are imported from the series file or calculated from a raw data file.
     """
 
     def __init__(self, series, **values):
         """ Initializes a Group object and embedded Star objects from a simulated sample of stars
-            in a moving group, raw data in the form a Data object or from a database. This dataset
-            is then moved backward in time from the initial to the final time, and its age is
+            in a moving group, raw data in the form a Data object or from a file. This dataset is
+            then moved backward in time from the initial time to the final time, and its age is
             estimated by minimizing: the 3D scatter, median absolute deviation, covariances, and
             the minimum spanning tree branch length mean and median absolute deviation.
         """
@@ -371,7 +370,7 @@ class Group(list):
         def __init__(self, group, **values):
             """ Initializes a Star object with at least a name, velocity, velocity error, initial
                 position and position error. More values can be added (when initializing from a
-                database for instance). If a traceback is needed, the star's position and velocity
+                file for instance). If a traceback is needed, the star's position and velocity
                 overtime is computed with galpy. !!! Add galactic orbits computation here !!!
             """
 

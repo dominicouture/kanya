@@ -3,25 +3,22 @@
 
 """ __main__.py: Main pipeline of the Traceback package. It executes the following steps:
 
-        Series configuration:  arguments, parameters, data and database import, format and check,
-        and unit conversions.
-        Group creation: tracebacks from data or simulation, and age computation
-        Output creation: figures creation.
+        Series: arguments, parameters, data and file import, format and check, and conversions
+        Groups: star traceback from data or a model, and age computation
+        Output: figures creation
 """
 
-from init import *
 from series import *
 from output import *
-from quantity import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Series
-Series(path='config.py', args=True)
+Series(path='Traceback/config.py', args=True)
 
 # Groups
-collection.traceback()
+collection.create()
 
 # Output
 for series in collection:

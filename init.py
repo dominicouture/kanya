@@ -5,11 +5,8 @@
     Config object. This script must be run first to create a Series object.
 """
 
-from astropy import units as un
-from os import path
-from importlib.util import spec_from_file_location, module_from_spec
-from argparse import ArgumentParser
 from copy import deepcopy
+from collection import *
 from coordinate import *
 
 __author__ = 'Dominic Couture'
@@ -49,9 +46,8 @@ class Config():
                 parameter = vars(parameter)
 
             # Check if the parameter is a dictionary here
-            if type(parameter) != dict:
-                raise TypeError("A parameter must be a Config.Parameter object or a dictionary. "
-                    "('{}' given).".format(type(parameter)))
+            stop(type(parameter) != dict, 'TypeError', "A parameter must be a Config.Parameter "
+                "object or a dictionary. ('{}' given).", type(parameter))
 
             # Component conversion from singular to plural form
             for component in ('value', 'unit'):
@@ -89,13 +85,11 @@ class Config():
     # Default parameters
     default_parameters = {parameter.label: parameter for parameter in (
         Parameter(label='name', name='Name'),
+        Parameter(label='series_path', name='Series path'),
         Parameter(label='from_data', name='From data', values=False),
         Parameter(label='from_model', name='From model', values=False),
-        Parameter(label='from_database', name='From database', values=False),
-        Parameter(label='to_database', name='To database', values=False),
-        Parameter(label='output_dir', name='Output directory', values=''),
-        Parameter(label='logs_dir', name='Logs directory', values='Logs'),
-        Parameter(label='db_path', name='Database path'),
+        Parameter(label='from_file', name='From file', values=False),
+        Parameter(label='to_file', name='To file', values=False),
         Parameter(label='number_of_groups', name='Number of groups', values=1),
         Parameter(label='number_of_steps', name='Number of steps', values=1),
         Parameter(label='number_of_stars', name='Number of star'),
@@ -119,10 +113,10 @@ class Config():
     def __init__(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Config objects from, in order, 'parent', an existing Config object,
             'path', a string representing a path to a configuration file, 'args' a boolean value
-            that sets whether command line arguments are used, and **parameters, a dictionary of
-            dictionaries or Config.Parameter objects. Only values that match a key in
-            self.default_parameters are used. If no value are given the default parameter is used
-            instead.
+            that sets whether command line arguments are used, and '**parameters', a dictionary
+            of dictionaries, where keys must match values in Parameter.default_components, or
+            Config.Parameter objects. Only values that match a key in self.default_parameters are
+            used. If no value are given the default parameter is used instead.
         """
 
         # Default or parent's parameters import
@@ -145,33 +139,33 @@ class Config():
             absolute path or relative to the current working directory.
         """
 
-        # Check the type of config_path
-        if type(config_path) != str:
-            raise TypeError("The path to the configuration file must be a string "
-                "('{}' given).".format(type(config_path)))
+        # Check if config_path is a string
+        stop(type(config_path) != str, 'TypeError',
+            "The path to the configuration file must be a string ('{}' given).", type(config_path))
 
-        # Check if the configuration file is present
-        abs_config_path = path.abspath(config_path)
-        config_name = path.basename(config_path)
-        if not path.exists(abs_config_path):
-            raise FileNotFoundError(
-                "No configuration file found at location '{}'.".format(abs_config_path))
+        # Absolute path
+        config_path = directory(collection.base_dir, config_path, 'config_path')
+
+        # Check if the configuration file exists
+        stop(not path.exists(config_path), 'FileNotFoundError',
+            "No configuration file located at '{}'.", config_path)
 
         # Check if the configuration is a Python file
-        elif path.splitext(config_name)[1] != '.py':
-            raise TypeError("'{}' is not a Python file.".format(config_name))
+        stop(path.splitext(config_path)[1] != '.py', 'TypeError', "'{}' is not a Python file. "
+            "(with a .py extension)", path.basename(config_path))
 
         # Configuration file import
-        else:
-            try:
-                spec = spec_from_file_location(path.splitext(config_name)[0], config_path)
-                parameters = module_from_spec(spec)
-                vars(parameters).update(vars(self))
-                spec.loader.exec_module(parameters)
-            except NameError as error:
-                error.args = ( "{}, only values in 'default_parameters' are configurable".format(
-                    error.args[0]),)
-                raise
+        from importlib.util import spec_from_file_location, module_from_spec
+        try:
+            spec = spec_from_file_location(path.splitext(path.basename(config_path))[0], config_path)
+            parameters = module_from_spec(spec)
+            vars(parameters).update(vars(self))
+            spec.loader.exec_module(parameters)
+
+        # Check if all names are valid
+        except NameError as error:
+            stop(True, 'NameError', "{}, only values in 'default_parameters' are configurable.",
+                error.args[0])
 
         # Parameters import
         self.initialize_from_parameters(vars(parameters))
@@ -183,16 +177,17 @@ class Config():
         """
 
         # Check if 'args' is a boolean value
-        if type(args) != bool:
-            raise TypeError("'args' must be a boolean value ('{}' given).".format(type(args)))
+        stop(type(args) != bool, 'TypeError', "'args' must be a boolean value ('{}' given).",
+            type(args))
 
         # Arguments parsing
+        from argparse import ArgumentParser
         parser = ArgumentParser(
             prog='Traceback',
             description='traces given or simulated moving groups of stars back to their origin.')
         parser.add_argument(
             '-n', '--name', action='store', type=str,
-            help='name of the series of tracebacks, used in the database and output.')
+            help='name of the series of tracebacks.')
         parser.add_argument(
             '-d', '--data', action='store_true',
             help='use the data parameter in the configuration file as input.')
@@ -200,11 +195,11 @@ class Config():
             '-m', '--model', action='store_true',
             help='model an input based on simulation parameters in the configuration file.')
         parser.add_argument(
-            '-l', '--from_database', action='store_true',
-            help='load the input data from a database file.')
+            '-l', '--from_file', action='store_true',
+            help='load the input data from a file.')
         parser.add_argument(
-            '-s', '--to_database', action='store_true',
-            help='save the output data to a database file.')
+            '-s', '--to_file', action='store_true',
+            help='save the output data to a file.')
         args = parser.parse_args()
 
         # Series name import if not None
@@ -214,8 +209,8 @@ class Config():
         # Mode import, overwrites any value imported from a path
         self.from_data.values = args.data
         self.from_model.values = args.model
-        self.from_database.values = args.from_database
-        self.to_database.values = args.to_database
+        self.from_file.values = args.from_file
+        self.to_file.values = args.to_file
 
     def initialize_from_parameters(self, parameters):
         """ Initializes a Config object from a parameters dictionary. Overwrites values given in

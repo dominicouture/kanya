@@ -1,7 +1,9 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" tools.py: Defines various useful functions. """
+""" tools.py: Defines various useful functions to handle array manipulation and to wrap functions
+    around a Monte Carlo algorithm.
+"""
 
 import numpy as np
 
@@ -34,34 +36,16 @@ def full(name, shape, array):
         error.args = ("{} ({}) cannot be broadcast to the shape {}.".format(name, array, shape),)
         raise
 
-def stop():
-    """ New general stop function. """
-
-    pass
-
-def montecarlo(function, values, errors, n=200):
-    """ Wraps a function to output both its value and errors, calculated with Monte Carlo
-        algorithm with n iterations. The inputs and outputs are Quantity objects with values,
-        units and errors.
+def montecarlo(function, values, errors, n=10000):
+    """ Wraps a 'function' to output both its value and error, calculated with Monte Carlo
+        algorithm with 'n' iterations. 'values' and 'errors' are a list or tuple or values to be
+        used as arguments in 'function' and errors representating the standard deviation of those
+        values.
     """
 
-    values, errors = [i if type(i) in (tuple, list, np.ndarray) else [i] for i in (values, errors)]
     outputs = function(*values)
-    output_errors = np.std(
-        np.array([function(*arguments) for arguments in np.random.normal(
-            values, errors, (n, len(values)))]), axis=0)
-
-    return (outputs, output_errors)
-
-def montecarlo2(function, values, errors, n=10000):
-    """ Wraps a function to output both its value and errors, calculated with Monte Carlo
-        algorithm with n iterations. The inputs and outputs are Quantity objects with values,
-        units and errors.
-    """
-
-    outputs = function(values)
-    output_errors = np.std(
-        np.array([function(arguments) for arguments in np.random.normal(
-            values, errors, (n, len(values)))]), axis=0)
+    output_errors = np.std(np.array(
+        [function(*arguments) for arguments in np.random.normal(values, errors, (n, len(values)))]
+    ), axis=0)
 
     return (outputs, output_errors)

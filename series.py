@@ -2,20 +2,16 @@
 # -*- coding: utf-8 -*-
 
 """ series.py: Defines the class Series which uses a Config object to create a series of tracebacks
-    either from a database, data or a model. First, it handles exceptions (name, type, value,
-    shape) of all parameters, then creates or imports the database, if needed, handles unit,
+    either from a file, data or a model. First, it handles exceptions (name, type, value,
+    shape) of all parameters, then creates or imports the file, if needed, handles unit,
     conversions, and checks for the presence of output and logs directories and creates them, if
     needed.
 """
 
 import numpy as np
-from time import strftime
-from os import path, makedirs, remove, getcwd, chdir
-from logging import basicConfig, info, warning, INFO
+from init import *
 from coordinate import *
 from quantity import *
-from collection import *
-from init import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -42,24 +38,20 @@ class Series(list):
     def configure(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Series objects from 'parent', an existing Config object, 'path', a string
             representing a path to a configuration file, 'args' a boolean value that sets whether
-            command line arguments are used, and '**parameters', a dictionary of dictionarie or
+            command line arguments are used, and '**parameters', a dictionary of dictionaries or
             Config.Parameter objects, in that order. If no value are given the default parameter is
             used instead. Only values that match a key in self.default_parameters are used. Then,
             parameters are copied, checked for errors and converted, and the series is configured.
         """
 
-        # Inilialization
+        # Configuration inilialization
         self.config = Config(parent, path, args, **parameters)
-        self.logs_dir = None
 
         # Parameters configuration
         self.configure_parameters()
 
-        # Series basic configuration
+        # Series configuration
         self.configure_series()
-
-        # Logs configuration
-        self.configure_logs()
 
     def configure_parameters(self):
         """ Checks if all parameters are present and are Config.Parameter objects with all their
@@ -143,8 +135,8 @@ class Series(list):
     def configure_series(self):
         """ Checks basic series parameters. Checks if self.name is a string and creates a default
             value if needed. Checks the type of the modes provided in the configuration and checks
-            if their values are valid. self.to_database is set to False if self.from_database
-            is True. Moreover, self.date and self.output_dir are defined.
+            if their values are valid. self.to_file is set to False if self.from_file is True.
+            Moreover, self.date is defined.
         """
 
         # Series name
@@ -152,14 +144,15 @@ class Series(list):
             else self.config.name.values
 
         # Current date and time
+        from time import strftime
         self.date = strftime('%Y-%m-%d %H:%M:%S')
 
         # Check if series.name is a string
         self.stop(type(self.name) != str, 'TypeError', "'name' must be a string ('{}' given).",
             type(self.name))
 
-        # from_data, from_model, from_database and to_database parameters
-        for argument in ('from_data', 'from_model', 'from_database', 'to_database'):
+        # from_data, from_model, from_file and to_file parameters
+        for argument in ('from_data', 'from_model', 'from_file', 'to_file'):
             vars(self)[argument] = vars(self.config)[argument].values
             self.stop(vars(self)[argument] is None, 'NameError'
                 "Required parameter '{}' is missing in the configuration.", argument)
@@ -171,107 +164,81 @@ class Series(list):
             'ValueError', "No more than one traceback mode ('from_data' or 'from_model') can be "
             "selected for '{}'", self.name)
 
-        # self.to_database parameter set to False if self.from_database is True
-        if self.from_database and self.to_database:
-            info("Output of '{}' from and to database. "
-                "The database will not be updated with its own data.".format(self.name))
-            self.to_database = False
+        # self.to_file parameter set to False if self.from_file is True
+        if self.from_file and self.to_file:
+            log("Output of '{}' from and to file. "
+                "The file will not be updated with its own data.", self.name)
+            self.to_file = False
 
-        # Output directory creation
-        self.output_dir = self.directory(
-            path.abspath(path.join(path.dirname(path.realpath(__file__)), '..')),
-            self.config.output_dir.values, 'output_dir', create=True)
-
-    def configure_logs(self):
-        """ Checks if the logs directory already exists, creates it if needed and configures
-            the Logs file. 'logs_dir' is redefined as the absolute path to the logs directory.
+    def configure_file(self, series_path=None):
+        """ Checks if the file directory and the file itself exist and creates them if needed.
+            self.series_path is redefined as the absolute path to the file. Errors are handed
+            based on whether the input or output from and to the file is required.
         """
 
-        # Logs directory parameter
-        self.logs_dir = 'Logs' if self.config.logs_dir.values is None \
-            else self.config.logs_dir.values
+        # series_path parameter
+        self.series_path = series_path if series_path is not None \
+            else self.config.series_path.values if self.config.series_path.values is not None \
+            else path.join(output(check=self.from_file, create=self.to_file),
+                '{}.series'.format(self.name))
 
-        # Logs direction creation self.logs_dir redefinied as the absolute path
-        self.logs_dir = self.directory(
-            self.output_dir, self.config.logs_dir.values, 'logs_dir', create=True)
+        # Check if series_path parameter is a string, which must be done before the directory call
+        self.stop(type(self.series_path) != str, 'TypeError', "'series_path' must be a string "
+            "({} given).", type(self.series_path))
 
-        # Logs configuration
-        basicConfig(
-            filename=path.join(
-                self.logs_dir, '{}_{}.log'.format(self.name, strftime('%Y-%m-%d_%H-%M-%S'))),
-            format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
+        # self.series_path redefined as the absolute path, default name and directory creation
+        self.series_path = path.join(
+            directory(collection.base_dir, path.dirname(self.series_path),
+                'series_path', check=self.from_file, create=self.to_file),
+            '{}.series'.format(self.name) if path.basename(self.series_path) == '' \
+                else path.basename(self.series_path))
 
-        # Set logs_configured as True
-        self.logs_configured = True
+        # Check if the series file exists, if loading from a file
+        self.stop(self.from_file and not path.exists(self.series_path), 'FileNotFoundError',
+            "No series file located at '{}'.", self.series_path)
 
-    def configure_database(self, db_path=None):
-        """ Checks if the database directory and the database file itself exist and creates them
-            if needed. self.db_path is redefined as the absolute path to the database. Errors are
-            handled based on whether the input or output from and to the database is required.
-        """
-
-        # db_path parameter
-        self.db_path = db_path if db_path is not None \
-            else self.config.db_path.values if self.config.db_path.values is not None \
-            else '{}.db'.format(self.name)
-
-        # Check if db_path parameter is a string, which must be done before the self.directory call
-        self.stop(type(self.db_path) != str, 'TypeError', "'db_path' must be a string ({} given).",
-            type(self.db_path))
-
-        # Database absolute name and directory
-        self.db_name = '{}.db'.format(self.name) if path.basename(self.db_path) == '' \
-            else path.basename(self.db_path)
-        self.db_dir = self.directory(self.output_dir, path.dirname(self.db_path), 'db_path',
-            create=self.to_database)
-
-        # self.db_path redefined as the absolute path
-        self.db_path = path.join(self.db_dir, self.db_name)
-
-        # Check if the path links to a database file
-        self.stop(path.splitext(self.db_path)[1].lower() != '.db', 'TypeError',
-            "'{}' is not a database file (with a .db extension).", self.db_path)
+        # Check if the file is a series file
+        self.stop(path.splitext(self.series_path)[1].lower() != '.series',
+            'TypeError', "'{}' is not a series file (with a .series extension).",
+            path.basename(self.series_path))
 
     def configure_traceback(self):
         """ Checks traceback configuration parameters from data or a model. """
 
-        # Check whether a traceback is needed
-        if self.from_data or self.from_model:
+        # number_of_groups parameter
+        self.number_of_groups = self.configure_integer(self.config.number_of_groups)
 
-            # number_of_groups parameter
-            self.number_of_groups = self.configure_integer(self.config.number_of_groups)
+        # number_of_steps parameter: one more step to account for t = 0
+        self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
 
-            # number_of_steps parameter: one more step to account for t = 0
-            self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
+        # initial_time parameter
+        self.initial_time = self.configure_quantity(self.config.initial_time)
 
-            # initial_time parameter
-            self.initial_time = self.configure_quantity(self.config.initial_time)
+        # final_time parameter
+        self.final_time = self.configure_quantity(self.config.final_time)
+        self.stop(not self.final_time > self.initial_time, 'ValueError',
+            "'final_time' must be greater than initial_time ({} and {} given).",
+            self.final_time, self.initial_time)
 
-            # final_time parameter
-            self.final_time = self.configure_quantity(self.config.final_time)
-            self.stop(not self.final_time > self.initial_time, 'ValueError',
-                "'final_time' must be greater than initial_time ({} and {} given).",
-                self.final_time, self.initial_time)
+        # duration, timesteps and time parameters
+        self.duration = self.final_time - self.initial_time
+        self.timestep = self.duration / (self.number_of_steps - 1)
+        self.time = np.linspace(
+            self.initial_time.values, self.final_time.values, self.number_of_steps)
 
-            # duration, timesteps and time parameters
-            self.duration = self.final_time - self.initial_time
-            self.timestep = self.duration / (self.number_of_steps - 1)
-            self.time = np.linspace(
-                self.initial_time.values, self.final_time.values, self.number_of_steps)
+        # Radial velocity offset paramaters
+        self.rv_offset = self.configure_quantity(self.config.rv_offset)
 
-            # Radial velocity offset paramaters
-            self.rv_offset = self.configure_quantity(self.config.rv_offset)
+        # Data configuration for inclusion in a model
+        if self.from_data or True:
+            self.configure_data()
 
-            # Data configuration for inclusion in a model
-            if self.from_data or True:
-                self.configure_data()
+        # Simulation configuration
+        if self.from_model:
+            self.configure_model()
 
-            # Simulation configuration
-            if self.from_model:
-                self.configure_model()
-
-            # Logging
-            info("Series '{}' ready for traceback.".format(self.name))
+        # Logging
+        log("Series '{}' ready for traceback.", self.name)
 
     def configure_data(self):
         """ Checks if traceback and output from data is possible and creates a Data object from a
@@ -279,7 +246,7 @@ class Series(list):
         """
 
         # Logging
-        info("Initializing '{}' from data.".format(self.name))
+        log("Initializing '{}' from data.", self.name)
 
         # Check if data is present
         self.stop(self.config.data is None, 'NameError',
@@ -301,7 +268,7 @@ class Series(list):
         """ Checks if traceback and output from a model is possible. """
 
         # Logging
-        info("Initializing '{}' from a model.".format(self.name))
+        log("Initializing '{}' from a model.", self.name)
 
         # Check if all the necessary parameters are present
         for parameter in ('number_of_stars', 'age', *self.config.position_parameters,
@@ -513,7 +480,7 @@ class Series(list):
                     collection.append(self)
 
                     # Logging
-                    info("Series renamed '{}' and added to the collection.".format(self.name))
+                    log("Series renamed '{}' and added to the collection.", self.name)
 
             # Existing series deletion and series addition to the collection
             if forced or choice.lower() in ('y', 'yes'):
@@ -521,17 +488,17 @@ class Series(list):
                 collection.append(self)
 
                 # Logging
-                info("Series '{}' deleted and replaced in the collection.".format(self.name))
+                log("Series '{}' deleted and replaced in the collection.", self.name)
 
         # Series addition to the collection
         else:
             collection.append(self)
 
             # Logging
-            info("Series '{}' added to the collection.".format(self.name))
+            log("Series '{}' added to the collection.", self.name)
 
-        # Collection re-initialization
-        collection.__init__()
+        # Collection series re-initialization
+        collection.initialize_series()
 
     def remove(self):
         """ Removes the series from the collection. """
@@ -540,16 +507,17 @@ class Series(list):
         if self.name in collection.series.keys():
             del collection[collection.series[self.name]]
 
-        # Collection re-initialization
-        collection.__init__()
+        # Collection series re-initialization
+        collection.initialize_series()
 
         # Logging
-        info("Series '{}' removed from the collection.".format(self.name))
+        log("Series '{}' removed from the collection.", self.name)
 
     def update(self, parent=None, path=None, args=False, **parameters):
         """ Updates the series by modifying its self.config configuration, re-initializing itself
             and deleting existing groups. The groups are also traced back again if they had been
-            traced back before the update.
+            traced back before the update. 'parent', 'path', 'args' and '**parameters' are the
+            same as in Series._init__.
         """
 
         # Initialization
@@ -557,10 +525,10 @@ class Series(list):
         traceback = True if len(self) > 0 else False
 
         # Removal of self from the collection, if it exists
-        if self.name in collection.series:
+        if self.name in collection.series.keys():
             self.remove()
 
-        # Deletion of all parameters and groups and of self from the collection
+        # Deletion of all parameters and groups
         vars(self).clear()
         self.clear()
 
@@ -569,18 +537,18 @@ class Series(list):
         if traceback:
             self.traceback()
 
-        # Series re-addition to self
+        # Self re-addition to the collection
         self.add()
 
         # Logging
-        info("Series '{}' updated.".format(self.name))
+        log("Series '{}' updated.", self.name)
 
         return self
 
     def copy(self, parent=None, path=None, args=False, **parameters):
         """ Copies the series under a new name. If 'parent', 'path', 'args' or '**parameters' are
-            provided, this new Series object is updated as well. If no new 'name' is provided,
-            a default name is used instead.
+            provided, the same as in Series.__init__, this new Series object is updated as well.
+            If no new 'name' is provided,  a default name is used instead.
         """
 
         # Self cloning
@@ -595,36 +563,33 @@ class Series(list):
             clone.update(parent=parent, path=path, args=args, **parameters)
 
         # Logging
-        info("Series '{}' copied.".format(self.name))
+        log("Series '{}' copied.", self.name)
 
         return clone
 
-    def load(self, db_path=None):
-        """ Loads a series from the database binary file. self.db_path is defined as the actual
-            path to the file.
+    def load(self, series_path=None):
+        """ Loads a series from a binary file. self.series_path is defined as the absolute path to
+            the file.
         """
 
         # Logging
-        info("Loading '{}' from a database file.".format(self.name))
+        log("Loading '{}' from a file.", self.name)
 
-        # Database configuration
-        self.from_database = True
-        self.configure_database(db_path=db_path)
+        # File configuration
+        self.from_file = True
+        self.to_file = False
+        self.configure_file(series_path=series_path)
 
         # Check if loading has already been done
         if len(self) > 0:
-            info("Series '{}' has already been loaded.".format(self.name))
+            log("Series '{}' has already been loaded.", self.name)
 
-        # Check if a database file exists
+        # File unpickling
         else:
-            self.stop(not path.exists(self.db_path), 'NameError',
-                "No existing database located at '{}'.", self.db_path)
-
-            # Database file unpickling
             from pickle import load
-            database = open(self.db_path, 'rb')
-            parameters, groups = load(database)
-            database.close()
+            series_file = open(self.series_path, 'rb')
+            parameters, groups = load(series_file)
+            series_file.close()
 
             # Parameters and groups import
             vars(self).update(parameters)
@@ -632,7 +597,7 @@ class Series(list):
                 self.append(group)
 
             # Logging
-            info("Series '{}' loaded from '{}'.".format(self.name, self.db_path))
+            log("Series '{}' loaded from '{}'.", self.name, self.series_path)
 
     def traceback(self):
         """ Traces back Group and embeded Star objects using either imported data or by
@@ -640,159 +605,98 @@ class Series(list):
         """
 
         # Check if at least one mode has been selected
-        self.stop(self.from_data == False and self.from_model == False,
-            'ValueError', "Either traceback '{}' from data or a model (none selected).", self.name)
+        self.stop(self.from_data == False and self.from_model == False, 'ValueError',
+            "Either traceback '{}' from data or a model (none selected).", self.name)
 
-        # Traceback configuration
+        # Traceback configuration, if traceback is needed
         self.configure_traceback()
 
         # Check if traceback has already been done
         if len(self) == self.number_of_groups:
-            info("Series '{}' has already been traced back.".format(self.name))
+            log("Series '{}' has already been traced back.", self.name)
 
-        # Group name creation
+        # Group creation
         else:
             from group import Group
             for name in ['{}-{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]:
 
                 # Logging
-                message = "Tracing back '{}' from {}.".format(
-                    name, 'data' if self.from_data else 'a model')
-                info(message)
-                print(message)
+                log("Tracing back '{}' from {}.", name, 'data' if self.from_data else 'a model')
 
                 # Group traceback
                 self.append(Group(self, name=name))
 
             # Logging
-            info("Series '{}' succesfully traced back.".format(self.name))
+            log("Series '{}' succesfully traced back.", self.name)
 
-    def save(self, db_path=None, forced=False):
-        """ Saves a series to a database binary file. self.db_path is defined as the actual path
-            to the file. If forced, the existing file is overwritten and otherwise user input is
-            required to proceed.
+    def save(self, series_path=None, forced=False):
+        """ Saves a series to a binary file. self.series_path is defined as the actual path to the
+            file. If forced, the existing file is overwritten and otherwise user input is required
+            to proceed.
         """
 
         # Logging
-        info("Saving '{}' to a database file.".format(self.name))
+        log("Saving '{}' to a file.", self.name)
 
-        # Database configuration
-        self.to_database = True
-        self.configure_database(db_path=db_path)
+        # File configuration
+        self.from_file = False
+        self.to_file = True
+        self.configure_file(series_path=series_path)
 
-        # Existing database file deletion, if needed
-        if path.exists(self.db_path):
+        # Existing file deletion, if needed
+        if path.exists(self.series_path):
             if not forced:
                 forced = None
                 while forced is None:
                     choice = input("The file located at '{}' already exists. "
-                        "Do you wish to overwrite? (Y/N) ".format(self.db_path))
+                        "Do you wish to overwrite? (Y/N) ".format(self.series_path))
                     forced = True if choice.lower() in ('y', 'yes') \
                         else False if choice.lower() in ('n', 'no') else None
                     if forced is None:
                         print("Could not understand '{}'.".format(choice))
             if forced:
-                remove(self.db_path)
-                info("Existing database file located at '{}' deleted.".format(self.db_path))
+                from os import remove
+                remove(self.series_path)
+                log("Existing file located at '{}' deleted.", self.series_path)
         else:
             forced = True
 
         # Parameters export
         if forced:
             parameters = {parameter: vars(self)[parameter] for parameter in vars(self).keys() \
-                if parameter not in (
-                    'output_dir', 'logs_dir', 'logs_configured',
-                    'db_path', 'db_name', 'db_dir',
-                    'to_database', 'from_database')}
+                if parameter not in ('series_path', 'to_file', 'from_file')}
 
-            # Database file pickling
+            # File pickling
             from pickle import dump
-            database = open(self.db_path, 'wb')
-            dump((parameters, tuple(group for group in self)), database)
-            database.close()
+            series_file = open(self.series_path, 'wb')
+            dump((parameters, tuple(group for group in self)), series_file)
+            series_file.close()
 
             # Logging
-            info("Series '{}' saved at '{}'.".format(self.name, self.db_path))
+            log("Series '{}' saved at '{}'.", self.name, self.series_path)
 
     def create(self):
-        """ Either loads a series from a database file, or traces a series back from data or a
-            model. If needed, the series is also saved.
+        """ Either loads a series from a file, or traces a series back from data or a model. If
+            needed, the series is also saved. If both self.from_file, and self.from_data or
+            self.from_model are True, loading operation supercedes the traceback mode, which is
+            ignored and replaced by the value loaded from the file.
         """
 
-        # Load from database
-        if self.from_database:
+        # Load from a file
+        if self.from_file:
             self.load()
 
         # Traceback from data or a model
         elif self.from_data or self.from_model:
             self.traceback()
 
-        # Save to database
-        if self.to_database:
+        # Save to a file
+        if self.to_file:
             self.save()
 
-    def directory(self, base, directory, name, create=True):
-        """ Checks for type errors, checks if 'directory' already exists, creates it if
-            needed and returns the absolute directory path. The directory can either be
-            relative path to the 'base' or an absolute path.
-        """
+    def stop(self, condition, error, message, *words):
+        """ Calls the stop function from tools with self.name, if it has been set. """
 
-        # Check the type of directory
-        self.stop(type(directory) is not str, 'TypeError', "'{}' must be a string ({} given).",
-            name, type(directory))
-
-        # Output directory formatting
-        working_dir = getcwd()
-        chdir(path.abspath(base))
-        abs_dir = path.abspath(directory)
-        chdir(working_dir)
-
-        # Output directory creation
-        if create and not path.exists(abs_dir):
-            makedirs(abs_dir)
-        return abs_dir
-
-    def stop(self, condition, error, message, *words, extra=1, name=None):
-        """ Raises an exception if 'condition' is True, logs it into the log file if logs have
-            been configured and stops the execution. 'error' is a string representing an exception
-            class, 'message' is the error message to be displayed, 'words' is a list of words to
-            be inserted into 'message' and 'extra' is the number of superfluous lines in the
-            traceback stack. If an exception isn't being handled, the function is recursively
-            called within an except statement.
-        """
-
-        # Exception information extraction
-        from sys import exc_info, exit
-        exc_type, exc_value = exc_info()[:2]
-
-        # If no exception is being handled, one is raised if 'conidition' is True
-        if exc_type is None and exc_value is None:
-            try:
-                if condition:
-                    exec("raise {}".format(error))
-            except:
-                self.stop(True, error, message, *words, extra=2)
-
-        # If an exception is being handled, its traceback is formatted and execution is terminated
-        else:
-
-            # Traceback message creation
-            tb_message = "{} in '{}': {}".format(error, self.name, message.format(*words)) \
-                if 'name' in vars(self) else "{}: {}".format(error, message.format(*words))
-
-            # Traceback stack formatting
-            from traceback import format_stack
-            tb_stack = ''.join(
-                ['An exception has been raised: \n'] + format_stack()[:-extra] + [tb_message])
-
-            # Exception logging only if logs have been configured and code termination
-            if self.logs_dir is not None:
-                warning(tb_stack)
-            print(tb_stack)
-            exit()
-
-    def new_stop(self, condition, error, message, *words, extra=1):
-        """ Calls the stop function from tools with self.name if it has been set. """
-
-        stop(condition, error, message, *words, extra,
-            name=self.name if 'name' in vars(self) else None)
+        # Addition of series name to stop function call
+        stop(condition, error, message, *words,
+            name=self.name if 'name' in vars(self) else None, extra=2)
