@@ -9,12 +9,13 @@
 
 import numpy as np
 from data import Data
+from output import Output_Group
 from coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-class Group(list):
+class Group(list, Output_Group):
     """ Contains the values and related methods of a moving group and a list of Star objets that
         are part of it. Stars are imported from the series file or calculated from a raw data file.
     """

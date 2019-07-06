@@ -85,7 +85,7 @@ class Config():
     # Default parameters
     default_parameters = {parameter.label: parameter for parameter in (
         Parameter(label='name', name='Name'),
-        Parameter(label='series_path', name='Series path'),
+        Parameter(label='file_path', name='Series path'),
         Parameter(label='from_data', name='From data', values=False),
         Parameter(label='from_model', name='From model', values=False),
         Parameter(label='from_file', name='From file', values=False),
@@ -124,6 +124,9 @@ class Config():
             self.initialize_from_parameters(deepcopy(self.default_parameters))
         elif type(parent) == Config:
             self.initialize_from_parameters(deepcopy(vars(parent)))
+        else:
+            stop(True, 'TypeError', "'parent' can either be a Config object or None ({} given).",
+                type(parent))
 
         # Parameters import
         if path is not None:

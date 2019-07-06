@@ -15,7 +15,6 @@ from os import path
 from csv import reader, writer, Sniffer
 from collection import *
 from coordinate import *
-from quantity import *
 
 class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.

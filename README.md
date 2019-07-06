@@ -9,10 +9,9 @@ This software allows one to perform three-dimensional (3D) tracebacks of stars i
 - Mininum spanning tree median absolute deviation branch length
 - X-U, Y-V and Z-W covariances
 
-The algorithm uses current day positions (distance, declination and right ascension) and velocities (radial velocity, declination proper motion and right ascension proper motion) observables in an equatorial plane as its inputs and performs the conversion into XYZ positions and UVW velocities in a galactic plane. The shift toward young age due to measurement errors and errors in radial velocity due to the gravitational redshift are compensated.
+The algorithm uses current day positions (distance, declination and right ascension) and velocities (radial velocity, declination proper motion and right ascension proper motion) observables in an equatorial plane as its inputs and performs the conversion into XYZ positions and UVW velocities in a galactic plane. The shift toward young ages due to measurement errors and errors in radial velocity due to the gravitational redshift are compensated.
 
 Future developments
-
 -------------------
 
 In the near future, this software will also eliminate the relatively imprecise radial velocity measurements and replace them with optimal values. Also, tracebacks will be performed using galactic orbits computation.

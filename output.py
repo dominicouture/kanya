@@ -15,301 +15,392 @@ from collection import *
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-def create_size_indicators_plot(series, secondary=False):
-    """ Creates a plot of scatter, median absolute deviation, and minimum spanning tree branches
-        length mean and median absolute deviation over the entire duration of the data.
+def save_figure(plt, name, file_path=None, forced=False, default=False, cancel=False):
+    """ Checks whether a path already exists and asks for user input if it does. The base path
+        is assumed to be the output directory. Also, if the path does not have an extension, a
+        '.pdf' extension is added.
     """
 
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '14'})
-    plt.figure(figsize=(12, 8), facecolor='w')
+    # file_path parameter
+    file_path = file_path if file_path is not None else output(create=True) + '/'
 
-    # Scatter
-    mean_scatter = np.mean([group.scatter for group in series], axis=0)
-    mean_scatter = mean_scatter / mean_scatter[0]
-    scatter_ages = [group.scatter_age for group in series]
-    scatter_age = np.round(np.mean(scatter_ages), 3)
-    scatter_age_error = np.round(np.std(scatter_ages), 3)
-    plt.plot(series.time, mean_scatter, 'k-', linewidth=2.0,
-        label='Scatter age: ({} ± {}) Myr'.format(scatter_age, scatter_age_error))
+    # Check if file_path parameter is a string, which must be done before the directory call
+    stop(type(file_path) != str, 'TypeError', "'file_path' must be a string ({} given).",
+        type(file_path))
 
-    # MAD
-    mean_mad = np.mean([group.mad for group in series], axis=0)
-    mean_mad = mean_mad / mean_mad[0]
-    mad_ages = [group.mad_age for group in series]
-    mad_age = np.round(np.mean(mad_ages), 3)
-    mad_age_error = np.round(np.std(mad_ages), 3)
-    plt.plot(series.time, mean_mad, '-.', color='0.2', linewidth=2.0,
-        label='MAD age: ({} ± {}) Myr'.format(mad_age, mad_age_error))
+    # file_path redefined as the absolute path, default name and directory creation
+    file_path = path.join(directory(output(), path.dirname(file_path), 'file_path', create=True),
+        path.basename(file_path)) if path.basename(file_path) != '' else '{}.pdf'.format(name)
 
-    # MST Mean
-    mean_mst_mean = np.mean([group.mst_mean for group in series], axis=0)
-    mean_mst_mean = mean_mst_mean / mean_mst_mean[0]
-    mst_mean_ages = [group.mst_mean_age for group in series]
-    mst_mean_age = np.round(np.mean(mst_mean_ages), 3)
-    mst_mean_age_error = np.round(np.std(mst_mean_ages), 3)
-    plt.plot(series.time, mean_mst_mean, '--', color='0.4', linewidth=2.0,
-        label='MST mean age: ({} ± {}) Myr'.format(mst_mean_age, mst_mean_age_error))
+    # Check if there's an extension and add a '.pdf' extension, if needed
+    if path.splitext(file_path)[1] == '':
+        file_path += '.pdf'
 
-    # MST MAD
-    mean_mst_mad = np.mean([group.mst_mad for group in series], axis=0)
-    mean_mst_mad = mean_mst_mad / mean_mst_mad[0]
-    mst_mad_ages = [group.mst_mad_age for group in series]
-    mst_mad_age = np.round(np.mean(mst_mad_ages), 3)
-    mst_mad_age_error = np.round(np.std(mst_mad_ages), 3)
-    plt.plot(series.time, mean_mst_mad, 'g:', color='0.6', linewidth=2.0,
-        label='MST MAD age: ({} ± {}) Myr'.format(mst_mad_age, mst_mad_age_error))
+    # Check if a file already exists
+    if path.exists(file_path):
+        choice = None
+        if not forced:
+            if not default:
+                if not cancel:
 
-    # Secondary lines
-    if secondary:
-        i = 0
-        plot_i = np.arange(0, len(series), 20)
-        for group in series:
-            if i in plot_i:
-                plt.plot(series.time, group.scatter, '-', color='0.7', linewidth=0.5)
-            i += 1
+                    # User input
+                    while choice == None:
+                        choice = input(
+                            "A file already exists at '{}'. Do you wish to overwrite (Y), "
+                            "keep both (K) or cancel (N)? ".format(file_path)).lower()
 
-    # Title, legend and axis formatting
-    if series.from_data:
-        plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
-            "with {} km/s redshift correction and actual measurement errors\n".format(
-                series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
-    elif series.from_model:
-        plt.title("Average size indicators of {} moving group simulations with kinematics similar "
-            "to β Pictoris\n over {} Myr with {} km/s redshift correction and actual measurement "
-            "errors of Gaia DR2\n".format(series.number_of_groups,
-                series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
-    plt.legend()
-    plt.xlabel('Time (Myr)')
-    plt.ylabel('Relative Scatter, MAD, MST mean and MST MAD')
-    plt.xlim(0, series.final_time.value)
-    plt.ylim(0, 1.5)
-    # plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
-    # plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
+                        # Loop over question if input could not be interpreted
+                        if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
+                            print("Could not understand '{}'.".format(choice))
+                            choice = None
 
-    # Save and show figure
-    # plt.savefig(path.join(output(), '{}.pdf'.format(series.name)))
-    plt.show()
+                # Saving cancellation
+                if cancel or choice in ('n', 'no'):
 
-def create_covariances_plot(series):
-    """ Creates a plot of X-U, Y-V and Z-W covariances. """
+                    # Logging
+                    log("'{}': figure not saved because a file already exists at '{}'.",
+                        name, file_path)
 
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '14'})
-    plt.figure(figsize=(12, 8), facecolor='w')
+            # Default name and saving
+            if default or choice in ('k', 'keep'):
+                from tools import default_name
+                file_path = default_name(file_path)
+                plt.savefig(file_path)
 
-    # Covariances
-    mean_covariance = np.mean([group.covariance for group in series], axis=0)
-    mean_covariance = mean_covariance / mean_covariance[0]
-    xu_ages = np.array([group.covariance_age[0] for group in series])
-    yv_ages = np.array([group.covariance_age[1] for group in series])
-    zw_ages = np.array([group.covariance_age[2] for group in series])
-    plt.plot(series.time, mean_covariance[:,0], '-', color='0.0', linewidth=2.0,
-        label='X-U covariance age: ({} ± {}) Myr'.format(
-            np.round(np.mean(xu_ages), 3), np.round(np.std(xu_ages), 3)))
-    plt.plot(series.time, mean_covariance[:,1], '-.', color='0.2', linewidth=2.0,
-        label='Y-V covariance age: ({} ± {}) Myr'.format(
-            np.round(np.mean(yv_ages), 3), np.round(np.std(yv_ages), 3)))
-    plt.plot(series.time, mean_covariance[:,2], '--', color='0.4', linewidth=2.0,
-        label='Z-W covariance age: ({} ± {}) Myr'.format(
-            np.round(np.mean(zw_ages), 3), np.round(np.std(zw_ages), 3)))
+                # Logging
+                log("'{}': file name changed and figure saved at '{}'.", name, file_path)
 
-    # Title, legend and axis formatting
-    if series.from_data:
-        plt.title("X-U, Y-V and Z-W covariances of β Pictoris (without outliners) over {} Myr\n"
-            "with {} km/s redshift correction and actual measurement errors\n".format(
-                series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
-    elif series.from_model:
-        plt.title("X-U, Y-V and Z-W covariances of {} moving group simulations with kinematics "
-            "similar to β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
-            "measurement errors of Gaia DR2\n".format(series.number_of_groups,
-                series.duration.value, round(series.rv_offset.to('km/s').value, 2)))
-    plt.legend()
-    plt.xlabel('Time (Myr)')
-    plt.ylabel('Covariance')
-    plt.xlim(0, series.final_time.value)
-    plt.ylim(0, 1.5)
+        # Existing file deletion and saving
+        if forced or choice in ('y', 'yes'):
+            from os import remove
+            remove(file_path)
+            plt.savefig(file_path)
 
-    # Show figure
-    plt.show()
+            # Logging
+            log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
 
-def create_covariances_scatter(group, i, j, step=None, age=None):
-    """ Creates a scatter plot of star positions in i and j at a given 'step' or 'age' in Myr.
-        If 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'steps'
-        if both are given. 'labels' adds the stars' name and 'mst' adds the minimum spanning tree
-        branches.
-    """
-
-    # Axis selection
-    position_axis = {'x': 0, 'y': 1, 'z': 2}
-    velocity_axis = {'u': 0, 'v': 1, 'w': 2}
-    position_keys = tuple(position_axis.keys())
-    velocity_keys = tuple(velocity_axis.keys())
-    i = position_axis[i.lower()]
-    j = velocity_axis[j.lower()]
-
-    # Step or age calculation
-    if age is not None:
-        step = int(round(age / group.series.timestep.value))
-        age = round(group.series.time[step], 2)
+    # Saving
     else:
-        age = round(step * group.series.timestep, 2)
+        plt.savefig(file_path)
 
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': 14, 'lines.markersize': 4})
-    plt.figure(figsize=(12, 8), facecolor='w')
+        # Logging
+        log("'{}': figure saved at '{}'.", name, file_path)
 
-    # Scatter
-    plt.scatter(
-        [star.position[step, i] for star in group.stars],
-        [star.velocity[j] for star in group.stars], marker='o', color='0.0')
+class Output_Series():
+    """ Defines output methods from a Series object. """
 
-    # Title and axis formatting
-    plt.title("{} and {} covariance of stars in β Pictoris at {} Myr wihtout outliers.\n".format(
-        position_keys[i].upper(), velocity_keys[j].upper(), age))
-    plt.xlabel('{} (pc)'.format(position_keys[i].upper()))
-    plt.ylabel('{} (pc/Myr)'.format(velocity_keys[j].upper()))
+    def create_size_indicators_plot(self, secondary=False,
+            forced=False, default=False, cancel=False):
+        """ Creates a plot of scatter, median absolute deviation, and minimum spanning tree
+            branches length mean and median absolute deviation over the entire duration of the
+            data.
+        """
 
-    # Show figure
-    plt.show()
+        # Figure initialization
+        rcParams.update({'font.family': 'serif', 'font.size': '14'})
+        plt.figure(figsize=(12, 8), facecolor='w')
 
-def create_2D_scatter(group, i, j, step=None, age=None, errors=False, labels=False, mst=False):
-    """ Creates a scatter plot of star positions in i and j at a given 'step' or 'age' in Myr.
-        If 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'steps'
-        if both are given. 'labels' adds the stars' name and 'mst' adds the minimum spanning tree
-        branches.
-    """
+        # Scatter
+        mean_scatter = np.mean([group.scatter for group in self], axis=0)
+        mean_scatter = mean_scatter / mean_scatter[0]
+        scatter_ages = [group.scatter_age for group in self]
+        scatter_age = np.round(np.mean(scatter_ages), 3)
+        scatter_age_error = np.round(np.std(scatter_ages), 3)
+        plt.plot(self.time, mean_scatter, 'k-', linewidth=2.0,
+            label='Scatter age: ({} ± {}) Myr'.format(scatter_age, scatter_age_error))
 
-    # Axis selection
-    axis = {'x': 0, 'y': 1, 'z': 2}
-    keys = tuple(axis.keys())
-    i = axis[i.lower()]
-    j = axis[j.lower()]
+        # MAD
+        mean_mad = np.mean([group.mad for group in self], axis=0)
+        mean_mad = mean_mad / mean_mad[0]
+        mad_ages = [group.mad_age for group in self]
+        mad_age = np.round(np.mean(mad_ages), 3)
+        mad_age_error = np.round(np.std(mad_ages), 3)
+        plt.plot(self.time, mean_mad, '-.', color='0.2', linewidth=2.0,
+            label='MAD age: ({} ± {}) Myr'.format(mad_age, mad_age_error))
 
-    # Step or age calculation
-    if age is not None:
-        step = int(round(age / group.series.timestep.value))
-        age = round(group.series.time[step], 2)
-    else:
-        age = round(step * group.series.timestep, 2)
+        # MST Mean
+        mean_mst_mean = np.mean([group.mst_mean for group in self], axis=0)
+        mean_mst_mean = mean_mst_mean / mean_mst_mean[0]
+        mst_mean_ages = [group.mst_mean_age for group in self]
+        mst_mean_age = np.round(np.mean(mst_mean_ages), 3)
+        mst_mean_age_error = np.round(np.std(mst_mean_ages), 3)
+        plt.plot(self.time, mean_mst_mean, '--', color='0.4', linewidth=2.0,
+            label='MST mean age: ({} ± {}) Myr'.format(mst_mean_age, mst_mean_age_error))
 
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': 14, 'lines.markersize': 4})
-    plt.figure(figsize=(12, 8), facecolor='w')
+        # MST MAD
+        mean_mst_mad = np.mean([group.mst_mad for group in self], axis=0)
+        mean_mst_mad = mean_mst_mad / mean_mst_mad[0]
+        mst_mad_ages = [group.mst_mad_age for group in self]
+        mst_mad_age = np.round(np.mean(mst_mad_ages), 3)
+        mst_mad_age_error = np.round(np.std(mst_mad_ages), 3)
+        plt.plot(self.time, mean_mst_mad, 'g:', color='0.6', linewidth=2.0,
+            label='MST MAD age: ({} ± {}) Myr'.format(mst_mad_age, mst_mad_age_error))
 
-    # Scatter
-    plt.scatter(
-        [star.position[step, i] for star in group.stars],
-        [star.position[step, j] for star in group.stars], marker='o', color='0.0')
+        # Secondary lines
+        if secondary:
+            i = 0
+            plot_i = np.arange(0, len(self), 20)
+            for group in self:
+                if i in plot_i:
+                    plt.plot(self.time, group.scatter, '-', color='0.7', linewidth=0.5)
+                i += 1
 
-    # Error bars
-    if errors:
-        for star in group.stars:
-            position = star.position[step]
-            error = star.position_error[step]
-            plt.plot(
-                (position[i] - error[i], position[i] + error[i]),
-                (position[j], position[j]), c='0.1', linewidth=0.7)
-            plt.plot(
-                (position[i], position[i]),
-                (position[j] - error[j], position[j] + error[j]), c='0.1', linewidth=0.7)
+        # Title, legend and axis formatting
+        if self.from_data:
+            plt.title("Size indicators of β-Pictoris (without outliners) over {} Myr\n"
+                "with {} km/s redshift correction and actual measurement errors\n".format(
+                    self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+        elif self.from_model:
+            plt.title("Average size indicators of {} moving group simulations with kinematics "
+                "similar to β Pictoris\n over {} Myr with {} km/s redshift correction and actual "
+                "measurement errors of Gaia DR2\n".format(self.number_of_groups,
+                    self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+        plt.legend()
+        plt.xlabel('Time (Myr)')
+        plt.ylabel('Relative Scatter, MAD, MST mean and MST MAD')
+        plt.xlim(0, self.final_time.value)
+        plt.ylim(0, 1.5)
+        # plt.xticks([14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0])
+        # plt.yticks([2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0])
 
-    # Star labels
-    if labels:
-        for star in group.stars:
-            plt.text(star.position[step, i] + 1, star.position[step, j] + 1, star.name,
-            horizontalalignment='left', fontsize=7)
+        # Save and show figure
+        save_figure(plt, self.name, 'Size_indicator_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
 
-    # Branches creation
-    if mst:
-        for branch in group.mst[step]:
-            plt.plot(
-                (branch.start.position[step, i], branch.end.position[step, i]),
-                (branch.start.position[step, j], branch.end.position[step, j]), c='b')
+    def create_covariances_plot(self, forced=False, default=False, cancel=False):
+        """ Creates a plot of X-U, Y-V and Z-W covariances. """
 
-    # Title and axis formatting
-    plt.title("{} and {} positions of stars in β Pictoris at {} Myr wihtout outliers.\n".format(
-        keys[i].upper(), keys[j].upper(), age))
-    plt.xlabel('{} (pc)'.format(keys[i].upper()))
-    plt.ylabel('{} (pc)'.format(keys[j].upper()))
+        # Figure initialization
+        rcParams.update({'font.family': 'serif', 'font.size': '14'})
+        plt.figure(figsize=(12, 8), facecolor='w')
 
-    # Show figure
-    plt.show()
-    # plt.savefig(path.join(
-    #     "/Users/Dominic/Desktop/beta_pic_frames", 'beta_pictoris_xz_{}.pdf'.format(age)))
+        # Covariances
+        mean_covariance = np.mean([group.covariance for group in self], axis=0)
+        mean_covariance = mean_covariance / mean_covariance[0]
+        xu_ages = np.array([group.covariance_age[0] for group in self])
+        yv_ages = np.array([group.covariance_age[1] for group in self])
+        zw_ages = np.array([group.covariance_age[2] for group in self])
+        plt.plot(self.time, mean_covariance[:,0], '-', color='0.0', linewidth=2.0,
+            label='X-U covariance age: ({} ± {}) Myr'.format(
+                np.round(np.mean(xu_ages), 3), np.round(np.std(xu_ages), 3)))
+        plt.plot(self.time, mean_covariance[:,1], '-.', color='0.2', linewidth=2.0,
+            label='Y-V covariance age: ({} ± {}) Myr'.format(
+                np.round(np.mean(yv_ages), 3), np.round(np.std(yv_ages), 3)))
+        plt.plot(self.time, mean_covariance[:,2], '--', color='0.4', linewidth=2.0,
+            label='Z-W covariance age: ({} ± {}) Myr'.format(
+                np.round(np.mean(zw_ages), 3), np.round(np.std(zw_ages), 3)))
 
-def create_3D_scatter(group, step=None, age=None, errors=False, labels=False, mst=False):
-    """ Creates a scatter plot of star positions in x, y and z at a given 'step' or 'age' in Myr.
-        If 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'step'
-        if both are given. 'labels' adds the stars' name and 'mst' adds the minimum spanning tree
-        branches.
-    """
+        # Title, legend and axis formatting
+        if self.from_data:
+            plt.title("X-U, Y-V and Z-W covariances of β Pictoris (without outliners) over {} Myr\n"
+                "with {} km/s redshift correction and actual measurement errors\n".format(
+                    self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+        elif self.from_model:
+            plt.title("X-U, Y-V and Z-W covariances of {} moving group simulations with kinematics "
+                "similar to β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
+                "measurement errors of Gaia DR2\n".format(self.number_of_groups,
+                    self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+        plt.legend()
+        plt.xlabel('Time (Myr)')
+        plt.ylabel('Covariance')
+        plt.xlim(0, self.final_time.value)
+        plt.ylim(0, 1.5)
 
-    # Step or age calculation
-    if age is not None:
-        step = int(round(age / group.series.timestep.value))
-        age = round(group.series.time[step], 2)
-    else:
-        step = int(step)
-        age = round(step * group.series.timestep.value, 2)
+        # Show figure
+        save_figure(plt, self.name, 'Covariances_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
 
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '14', 'lines.markersize': 4})
-    fig = plt.figure(figsize=(12, 8), facecolor='w')
-    ax = fig.add_subplot(111, projection='3d')
+class Output_Group():
+    """ Defines output methods from a Group object. """
 
-    # Scatter
-    ax.scatter(
-        [star.relative_position[step, 0] for star in group.stars],
-        [star.relative_position[step, 1] for star in group.stars],
-        [star.relative_position[step, 2] for star in group.stars], marker='o', c='0.0')
+    def create_2D_scatter(self, i, j, step=None, age=None, errors=False, labels=False, mst=False,
+            forced=False, default=False, cancel=False):
+        """ Creates a 2D scatter plot of star positions in i and j at a given 'step' or 'age' in
+            Myr. If 'age' doesn't match a step, the closest step is used instead. 'age' overrules
+            'steps' if both are given. 'labels' adds the stars' name and 'mst' adds the minimun
+            spanning tree branches.
+        """
 
-    # Error bars
-    if errors:
-        for star in group.stars:
-            position = star.relative_position[step]
-            error = star.relative_position_error[step]
-            ax.plot(
-                (position[0] - error[0], position[0] + error[0]),
-                (position[1], position[1]), (position[2], position[2]), c='0.1', linewidth=0.7)
-            ax.plot(
-                (position[0], position[0]), (position[1] - error[1], position[1] + error[1]),
-                (position[2], position[2]), c='0.1', linewidth=0.7)
-            ax.plot(
-                (position[0], position[0]), (position[1], position[1]),
-                (position[2] - error[2], position[2] + error[2]), c='0.1', linewidth=0.7)
+        # Axis selection
+        axis = {'x': 0, 'y': 1, 'z': 2}
+        keys = tuple(axis.keys())
+        i = axis[i.lower()]
+        j = axis[j.lower()]
 
-    # Star labels
-    if labels:
-        for star in group.stars:
-            ax.text(
-                star.position[step, 0] + 2, star.position[step, 1] + 2, star.position[step, 2] + 2,
-                star.name, horizontalalignment='left', fontsize=7)
+        # Step or age calculation
+        if age is not None:
+            step = int(round(age / self.series.timestep.value))
+            age = round(self.series.time[step], 2)
+        else:
+            age = round(step * self.series.timestep, 2)
 
-    # Branches creation
-    if mst:
-        for branch in group.mst[step]:
-            ax.plot(
-                (branch.start.relative_position[step, 0], branch.end.relative_position[step, 0]),
-                (branch.start.relative_position[step, 1], branch.end.relative_position[step, 1]),
-                (branch.start.relative_position[step, 2], branch.end.relative_position[step, 2]),
-                    c='b')
+        # Figure initialization
+        rcParams.update({'font.family': 'serif', 'font.size': 14, 'lines.markersize': 4})
+        plt.figure(figsize=(12, 8), facecolor='w')
 
-    # Title and axis formatting
-    plt.title("Minimum spanning tree of stars in β Pictoris at {} Myr.\n".format(age))
-    ax.set_xlabel('\n X (pc)')
-    ax.set_ylabel('\n Y (pc)')
-    ax.set_zlabel('\n Z (pc)')
-    # ax.set_xlim3d(-70, 70)
-    # ax.set_ylim3d(-30, 30)
-    # ax.set_zlim3d(-30, 30)
+        # Scatter
+        plt.scatter(
+            [star.position[step, i] for star in self.stars],
+            [star.position[step, j] for star in self.stars], marker='o', color='0.0')
 
-    # Show figure
-    plt.show()
-    # plt.savefig(path.join(
-    #     "/Users/Dominic/Desktop/beta_pic_frames", 'beta_pic_{}.png'.format(step)))
+        # Error bars
+        if errors:
+            for star in self.stars:
+                position = star.position[step]
+                error = star.position_error[step]
+                plt.plot(
+                    (position[i] - error[i], position[i] + error[i]),
+                    (position[j], position[j]), c='0.1', linewidth=0.7)
+                plt.plot(
+                    (position[i], position[i]),
+                    (position[j] - error[j], position[j] + error[j]), c='0.1', linewidth=0.7)
 
-def plot_age_error():
+        # Star labels
+        if labels:
+            for star in self.stars:
+                plt.text(star.position[step, i] + 1, star.position[step, j] + 1, star.name,
+                horizontalalignment='left', fontsize=7)
+
+        # Branches creation
+        if mst:
+            for branch in self.mst[step]:
+                plt.plot(
+                    (branch.start.position[step, i], branch.end.position[step, i]),
+                    (branch.start.position[step, j], branch.end.position[step, j]), c='b')
+
+        # Title and axis formatting
+        plt.title("{} and {} positions of stars in β Pictoris at {} Myr "
+            "wihtout outliers.\n".format(keys[i].upper(), keys[j].upper(), age))
+        plt.xlabel('{} (pc)'.format(keys[i].upper()))
+        plt.ylabel('{} (pc)'.format(keys[j].upper()))
+
+        # Show figure
+        save_figure(plt, self.name, '2D_Scatter_{}_{}{}.pdf'.format(
+                self.name, keys[i].upper(), keys[j].upper()),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_3D_scatter(self, step=None, age=None, errors=False, labels=False, mst=False,
+            forced=False, default=False, cancel=False):
+        """ Creates a 3D scatter plot of star positions in x, y and z at a given 'step' or 'age'
+            in Myr. If 'age' doesn't match a step, the closest step is used instead. 'age'
+            overrules 'step' if both are given. 'labels' adds the stars' name and 'mst' adds the
+            minimum spanning tree branches.
+        """
+
+        # Step or age calculation
+        if age is not None:
+            step = int(round(age / self.series.timestep.value))
+            age = round(self.series.time[step], 2)
+        else:
+            step = int(step)
+            age = round(step * self.series.timestep.value, 2)
+
+        # Figure initialization
+        rcParams.update({'font.family': 'serif', 'font.size': '14', 'lines.markersize': 4})
+        fig = plt.figure(figsize=(12, 8), facecolor='w')
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Scatter
+        ax.scatter(
+            [star.relative_position[step, 0] for star in self.stars],
+            [star.relative_position[step, 1] for star in self.stars],
+            [star.relative_position[step, 2] for star in self.stars], marker='o', c='0.0')
+
+        # Error bars
+        if errors:
+            for star in self.stars:
+                position = star.relative_position[step]
+                error = star.relative_position_error[step]
+                ax.plot(
+                    (position[0] - error[0], position[0] + error[0]),
+                    (position[1], position[1]), (position[2], position[2]), c='0.1', linewidth=0.7)
+                ax.plot(
+                    (position[0], position[0]), (position[1] - error[1], position[1] + error[1]),
+                    (position[2], position[2]), c='0.1', linewidth=0.7)
+                ax.plot(
+                    (position[0], position[0]), (position[1], position[1]),
+                    (position[2] - error[2], position[2] + error[2]), c='0.1', linewidth=0.7)
+
+        # Star labels
+        if labels:
+            for star in self.stars:
+                ax.text(star.position[step, 0] + 2, star.position[step, 1] + 2,
+                    star.position[step, 2] + 2, star.name, horizontalalignment='left', fontsize=7)
+
+        # Branches creation
+        if mst:
+            for branch in self.mst[step]:
+                ax.plot(
+                    (branch.start.relative_position[step, 0],
+                        branch.end.relative_position[step, 0]),
+                    (branch.start.relative_position[step, 1],
+                        branch.end.relative_position[step, 1]),
+                    (branch.start.relative_position[step, 2],
+                        branch.end.relative_position[step, 2]), c='b')
+
+        # Title and axis formatting
+        plt.title("Minimum spanning tree of stars in β Pictoris at {} Myr.\n".format(age))
+        ax.set_xlabel('\n X (pc)')
+        ax.set_ylabel('\n Y (pc)')
+        ax.set_zlabel('\n Z (pc)')
+        # ax.set_xlim3d(-70, 70)
+        # ax.set_ylim3d(-30, 30)
+        # ax.set_zlim3d(-30, 30)
+
+        # Show figure
+        save_figure(plt, self.name, '3D_Scatter_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_covariances_scatter(self, i, j, step=None, age=None, errors=False, labels=False,
+            mst=False, forced=False, default=False, cancel=False):
+        """ Creates a covariance scatter of star positions and velocities in i and j at a given
+            'step' or 'age' in Myr. If 'age' doesn't match a step, the closest step is used
+            instead. 'age' overrules 'steps' if both are given. 'labels' adds the stars' name
+            and 'mst' adds the minimum spanning tree branches.
+        """
+
+        # Axis selection
+        position_axis = {'x': 0, 'y': 1, 'z': 2}
+        velocity_axis = {'u': 0, 'v': 1, 'w': 2}
+        position_keys = tuple(position_axis.keys())
+        velocity_keys = tuple(velocity_axis.keys())
+        i = position_axis[i.lower()]
+        j = velocity_axis[j.lower()]
+
+        # Step or age calculation
+        if age is not None:
+            step = int(round(age / self.series.timestep.value))
+            age = round(self.series.time[step], 2)
+        else:
+            age = round(step * self.series.timestep, 2)
+
+        # Figure initialization
+        rcParams.update({'font.family': 'serif', 'font.size': 14, 'lines.markersize': 4})
+        plt.figure(figsize=(12, 8), facecolor='w')
+
+        # Scatter
+        plt.scatter(
+            [star.position[step, i] for star in self.stars],
+            [star.velocity[j] for star in self.stars], marker='o', color='0.0')
+
+        # Title and axis formatting
+        plt.title("{} and {} covariance of stars in β Pictoris at {} Myr "
+            "wihtout outliers.\n".format(position_keys[i].upper(), velocity_keys[j].upper(), age))
+        plt.xlabel('{} (pc)'.format(position_keys[i].upper()))
+        plt.ylabel('{} (pc/Myr)'.format(velocity_keys[j].upper()))
+
+        # Show figure
+        save_figure(plt, self.name, 'Covariances_Scatter_{}_{}{}.pdf'.format(
+                self.name, position_keys[i].upper(), velocity_keys[j].upper()),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+def plot_age_error(errors=False, labels=False, mst=False,
+        forced=False, default=False, cancel=False):
     """ Creates a plot of ages obtained for diffrent measurement errors on radial velocity
         and offset due to gravitationnal redshift.
     """
@@ -356,56 +447,11 @@ def plot_age_error():
     plt.ylim(6, 24.5)
 
     # Show figure
-    plt.show()
+    save_figure(plt, 'Error-RV Offset Plot', 'Error-RV Offset Plot.pdf',
+        forced=forced, default=default, cancel=cancel)
+    # plt.show()
 
-def create_histogram_ages(groups):
-    """ Creates an histogram of ages computed by multiple tracebacks. """
-
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '14'})
-    plt.figure(figsize=(12, 8), facecolor='w')
-
-    # Histogram plotting
-    ages = [group.scatter_age for group in groups]
-    plt.hist(ages, bins='auto') # bins=np.arange(21.975, 26.025, 0.05)
-
-    # Title and axis formatting
-    plt.title(
-        'Distribution of {} moving groups age,\n'
-        'without measurement errors. Average age: ({} ± {}) Myr\n'.format(
-            len(groups), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
-    plt.xlabel('Age (Myr)')
-    plt.ylabel('Number of groups')
-
-    # Show figure
-    plt.show()
-
-def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, age):
-    """ Creates an histogram of ages computed by multiple tracebacks. """
-
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '15'})
-    plt.figure(figsize=(12, 8), facecolor='w')
-
-    # Histogram plotting
-    hist, bin_edges = np.histogram(ages, density=True)
-    plt.hist(ages, bins='auto', density=True) # bins=np.arange(21.975, 26.025, 0.05)
-
-    # Title  and axis formatting
-    plt.title(
-        'Distribution of ages ({} groups, {} Myr, {} stars,\ninitial scatter = {} pc, {})'.format(
-            number_of_groups, age, number_of_stars, initial_scatter,
-            'calculated age = ({} ± {}) Myr'.format(
-                np.round(np.average(ages), 3), np.round(np.std(ages), 3))))
-    plt.xlabel('Age (Myr)')
-    plt.ylabel('Number of groups')
-
-    # Save figure
-    plt.savefig(path.join(output(), '{}.pdf'.format(
-        'Distribution of ages ({} groups, {} Myr, {} stars, initial scatter = {} pc)'.format(
-            number_of_groups, age, number_of_stars, initial_scatter))))
-
-def create_single_scatter_plot(groups):
+def create_single_scatter_plot(groups, forced=False, default=False, cancel=False):
     """ Creates a plot of scatter over time of a single group (0). """
 
     # Figure initialization
@@ -426,7 +472,59 @@ def create_single_scatter_plot(groups):
     plt.savefig(path.join(output(), 'Scatter of a moving group over time.pdf'))
     plt.show()
 
-def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_groups):
+def create_histogram_ages(groups, forced=False, default=False, cancel=False):
+    """ Creates an histogram of ages computed by multiple tracebacks. """
+
+    # Figure initialization
+    rcParams.update({'font.family': 'serif', 'font.size': '14'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+
+    # Histogram plotting
+    ages = [group.scatter_age for group in groups]
+    plt.hist(ages, bins='auto') # bins=np.arange(21.975, 26.025, 0.05)
+
+    # Title and axis formatting
+    plt.title(
+        'Distribution of {} moving groups age,\n'
+        'without measurement errors. Average age: ({} ± {}) Myr\n'.format(
+            len(groups), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
+    plt.xlabel('Age (Myr)')
+    plt.ylabel('Number of groups')
+
+    # Show figure
+    save_figure(plt, 'Age Histogram', 'Age Historgram.pdf',
+        forced=forced, default=default, cancel=cancel)
+    # plt.show()
+
+def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, age,
+        forced=False, default=False, cancel=False):
+    """ Creates an histogram of ages computed by multiple tracebacks. """
+
+    # Figure initialization
+    rcParams.update({'font.family': 'serif', 'font.size': '15'})
+    plt.figure(figsize=(12, 8), facecolor='w')
+
+    # Histogram plotting
+    hist, bin_edges = np.histogram(ages, density=True)
+    plt.hist(ages, bins='auto', density=True) # bins=np.arange(21.975, 26.025, 0.05)
+
+    # Title  and axis formatting
+    plt.title(
+        'Distribution of ages ({} groups, {} Myr, {} stars,\ninitial scatter = {} pc, {})'.format(
+            number_of_groups, age, number_of_stars, initial_scatter,
+            'calculated age = ({} ± {}) Myr'.format(
+                np.round(np.average(ages), 3), np.round(np.std(ages), 3))))
+    plt.xlabel('Age (Myr)')
+    plt.ylabel('Number of groups')
+
+    # Save figure
+    save_figure(plt, 'Histogram', 'Distribution of ages ({} groups, {} Myr, {} stars, initial '
+            'scatter = {} pc).pdf'.format(number_of_groups, age, number_of_stars, initial_scatter),
+        forced=forced, default=default, cancel=cancel)
+    # plt.show()
+
+def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_groups,
+        forced=False, default=False, cancel=False):
     """ Creates a color mesh of ages over the initial scatter and number_of_stars.
         !!! Créer un pour passer d'un array numpy de shape (n, 3) à un color mesh + smoothing !!!
         !!! Genre create_color_mesh(x, y, z, smoothing). !!!
@@ -452,9 +550,11 @@ def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_gro
     plt.xticks([5.0, 10.0, 15.0, 20.0, 25.0])
 
     # Save figure
-    plt.savefig(path.join(series.output_dir, 'Scatter on age ({} Myr).png').format(age))
+    save_figure(plt, 'Scatter on age ({} Myr)'.format(age),
+        'Scatter on age ({} Myr).png'.format(age), forced=forced, default=default, cancel=cancel)
+    # plt.show()
 
-def create_minimum_error_plots():
+def create_minimum_error_plots(forced=False, default=False, cancel=False):
     """ Creates a plot of the minimal possible errors with 0.0 measurement errors. """
 
     # Data
@@ -527,4 +627,6 @@ def create_minimum_error_plots():
     plt.ylabel('Age of minimal scatter (Myr)')
 
     # Show figure
-    plt.show()
+    save_figure(plt, 'Minium Error Plot', 'minimum_error_plot.pdf',
+        forced=forced, default=default, cancel=cancel)
+    # plt.show()

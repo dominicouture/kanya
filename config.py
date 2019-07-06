@@ -26,7 +26,7 @@ name.value = 'beta_pictoris'
 # Path to the file or directory used as input or output relative the base directory (str). If the
 # is None or absent, by default, the  data is loaded or saved to a file in the output directory
 # named 'name.values'.series.
-series_path.value = None
+file_path.value = None
 
 # Number of groups to be simulated in the series (integer, > 0)
 number_of_groups.value = 1

@@ -61,8 +61,8 @@ class Collection(list):
         from time import strftime
 
         # self.logs_path parameter
-        self.logs_path = path.join(path.join(self.output_dir, 'Logs'), 'Traceback_{}.log'.format(
-            strftime('%Y-%m-%d_%H-%M-%S'))) if logs_path is None else logs_path
+        self.logs_path = path.join(self.output_dir, 'Logs') + '/' if logs_path is None \
+            else logs_path
 
         # Check if logs_path parameter is a string, which must be done before the directory call
         stop(type(self.logs_path) != str, 'TypeError', "'logs_path' must be a string ({} given).",
@@ -97,6 +97,13 @@ class Collection(list):
         for series in self.select(*series):
             series.remove()
 
+    def reset(self, *series):
+        """ Resets one or multiple series from the collection from series.name. """
+
+        # Series deletion from collection
+        for series in self.select(*series):
+            series.reset()
+
     def update(self, *series, **parameters):
         """ Updates the series by modifying its self.config configuration, re-initializing itself
             and deleting existing groups. The groups are also traced back again if they had been
@@ -115,23 +122,25 @@ class Collection(list):
         for series in self.select(*series):
             series.copy(**parameters)
 
-    def load(self, *series):
-        """ Loads one or multiple series from the binary file. """
-
-        for series in self.select(*series):
-            series.load()
-
-    def traceback(self, *series):
-        """ Traces back all series in self if no series name is given or selected series given
-            given in argument by name.
+    def load(self, *series, forced=False):
+        """ Loads one or multiple series from the binary file. If forced, existing groups are
+            overwritten.
         """
 
         for series in self.select(*series):
-            series.traceback()
+            series.load(forced=forced)
+
+    def traceback(self, *series, forced=False):
+        """ Traces back all series in self if no series name is given or selected series given
+            given in argument by name. If forced, existing groups are overwritten.
+        """
+
+        for series in self.select(*series):
+            series.traceback(forced=forced)
 
     def save(self, *series, forced=False):
-        """ Saves one or multiple series to a binary file. If forced, the existing
-            files are overwritten.
+        """ Saves one or multiple series to a binary file. If forced, existing files are
+            overwritten.
         """
 
         for series in self.select(*series):
@@ -164,10 +173,13 @@ class Collection(list):
 
             return [self[self.series[name]] for name in series]
 
-    def default(self, name):
+    def default_name(self, name=None):
         """ Loops over all Series in self and returns a default 'name-i' name where i is the
             lowest possible number for an series titled 'name'.
         """
+
+        # Initialization
+        name = name if name is not None else 'untitled'
 
         # Identify whether 'name' ends with a digit
         i = name.split('-')[-1]

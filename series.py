@@ -10,13 +10,12 @@
 
 import numpy as np
 from init import *
-from coordinate import *
-from quantity import *
+from output import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-class Series(list):
+class Series(list, Output_Series):
     """ Contains a series of Groups and their embedded Star objects and the methods required to
         initialize a series from a Config object. Values and data in the Config object are, copied,
         checked for errors and converted to usable types such as Quantity objects, and values are
@@ -24,16 +23,18 @@ class Series(list):
         in which all groups have the same Config object as their progenitor.
     """
 
-    def __init__(self, parent=None, path=None, args=False, **parameters):
+    def __init__(self, parent=None, path=None, args=False, forced=False, default=False,
+                cancel=False, **parameters):
         """ Initializes a Series object by first configuring it with 'parent', 'path', 'args' and
-            '**parameter' and then adding it to the collection.
+            '**parameter' and then adding it to the collection. 'forced', 'default' and 'cancel'
+            arguments are passed to self.add function.
         """
 
         # Configuration
         self.configure(parent, path, args, **parameters)
 
         # Series addition to the collection
-        self.add()
+        self.add(forced=forced, default=default, cancel=cancel)
 
     def configure(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Series objects from 'parent', an existing Config object, 'path', a string
@@ -140,7 +141,7 @@ class Series(list):
         """
 
         # Series name
-        self.name = collection.default('untitled') if self.config.name.values is None \
+        self.name = collection.default_name() if self.config.name.values is None \
             else self.config.name.values
 
         # Current date and time
@@ -170,37 +171,36 @@ class Series(list):
                 "The file will not be updated with its own data.", self.name)
             self.to_file = False
 
-    def configure_file(self, series_path=None):
+    def configure_file(self, file_path=None):
         """ Checks if the file directory and the file itself exist and creates them if needed.
-            self.series_path is redefined as the absolute path to the file. Errors are handed
+            self.file_path is redefined as the absolute path to the file. Errors are handed
             based on whether the input or output from and to the file is required.
         """
 
-        # series_path parameter
-        self.series_path = series_path if series_path is not None \
-            else self.config.series_path.values if self.config.series_path.values is not None \
-            else path.join(output(check=self.from_file, create=self.to_file),
-                '{}.series'.format(self.name))
+        # file_path parameter
+        self.file_path = file_path if file_path is not None \
+            else self.config.file_path.values if self.config.file_path.values is not None \
+            else output(check=self.from_file, create=self.to_file) + '/'
 
-        # Check if series_path parameter is a string, which must be done before the directory call
-        self.stop(type(self.series_path) != str, 'TypeError', "'series_path' must be a string "
-            "({} given).", type(self.series_path))
+        # Check if file_path parameter is a string, which must be done before the directory call
+        self.stop(type(self.file_path) != str, 'TypeError', "'file_path' must be a string "
+            "({} given).", type(self.file_path))
 
-        # self.series_path redefined as the absolute path, default name and directory creation
-        self.series_path = path.join(
-            directory(collection.base_dir, path.dirname(self.series_path),
-                'series_path', check=self.from_file, create=self.to_file),
-            '{}.series'.format(self.name) if path.basename(self.series_path) == '' \
-                else path.basename(self.series_path))
+        # self.file_path redefined as the absolute path, default name and directory creation
+        self.file_path = path.join(
+            directory(collection.base_dir, path.dirname(self.file_path),
+                'file_path', check=self.from_file, create=self.to_file),
+            '{}.series'.format(self.name) if path.basename(self.file_path) == '' \
+                else path.basename(self.file_path))
 
         # Check if the series file exists, if loading from a file
-        self.stop(self.from_file and not path.exists(self.series_path), 'FileNotFoundError',
-            "No series file located at '{}'.", self.series_path)
+        self.stop(self.from_file and not path.exists(self.file_path), 'FileNotFoundError',
+            "No series file located at '{}'.", self.file_path)
 
         # Check if the file is a series file
-        self.stop(path.splitext(self.series_path)[1].lower() != '.series',
+        self.stop(path.splitext(self.file_path)[1].lower() != '.series',
             'TypeError', "'{}' is not a series file (with a .series extension).",
-            path.basename(self.series_path))
+            path.basename(self.file_path))
 
     def configure_traceback(self):
         """ Checks traceback configuration parameters from data or a model. """
@@ -238,7 +238,7 @@ class Series(list):
             self.configure_model()
 
         # Logging
-        log("Series '{}' ready for traceback.", self.name)
+        log("'{}' series ready for traceback.", self.name)
 
     def configure_data(self):
         """ Checks if traceback and output from data is possible and creates a Data object from a
@@ -246,7 +246,7 @@ class Series(list):
         """
 
         # Logging
-        log("Initializing '{}' from data.", self.name)
+        log("Initializing '{}' series from data.", self.name)
 
         # Check if data is present
         self.stop(self.config.data is None, 'NameError',
@@ -268,7 +268,7 @@ class Series(list):
         """ Checks if traceback and output from a model is possible. """
 
         # Logging
-        log("Initializing '{}' from a model.", self.name)
+        log("Initializing '{}' series from a model.", self.name)
 
         # Check if all the necessary parameters are present
         for parameter in ('number_of_stars', 'age', *self.config.position_parameters,
@@ -448,107 +448,147 @@ class Series(list):
         # Units conversion to default units
         return quantity.to()
 
-    def add(self, forced=False, default=False, cancel=False):
-        """ Adds the series to the collection. If forced is True, any existing series with the
+    def add(self, forced=False, default=False, cancel=False, logging=True):
+        """ Adds the series to the collection. If 'forced' is True, any existing series with the
             same name is overwritten, otherwise user input is required to proceed (overwrite, do
-            nothing or default). If default is True, then instead of asking for a input, a default
-            name is used and the series added to the collection.
+            nothing or default). If 'default' is True, then instead of asking for an input, a
+            default name is used and the series added to the collection. If 'cancel' is True,
+            instead of asking for an input,
         """
 
-        # Series addition and replacement, if needed
+        # Check if a series already exists
         if self.name in collection.series.keys():
-            choice = ''
+            choice = None
             if not forced:
                 if not default:
                     if not cancel:
 
                         # User input
-                        while choice == '':
+                        while choice == None:
                             choice = input(
-                                "The series '{}' already exists. Do you wish to overwrite"
-                                "(Y), keep both (K) or cancel (N)? ".format(self.name))
+                                "The series '{}' already exists. Do you wish to overwrite (Y), "
+                                "keep both (K) or cancel (N)? ".format(self.name)).lower()
 
                             # Loop over question if input could not be interpreted
-                            if choice.lower() not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
+                            if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
                                 print("Could not understand '{}'.".format(choice))
-                                choice = ''
+                                choice = None
 
-                # Default name and series addition to the collection
-                if default or choice.lower() in ('k', 'keep'):
-                    self.name = collection.default(self.name)
+                    # Addition cancellation and series deletion
+                    if cancel or choice in ('n', 'no'):
+
+                        # Logging
+                        if logging:
+                            log("'{}' series was not added to the collection because a series "
+                                "with the same name already exists.", self.name)
+                        del self
+
+                # Default name and addition to the collection
+                if default or choice in ('k', 'keep'):
+                    self.name = collection.default_name(self.name)
                     self.config.name.values = self.name
                     collection.append(self)
 
                     # Logging
-                    log("Series renamed '{}' and added to the collection.", self.name)
+                    if logging:
+                        log("Series renamed '{}' and added to the collection.", self.name)
 
-            # Existing series deletion and series addition to the collection
-            if forced or choice.lower() in ('y', 'yes'):
+            # Existing series deletion and addition to the collection
+            if forced or choice in ('y', 'yes'):
                 del collection[collection.series[self.name]]
                 collection.append(self)
 
                 # Logging
-                log("Series '{}' deleted and replaced in the collection.", self.name)
+                if logging:
+                    log("Existing '{}' series deleted and new series added to the collection.",
+                        self.name)
 
-        # Series addition to the collection
+        # Addition to the collection
         else:
             collection.append(self)
 
             # Logging
-            log("Series '{}' added to the collection.", self.name)
+            if logging:
+                log("'{}' series added to the collection.", self.name)
 
         # Collection series re-initialization
         collection.initialize_series()
 
-    def remove(self):
+    def remove(self, logging=True):
         """ Removes the series from the collection. """
 
+        # Check if the series is in the collection
+        self.stop(self.name not in collection.series.keys(), 'NameError',
+            "'{}' is not in the collection", self.name)
+
         # Series deletion from the collection
-        if self.name in collection.series.keys():
-            del collection[collection.series[self.name]]
+        del collection[collection.series[self.name]]
 
         # Collection series re-initialization
         collection.initialize_series()
 
         # Logging
-        log("Series '{}' removed from the collection.", self.name)
+        if logging:
+            log("'{}' series removed from the collection.", self.name)
 
-    def update(self, parent=None, path=None, args=False, **parameters):
-        """ Updates the series by modifying its self.config configuration, re-initializing itself
-            and deleting existing groups. The groups are also traced back again if they had been
-            traced back before the update. 'parent', 'path', 'args' and '**parameters' are the
-            same as in Series._init__.
+    def reset(self, logging=True):
+        """ Clears all groups, as well as all parameter and returns the series to its original
+            configuration This effectively undo a load or traceback operation.
         """
 
         # Initialization
-        parent = self.config if parent is None else parent
-        traceback = True if len(self) > 0 else False
-
-        # Removal of self from the collection, if it exists
-        if self.name in collection.series.keys():
-            self.remove()
+        parent = self.config
 
         # Deletion of all parameters and groups
         vars(self).clear()
         self.clear()
 
-        # Series re-initialization and traceback, if needed
+        # Series re-initialization
+        self.configure(parent=parent)
+
+        # Logging
+        if logging:
+            log("'{}' series reset.", self.name)
+
+    def update(self, parent=None, path=None, args=False, logging=True, traceback=True, **parameters):
+        """ Updates the series by modifying its self.config configuration, re-initializing itself
+            and deleting existing groups. The groups are also traced back again if they had been
+            traced back before the update, unless 'traceback' is set to False. 'parent', 'path',
+            'args' and '**parameters' are the same as in Series.__init__.
+        """
+
+        # Initialization
+        parent = self.config if parent is None else parent
+        traceback = False if len(self) == 0 else traceback
+
+        # Removal of self from the collection, if it exists
+        if self.name in collection.series.keys():
+            self.remove(logging=False)
+
+        # Deletion of all parameters and groups
+        vars(self).clear()
+        self.clear()
+
+        # Series re-initialization
         self.configure(parent=parent, path=path, args=args, **parameters)
+
+        # Series re-addition to the collection
+        self.add(logging=False)
+
+        # Traceback, if needed
         if traceback:
             self.traceback()
 
-        # Self re-addition to the collection
-        self.add()
-
         # Logging
-        log("Series '{}' updated.", self.name)
+        if logging:
+            log("'{}' series updated.", self.name)
 
         return self
 
-    def copy(self, parent=None, path=None, args=False, **parameters):
+    def copy(self, parent=None, path=None, args=False, logging=True, traceback=True, **parameters):
         """ Copies the series under a new name. If 'parent', 'path', 'args' or '**parameters' are
             provided, the same as in Series.__init__, this new Series object is updated as well.
-            If no new 'name' is provided,  a default name is used instead.
+            If no new 'name' is provided, a default name is used instead.
         """
 
         # Self cloning
@@ -560,122 +600,225 @@ class Series(list):
 
         # Clone update, if needed
         if parent is not None or path is not None or args == True or len(parameters) > 0:
-            clone.update(parent=parent, path=path, args=args, **parameters)
+            clone.update(parent=parent, path=path, args=args, logging=False, traceback=traceback,
+                **parameters)
 
         # Logging
-        log("Series '{}' copied.", self.name)
+        if logging:
+            log("'{}' series copied to '{}'.", self.name, clone.name)
 
         return clone
 
-    def load(self, series_path=None):
-        """ Loads a series from a binary file. self.series_path is defined as the absolute path to
-            the file.
+    def load(self, file_path=None, forced=False):
+        """ Loads a series from a binary file. self.file_path is defined as the absolute path to
+            the file. If forced, the existing groups are overwritten, otherwise user input is
+            required to proceed if groups already exists.
         """
 
-        # Logging
-        log("Loading '{}' from a file.", self.name)
-
-        # File configuration
-        self.from_file = True
-        self.to_file = False
-        self.configure_file(series_path=series_path)
-
-        # Check if loading has already been done
+        # Check if a traceback has already been done
         if len(self) > 0:
-            log("Series '{}' has already been loaded.", self.name)
 
-        # File unpickling
+            # User input
+            if not forced:
+                forced = None
+                while forced is None:
+                    choice = input("'{}' series has already been traced back. Do you wish "
+                        "to overwrite existing groups? (Y/N) ".format(self.name)).lower()
+                    forced = True if choice in ('y', 'yes') \
+                        else False if choice in ('n', 'no') else None
+                    if forced is None:
+                        print("Could not understand '{}'.".format(choice))
+
+            # Groups deletion
+            if forced:
+                self.clear()
+
+                # Logging
+                log("Existing groups in series '{}' deleted.", self.name)
+
+            # Loading cancellation
+            else:
+
+                # Logging
+                log("'{}' series was not loaded because it has already been traced back.",
+                    self.name)
         else:
-            from pickle import load
-            series_file = open(self.series_path, 'rb')
-            parameters, groups = load(series_file)
-            series_file.close()
+            forced = True
 
-            # Parameters and groups import
+        # Loading
+        if forced:
+
+            # File configuration
+            self.from_file = True
+            self.to_file = False
+            self.configure_file(file_path=file_path)
+
+            # Series unpickling
+            from pickle import load
+            file = open(self.file_path, 'rb')
+            parameters, groups = load(file)
+            file.close()
+
+            # Parameters deletion and series removal from the collection
+            self.remove(logging=False)
+            for parameter in [parameter for parameter in vars(self).keys() \
+                    if parameter not in ('file_path', 'from_file', 'to_file')]:
+                del vars(self)[parameter]
+
+            # Parameters and groups import, and series re-addition to the collection
             vars(self).update(parameters)
             for group in groups:
                 self.append(group)
+            self.add(logging=False)
 
             # Logging
-            log("Series '{}' loaded from '{}'.", self.name, self.series_path)
+            log("'{}' series loaded from '{}'.", self.name, self.file_path)
 
-    def traceback(self):
+    def traceback(self, forced=False, mode=None):
         """ Traces back Group and embeded Star objects using either imported data or by
             modeling a group based on simulation parameters.
         """
+
+        # Mode import
+        if mode is not None:
+            stop(type(mode) != str, 'TypeError', "'mode' must be a string ({} given).", type(mode))
+            if mode.lower().replace('_', '').replace('from', '') == 'data':
+                self.from_data = True
+                self.from_model = False
+            elif mode.lower().replace('_', '').replace('from', '') == 'model':
+                self.from_data = False
+                self.from_model = True
+            else:
+                stop(True, 'ValueError', "Could not understand mode '{}'", mode)
 
         # Check if at least one mode has been selected
         self.stop(self.from_data == False and self.from_model == False, 'ValueError',
             "Either traceback '{}' from data or a model (none selected).", self.name)
 
-        # Traceback configuration, if traceback is needed
-        self.configure_traceback()
+        # Check if a traceback has already been done
+        if len(self) > 0:
 
-        # Check if traceback has already been done
-        if len(self) == self.number_of_groups:
-            log("Series '{}' has already been traced back.", self.name)
+            # User input
+            if not forced:
+                forced = None
+                while forced is None:
+                    choice = input("'{}' series has already been traced back. Do you wish "
+                        "to overwrite existing groups? (Y/N) ".format(self.name)).lower()
+                    forced = True if choice in ('y', 'yes') \
+                        else False if choice in ('n', 'no') else None
+                    if forced is None:
+                        print("Could not understand '{}'.".format(choice))
 
-        # Group creation
+            # Groups deletion
+            if forced:
+                self.clear()
+                log("Existing groups in series '{}' deleted.", self.name)
+
+            # Traceback cancellation
+            else:
+                self.from_data = self.config.from_data.values
+                self.from_model = self.config.from_model.values
+                log("'{}' series was not loaded because it has already been traced back.",
+                    self.name)
         else:
+            forced = True
+
+        # Groups creation
+        if forced:
+
+            # Traceback configuration
+            self.configure_traceback()
+
+            # Traceback
             from group import Group
             for name in ['{}-{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]:
 
                 # Logging
-                log("Tracing back '{}' from {}.", name, 'data' if self.from_data else 'a model')
+                log("Tracing back '{}' group from {}.", name,
+                    'data' if self.from_data else 'a model')
 
                 # Group traceback
                 self.append(Group(self, name=name))
 
             # Logging
-            log("Series '{}' succesfully traced back.", self.name)
+            log("'{}' series succesfully traced back.", self.name)
 
-    def save(self, series_path=None, forced=False):
-        """ Saves a series to a binary file. self.series_path is defined as the actual path to the
-            file. If forced, the existing file is overwritten and otherwise user input is required
-            to proceed.
+    def save(self, file_path=None, forced=False, default=False, cancel=False):
+        """ Saves a series to a binary file. self.file_path is defined as the actual path to the
+            file. If forced, the existing file is overwritten, otherwise user input is required
+            to proceed if a file already exists.
         """
 
-        # Logging
-        log("Saving '{}' to a file.", self.name)
+        def save(self):
+            """ Saves the series. """
+
+            # Series pickling
+            from pickle import dump
+            file = open(self.file_path, 'wb')
+            dump(({parameter: vars(self)[parameter] for parameter in vars(self).keys() \
+                    if parameter not in ('file_path', 'to_file', 'from_file')},
+                tuple(group for group in self)), file)
+            file.close()
 
         # File configuration
         self.from_file = False
         self.to_file = True
-        self.configure_file(series_path=series_path)
+        self.configure_file(file_path=file_path)
 
-        # Existing file deletion, if needed
-        if path.exists(self.series_path):
+        # Check if a file already exists
+        if path.exists(self.file_path):
+            choice = None
             if not forced:
-                forced = None
-                while forced is None:
-                    choice = input("The file located at '{}' already exists. "
-                        "Do you wish to overwrite? (Y/N) ".format(self.series_path))
-                    forced = True if choice.lower() in ('y', 'yes') \
-                        else False if choice.lower() in ('n', 'no') else None
-                    if forced is None:
-                        print("Could not understand '{}'.".format(choice))
-            if forced:
+                if not default:
+                    if not cancel:
+
+                        # User input
+                        while choice == None:
+                            choice = input(
+                                "A file already exists at '{}'. Do you wish to overwrite (Y), "
+                                "keep both (K) or cancel (N)? ".format(self.file_path)).lower()
+
+                            # Loop over question if input could not be interpreted
+                            if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
+                                print("Could not understand '{}'.".format(choice))
+                                choice = None
+
+                    # Saving cancellation
+                    if cancel or choice in ('n', 'no'):
+                        self.from_file = self.config.from_file.values
+                        self.to_file = self.config.to_file.values
+
+                        # Logging
+                        log("'{}' series was not saved because a file already exists at '{}'",
+                            self.name, self.file_path)
+                        del vars(self)['file_path']
+
+                # Default name and saving
+                if default or choice in ('k', 'keep'):
+                    from tools import default_name
+                    self.file_path = default_name(self.file_path)
+                    save(self)
+
+                    # Logging
+                    log("File name changed and series saved at '{}'.", self.file_path)
+
+            # Existing file deletion and saving
+            if forced or choice in ('y', 'yes'):
                 from os import remove
-                remove(self.series_path)
-                log("Existing file located at '{}' deleted.", self.series_path)
+                remove(self.file_path)
+                save(self)
+
+                # Logging
+                log("Existing file located at '{}' deleted and replaced.", self.file_path)
+
+        # Saving
         else:
-            forced = True
-
-        # Parameters export
-        if forced:
-            parameters = {parameter: vars(self)[parameter] for parameter in vars(self).keys() \
-                if parameter not in ('series_path', 'to_file', 'from_file')}
-
-            # File pickling
-            from pickle import dump
-            series_file = open(self.series_path, 'wb')
-            dump((parameters, tuple(group for group in self)), series_file)
-            series_file.close()
+            save(self)
 
             # Logging
-            log("Series '{}' saved at '{}'.", self.name, self.series_path)
+            log("'{}' series saved at '{}'.", self.name, self.file_path)
 
-    def create(self):
+    def create(self, forced=False, default=False, cancel=False):
         """ Either loads a series from a file, or traces a series back from data or a model. If
             needed, the series is also saved. If both self.from_file, and self.from_data or
             self.from_model are True, loading operation supercedes the traceback mode, which is
@@ -684,15 +827,15 @@ class Series(list):
 
         # Load from a file
         if self.from_file:
-            self.load()
+            self.load(forced=forced, default=default, cancel=cancel)
 
         # Traceback from data or a model
         elif self.from_data or self.from_model:
-            self.traceback()
+            self.traceback(forced=forced)
 
         # Save to a file
         if self.to_file:
-            self.save()
+            self.save(forced=forced, default=default, cancel=cancel)
 
     def stop(self, condition, error, message, *words):
         """ Calls the stop function from tools with self.name, if it has been set. """

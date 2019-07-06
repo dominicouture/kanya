@@ -9,7 +9,6 @@
 """
 
 from series import *
-from output import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -22,9 +21,9 @@ collection.create()
 
 # Output
 for series in collection:
-    create_size_indicators_plot(series)
-    create_covariances_plot(series)
+    series.create_size_indicators_plot()
+    series.create_covariances_plot()
     for group in series:
-        create_covariances_scatter(group, 'x', 'u', age=0)
-        create_2D_scatter(group, 'x', 'z', age=15.0, errors=True, labels=True, mst=False)
-        create_3D_scatter(group, age=15.0, errors=False, labels=False, mst=True)
+        group.create_2D_scatter('x', 'z', age=15.0, errors=True, labels=True, mst=False)
+        group.create_3D_scatter(age=15.0, errors=False, labels=False, mst=True)
+        group.create_covariances_scatter('x', 'u', age=0)
