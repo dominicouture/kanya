@@ -3,34 +3,36 @@
 
 """ __main__.py: Defines the Group class and the embeded Star classes. These classes contain the
     information and methods necessary to compute tracebacks of stars in a moving group and
-    assess its age by minimizing: the 3D scatter, median absolute deviation, covariances and
-    minimum spanning tree mean branch length and median absolute deviation of branch length.
+    assess its age by minimizing: the 3D scatter, median absolute deviation, position-velocity
+    covariances and minimum spanning tree mean branch length and median absolute deviation of
+    branch length.
 """
 
 import numpy as np
-from data import Data
-from output import Output_Group
-from coordinate import *
+from Traceback.data import Data
+from Traceback.output import Output_Group
+from Traceback.coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 class Group(list, Output_Group):
     """ Contains the values and related methods of a moving group and a list of Star objets that
-        are part of it. Stars are imported from the series file or calculated from a raw data file.
+        are part of it. Stars are can be imported from a raw data file or modeled base on
+        simulation parameters
     """
 
-    def __init__(self, series, **values):
+    def __init__(self, series, name):
         """ Initializes a Group object and embedded Star objects from a simulated sample of stars
-            in a moving group, raw data in the form a Data object or from a file. This dataset is
-            then moved backward in time from the initial time to the final time, and its age is
-            estimated by minimizing: the 3D scatter, median absolute deviation, covariances, and
-            the minimum spanning tree branch length mean and median absolute deviation.
+            in a moving group or raw data in the form a Data object. This dataset is then moved
+            backwards in time from the initial time to the final time, and its age is estimated
+            by minimizing: the 3D scatter, median absolute deviation, covariances, and the minimum
+            spanning tree branch length mean and median absolute deviation.
         """
 
         # Initialization
         self.series = series
-        vars(self).update(values)
+        self.name = name
 
         # Stars from data
         if series.from_data:
@@ -40,52 +42,50 @@ class Group(list, Output_Group):
         elif series.from_model:
             self.stars_from_model()
 
-        # Average velocity and position and scatter computation
+        # Average velocity and position, scatter and outliers
         self.get_scatter()
 
-        # Median absolute deviation computation
+        # Median absolute deviation
         self.get_median_absolute_deviation()
 
-        # X-U, Y-V and Z-W covariances computation
+        # X-U, Y-V and Z-W covariances
         self.get_covariances()
 
-        # Minimum spanning tree computation
+        # Minimum spanning tree
         self.get_minimum_spanning_tree()
 
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
-            parameters including the name of the stars, their XYZ position and UVW velocity,
-            and the respective errors. Radial velocity offset is also added.
+            parameters including the name of the stars, their XYZ positions and UVW velocities,
+            and their respective measurement errors. Radial velocity offset is also added. If
+            only one group is created in the series, actual values are used. If multiple groups
+            are created, positions and velocities are scrambled based on measurement errors.
         """
 
-        # From cartesian coordinates
-        # for star in self.series.data:
-        #     # Stars creation
-        #     self.append(self.Star(name=star.name,
-        #         velocity=star.velocity.values, velocity_error=star.velocity.values,
-        #         position=star.position.values, position_error=star.position.values))
-
-        # From observables
+        # Star creation from observables
         for star in self.series.data:
 
             # Observables conversion into equatorial spherical coordinates
-            (position_rδα, velocity_rvμδμα,
-                position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
-                    *star.position.values,
-                    *star.velocity.values + np.array([self.series.rv_offset.value, 0.0, 0.0]),
-                    *star.position.errors,
-                    *star.velocity.errors)
+            (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
+                observables_spherical(
+
+                    # Position
+                    *(star.position.values if self.series.number_of_groups == 1 else
+                        np.random.normal(star.position.values, star.position.errors)),
+
+                    # Velocity and radial velocity offset
+                    *(star.velocity.values if self.series.number_of_groups == 1 else
+                        np.random.normal(star.velocity.values, star.velocity.errors)) \
+                        + np.array([self.series.rv_offset.value, 0.0, 0.0]),
+
+                    # Position and velocity errors
+                    *star.position.errors, *star.velocity.errors)
 
             # Equatorial spherical coordinates conversion into galactic cartesian coordinates
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
                 *position_rδα, *position_rδα_error)
             velocity_uvw, velocity_uvw_error = equatorial_rvμδμα_galactic_uvw(
                 *position_rδα, *velocity_rvμδμα, *position_rδα_error, *velocity_rvμδμα_error)
-
-            # Speed of light correction
-            # from astropy import units as un
-            # position_xyz = position_xyz + velocity_uvw * (un.km/un.s).to(un.pc/un.Myr) * \
-            #     position_rδα[0] / (299792458 * (un.m/un.s).to(un.pc/un.Myr))
 
             # Star creation
             self.append(self.Star(
@@ -95,6 +95,14 @@ class Group(list, Output_Group):
                 velocity_error=velocity_uvw_error,
                 position=position_xyz,
                 position_error=position_xyz_error))
+
+            # Stars creation from cartesian coordinates
+            # self.append(self.Star(
+            #     self, outlier=False, name=star.name,
+            #     velocity=star.velocity.values,
+            #     velocity_error=star.velocity.values,
+            #     position=star.position.values,
+            #     position_error=star.position.values))
 
     def stars_from_model(self):
         """ Creates an artificial model of star for a given number of stars and age based on
@@ -113,6 +121,7 @@ class Group(list, Output_Group):
         avg_position_error = self.series.avg_position_error.values
         avg_position_scatter = self.series.avg_position_scatter.values
 
+        # Stars creation from a model
         for star in range(1, self.series.number_of_stars + 1):
 
             # Velocity and a position based average values and scatters
@@ -130,13 +139,16 @@ class Group(list, Output_Group):
             # Velocity and position conversion to observables
             position_obs, velocity_obs = spherical_observables(*position_rδα, *velocity_rvμδμα)[:2]
 
-            # Velocity and position scrambling based on measurement errors and conversion back to
-            # equatorial spherical coordinates
-            (position_rδα, velocity_rvμδμα,
-                position_rδα_error, velocity_rvμδμα_error) = observables_spherical(
+            # Observables conversion back into equatorial spherical coordinates
+            (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
+                observables_spherical(
+
+                    # Velocity and position scrambling based on average measurement errors
                     # *np.random.normal(position_obs, avg_position_error),
                     # *np.random.normal(velocity_obs, avg_velocity_error),
                     # *avg_position_error, *avg_velocity_error)
+
+                    # Velocity and position scrambling based on actual measurement errors
                     *np.random.normal(position_obs, self.series.data[star].position.errors),
                     *np.random.normal(velocity_obs, self.series.data[star].velocity.errors),
                     *self.series.data[star].position.errors,
@@ -203,14 +215,11 @@ class Group(list, Output_Group):
 
             # XYZ scatter
             self.scatter_xyz = np.std([star.position for star in self.stars], axis=0)
-            self.scatter_xyz_error = self.avg_position_error
 
             # 3D scatter
             self.scatter = (np.sum(self.scatter_xyz**2, axis=1) - np.sum(
                 self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
                 * np.expand_dims(self.series.time, axis=0).T**2, axis=1))**0.5
-            self.scatter_error = np.sum(
-                (self.scatter_xyz * self.scatter_xyz_error)**2, axis=1)**0.5 / self.scatter
 
             # Alternative 3D scatter
             # self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
@@ -219,14 +228,13 @@ class Group(list, Output_Group):
 
             # Filter stars located beyond 3σ of the average position and loop scatter computation
             for star in self.stars:
-                if (star.distance > (self.scatter * 2.5)).any():
+                if (star.distance > (self.scatter * 3.0)).any():
                     star.outlier = True
             outliers = np.array([star.outlier for star in self.stars])
             outliers = False if outliers.all() else outliers.any()
 
-        # Age calculation
+        # Scatter age
         self.scatter_age = self.series.time[np.argmin(self.scatter)]
-        self.scatter_age_error = 0.0
 
     def get_median_absolute_deviation(self):
         """ Computes the XYZ and total median absolute deviation (MAD) of a group and their
@@ -236,18 +244,14 @@ class Group(list, Output_Group):
 
         # XYZ median absolute deviation
         self.median_xyz = np.median(np.array([star.position for star in self.stars]), axis=0)
-        self.median_xyz_error = np.zeros(self.median_xyz.shape)
         self.mad_xyz = np.median(
             np.abs(np.array([star.position for star in self.stars]) - self.median_xyz), axis=0)
-        self.mad_xyz_error = np.zeros(self.mad_xyz.shape)
 
         # XYZ median absolute deviation
         self.mad = np.sum(self.mad_xyz**2, axis=1)**0.5
-        self.mad_error = np.zeros(self.mad.shape)
 
-        # Age calculation
+        # Median absolute deviation age
         self.mad_age = self.series.time[np.argmin(self.mad)]
-        self.mad_age_error = 0.0
 
     def get_covariances(self):
         """ Computes the X-U, Y-V and Z-W absolute covariances of a group and their respective
@@ -256,16 +260,14 @@ class Group(list, Output_Group):
         """
 
         # Covariances calculation
-        self.covariance = np.absolute(np.sum(
+        self.covariances = np.absolute(np.sum(
             (np.array([star.position for star in self.stars]) - self.avg_position) *
             np.expand_dims(np.array([star.velocity for star in self.stars]) - self.avg_velocity,
                 axis=1), axis=0) /self.series.number_of_stars)
-        self.covariance_error = np.zeros(self.covariance.shape)
 
-        # Age calculation
-        self.covariance_age = np.vectorize(
-            lambda step: self.series.time[step])(np.argmin(self.covariance, axis=0))
-        self.covariance_age_error = np.zeros(self.covariance_age.shape)
+        # Covariances age
+        self.covariances_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.covariances, axis=0))
 
     def get_minimum_spanning_tree(self):
         """ Builds the minimal spanning tree (MST) of a group for all timseteps using a Kruskal
@@ -285,7 +287,6 @@ class Group(list, Output_Group):
         self.mst = np.empty(
             (self.series.number_of_steps, self.number_of_branches), dtype=object)
         self.mst_lengths = np.zeros(self.mst.shape)
-        self.mst_lengths_error = np.zeros(self.mst.shape)
 
         # Minimum spanning tree computation for every timestep
         for step in range(self.series.number_of_steps):
@@ -317,22 +318,16 @@ class Group(list, Output_Group):
             # Minimum spanning tree branches length
             self.mst_lengths[step] = np.vectorize(
                 lambda branch: branch.length[step])(self.mst[step])
-            self.mst_lengths_error[step] = 0.0
 
         # Minimum spanning tree average branch length and age computation
         self.mst_mean = np.mean(self.mst_lengths, axis=1)
-        self.mst_mean_error = np.zeros([self.series.number_of_steps])
         self.mst_mean_age = self.series.time[np.argmin(self.mst_mean)]
-        self.mst_mean_error = 0.0
 
         # Minimum spanning tree branch length median absolute deviation
         self.mst_median = np.median(self.mst_lengths, axis=1)
-        self.mst_median_error = np.zeros(self.mst_median.shape)
         self.mst_mad = np.median(
             np.abs(self.mst_lengths - np.expand_dims(self.mst_median, axis=0).T), axis=1)
-        self.mst_mad_error = np.zeros([self.series.number_of_steps])
         self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
-        self.mst_mad_age_error = 0.0
 
     class Branch:
         """ Line connecting two stars used for the calculation of the minimum spanning tree. """
@@ -345,7 +340,6 @@ class Group(list, Output_Group):
             self.start = start
             self.end = end
             self.length = np.sum((self.start.position - self.end.position)**2, axis=1)**0.5
-            self.length_error = 0.0
 
         def __repr__(self):
             """ Returns a string of name of the branch. """

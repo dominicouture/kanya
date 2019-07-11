@@ -9,7 +9,7 @@
 
 import numpy as np
 from math import cos, sin, asin, atan2, pi as π, degrees, radians
-from quantity import *
+from Traceback.quantity import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'

@@ -10,7 +10,7 @@ from os import path
 from matplotlib import rcParams, pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
-from collection import *
+from Traceback.collection import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -39,8 +39,14 @@ def save_figure(plt, name, file_path=None, forced=False, default=False, cancel=F
     # Check if a file already exists
     if path.exists(file_path):
         choice = None
+        stop(type(forced) != bool, 'TypeError',
+            "'forced' must be a boolean ({} given).", type(forced))
         if not forced:
+            stop(type(default) != bool, 'TypeError',
+                "'default' must be a default ({} given).", type(default))
             if not default:
+                stop(type(cancel) != bool, 'TypeError',
+                    "'cancel' must be a boolean ({} given).", type(cancel))
                 if not cancel:
 
                     # User input
@@ -63,7 +69,7 @@ def save_figure(plt, name, file_path=None, forced=False, default=False, cancel=F
 
             # Default name and saving
             if default or choice in ('k', 'keep'):
-                from tools import default_name
+                from Traceback.tools import default_name
                 file_path = default_name(file_path)
                 plt.savefig(file_path)
 
@@ -101,42 +107,24 @@ class Output_Series():
         plt.figure(figsize=(12, 8), facecolor='w')
 
         # Scatter
-        mean_scatter = np.mean([group.scatter for group in self], axis=0)
-        mean_scatter = mean_scatter / mean_scatter[0]
-        scatter_ages = [group.scatter_age for group in self]
-        scatter_age = np.round(np.mean(scatter_ages), 3)
-        scatter_age_error = np.round(np.std(scatter_ages), 3)
-        plt.plot(self.time, mean_scatter, 'k-', linewidth=2.0,
-            label='Scatter age: ({} ± {}) Myr'.format(scatter_age, scatter_age_error))
+        plt.plot(self.time, self.scatter / self.scatter[0], 'k-', linewidth=2.0,
+            label='Scatter age: ({} ± {}) Myr'.format(self.scatter_age, self.scatter_age_error))
 
-        # MAD
-        mean_mad = np.mean([group.mad for group in self], axis=0)
-        mean_mad = mean_mad / mean_mad[0]
-        mad_ages = [group.mad_age for group in self]
-        mad_age = np.round(np.mean(mad_ages), 3)
-        mad_age_error = np.round(np.std(mad_ages), 3)
-        plt.plot(self.time, mean_mad, '-.', color='0.2', linewidth=2.0,
-            label='MAD age: ({} ± {}) Myr'.format(mad_age, mad_age_error))
+        # Median absolute deviation
+        plt.plot(self.time, self.mad / self.mad[0], '-.', color='0.2', linewidth=2.0,
+            label='MAD age: ({} ± {}) Myr'.format(self.mad_age, self.mad_age_error))
 
-        # MST Mean
-        mean_mst_mean = np.mean([group.mst_mean for group in self], axis=0)
-        mean_mst_mean = mean_mst_mean / mean_mst_mean[0]
-        mst_mean_ages = [group.mst_mean_age for group in self]
-        mst_mean_age = np.round(np.mean(mst_mean_ages), 3)
-        mst_mean_age_error = np.round(np.std(mst_mean_ages), 3)
-        plt.plot(self.time, mean_mst_mean, '--', color='0.4', linewidth=2.0,
-            label='MST mean age: ({} ± {}) Myr'.format(mst_mean_age, mst_mean_age_error))
+        # Minimum spanning tree mean branch length
+        plt.plot(self.time, self.mst_mean / self.mst_mean[0], '--', color='0.4', linewidth=2.0,
+            label='MST mean age: ({} ± {}) Myr'.format(self.mst_mean_age, self.mst_mean_age_error))
 
-        # MST MAD
-        mean_mst_mad = np.mean([group.mst_mad for group in self], axis=0)
-        mean_mst_mad = mean_mst_mad / mean_mst_mad[0]
-        mst_mad_ages = [group.mst_mad_age for group in self]
-        mst_mad_age = np.round(np.mean(mst_mad_ages), 3)
-        mst_mad_age_error = np.round(np.std(mst_mad_ages), 3)
-        plt.plot(self.time, mean_mst_mad, 'g:', color='0.6', linewidth=2.0,
-            label='MST MAD age: ({} ± {}) Myr'.format(mst_mad_age, mst_mad_age_error))
+        # Minimum spanning tree median absolute deviation branch length
+        plt.plot(self.time, self.mst_mad / self.mst_mad[0], 'g:', color='0.6', linewidth=2.0,
+            label='MST MAD age: ({} ± {}) Myr'.format(self.mst_mad_age, self.mst_mad_age_error))
 
         # Secondary lines
+        self.stop(type(secondary) != bool, 'TypeError',
+            "'secondary' must be a boolean ({} given).", type(secondary))
         if secondary:
             i = 0
             plot_i = np.arange(0, len(self), 20)
@@ -152,8 +140,8 @@ class Output_Series():
                     self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
         elif self.from_model:
             plt.title("Average size indicators of {} moving group simulations with kinematics "
-                "similar to β Pictoris\n over {} Myr with {} km/s redshift correction and actual "
-                "measurement errors of Gaia DR2\n".format(self.number_of_groups,
+                "similar to β Pictoris\n over {} Myr with {} km/s redshift correction and "
+                "actual measurement errors of Gaia DR2\n".format(self.number_of_groups,
                     self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
         plt.legend()
         plt.xlabel('Time (Myr)')
@@ -175,21 +163,20 @@ class Output_Series():
         rcParams.update({'font.family': 'serif', 'font.size': '14'})
         plt.figure(figsize=(12, 8), facecolor='w')
 
-        # Covariances
-        mean_covariance = np.mean([group.covariance for group in self], axis=0)
-        mean_covariance = mean_covariance / mean_covariance[0]
-        xu_ages = np.array([group.covariance_age[0] for group in self])
-        yv_ages = np.array([group.covariance_age[1] for group in self])
-        zw_ages = np.array([group.covariance_age[2] for group in self])
-        plt.plot(self.time, mean_covariance[:,0], '-', color='0.0', linewidth=2.0,
-            label='X-U covariance age: ({} ± {}) Myr'.format(
-                np.round(np.mean(xu_ages), 3), np.round(np.std(xu_ages), 3)))
-        plt.plot(self.time, mean_covariance[:,1], '-.', color='0.2', linewidth=2.0,
-            label='Y-V covariance age: ({} ± {}) Myr'.format(
-                np.round(np.mean(yv_ages), 3), np.round(np.std(yv_ages), 3)))
-        plt.plot(self.time, mean_covariance[:,2], '--', color='0.4', linewidth=2.0,
-            label='Z-W covariance age: ({} ± {}) Myr'.format(
-                np.round(np.mean(zw_ages), 3), np.round(np.std(zw_ages), 3)))
+        # Covariance normalization
+        covariances = self.covariances / self.covariances[0]
+
+        # X-U covariance
+        plt.plot(self.time, covariances[:,0], '-', color='0.0', linewidth=2.0,
+            label='X-U covariance age: ({} ± {}) Myr'.format(self.xu_age, self.xu_age_error))
+
+        # Y-V covariance
+        plt.plot(self.time, covariances[:,1], '-.', color='0.2', linewidth=2.0,
+            label='Y-V covariance age: ({} ± {}) Myr'.format(self.yv_age, self.yv_age_error))
+
+        # Z-W covariance
+        plt.plot(self.time, covariances[:,2], '--', color='0.4', linewidth=2.0,
+            label='Z-W covariance age: ({} ± {}) Myr'.format(self.zw_age, self.zw_age_error))
 
         # Title, legend and axis formatting
         if self.from_data:
@@ -212,6 +199,30 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
+    def create_histogram_ages(self, forced=False, default=False, cancel=False):
+        """ Creates an histogram of ages computed in a series. """
+
+        # Figure initialization
+        rcParams.update({'font.family': 'serif', 'font.size': '14'})
+        plt.figure(figsize=(12, 8), facecolor='w')
+
+        # Histogram plotting
+        ages = [group.scatter_age for group in self]
+        plt.hist(ages, bins='auto') # bins=np.arange(21.975, 26.025, 0.05)
+
+        # Title and axis formatting
+        plt.title(
+            'Distribution of {} moving groups age,\n'
+            'without measurement errors. Average age: ({} ± {}) Myr\n'.format(
+                len(self), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
+        plt.xlabel('Age (Myr)')
+        plt.ylabel('Number of groups')
+
+        # Show figure
+        save_figure(plt, 'Age Histogram', 'Age Historgram.pdf',
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
 class Output_Group():
     """ Defines output methods from a Group object. """
 
@@ -223,11 +234,33 @@ class Output_Group():
             spanning tree branches.
         """
 
-        # Axis selection
+        # Axis initialization
         axis = {'x': 0, 'y': 1, 'z': 2}
         keys = tuple(axis.keys())
+
+        # X axis
+        self.series.stop(type(i) != str, "X axis 'i' must be a string ({} given).", type(i))
+        self.series.stop(i.lower() not in keys, 'ValueError',
+            "X axis 'i' must be an axis key ('x', 'y' or 'z', {} given).", i)
         i = axis[i.lower()]
+
+        # Y axis
+        self.series.stop(type(j) != str, "Y axis 'j' must be a string ({} given).", type(j))
+        self.series.stop(j.lower() not in keys, 'ValueError',
+            "Y axis 'j' must be an axis key ('x', 'y' or 'z', {} given).", j)
         j = axis[j.lower()]
+
+        # Check if step and age are valid
+        if step is not None:
+            self.series.stop(type(step) not in (int, float), 'TypeError',
+                "'step' must an integer or float ({} given).", type(step))
+            self.series.stop(step % 1 != 0, 'ValueError',
+                "'step' must be convertible to an integer ({} given).", step)
+        if age is not None:
+            self.series.stop(type(age) not in (int, float), 'TypeError',
+                "'age' must be an integer or float ({} given).", type(age))
+            self.series.stop(age < 0, 'ValueError',
+                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
 
         # Step or age calculation
         if age is not None:
@@ -246,24 +279,33 @@ class Output_Group():
             [star.position[step, j] for star in self.stars], marker='o', color='0.0')
 
         # Error bars
+        self.series.stop(type(errors) != bool, 'TypeError',
+            "'error' must be a boolean ({} given).", type(errors))
         if errors:
             for star in self.stars:
                 position = star.position[step]
                 error = star.position_error[step]
+
+                # Horizontal error bars
                 plt.plot(
                     (position[i] - error[i], position[i] + error[i]),
                     (position[j], position[j]), c='0.1', linewidth=0.7)
+
+                # Vertical error bars
                 plt.plot(
                     (position[i], position[i]),
                     (position[j] - error[j], position[j] + error[j]), c='0.1', linewidth=0.7)
 
         # Star labels
+        self.series.stop(type(labels) != bool, 'TypeError',
+            "'labels' must be a boolean ({} given).", type(labels))
         if labels:
             for star in self.stars:
                 plt.text(star.position[step, i] + 1, star.position[step, j] + 1, star.name,
                 horizontalalignment='left', fontsize=7)
 
         # Branches creation
+        self.series.stop(type(mst) != bool, 'TypeError', "'mst' must be a boolean ({} given).", type(mst))
         if mst:
             for branch in self.mst[step]:
                 plt.plot(
@@ -290,6 +332,18 @@ class Output_Group():
             minimum spanning tree branches.
         """
 
+        # Check if step and age are valid
+        if step is not None:
+            self.series.stop(type(step) not in (int, float), 'TypeError',
+                "'step' must an integer or float ({} given).", type(step))
+            self.series.stop(step % 1 != 0, 'ValueError',
+                "'step' must be convertible to an integer ({} given).", step)
+        if age is not None:
+            self.series.stop(type(age) not in (int, float), 'TypeError',
+                "'age' must be an integer or float ({} given).", type(age))
+            self.series.stop(age < 0, 'ValueError',
+                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
+
         # Step or age calculation
         if age is not None:
             step = int(round(age / self.series.timestep.value))
@@ -310,27 +364,38 @@ class Output_Group():
             [star.relative_position[step, 2] for star in self.stars], marker='o', c='0.0')
 
         # Error bars
+        self.series.stop(type(errors) != bool, 'TypeError',
+            "'error' must be a boolean ({} given).", type(errors))
         if errors:
             for star in self.stars:
                 position = star.relative_position[step]
                 error = star.relative_position_error[step]
+
+                # X axis error bars
                 ax.plot(
                     (position[0] - error[0], position[0] + error[0]),
                     (position[1], position[1]), (position[2], position[2]), c='0.1', linewidth=0.7)
+
+                # Y axis error bars
                 ax.plot(
                     (position[0], position[0]), (position[1] - error[1], position[1] + error[1]),
                     (position[2], position[2]), c='0.1', linewidth=0.7)
+
+                # Z axis error bars
                 ax.plot(
                     (position[0], position[0]), (position[1], position[1]),
                     (position[2] - error[2], position[2] + error[2]), c='0.1', linewidth=0.7)
 
         # Star labels
+        self.series.stop(type(labels) != bool, 'TypeError',
+            "'labels' must be a boolean ({} given).", type(labels))
         if labels:
             for star in self.stars:
                 ax.text(star.position[step, 0] + 2, star.position[step, 1] + 2,
                     star.position[step, 2] + 2, star.name, horizontalalignment='left', fontsize=7)
 
         # Branches creation
+        self.series.stop(type(mst) != bool, 'TypeError', "'mst' must be a boolean ({} given).", type(mst))
         if mst:
             for branch in self.mst[step]:
                 ax.plot(
@@ -356,20 +421,42 @@ class Output_Group():
         # plt.show()
 
     def create_covariances_scatter(self, i, j, step=None, age=None, errors=False, labels=False,
-            mst=False, forced=False, default=False, cancel=False):
+            forced=False, default=False, cancel=False):
         """ Creates a covariance scatter of star positions and velocities in i and j at a given
             'step' or 'age' in Myr. If 'age' doesn't match a step, the closest step is used
             instead. 'age' overrules 'steps' if both are given. 'labels' adds the stars' name
             and 'mst' adds the minimum spanning tree branches.
         """
 
-        # Axis selection
+        # Axex initialization
         position_axis = {'x': 0, 'y': 1, 'z': 2}
         velocity_axis = {'u': 0, 'v': 1, 'w': 2}
         position_keys = tuple(position_axis.keys())
         velocity_keys = tuple(velocity_axis.keys())
+
+        # Position axis
+        self.series.stop(type(i) != str, "Position axis 'i' must be a string ({} given).", type(i))
+        self.series.stop(i.lower() not in position_keys, 'ValueError',
+            "Position axis 'i' must be an postion axis key ('x', 'y' or 'z', {} given).", i)
         i = position_axis[i.lower()]
+
+        # Velocity axis
+        self.series.stop(type(j) != str, "Velocity axis 'j' must be a string ({} given).", type(j))
+        self.series.stop(j.lower() not in velocity_keys, 'ValueError',
+            "Velocity axis 'j' must be an postion axis key ('u', 'v' or 'w', {} given).", j)
         j = velocity_axis[j.lower()]
+
+        # Check if step and age are valid
+        if step is not None:
+            self.series.stop(type(step) not in (int, float), 'TypeError',
+                "'step' must an integer or float ({} given).", type(step))
+            self.series.stop(step % 1 != 0, 'ValueError',
+                "'step' must be convertible to an integer ({} given).", step)
+        if age is not None:
+            self.series.stop(type(age) not in (int, float), 'TypeError',
+                "'age' must be an integer or float ({} given).", type(age))
+            self.series.stop(age < 0, 'ValueError',
+                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
 
         # Step or age calculation
         if age is not None:
@@ -387,6 +474,36 @@ class Output_Group():
             [star.position[step, i] for star in self.stars],
             [star.velocity[j] for star in self.stars], marker='o', color='0.0')
 
+        # Error bars
+        self.series.stop(type(errors) != bool, 'TypeError',
+            "'error' must be a boolean ({} given).", type(errors))
+        if errors:
+            for star in self.stars:
+                position = star.position[step]
+                position_error = star.position_error[step]
+                velocity = star.velocity
+                velocity_error = star.velocity_error
+
+                # Position (horizontal) error bars
+                plt.plot(
+                    (position[i] - position_error[i], position[i] + position_error[i]),
+                    (velocity[j], velocity[j]),
+                    c='0.1', linewidth=0.7)
+
+                # Velocity (vertical) error bars
+                plt.plot(
+                    (position[i], position[i]),
+                    (velocity[j] - velocity_error[j], velocity[j] + velocity_error[j]),
+                    c='0.1', linewidth=0.7)
+
+        # Star labels
+        self.series.stop(type(labels) != bool, 'TypeError',
+            "'labels' must be a boolean ({} given).", type(labels))
+        if labels:
+            for star in self.stars:
+                plt.text(star.position[step, i] + 1, star.velocity[step, j] + 1, star.name,
+                horizontalalignment='left', fontsize=7)
+
         # Title and axis formatting
         plt.title("{} and {} covariance of stars in β Pictoris at {} Myr "
             "wihtout outliers.\n".format(position_keys[i].upper(), velocity_keys[j].upper(), age))
@@ -399,8 +516,7 @@ class Output_Group():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-def plot_age_error(errors=False, labels=False, mst=False,
-        forced=False, default=False, cancel=False):
+def plot_age_error(forced=False, default=False, cancel=False):
     """ Creates a plot of ages obtained for diffrent measurement errors on radial velocity
         and offset due to gravitationnal redshift.
     """
@@ -430,7 +546,7 @@ def plot_age_error(errors=False, labels=False, mst=False,
         yerr=[0.331, 0.332, 0.342, 0.448, 0.636, 0.973, 1.066],
         fmt='^', color='0.4', label='+ 1.0 km/s')
 
-    # β-Pictoris typical error line
+    # β Pictoris typical error line
     plt.axvline(x=1.0112, ymin=0.0, ymax = 25, linewidth=1, color='k', ls='dashed')
     plt.text(1.05, 24, 'β Pictoris typical RV error.', horizontalalignment='left', fontsize=8)
 
@@ -451,54 +567,44 @@ def plot_age_error(errors=False, labels=False, mst=False,
         forced=forced, default=default, cancel=cancel)
     # plt.show()
 
-def create_single_scatter_plot(groups, forced=False, default=False, cancel=False):
-    """ Creates a plot of scatter over time of a single group (0). """
-
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '14'})
-    plt.figure(figsize=(12, 8), facecolor='w')
-
-    # Scatter plotting
-    mean = np.mean([group.scatter for group in groups], axis=0)
-    plt.plot(groups[0].time, mean, '-', color='0.0', linewidth=0.5)
-
-    # Title and axis formatting
-    plt.title('Scatter of a moving group over time\n')
-    plt.xlabel('Time (Myr)')
-    plt.ylabel('Scatter (pc)')
-    plt.xlim(0, 30)
-
-    # Save and show figure
-    plt.savefig(path.join(output(), 'Scatter of a moving group over time.pdf'))
-    plt.show()
-
-def create_histogram_ages(groups, forced=False, default=False, cancel=False):
-    """ Creates an histogram of ages computed by multiple tracebacks. """
-
-    # Figure initialization
-    rcParams.update({'font.family': 'serif', 'font.size': '14'})
-    plt.figure(figsize=(12, 8), facecolor='w')
-
-    # Histogram plotting
-    ages = [group.scatter_age for group in groups]
-    plt.hist(ages, bins='auto') # bins=np.arange(21.975, 26.025, 0.05)
-
-    # Title and axis formatting
-    plt.title(
-        'Distribution of {} moving groups age,\n'
-        'without measurement errors. Average age: ({} ± {}) Myr\n'.format(
-            len(groups), np.round(np.mean(ages), 3), np.round(np.std(ages), 3)))
-    plt.xlabel('Age (Myr)')
-    plt.ylabel('Number of groups')
-
-    # Show figure
-    save_figure(plt, 'Age Histogram', 'Age Historgram.pdf',
-        forced=forced, default=default, cancel=cancel)
-    # plt.show()
-
 def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, age,
         forced=False, default=False, cancel=False):
     """ Creates an histogram of ages computed by multiple tracebacks. """
+
+    # Check if ages are valid
+    stop(type(ages) not in (tuple, list),
+        "'ages' must either must be a tuple or list ({} given)", type(ages))
+    for age in ages:
+        stop(type(age) not in (int, float), 'TypeError',
+            "All 'ages' must be an integer or float ({} given).", type(age))
+        stop(age < 0, 'ValueError',
+            "All 'ages' must be greater than or equal to 0.0 ({} given).", type(age))
+
+    # Check if age is valid
+    stop(type(age) not in (int, float), 'TypeError',
+        "'age' must be an integer or float ({} given).", type(age))
+    stop(age < 0, 'ValueError',
+        "'age' must be greater than or equal to 0.0 ({} given).",type(age))
+
+    # Check if initial scatter is valid
+    stop(type(initial_scatter) not in (int, float), 'TypeError',
+        "'initial_scatter' must be an integer or float ({} given).", type(initial_scatter))
+    stop(initial_scatter < 0, 'ValueError', "'initial_scatter' must be greater than "
+        "or equal to 0.0 ({} given).", type(initial_scatter))
+
+    # Check if number_of_stars is valid
+    stop(type(number_of_stars) not in (int, float), 'TypeError',
+        "'number_of_stars' must an integer or float ({} given).", type(number_of_stars))
+    stop(number_of_stars % 1 != 0, 'ValueError',
+        "'number_of_stars' must be convertible to an integer ({} given).", number_of_stars)
+    number_of_stars = int(number_of_stars)
+
+    # Check if number_of_groups is valid
+    stop(type(number_of_groups) not in (int, float), 'TypeError',
+        "'number_of_groups' must an integer or float ({} given).", type(number_of_groups))
+    stop(number_of_groups % 1 != 0, 'ValueError',
+        "'number_of_groups' must be convertible to an integer ({} given).", number_of_groups)
+    number_of_groups = int(number_of_groups)
 
     # Figure initialization
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
@@ -523,12 +629,47 @@ def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, a
         forced=forced, default=default, cancel=cancel)
     # plt.show()
 
-def create_color_mesh(initial_scatter, number_of_stars, ages, age, number_of_groups,
+def create_color_mesh(ages, age, initial_scatter, number_of_stars, number_of_groups,
         forced=False, default=False, cancel=False):
     """ Creates a color mesh of ages over the initial scatter and number_of_stars.
         !!! Créer un pour passer d'un array numpy de shape (n, 3) à un color mesh + smoothing !!!
         !!! Genre create_color_mesh(x, y, z, smoothing). !!!
     """
+
+    # Check if ages are valid
+    stop(type(ages) not in (tuple, list),
+        "'ages' must either must be a tuple or list ({} given)", type(ages))
+    for age in ages:
+        stop(type(age) not in (int, float), 'TypeError',
+            "All 'ages' must be an integer or float ({} given).", type(age))
+        stop(age < 0, 'ValueError',
+            "All 'ages' must be greater than or equal to 0.0 ({} given).", type(age))
+
+    # Check if age is valid
+    stop(type(age) not in (int, float), 'TypeError',
+        "'age' must be an integer or float ({} given).", type(age))
+    stop(age < 0, 'ValueError',
+        "'age' must be greater than or equal to 0.0 ({} given).",type(age))
+
+    # Check if initial scatter is valid
+    stop(type(initial_scatter) not in (int, float), 'TypeError',
+        "'initial_scatter' must be an integer or float ({} given).", type(initial_scatter))
+    stop(initial_scatter < 0, 'ValueError', "'initial_scatter' must be greater than "
+        "or equal to 0.0 ({} given).", type(initial_scatter))
+
+    # Check if number_of_stars is valid
+    stop(type(number_of_stars) not in (int, float), 'TypeError',
+        "'number_of_stars' must an integer or float ({} given).", type(number_of_stars))
+    stop(number_of_stars % 1 != 0, 'ValueError',
+        "'number_of_stars' must be convertible to an integer ({} given).", number_of_stars)
+    number_of_stars = int(number_of_stars)
+
+    # Check if number_of_groups is valid
+    stop(type(number_of_groups) not in (int, float), 'TypeError',
+        "'number_of_groups' must an integer or float ({} given).", type(number_of_groups))
+    stop(number_of_groups % 1 != 0, 'ValueError',
+        "'number_of_groups' must be convertible to an integer ({} given).", number_of_groups)
+    number_of_groups = int(number_of_groups)
 
     # Figure initialization
     rcParams.update({'font.family': 'serif', 'font.size': '14'})

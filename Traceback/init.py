@@ -6,8 +6,8 @@
 """
 
 from copy import deepcopy
-from collection import *
-from coordinate import *
+from Traceback.collection import *
+from Traceback.coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -47,7 +47,7 @@ class Config():
 
             # Check if the parameter is a dictionary here
             stop(type(parameter) != dict, 'TypeError', "A parameter must be a Config.Parameter "
-                "object or a dictionary. ('{}' given).", type(parameter))
+                "object or a dictionary ({} given).", type(parameter))
 
             # Component conversion from singular to plural form
             for component in ('value', 'unit'):
@@ -180,7 +180,7 @@ class Config():
         """
 
         # Check if 'args' is a boolean value
-        stop(type(args) != bool, 'TypeError', "'args' must be a boolean value ('{}' given).",
+        stop(type(args) != bool, 'TypeError', "'args' must be a boolean value ({} given).",
             type(args))
 
         # Arguments parsing

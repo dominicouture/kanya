@@ -2,15 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """ series.py: Defines the class Series which uses a Config object to create a series of tracebacks
-    either from a file, data or a model. First, it handles exceptions (name, type, value,
-    shape) of all parameters, then creates or imports the file, if needed, handles unit,
-    conversions, and checks for the presence of output and logs directories and creates them, if
-    needed.
+    either from a file, data or a model. First, it handles exceptions (name, type, value, shape)
+    of all parameters, then creates or imports the file, if needed, handles unit, conversions, and
+    checks for the presence of output and logs directories and creates them, if needed.
 """
 
 import numpy as np
-from init import *
-from output import *
+from Traceback.init import *
+from Traceback.output import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -24,17 +23,17 @@ class Series(list, Output_Series):
     """
 
     def __init__(self, parent=None, path=None, args=False, forced=False, default=False,
-                cancel=False, **parameters):
+                cancel=False, logging=True, **parameters):
         """ Initializes a Series object by first configuring it with 'parent', 'path', 'args' and
-            '**parameter' and then adding it to the collection. 'forced', 'default' and 'cancel'
-            arguments are passed to self.add function.
+            '**parameter' and then adding it to the collection. 'forced', 'default', 'cancel' and
+            'logging' arguments are passed to self.add function.
         """
 
         # Configuration
         self.configure(parent, path, args, **parameters)
 
         # Series addition to the collection
-        self.add(forced=forced, default=default, cancel=cancel)
+        self.add(forced=forced, default=default, cancel=cancel, logging=True)
 
     def configure(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Series objects from 'parent', an existing Config object, 'path', a string
@@ -62,13 +61,15 @@ class Series(list, Output_Series):
             not None.
         """
 
-        # Check if all parameters are present and are Config.Parameter objects with all components
+        # Check if all parameters are present and are Config.Parameter objects
         for parameter in self.config.default_parameters.keys():
             self.stop(parameter not in vars(self.config), 'NameError',
                 "Required parameter '{}' is missing in the configuration.", parameter)
             self.stop(type(vars(self.config)[parameter]) != self.config.Parameter, 'TypeError',
                 "'{}' must be a Config.Parameter object ({} given).", parameter,
                 type(vars(self.config)[parameter]))
+
+            # Check if all components are present
             for component in self.config.Parameter.default_components.keys():
                 self.stop(component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
                     "Required component '{}' is missing from the '{}' parameter "
@@ -83,7 +84,7 @@ class Series(list, Output_Series):
                     'NameError', "Parameter's component '{}' in '{}' is invalid.", component_label,
                      parameter_label)
 
-                # Check whether all components, but parameter.values and parameter.units are
+                # Check whether all components, but parameter.values and parameter.units, are
                 # strings or None
                 if component_label not in ('values', 'units'):
                     self.stop(component is not None and type(component) not in (
@@ -155,9 +156,9 @@ class Series(list, Output_Series):
         # from_data, from_model, from_file and to_file parameters
         for argument in ('from_data', 'from_model', 'from_file', 'to_file'):
             vars(self)[argument] = vars(self.config)[argument].values
-            self.stop(vars(self)[argument] is None, 'NameError'
+            self.stop(vars(self)[argument] is None, 'NameError',
                 "Required parameter '{}' is missing in the configuration.", argument)
-            self.stop(type(vars(self)[argument]) != bool, 'TypeError'
+            self.stop(type(vars(self)[argument]) != bool, 'TypeError',
                 "'{}' must be a boolean value ({} given).", argument, type(vars(self)[argument]))
 
         # Check if no more than one mode has been selected
@@ -253,7 +254,7 @@ class Series(list, Output_Series):
             "Required traceback parameter 'data' is missing in the configuration.")
 
         # Stars creation from data
-        from data import Data
+        from Traceback.data import Data
         self.data = Data(self)
 
         # number_of_stars parameter
@@ -459,8 +460,14 @@ class Series(list, Output_Series):
         # Check if a series already exists
         if self.name in collection.series.keys():
             choice = None
+            self.stop(type(forced) != bool, 'TypeError',
+                "'forced' must be a boolean ({} given).", type(forced))
             if not forced:
+                self.stop(type(default) != bool, 'TypeError',
+                    "'default' must be a default ({} given).", type(default))
                 if not default:
+                    self.stop(type(cancel) != bool, 'TypeError',
+                        "'cancel' must be a boolean ({} given).", type(cancel))
                     if not cancel:
 
                         # User input
@@ -478,9 +485,8 @@ class Series(list, Output_Series):
                     if cancel or choice in ('n', 'no'):
 
                         # Logging
-                        if logging:
-                            log("'{}' series was not added to the collection because a series "
-                                "with the same name already exists.", self.name)
+                        log("'{}' series was not added to the collection because a series "
+                            "with the same name already exists.", self.name, logging=logging)
                         del self
 
                 # Default name and addition to the collection
@@ -490,8 +496,8 @@ class Series(list, Output_Series):
                     collection.append(self)
 
                     # Logging
-                    if logging:
-                        log("Series renamed '{}' and added to the collection.", self.name)
+                    log("Series renamed '{}' and added to the collection.",
+                        self.name, logging=logging)
 
             # Existing series deletion and addition to the collection
             if forced or choice in ('y', 'yes'):
@@ -499,17 +505,15 @@ class Series(list, Output_Series):
                 collection.append(self)
 
                 # Logging
-                if logging:
-                    log("Existing '{}' series deleted and new series added to the collection.",
-                        self.name)
+                log("Existing '{}' series deleted and new series added to the collection.",
+                    self.name, logging=logging)
 
         # Addition to the collection
         else:
             collection.append(self)
 
             # Logging
-            if logging:
-                log("'{}' series added to the collection.", self.name)
+            log("'{}' series added to the collection.", self.name, logging=logging)
 
         # Collection series re-initialization
         collection.initialize_series()
@@ -528,8 +532,7 @@ class Series(list, Output_Series):
         collection.initialize_series()
 
         # Logging
-        if logging:
-            log("'{}' series removed from the collection.", self.name)
+        log("'{}' series removed from the collection.", self.name, logging=logging)
 
     def reset(self, logging=True):
         """ Clears all groups, as well as all parameter and returns the series to its original
@@ -547,8 +550,7 @@ class Series(list, Output_Series):
         self.configure(parent=parent)
 
         # Logging
-        if logging:
-            log("'{}' series reset.", self.name)
+        log("'{}' series reset.", self.name, logging=logging)
 
     def update(self, parent=None, path=None, args=False, logging=True, traceback=True, **parameters):
         """ Updates the series by modifying its self.config configuration, re-initializing itself
@@ -559,6 +561,8 @@ class Series(list, Output_Series):
 
         # Initialization
         parent = self.config if parent is None else parent
+        self.stop(type(traceback) != bool, 'TypeError',
+            "'traceback' must be a boolean ({} given).", type(traceback))
         traceback = False if len(self) == 0 else traceback
 
         # Removal of self from the collection, if it exists
@@ -580,8 +584,7 @@ class Series(list, Output_Series):
             self.traceback()
 
         # Logging
-        if logging:
-            log("'{}' series updated.", self.name)
+        log("'{}' series updated.", self.name, logging=logging)
 
         return self
 
@@ -604,18 +607,19 @@ class Series(list, Output_Series):
                 **parameters)
 
         # Logging
-        if logging:
-            log("'{}' series copied to '{}'.", self.name, clone.name)
+        log("'{}' series copied to '{}'.", self.name, clone.name, logging=logging)
 
         return clone
 
-    def load(self, file_path=None, forced=False):
+    def load(self, file_path=None, forced=False, logging=True):
         """ Loads a series from a binary file. self.file_path is defined as the absolute path to
             the file. If forced, the existing groups are overwritten, otherwise user input is
             required to proceed if groups already exists.
         """
 
         # Check if a traceback has already been done
+        self.stop(type(forced) != bool, 'TypeError',
+            "'forced' must be a boolean ({} given).", type(forced))
         if len(self) > 0:
 
             # User input
@@ -634,14 +638,14 @@ class Series(list, Output_Series):
                 self.clear()
 
                 # Logging
-                log("Existing groups in series '{}' deleted.", self.name)
+                log("Existing groups in series '{}' deleted.", self.name, logging=logging)
 
             # Loading cancellation
             else:
 
                 # Logging
                 log("'{}' series was not loaded because it has already been traced back.",
-                    self.name)
+                    self.name, logging=logging)
         else:
             forced = True
 
@@ -672,16 +676,17 @@ class Series(list, Output_Series):
             self.add(logging=False)
 
             # Logging
-            log("'{}' series loaded from '{}'.", self.name, self.file_path)
+            log("'{}' series loaded from '{}'.", self.name, self.file_path, logging=logging)
 
-    def traceback(self, forced=False, mode=None):
+    def traceback(self, forced=False, logging=True, mode=None):
         """ Traces back Group and embeded Star objects using either imported data or by
             modeling a group based on simulation parameters.
         """
 
         # Mode import
         if mode is not None:
-            stop(type(mode) != str, 'TypeError', "'mode' must be a string ({} given).", type(mode))
+            self.stop(type(mode) != str, 'TypeError', "'mode' must be a string ({} given).",
+                type(mode))
             if mode.lower().replace('_', '').replace('from', '') == 'data':
                 self.from_data = True
                 self.from_model = False
@@ -689,13 +694,15 @@ class Series(list, Output_Series):
                 self.from_data = False
                 self.from_model = True
             else:
-                stop(True, 'ValueError', "Could not understand mode '{}'", mode)
+                self.stop(True, 'ValueError', "Could not understand mode '{}'", mode)
 
         # Check if at least one mode has been selected
         self.stop(self.from_data == False and self.from_model == False, 'ValueError',
             "Either traceback '{}' from data or a model (none selected).", self.name)
 
         # Check if a traceback has already been done
+        self.stop(type(forced) != bool, 'TypeError',
+            "'forced' must be a boolean ({} given).", type(forced))
         if len(self) > 0:
 
             # User input
@@ -712,14 +719,14 @@ class Series(list, Output_Series):
             # Groups deletion
             if forced:
                 self.clear()
-                log("Existing groups in series '{}' deleted.", self.name)
+                log("Existing groups in series '{}' deleted.", self.name, logging=logging)
 
             # Traceback cancellation
             else:
                 self.from_data = self.config.from_data.values
                 self.from_model = self.config.from_model.values
                 log("'{}' series was not loaded because it has already been traced back.",
-                    self.name)
+                    self.name, logging=logging)
         else:
             forced = True
 
@@ -727,23 +734,59 @@ class Series(list, Output_Series):
         if forced:
 
             # Traceback configuration
+            from Traceback.group import Group
             self.configure_traceback()
 
             # Traceback
-            from group import Group
             for name in ['{}-{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]:
 
                 # Logging
                 log("Tracing back '{}' group from {}.", name,
-                    'data' if self.from_data else 'a model')
+                    'data' if self.from_data else 'a model', display=True, logging=logging)
 
                 # Group traceback
-                self.append(Group(self, name=name))
+                self.append(Group(self, name))
 
             # Logging
-            log("'{}' series succesfully traced back.", self.name)
+            log("'{}' series succesfully traced back.", self.name, logging=logging)
 
-    def save(self, file_path=None, forced=False, default=False, cancel=False):
+            # Scatter age
+            self.scatter = np.mean([group.scatter for group in self], axis=0)
+            self.scatter_age = np.round(np.mean([group.scatter_age for group in self]), 3)
+            self.scatter_age_error = np.round(np.std([group.scatter_age for group in self]), 3)
+
+            # Median absolute deviation age
+            self.mad = np.mean([group.mad for group in self], axis=0)
+            self.mad_age = np.round(np.mean([group.mad_age for group in self]), 3)
+            self.mad_age_error = np.round(np.std([group.mad_age for group in self]), 3)
+
+            # Minimum spanning tree mean branch length age
+            self.mst_mean = np.mean([group.mst_mean for group in self], axis=0)
+            self.mst_mean_age = np.round(np.mean([group.mst_mean_age for group in self]), 3)
+            self.mst_mean_age_error = np.round(np.std([group.mst_mean_age for group in self]), 3)
+
+            # Minimum spanning tree median absolute deviation branch length age
+            self.mst_mad = np.mean([group.mst_mad for group in self], axis=0)
+            self.mst_mad_age = np.round(np.mean([group.mst_mad_age for group in self]), 3)
+            self.mst_mad_age_error = np.round(np.std([group.mst_mad_age for group in self]), 3)
+
+            # X-U, Y-V and Z-W covariance
+            self.covariances = np.mean([group.covariances for group in self], axis=0)
+
+            # X-U covariance age
+            self.xu_age = np.round(np.mean([group.covariances_age[0] for group in self]), 3)
+            self.xu_age_error = np.round(np.std([group.covariances_age[0] for group in self]), 3)
+
+            # Y-V covariance age
+            self.yv_age = np.round(np.mean([group.covariances_age[1] for group in self]), 3)
+            self.yv_age_error = np.round(np.std([group.covariances_age[1] for group in self]), 3)
+
+            # Z-W covariance age
+            self.zw_age = np.round(np.mean([group.covariances_age[2] for group in self]), 3)
+            self.zw_age_error = np.round(np.std([group.covariances_age[2] for group in self]), 3)
+
+
+    def save(self, file_path=None, forced=False, default=False, cancel=False, logging=True):
         """ Saves a series to a binary file. self.file_path is defined as the actual path to the
             file. If forced, the existing file is overwritten, otherwise user input is required
             to proceed if a file already exists.
@@ -768,8 +811,14 @@ class Series(list, Output_Series):
         # Check if a file already exists
         if path.exists(self.file_path):
             choice = None
+            self.stop(type(forced) != bool, 'TypeError',
+                "'forced' must be a boolean ({} given).", type(forced))
             if not forced:
+                self.stop(type(default) != bool, 'TypeError',
+                    "'default' must be a default ({} given).", type(default))
                 if not default:
+                    self.stop(type(cancel) != bool, 'TypeError',
+                        "'cancel' must be a boolean ({} given).", type(cancel))
                     if not cancel:
 
                         # User input
@@ -790,17 +839,18 @@ class Series(list, Output_Series):
 
                         # Logging
                         log("'{}' series was not saved because a file already exists at '{}'",
-                            self.name, self.file_path)
+                            self.name, self.file_path, logging=logging)
                         del vars(self)['file_path']
 
                 # Default name and saving
                 if default or choice in ('k', 'keep'):
-                    from tools import default_name
+                    from Traceback.tools import default_name
                     self.file_path = default_name(self.file_path)
                     save(self)
 
                     # Logging
-                    log("File name changed and series saved at '{}'.", self.file_path)
+                    log("File name changed and series saved at '{}'.", self.file_path,
+                        logging=logging)
 
             # Existing file deletion and saving
             if forced or choice in ('y', 'yes'):
@@ -809,16 +859,17 @@ class Series(list, Output_Series):
                 save(self)
 
                 # Logging
-                log("Existing file located at '{}' deleted and replaced.", self.file_path)
+                log("Existing file located at '{}' deleted and replaced.", self.file_path,
+                    logging=logging)
 
         # Saving
         else:
             save(self)
 
             # Logging
-            log("'{}' series saved at '{}'.", self.name, self.file_path)
+            log("'{}' series saved at '{}'.", self.name, self.file_path, logging=logging)
 
-    def create(self, forced=False, default=False, cancel=False):
+    def create(self, forced=False, default=False, cancel=False, logging=True):
         """ Either loads a series from a file, or traces a series back from data or a model. If
             needed, the series is also saved. If both self.from_file, and self.from_data or
             self.from_model are True, loading operation supercedes the traceback mode, which is
@@ -827,17 +878,17 @@ class Series(list, Output_Series):
 
         # Load from a file
         if self.from_file:
-            self.load(forced=forced, default=default, cancel=cancel)
+            self.load(forced=forced, default=default, cancel=cancel, logging=logging)
 
         # Traceback from data or a model
         elif self.from_data or self.from_model:
-            self.traceback(forced=forced)
+            self.traceback(forced=forced, logging=logging)
 
         # Save to a file
         if self.to_file:
-            self.save(forced=forced, default=default, cancel=cancel)
+            self.save(forced=forced, default=default, cancel=cancel, logging=logging)
 
-    def stop(self, condition, error, message, *words):
+    def stop(self, condition, error, message, *words, marmalade=False):
         """ Calls the stop function from tools with self.name, if it has been set. """
 
         # Addition of series name to stop function call

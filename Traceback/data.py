@@ -11,10 +11,9 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
-from os import path
 from csv import reader, writer, Sniffer
-from collection import *
-from coordinate import *
+from Traceback.collection import *
+from Traceback.coordinate import *
 
 class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.

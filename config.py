@@ -76,7 +76,7 @@ avg_velocity_scatter.values = (1.68050, 1.68050, 1.68050) # (2.21753, 1.36009, 1
 avg_velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dict)
-data.value = 'Data/bpic_updated.csv'
+data.value = '../Data/bpic_updated.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'

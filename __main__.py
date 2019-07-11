@@ -3,27 +3,34 @@
 
 """ __main__.py: Main pipeline of the Traceback package. It executes the following steps:
 
-        Series: arguments, parameters, data and file import, format and check, and conversions
-        Groups: star traceback from data or a model, and age computation
-        Output: figures creation
+        -   Series creation: arguments, parameters, data and configuration file import, format and
+            check, and conversions
+
+        -   Groups creation: star traceback from data or a model, and age computation by minimizing
+            the scater, median absolute deviation (MAD), minimum spanning tree (MST) mean branch
+            length, MST branch length MAD and covariances
+
+        -   Output creation: series and groups output
 """
 
-from series import *
+from Traceback import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Series
-Series(path='Traceback/config.py', args=True)
+# Series creation
+collection.new(path='config.py', args=True)
 
-# Groups
+# Groups creation
 collection.create()
 
-# Output
+# Series output
 for series in collection:
-    series.create_size_indicators_plot()
-    series.create_covariances_plot()
+    series.create_size_indicators_plot(forced=True)
+    series.create_covariances_plot(forced=True)
+
+    # Group output
     for group in series:
-        group.create_2D_scatter('x', 'z', age=15.0, errors=True, labels=True, mst=False)
-        group.create_3D_scatter(age=15.0, errors=False, labels=False, mst=True)
-        group.create_covariances_scatter('x', 'u', age=0)
+        group.create_2D_scatter('x', 'z', age=15.0, errors=True, labels=True, mst=False, forced=True)
+        group.create_3D_scatter(age=15.0, errors=False, labels=False, mst=True, forced=True)
+        group.create_covariances_scatter('x', 'u', age=0, errors=True, forced=True)
