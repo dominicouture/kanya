@@ -23,7 +23,7 @@ class Series(list, Output_Series):
     """
 
     def __init__(self, parent=None, path=None, args=False, forced=False, default=False,
-                cancel=False, logging=True, **parameters):
+                cancel=False, logging=True, data_errors=False, **parameters):
         """ Initializes a Series object by first configuring it with 'parent', 'path', 'args' and
             '**parameter' and then adding it to the collection. 'forced', 'default', 'cancel' and
             'logging' arguments are passed to self.add function.
@@ -31,9 +31,10 @@ class Series(list, Output_Series):
 
         # Configuration
         self.configure(parent, path, args, **parameters)
+        self.data_errors = data_errors
 
         # Series addition to the collection
-        self.add(forced=forced, default=default, cancel=cancel, logging=True)
+        self.add(forced=forced, default=default, cancel=cancel, logging=logging)
 
     def configure(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Series objects from 'parent', an existing Config object, 'path', a string
@@ -161,16 +162,38 @@ class Series(list, Output_Series):
             self.stop(type(vars(self)[argument]) != bool, 'TypeError',
                 "'{}' must be a boolean value ({} given).", argument, type(vars(self)[argument]))
 
-        # Check if no more than one mode has been selected
-        self.stop(self.from_data == True and self.from_model == True,
-            'ValueError', "No more than one traceback mode ('from_data' or 'from_model') can be "
-            "selected for '{}'", self.name)
-
         # self.to_file parameter set to False if self.from_file is True
         if self.from_file and self.to_file:
             log("Output of '{}' from and to file. "
                 "The file will not be updated with its own data.", self.name)
             self.to_file = False
+
+    def configure_mode(self, mode=None):
+        """ Checks if selected mode is valid, and if one and no more than one mode has been
+            selected.
+        """
+
+        # Mode import
+        if mode is not None:
+            self.stop(type(mode) != str, 'TypeError', "'mode' must be a string ({} given).",
+                type(mode))
+            if mode.lower().replace('_', '').replace('from', '') == 'data':
+                self.from_data = True
+                self.from_model = False
+            elif mode.lower().replace('_', '').replace('from', '') == 'model':
+                self.from_data = False
+                self.from_model = True
+            else:
+                self.stop(True, 'ValueError', "Could not understand mode '{}'", mode)
+
+        # Check if at least one mode has been selected
+        self.stop(self.from_data == False and self.from_model == False, 'ValueError',
+            "Either traceback '{}' from data or a model (none selected).", self.name)
+
+        # Check if no more than one mode has been selected
+        self.stop(self.from_data == True and self.from_model == True,
+            'ValueError', "No more than one traceback mode ('from_data' or 'from_model') can be "
+            "selected for '{}'", self.name)
 
     def configure_file(self, file_path=None):
         """ Checks if the file directory and the file itself exist and creates them if needed.
@@ -225,13 +248,13 @@ class Series(list, Output_Series):
         self.duration = self.final_time - self.initial_time
         self.timestep = self.duration / (self.number_of_steps - 1)
         self.time = np.linspace(
-            self.initial_time.values, self.final_time.values, self.number_of_steps)
+            self.initial_time.values[0], self.final_time.values[0], self.number_of_steps)
 
         # Radial velocity offset paramaters
         self.rv_offset = self.configure_quantity(self.config.rv_offset)
 
         # Data configuration for inclusion in a model
-        if self.from_data or True:
+        if self.from_data:
             self.configure_data()
 
         # Simulation configuration
@@ -243,7 +266,9 @@ class Series(list, Output_Series):
 
     def configure_data(self):
         """ Checks if traceback and output from data is possible and creates a Data object from a
-            CSV file, or a Python dictionary, list, tuple or np.ndarray.
+            CSV file, or a Python dictionary, list, tuple or np.ndarray. Simulation parameters
+            are also set to None or False if the traceback is from data. This allows to use data
+            errors without resetting simulation parameters.
         """
 
         # Logging
@@ -258,12 +283,14 @@ class Series(list, Output_Series):
         self.data = Data(self)
 
         # number_of_stars parameter
-        self.number_of_stars = len(self.data)
+        if self.from_data:
+            self.number_of_stars = len(self.data)
 
-        # Simulation parameters set to None because stars are imported from data
-        for parameter in ('age', *self.config.position_parameters,
-                *self.config.velocity_parameters):
-            vars(self)[parameter] = None
+            # Simulation parameters set to None or False if stars are imported from data
+            for parameter in ('age', *self.config.position_parameters,
+                    *self.config.velocity_parameters):
+                vars(self)[parameter] = None
+            self.data_errors = False
 
     def configure_model(self):
         """ Checks if traceback and output from a model is possible. """
@@ -272,7 +299,7 @@ class Series(list, Output_Series):
         log("Initializing '{}' series from a model.", self.name)
 
         # Check if all the necessary parameters are present
-        for parameter in ('number_of_stars', 'age', *self.config.position_parameters,
+        for parameter in ('number_of_stars', 'age', 'data_errors', *self.config.position_parameters,
                 *self.config.velocity_parameters):
             self.stop(vars(self.config)[parameter].values is None, 'NameError',
                 "Required simulation parameter '{}' is missing in the configuration.", parameter)
@@ -282,7 +309,7 @@ class Series(list, Output_Series):
 
         # age parameter
         self.age = self.configure_quantity(self.config.age)
-        self.stop(not self.age.value >= 0.0, 'ValueError',
+        self.stop(self.age.value < 0.0, 'ValueError',
             "'age' must be greater than or equal to 0.0 Myr ({} given).", self.age)
 
         # avg_position parameter
@@ -303,8 +330,18 @@ class Series(list, Output_Series):
         # avg_velocity_scatter parameter
         self.avg_velocity_scatter = self.configure_coordinate(self.config.avg_velocity_scatter)
 
-        # Data set to None because stars are simulated
-        # self.data = None
+        # data_errors parameter
+        self.data_errors = self.config.data_errors.values
+        self.stop(type(self.data_errors) != bool, 'TypeError',
+            "'data_errors' must be a boolean value ({} given).", type(self.data_errors))
+
+        # Data configured to use actual error measurements
+        if self.data_errors:
+            self.configure_data()
+
+        # Data set to None because measurement errors are simulated
+        else:
+            self.data = None
 
     def configure_integer(self, parameter):
         """ Checks if an integer value is valid and converts it if needed. """
@@ -683,22 +720,8 @@ class Series(list, Output_Series):
             modeling a group based on simulation parameters.
         """
 
-        # Mode import
-        if mode is not None:
-            self.stop(type(mode) != str, 'TypeError', "'mode' must be a string ({} given).",
-                type(mode))
-            if mode.lower().replace('_', '').replace('from', '') == 'data':
-                self.from_data = True
-                self.from_model = False
-            elif mode.lower().replace('_', '').replace('from', '') == 'model':
-                self.from_data = False
-                self.from_model = True
-            else:
-                self.stop(True, 'ValueError', "Could not understand mode '{}'", mode)
-
-        # Check if at least one mode has been selected
-        self.stop(self.from_data == False and self.from_model == False, 'ValueError',
-            "Either traceback '{}' from data or a model (none selected).", self.name)
+        # Mode configuration
+        self.configure_mode(mode)
 
         # Check if a traceback has already been done
         self.stop(type(forced) != bool, 'TypeError',
@@ -754,21 +777,25 @@ class Series(list, Output_Series):
             self.scatter = np.mean([group.scatter for group in self], axis=0)
             self.scatter_age = np.round(np.mean([group.scatter_age for group in self]), 3)
             self.scatter_age_error = np.round(np.std([group.scatter_age for group in self]), 3)
+            self.scatter_min = np.round(np.mean([group.scatter_min for group in self]), 3)
 
             # Median absolute deviation age
             self.mad = np.mean([group.mad for group in self], axis=0)
             self.mad_age = np.round(np.mean([group.mad_age for group in self]), 3)
             self.mad_age_error = np.round(np.std([group.mad_age for group in self]), 3)
+            self.mad_min = np.round(np.mean([group.mad_min for group in self]), 3)
 
             # Minimum spanning tree mean branch length age
             self.mst_mean = np.mean([group.mst_mean for group in self], axis=0)
             self.mst_mean_age = np.round(np.mean([group.mst_mean_age for group in self]), 3)
             self.mst_mean_age_error = np.round(np.std([group.mst_mean_age for group in self]), 3)
+            self.mst_mean_min = np.round(np.mean([group.mst_mean for group in self]), 3)
 
             # Minimum spanning tree median absolute deviation branch length age
             self.mst_mad = np.mean([group.mst_mad for group in self], axis=0)
             self.mst_mad_age = np.round(np.mean([group.mst_mad_age for group in self]), 3)
             self.mst_mad_age_error = np.round(np.std([group.mst_mad_age for group in self]), 3)
+            self.mst_mad_min = np.round(np.mean([group.mst_mad for group in self]), 3)
 
             # X-U, Y-V and Z-W covariance
             self.covariances = np.mean([group.covariances for group in self], axis=0)
@@ -776,14 +803,17 @@ class Series(list, Output_Series):
             # X-U covariance age
             self.xu_age = np.round(np.mean([group.covariances_age[0] for group in self]), 3)
             self.xu_age_error = np.round(np.std([group.covariances_age[0] for group in self]), 3)
+            self.xu_min = np.round(np.mean([group.covariances_min[0] for group in self]), 3)
 
             # Y-V covariance age
             self.yv_age = np.round(np.mean([group.covariances_age[1] for group in self]), 3)
             self.yv_age_error = np.round(np.std([group.covariances_age[1] for group in self]), 3)
+            self.yv_min = np.round(np.mean([group.covariances_min[1] for group in self]), 3)
 
             # Z-W covariance age
             self.zw_age = np.round(np.mean([group.covariances_age[2] for group in self]), 3)
             self.zw_age_error = np.round(np.std([group.covariances_age[2] for group in self]), 3)
+            self.zw_min = np.round(np.mean([group.covariances_min[2] for group in self]), 3)
 
 
     def save(self, file_path=None, forced=False, default=False, cancel=False, logging=True):
@@ -869,16 +899,19 @@ class Series(list, Output_Series):
             # Logging
             log("'{}' series saved at '{}'.", self.name, self.file_path, logging=logging)
 
-    def create(self, forced=False, default=False, cancel=False, logging=True):
+    def create(self, forced=False, default=False, cancel=False, logging=True, mode=None):
         """ Either loads a series from a file, or traces a series back from data or a model. If
             needed, the series is also saved. If both self.from_file, and self.from_data or
             self.from_model are True, loading operation supercedes the traceback mode, which is
             ignored and replaced by the value loaded from the file.
         """
 
+        # Mode configuration
+        self.configure_mode(mode)
+
         # Load from a file
         if self.from_file:
-            self.load(forced=forced, default=default, cancel=cancel, logging=logging)
+            self.load(forced=forced, logging=logging)
 
         # Traceback from data or a model
         elif self.from_data or self.from_model:

@@ -35,7 +35,7 @@ number_of_groups.value = 1
 number_of_steps.value = 200
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 45
+number_of_stars.value = 60
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
@@ -47,7 +47,8 @@ final_time.value = 30.0
 age.value = 24.0
 
 # Average position of the simulated sample of stars (tuple)
-avg_position.values = (0.0, 0.0, 0.0) # (15.19443946, -4.93616248, -17.07422231)
+avg_position.values = (0.0, 0.0, 0.0)
+# avg_position.values = (15.19443946, -4.93616248, -17.07422231)
 
 # Average position error of the simulated sample of stars (tuple)
 avg_position_error.values = (0.19846, 0.0, 0.0)
@@ -57,26 +58,32 @@ avg_position_error.system = 'observables'
 avg_position_error.axis = 'equatorial'
 
 # Average position scatter of the simulated sample of stars (tuple)
-avg_position_scatter.values = (5.0, 5.0, 5.0) # (29.3, 14.0, 9.0)
+avg_position_scatter.values = (5.0, 5.0, 5.0)
+# avg_position_scatter.values = (29.3, 14.0, 9.0)
 
 # Average velocity of the simulated sample of stars (tuple)
-avg_velocity.values =  (-11.3442, -11.3442, -11.3442) # (-10.54893, -15.88653,  -8.71138)
+avg_velocity.values = (-11.3442, -11.3442, -11.3442)
+# avg_velocity.values = (-10.54893, -15.88653,  -8.71138)
+# avg_velocity.values = (-10.93, -15.79,  -8.94)
 avg_velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
 avg_velocity_error.values = (1.0112, 0.30754, 0.26432)
 # avg_velocity_error.values = (0.0, 0.0, 0.0)
-# avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
+avg_velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 avg_velocity_error.units = 'observables'
 avg_velocity_error.system = 'observables'
 avg_velocity_error.axis = 'equatorial'
 
 # Average velocity scatter of the simulated sample of stars (tuple)
-avg_velocity_scatter.values = (1.68050, 1.68050, 1.68050) # (2.21753, 1.36009, 1.57355)
+# avg_velocity_scatter.values = (1.68050, 1.68050, 1.68050)
+# avg_velocity_scatter.values = (2.21753, 1.36009, 1.57355)
+avg_velocity_scatter.values = (1.2, 1.2, 1.2)
 avg_velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dict)
 data.value = '../Data/bpic_updated.csv'
+# data.value = '../Data/bpic_Crundall2019.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -132,5 +139,9 @@ data.axis = 'observables'
 # ]}
 
 # Radial velocity offset applied to all stars (float)
-rv_offset.value = 0.0
+rv_offset.value = -0.5
+# rv_offset.value = 0.0
 rv_offset.unit = 'km/s'
+
+# Whether to use actual or simulated measurement errors (boolean)
+data_errors.value = True

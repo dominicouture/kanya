@@ -103,6 +103,7 @@ class Config():
         Parameter(label='avg_velocity_error', name='Average velocity error', **null_velocity),
         Parameter(label='avg_velocity_scatter', name='Average velocity scatter', **null_velocity),
         Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
+        Parameter(label='data_errors', name='Data errors', values=False),
         Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
             units=System.default_units['speed'].label, system='cartesian'))}
 

@@ -1,7 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" __init.py: Initializes the Traceback package. """
+""" __init__.py: Initializes the Traceback package. """
 
 from Traceback.series import *
 

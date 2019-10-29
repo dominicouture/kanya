@@ -3,7 +3,7 @@
 
 """ data.py: Defines Data, and embeded Column and Row classes, which contains all the information
     from a CSV file or a Python dictionary, list, tuple or np.ndarray that can then be used as
-    an input for a Group object and all related methods to check and convert this data. Units are
+    an input for a Group object, and all related methods to check and convert this data. Units are
     identified and converted to default units.
 """
 
@@ -82,6 +82,12 @@ class Data(list):
             [row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))], dtype=object)
         data_csv.close()
 
+        # Check if self.table is a 2D array
+        self.series.stop(self.table.ndim != 2, 'ValueError',
+            "'data' parameter must represent a 2D array ({} dimensions in the given CSV). "
+            "Make sure all lines have an equal number of columns in the CSV file.",
+            self.table.ndim)
+
     def initialize_from_data(self):
         """ Initializes a Data object from a Python dictionary, list, tuple or np.ndarray (2D). If
             a dictionary is used, only the value with a key that matches self.series.name is used
@@ -111,9 +117,10 @@ class Data(list):
         if type(self.data.values) in (list, tuple, np.ndarray):
             self.table = np.array(self.data.values, dtype=object)
 
-        # Check if self.table has been converted a 2D array
+        # Check if self.table is a 2D array
         self.series.stop(self.table.ndim != 2, 'ValueError',
-            "'data' parameter must represent a 2D array ({} dimensions in the given data).",
+            "'data' parameter must represent a 2D array ({} dimensions in the given data). "
+            "Make sure all lines have an equal number of columns.",
             self.table.ndim)
 
         # Conversion of data into strings
@@ -248,7 +255,7 @@ class Data(list):
         """
 
         # Label permutations
-        permutations = {
+        label_permutations = {
             '-': '',
             '_': '',
             ' ': '',
@@ -275,8 +282,8 @@ class Data(list):
 
         def __init__(self, data, column, missing=False):
             """ Initializes a Column object from a 'data' object and a number 'column' matching the
-                position of the corresponding column in 'data'. If 'error' is set as true, a 'Δ' is
-                added to self.label.
+                position of the corresponding column in 'data'. If 'missing' is set as true, a 'Δ'
+                caracter is added to self.label.
             """
 
             # Initialization
@@ -287,7 +294,7 @@ class Data(list):
             # Label identification and permutations
             self.data_label = self.data.table[0, self.column]
             self.label = self.data_label.lower()
-            for old, new in self.permutations.items():
+            for old, new in self.label_permutations.items():
                 self.label = self.label.replace(old, new)
 
             # Error label permutations
@@ -349,7 +356,7 @@ class Data(list):
             """ Converts a 'label' into a reformatted version matching those used in 'system'. """
 
             # Label permutations
-            for old, new in self.permutations.items():
+            for old, new in self.label_permutations.items():
                 label = label.replace(old, new)
 
             # Error label permutations
@@ -441,16 +448,16 @@ class Data(list):
                             self.values[label], label)
 
             # Name column
-            self.name = self.values['name'] if 'name' in self.data.columns \
-                and self.values['name'] != '' else 'Star_{}'.format(str(self.row))
+            self.name = self.values['name'].strip() if 'name' in self.data.columns \
+                and self.values['name'].strip()  != '' else 'Star_{}'.format(str(self.row))
 
             # Type column
-            self.type = self.values['type'] if 'type' in self.data.columns \
-                and self.values['type'] != '' else None
+            self.type = self.values['type'].strip() if 'type' in self.data.columns \
+                and self.values['type'].strip() != '' else None
 
             # ID column
-            self.id = self.values['id'] if 'id' in self.data.columns \
-                and self.values['id'] != '' else str(self.row)
+            self.id = self.values['id'].strip() if 'id' in self.data.columns \
+                and self.values['id'].strip() != '' else str(self.row)
 
             # Position columns and unit conversion
             self.position = Quantity(

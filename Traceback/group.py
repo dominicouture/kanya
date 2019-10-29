@@ -22,7 +22,7 @@ class Group(list, Output_Group):
         simulation parameters
     """
 
-    def __init__(self, series, name):
+    def __init__(self, series, name, uncorrected=False):
         """ Initializes a Group object and embedded Star objects from a simulated sample of stars
             in a moving group or raw data in the form a Data object. This dataset is then moved
             backwards in time from the initial time to the final time, and its age is estimated
@@ -89,20 +89,15 @@ class Group(list, Output_Group):
 
             # Star creation
             self.append(self.Star(
-                self, outlier=False,
-                name=star.name,
-                velocity=velocity_uvw,
-                velocity_error=velocity_uvw_error,
-                position=position_xyz,
-                position_error=position_xyz_error))
+                self, outlier=False, name=star.name,
+                velocity=velocity_uvw, velocity_error=velocity_uvw_error,
+                position=position_xyz, position_error=position_xyz_error))
 
             # Stars creation from cartesian coordinates
             # self.append(self.Star(
             #     self, outlier=False, name=star.name,
-            #     velocity=star.velocity.values,
-            #     velocity_error=star.velocity.values,
-            #     position=star.position.values,
-            #     position_error=star.position.values))
+            #     velocity=star.velocity.values, velocity_error=star.velocity.values,
+            #     position=star.position.values, position_error=star.position.values))
 
     def stars_from_model(self):
         """ Creates an artificial model of star for a given number of stars and age based on
@@ -122,14 +117,14 @@ class Group(list, Output_Group):
         avg_position_scatter = self.series.avg_position_scatter.values
 
         # Stars creation from a model
-        for star in range(1, self.series.number_of_stars + 1):
+        for star in range(self.series.number_of_stars):
 
             # Velocity and a position based average values and scatters
             velocity_uvw = np.random.normal(avg_velocity, avg_velocity_scatter)
             position_xyz = velocity_uvw * self.series.age.values + (
                 np.random.normal(avg_position, avg_position_scatter) -
                 (avg_velocity * self.series.age.values + avg_position) + # Normalisation
-                (15.19444, -4.93612, -1.70742223)) # β Pictoris current average position
+                (15.19444, -4.93612, -17.0742223)) # β Pictoris current average position
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
@@ -140,19 +135,23 @@ class Group(list, Output_Group):
             position_obs, velocity_obs = spherical_observables(*position_rδα, *velocity_rvμδμα)[:2]
 
             # Observables conversion back into equatorial spherical coordinates
-            (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
-                observables_spherical(
+            # Velocity and position scrambling based on actual measurement errors
+            if self.series.data_errors:
+                star_errors = star - star // len(self.series.data) * len(self.series.data)
+                (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
+                        observables_spherical(
+                    *np.random.normal(position_obs, self.series.data[star_errors].position.errors),
+                    *np.random.normal(velocity_obs, self.series.data[star_errors].velocity.errors),
+                    *self.series.data[star_errors].position.errors,
+                    *self.series.data[star_errors].velocity.errors)
 
-                    # Velocity and position scrambling based on average measurement errors
-                    # *np.random.normal(position_obs, avg_position_error),
-                    # *np.random.normal(velocity_obs, avg_velocity_error),
-                    # *avg_position_error, *avg_velocity_error)
-
-                    # Velocity and position scrambling based on actual measurement errors
-                    *np.random.normal(position_obs, self.series.data[star].position.errors),
-                    *np.random.normal(velocity_obs, self.series.data[star].velocity.errors),
-                    *self.series.data[star].position.errors,
-                    *self.series.data[star].position.errors)
+            # Velocity and position scrambling based on average measurement errors
+            else:
+                (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
+                        observables_spherical(
+                    *np.random.normal(position_obs, avg_position_error),
+                    *np.random.normal(velocity_obs, avg_velocity_error),
+                    *avg_position_error, *avg_velocity_error)
 
             # Velocity and position conversion back to galactic cartesian coordinates
             position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
@@ -163,11 +162,11 @@ class Group(list, Output_Group):
             # Star creation
             self.append(self.Star(
                 self, outlier=False,
-                name='star_{}'.format(star),
+                name='star_{}'.format(star + 1),
                 velocity=velocity_uvw,
-                velocity_error=velocity_uvw_error,
+                velocity_error=position_xyz_error,
                 position=position_xyz,
-                position_error=position_xyz_error))
+                position_error=velocity_uvw_error))
 
     def get_stars_coordinates(self):
         """ Filters outliers and creates self.stars list of valid stars and computes the number
@@ -179,7 +178,7 @@ class Group(list, Output_Group):
         # Outliers filtering
         self.stars = list(filter(lambda star: not star.outlier, self))
 
-        # Group number of stars without outliers
+        # Number of stars remaining, without outliers
         self.number_of_stars = len(self.stars)
 
         # Average velocity
@@ -216,6 +215,9 @@ class Group(list, Output_Group):
             # XYZ scatter
             self.scatter_xyz = np.std([star.position for star in self.stars], axis=0)
 
+            # UVW scatter
+            self.scatter_uvw = np.std([star.velocity for star in self.stars], axis=0)
+
             # 3D scatter
             self.scatter = (np.sum(self.scatter_xyz**2, axis=1) - np.sum(
                 self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
@@ -235,6 +237,7 @@ class Group(list, Output_Group):
 
         # Scatter age
         self.scatter_age = self.series.time[np.argmin(self.scatter)]
+        self.scatter_min = np.min(self.scatter)
 
     def get_median_absolute_deviation(self):
         """ Computes the XYZ and total median absolute deviation (MAD) of a group and their
@@ -252,6 +255,7 @@ class Group(list, Output_Group):
 
         # Median absolute deviation age
         self.mad_age = self.series.time[np.argmin(self.mad)]
+        self.mad_min = np.min(self.mad)
 
     def get_covariances(self):
         """ Computes the X-U, Y-V and Z-W absolute covariances of a group and their respective
@@ -263,17 +267,18 @@ class Group(list, Output_Group):
         self.covariances = np.absolute(np.sum(
             (np.array([star.position for star in self.stars]) - self.avg_position) *
             np.expand_dims(np.array([star.velocity for star in self.stars]) - self.avg_velocity,
-                axis=1), axis=0) /self.series.number_of_stars)
+                axis=1), axis=0) /self.number_of_stars)
 
         # Covariances age
         self.covariances_age = np.vectorize(
             lambda step: self.series.time[step])(np.argmin(self.covariances, axis=0))
+        self.covariances_min = np.min(self.covariances, axis=0)
 
     def get_minimum_spanning_tree(self):
-        """ Builds the minimal spanning tree (MST) of a group for all timseteps using a Kruskal
-            algorithm, and computes errors, and the average branch length and the branch length
-            median absolute absolute deviation. The age of the moving is then estimated by
-            finding the time at which these measures are minimal.
+        """ Builds the minimum spanning tree (MST) of a group for all timesteps using a Kruskal
+            algorithm, and computes the average branch length and the branch length median absolute
+            absolute deviation of branch length. The age of the moving is then estimated by finding
+            the time at which these value are minimal.
         """
 
         # Branches creation
@@ -305,7 +310,7 @@ class Group(list, Output_Group):
                 branch = self.branches[i]
                 i += 1
 
-                # Replace branch start and end stars current nodes with their largest parent node
+                # Replace branch start and end stars' current nodes with their largest parent node
                 while branch.start.node.parent != None: branch.start.node = branch.start.node.parent
                 while branch.end.node.parent != None: branch.end.node = branch.end.node.parent
 
@@ -322,12 +327,14 @@ class Group(list, Output_Group):
         # Minimum spanning tree average branch length and age computation
         self.mst_mean = np.mean(self.mst_lengths, axis=1)
         self.mst_mean_age = self.series.time[np.argmin(self.mst_mean)]
+        self.mst_min = np.min(self.mst_mean)
 
         # Minimum spanning tree branch length median absolute deviation
         self.mst_median = np.median(self.mst_lengths, axis=1)
         self.mst_mad = np.median(
             np.abs(self.mst_lengths - np.expand_dims(self.mst_median, axis=0).T), axis=1)
         self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
+        self.mst_mad_min = np.min(self.mst_mad)
 
     class Branch:
         """ Line connecting two stars used for the calculation of the minimum spanning tree. """

@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """ collection.py: Defines the Collection class and initializes global parameters. Global
-    functions, such directory, output, log and stop are also defined.
+    functions used by Series class and more, such as directory, output, log and stop are also
+    defined.
 """
 
 __author__ = 'Dominic Couture'
@@ -13,7 +14,8 @@ from os import path
 class Collection(list):
     """ Contains all series objects created from data, a model or a file. Functions to add,
         remove, update, copy, load, traceback, save, create and select series are defined, as
-        well as a function to generate default series name from the names in self.series.
+        well as a function to generate default series names from the existing series names in
+        self.series.
     """
 
     def __init__(self):
@@ -358,7 +360,7 @@ def stop(condition, error, message, *words, name=None, extra=1):
         from sys import exc_info, exit
         exc_type, exc_value = exc_info()[:2]
 
-        # If no exception is being handled
+        # If no exception is being handled, an exception is raised
         if exc_type is None and exc_value is None:
             try:
                 exec("raise {}".format(error))
@@ -367,6 +369,7 @@ def stop(condition, error, message, *words, name=None, extra=1):
 
         # If an exception is being handled, its traceback is formatted and execution is terminated
         else:
+
             # Traceback message creation
             if len(words) > 0:
                 message = message.format(*words)
@@ -378,7 +381,7 @@ def stop(condition, error, message, *words, name=None, extra=1):
             tb_stack = ''.join(
                 ['An exception has been raised: \n'] + format_stack()[:-extra] + [tb_message])
 
-            # Exception logging only if logs have been configured and code termination
+            # Exception logging, if logs have been configured, and code termination
             if 'collection' in globals().keys() and collection.logs_configured:
                 log(tb_stack, level='warning')
             print(tb_stack)

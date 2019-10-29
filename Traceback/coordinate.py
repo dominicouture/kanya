@@ -130,6 +130,7 @@ class Coordinate:
     """
 
     # J2000.0 Galactic-equatorial rotation matrix from Liu et al. (2018) 1010.3773
+    # Rotates a vector from equatorial to galactic reference frame
     # !!! This part should be moved to Axis !!!
     germ = np.array([
         [-0.054875657707, -0.873437051953, -0.483835073621],
@@ -145,9 +146,9 @@ class Coordinate:
     cos_δ_north = cos(δ_north)
     sin_δ_north = sin(δ_north)
 
-    # J2000.0 Galactic longitude (l) of the Celestial North pole (δ = 90°)
+    # J2000.0 position angle (l) of the galactic center from the equatorial pole (δ = 90°)
     # from Liu et al. (2018) 1010.3773
-    l_north = radians(122.931925267)
+    l_galaxy = radians(122.931925267)
 
     # Parallax conversion from radians to parsecs constant
     k = π / 648000
@@ -379,7 +380,7 @@ def rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, 
         return values, errors
 
 def equatorial_galactic_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
-    """ Rotates a cartesian XYZ position or UVW velocity from a galactic to an equatorial plane.
+    """ Rotates a cartesian XYZ position or UVW velocity from an equatorial to a galactic plane.
         All arguments must have the same units.
     """
 
@@ -394,7 +395,7 @@ def equatorial_galactic_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
         return values, errors
 
 def galactic_equatorial_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
-    """ Rotates a cartesian XYZ position or UVW velocity from an equatorial to a galactic plane.
+    """ Rotates a cartesian XYZ position or UVW velocity from an  galactic to an equatorial plane.
         All arguments must have the same units.
     """
 
