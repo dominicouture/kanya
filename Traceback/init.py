@@ -80,7 +80,7 @@ class Config():
         units=tuple(variable.unit.label for variable in systems['cartesian'].position))
     null_velocity = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
         units=tuple(variable.unit.label for variable in systems['cartesian'].velocity))
-    null_time = dict(units=System.default_units['time'].label, system='cartesian')
+    null_time = dict(units=System.default_units['time'].label)
 
     # Default parameters
     default_parameters = {parameter.label: parameter for parameter in (
@@ -105,7 +105,8 @@ class Config():
         Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
         Parameter(label='data_errors', name='Data errors', values=False),
         Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
-            units=System.default_units['speed'].label, system='cartesian'))}
+            units=System.default_units['speed'].label, system='cartesian'),
+        Parameter(label='cutoff', name='Cutoff'))}
 
     # Position and velocity paramaters
     position_parameters = ('avg_position', 'avg_position_error', 'avg_position_scatter')

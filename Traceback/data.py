@@ -366,7 +366,7 @@ class Data(list):
                 label = 'Δ' + label[1:]
 
             # Assumption that μα stands for μαcosδ when importing observables system
-            if system == 'observables' and label[-2:] == 'μα':
+            if system == systems['observables'] and label[-2:] == 'μα':
                 label = label + 'cosδ'
 
             return label

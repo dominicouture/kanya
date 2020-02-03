@@ -33,6 +33,16 @@ class System():
         self.position_error = [self.variables['Δ' + label] for label in position]
         self.velocity_error = [self.variables['Δ' + label] for label in velocity]
 
+    def __eq__(self, other):
+        """ Tests whether self is not the equal to other. """
+
+        return self.name == self.name
+
+    def __repr__(self):
+        """ Returns a string of name of the system. """
+
+        return self.name
+
     # Default units per physical type
     default_units = {
         'time': Unit('Myr', 'megayear'),
@@ -57,6 +67,16 @@ class System():
             # Initialization
             self.name = name
 
+        def __eq__(self, other):
+            """ Tests whether self is not the equal to other. """
+
+            return self.name == other.name
+
+        def __repr__(self):
+            """ Returns a string of name of the axis. """
+
+            return self.name
+
     # Coordinate system axes
     axes = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
 
@@ -80,6 +100,11 @@ class System():
             self.unit = unit
             self.physical_type = unit.physical_type
             self.usual_unit = self.unit if usual_unit is None else usual_unit
+
+        def __eq__(self, other):
+            """ Tests whether self is not the equal to other. """
+
+            return vars(self) == vars(other)
 
     # Variables
     variables = {variable.label: variable for variable in (

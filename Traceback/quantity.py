@@ -17,7 +17,8 @@ class Quantity:
         to value's unit if error unit don't match with value unit.
     """
 
-    def __init__(self, values, units=None, errors=None, error_units=None,
+    def __init__(
+            self, values, units=None, errors=None, error_units=None,
             parent=None, index=None, **optional):
         """ Initializes a Quantity object with its values, errors and their respective units.
             Errors are converted into the units of values.
@@ -500,6 +501,11 @@ class Unit():
         """ Returns the label of a unit. """
 
         return self.label if self.shape == (1,) else self.labels
+
+    def __eq__(self, other):
+        """ Tests whether self is not the equal to other. """
+
+        return vars(self) == vars(other)
 
     def compare(self, other, shape=None, types=True):
         """ Compare two Unit objects for compatible shapes and physical types and returns

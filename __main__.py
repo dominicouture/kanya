@@ -21,17 +21,18 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 # Series creation
 Series(path='config.py', args=True)
 
-# # Groups creation
+# Groups creation
 collection.create()
 
-# # Output creation
+# Output creation
 for series in collection:
-    series.create_size_indicators_plot(forced=True)
+    series.create_size_indicators_plot(forced=True, title=False)
+    series.create_size_indicators_covariance_plots(forced=True, title=False)
     series.create_covariances_plot(forced=True)
 
     # Group output
     for group in series:
-        group.create_map(title=False, forced=True, labels=True)
+        group.create_map(title=False, forced=True, labels=False)
         group.create_2D_and_3D_scatter([0,  5,  10], title=False, forced=True)
         group.create_2D_and_3D_scatter([15, 20, 25], title=False, forced=True)
         group.create_covariances_scatter('x', 'u', age=0, title=False, errors=True, forced=True)

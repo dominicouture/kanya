@@ -81,8 +81,9 @@ class Collection(list):
         stop(path.splitext(self.logs_path)[1].lower() != '.log', 'TypeError',
             "'{}' is not a log file (with a .log extension).", path.basename(self.logs_path))
 
-    def new(self, parent=None, path=None, args=False, forced=False, default=False,
-                cancel=False, logging=True, **parameters):
+    def new(
+            self, parent=None, path=None, args=False, forced=False, default=False,
+            cancel=False, logging=True, **parameters):
         """ Creates a new Series in the collection. Arguments are the same as those of
             Series.__init__.
         """
@@ -180,12 +181,19 @@ class Collection(list):
         # Selected series only
         else:
 
-            # Check if all series exists
+            # Selected series from an Series object
+            selected_series = []
             for name in series:
-                stop(type(name) != str, 'TypeError', "'series' must be a string ({} given).",
-                    type(name))
-                stop(name not in self.series.keys(), 'NameError',
-                    "Series '{}' is not in the collection.", name)
+                if str(type(name)) != "<class 'series.Series'>":
+                    selected_series.append(name)
+
+                # Selected series from a name, check if it exists
+                else:
+                    stop(type(name) != str, 'TypeError', "'series' must be a string ({} given).",
+                        type(name))
+                    stop(name not in self.series.keys(), 'NameError',
+                        "Series '{}' is not in the collection.", name)
+
 
             return [self[self.series[name]] for name in series]
 

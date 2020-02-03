@@ -22,7 +22,7 @@ class Group(list, Output_Group):
         simulation parameters
     """
 
-    def __init__(self, series, name, uncorrected=False):
+    def __init__(self, series, name):
         """ Initializes a Group object and embedded Star objects from a simulated sample of stars
             in a moving group or raw data in the form a Data object. This dataset is then moved
             backwards in time from the initial time to the final time, and its age is estimated
@@ -120,11 +120,10 @@ class Group(list, Output_Group):
         for star in range(self.series.number_of_stars):
 
             # Velocity and a position based average values and scatters
+            # Positions are projected forward in time centered around the average position
             velocity_uvw = np.random.normal(avg_velocity, avg_velocity_scatter)
-            position_xyz = velocity_uvw * self.series.age.values + (
-                np.random.normal(avg_position, avg_position_scatter) -
-                (avg_velocity * self.series.age.values + avg_position) + # Normalisation
-                (15.19444, -4.93612, -17.0742223)) # β Pictoris current average position
+            position_xyz = np.random.normal((0., 0., 0.), avg_position_scatter) + (
+                velocity_uvw - avg_velocity) * self.series.age.values + avg_position
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
@@ -169,31 +168,27 @@ class Group(list, Output_Group):
                 position_error=velocity_uvw_error))
 
     def get_stars_coordinates(self):
-        """ Filters outliers and creates self.stars list of valid stars and computes the number
-            of remaining stars, the average velocity and position of stars in the group, and the
-            stars' relative positions and distances from the average, regardless of whether the
-            stars are outliers or not.
+        """ Computes the number of stars that aren't ouliers, the stars average velocity and
+            position, excluding outliers, and the stars relative positions and distances from
+            the average, including outliers.
         """
 
-        # Outliers filtering
-        self.stars = list(filter(lambda star: not star.outlier, self))
-
-        # Number of stars remaining, without outliers
+        # Number of stars remaining, excluding outliers
         self.number_of_stars = len(self.stars)
 
-        # Average velocity
+        # Average velocity, excluding outliers
         self.avg_velocity = np.sum(np.array(
             [star.velocity for star in self.stars]), axis=0) / self.number_of_stars
         self.avg_velocity_error = np.sum(np.array(
             [star.velocity_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
 
-        # Average position
+        # Average position, excluding outliers
         self.avg_position = np.sum(np.array(
             [star.position for star in self.stars]), axis=0) / self.number_of_stars
         self.avg_position_error = np.sum(np.array(
             [star.position_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
 
-        # Stars relative position and velocity, distance and speed
+        # Stars relative position and velocity, distance and speed of all stars (outliers or not)
         for star in self:
             star.get_relative_coordinates()
 
@@ -202,14 +197,19 @@ class Group(list, Output_Group):
             timesteps, filters stars farther than 3σ from the average position and compensates
             for the drift of the minimal scatter age due to measurement errors. The age of the
             moving group is then estimated by finding the time at which the scatter is minimal.
-            If all stars are identified as outliers,
+            If all stars are identified as outliers, an error is raised.
         """
 
-        # Initial assumption that outliers are present in the group
+        # Valid stars and outliers lists
+        self.stars = list(self)
+        self.outliers = []
+
+        # Outlier filtering
         outliers = True
         while outliers:
+            # self.stars = list(filter(lambda star: not star.outlier, self))
 
-            # Outliers filtering and coordinates computation
+            # Coordinates computation
             self.get_stars_coordinates()
 
             # XYZ scatter
@@ -219,6 +219,7 @@ class Group(list, Output_Group):
             self.scatter_uvw = np.std([star.velocity for star in self.stars], axis=0)
 
             # 3D scatter
+            self.uncorrected = np.sum(self.scatter_xyz**2, axis=1)**0.5
             self.scatter = (np.sum(self.scatter_xyz**2, axis=1) - np.sum(
                 self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
                 * np.expand_dims(self.series.time, axis=0).T**2, axis=1))**0.5
@@ -228,14 +229,18 @@ class Group(list, Output_Group):
             #     self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
             #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1)**0.5
 
-            # Filter stars located beyond 3σ of the average position and loop scatter computation
+            # Filter stars beyond the σ cutoff of the average position and loop scatter computation
+            outliers = False
             for star in self.stars:
-                if (star.distance > (self.scatter * 3.0)).any():
+                if (star.distance > (self.scatter * self.series.cutoff)).any():
                     star.outlier = True
-            outliers = np.array([star.outlier for star in self.stars])
-            outliers = False if outliers.all() else outliers.any()
+                    outliers = True
+                    self.outliers.append(star)
+                    self.stars.remove(star)
 
         # Scatter age
+        self.uncorrected_age = self.series.time[np.argmin(self.uncorrected)]
+        self.uncorrected_min = np.min(self.uncorrected)
         self.scatter_age = self.series.time[np.argmin(self.scatter)]
         self.scatter_min = np.min(self.scatter)
 

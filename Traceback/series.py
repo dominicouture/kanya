@@ -22,8 +22,9 @@ class Series(list, Output_Series):
         in which all groups have the same Config object as their progenitor.
     """
 
-    def __init__(self, parent=None, path=None, args=False, forced=False, default=False,
-                cancel=False, logging=True, data_errors=False, **parameters):
+    def __init__(
+            self, parent=None, path=None, args=False, forced=False, default=False,
+            cancel=False, logging=True, addition=True, **parameters):
         """ Initializes a Series object by first configuring it with 'parent', 'path', 'args' and
             '**parameter' and then adding it to the collection. 'forced', 'default', 'cancel' and
             'logging' arguments are passed to self.add function.
@@ -31,10 +32,10 @@ class Series(list, Output_Series):
 
         # Configuration
         self.configure(parent, path, args, **parameters)
-        self.data_errors = data_errors
 
         # Series addition to the collection
-        self.add(forced=forced, default=default, cancel=cancel, logging=logging)
+        if addition:
+            self.add(forced=forced, default=default, cancel=cancel, logging=logging)
 
     def configure(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Series objects from 'parent', an existing Config object, 'path', a string
@@ -142,6 +143,11 @@ class Series(list, Output_Series):
             Moreover, self.date is defined.
         """
 
+        # Check if name is a string
+        if self.config.name.values is not None:
+            self.stop(type(self.config.name.values) != str, 'TypeError',
+                "'name' must be a string ('{}' given).", type(self.config.name.values))
+
         # Series name
         self.name = collection.default_name() if self.config.name.values is None \
             else self.config.name.values
@@ -149,10 +155,6 @@ class Series(list, Output_Series):
         # Current date and time
         from time import strftime
         self.date = strftime('%Y-%m-%d %H:%M:%S')
-
-        # Check if series.name is a string
-        self.stop(type(self.name) != str, 'TypeError', "'name' must be a string ('{}' given).",
-            type(self.name))
 
         # from_data, from_model, from_file and to_file parameters
         for argument in ('from_data', 'from_model', 'from_file', 'to_file'):
@@ -188,7 +190,7 @@ class Series(list, Output_Series):
 
         # Check if at least one mode has been selected
         self.stop(self.from_data == False and self.from_model == False, 'ValueError',
-            "Either traceback '{}' from data or a model (none selected).", self.name)
+            "Either traceback '{}' from data or a model (None selected).", self.name)
 
         # Check if no more than one mode has been selected
         self.stop(self.from_data == True and self.from_model == True,
@@ -232,7 +234,7 @@ class Series(list, Output_Series):
         # number_of_groups parameter
         self.number_of_groups = self.configure_integer(self.config.number_of_groups)
 
-        # number_of_steps parameter: one more step to account for t = 0
+        # number_of_steps parameter with one more step to account for t = 0
         self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
 
         # initial_time parameter
@@ -250,8 +252,17 @@ class Series(list, Output_Series):
         self.time = np.linspace(
             self.initial_time.values[0], self.final_time.values[0], self.number_of_steps)
 
-        # Radial velocity offset paramaters
+        # Radial velocity offset paramater
         self.rv_offset = self.configure_quantity(self.config.rv_offset)
+
+        # σ cutoff parameter
+        if self.config.cutoff.values is not None:
+            self.stop(type(self.config.cutoff.values) not in (int, float),
+                'TypeError', "'{}' must be an integer, float or None ({} given).",
+                self.config.cutoff.label, type(self.config.cutoff.values))
+            self.stop(self.config.cutoff.values <= 0.0, 'ValueError',
+                "'cutoff' must be greater to 0.0 ({} given).", self.config.cutoff.values)
+        self.cutoff = self.config.cutoff.values
 
         # Data configuration for inclusion in a model
         if self.from_data:
@@ -265,8 +276,8 @@ class Series(list, Output_Series):
         log("'{}' series ready for traceback.", self.name)
 
     def configure_data(self):
-        """ Checks if traceback and output from data is possible and creates a Data object from a
-            CSV file, or a Python dictionary, list, tuple or np.ndarray. Simulation parameters
+        """ Checks if traceback and output from data is possible and creates a Data object from
+            a CSV file, or a Python dictionary, list, tuple or np.ndarray. Simulation parameters
             are also set to None or False if the traceback is from data. This allows to use data
             errors without resetting simulation parameters.
         """
@@ -455,7 +466,7 @@ class Series(list, Output_Series):
                     parameter.units = [variable.usual_unit.unit \
                         for variable in systems[parameter.units.lower()].velocity]
             else:
-                parameter.units = [parameter.units]
+                parameter.units = (parameter.units,)
 
         # Check the type of parameter.units component
         self.stop(type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
@@ -481,7 +492,7 @@ class Series(list, Output_Series):
         self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
             "Units in '{}' do not have the correct physical type "
             "({} given, {} required for '{}' system.)", parameter.label,
-             quantity.physical_types.tolist(), physical_types, quantity.system.label)
+             quantity.physical_types.tolist(), physical_types.tolist(), quantity.system)
 
         # Units conversion to default units
         return quantity.to()
@@ -491,7 +502,7 @@ class Series(list, Output_Series):
             same name is overwritten, otherwise user input is required to proceed (overwrite, do
             nothing or default). If 'default' is True, then instead of asking for an input, a
             default name is used and the series added to the collection. If 'cancel' is True,
-            instead of asking for an input,
+            instead of asking for an input, the series isn't added to the collection.
         """
 
         # Check if a series already exists
@@ -528,13 +539,14 @@ class Series(list, Output_Series):
 
                 # Default name and addition to the collection
                 if default or choice in ('k', 'keep'):
+                    name = deepcopy(self.name)
                     self.name = collection.default_name(self.name)
                     self.config.name.values = self.name
                     collection.append(self)
 
                     # Logging
-                    log("Series renamed '{}' and added to the collection.",
-                        self.name, logging=logging)
+                    log("'{}' series renamed '{}' and added to the collection.",
+                        name, self.name, logging=logging)
 
             # Existing series deletion and addition to the collection
             if forced or choice in ('y', 'yes'):
@@ -571,9 +583,12 @@ class Series(list, Output_Series):
         # Logging
         log("'{}' series removed from the collection.", self.name, logging=logging)
 
+        # Series deletion
+        del self
+
     def reset(self, logging=True):
         """ Clears all groups, as well as all parameter and returns the series to its original
-            configuration This effectively undo a load or traceback operation.
+            configuration. This effectively undo a load or traceback operation.
         """
 
         # Initialization
@@ -589,39 +604,117 @@ class Series(list, Output_Series):
         # Logging
         log("'{}' series reset.", self.name, logging=logging)
 
-    def update(self, parent=None, path=None, args=False, logging=True, traceback=True, **parameters):
+    def update(
+            self, parent=None, path=None, args=False, create=True,
+            forced=False, default=False, cancel=False, logging=True, **parameters):
         """ Updates the series by modifying its self.config configuration, re-initializing itself
-            and deleting existing groups. The groups are also traced back again if they had been
-            traced back before the update, unless 'traceback' is set to False. 'parent', 'path',
-            'args' and '**parameters' are the same as in Series.__init__.
+            and deleting existing groups. The groups are also recreated if they had been created
+            before the update, unless 'create' is set to False. 'parent', 'path', 'args' and
+            '**parameters' are the same as in Series.__init__. If 'name' parameter is the only
+            one modified, existing groups are kept and also renamed.
         """
 
         # Initialization
         parent = self.config if parent is None else parent
-        self.stop(type(traceback) != bool, 'TypeError',
-            "'traceback' must be a boolean ({} given).", type(traceback))
-        traceback = False if len(self) == 0 else traceback
+        self.stop(type(create) != bool, 'TypeError',
+            "'create' must be a boolean ({} given).", type(create))
+        create = False if len(self) == 0 else create
 
-        # Removal of self from the collection, if it exists
-        if self.name in collection.series.keys():
-            self.remove(logging=False)
+        # New configuration
+        new_config = Config(parent, path, args, **parameters)
 
-        # Deletion of all parameters and groups
-        vars(self).clear()
-        self.clear()
+        # Check what parameters, if any, are modified
+        new_parameters = [parameter for parameter in vars(self.config)
+            if vars(vars(new_config)[parameter]) != vars(vars(self.config)[parameter])]
 
-        # Series re-initialization
-        self.configure(parent=parent, path=path, args=args, **parameters)
+        # No parameters are modified
+        if len(new_parameters) == 0:
 
-        # Series re-addition to the collection
-        self.add(logging=False)
+            # Logging
+            log("'{}' series unchanged.", self.name, logging=logging)
 
-        # Traceback, if needed
-        if traceback:
-            self.traceback()
+        # Only 'name' parameter is modified
+        elif len(new_parameters) == 1 and 'name' in new_parameters:
 
-        # Logging
-        log("'{}' series updated.", self.name, logging=logging)
+            # Check if name is a string
+            if new_config.name.values is not None:
+                self.stop(type(new_config.name.values) != str, 'TypeError',
+                    "'name' must be a string ('{}' given).", type(new_config.name.values))
+
+            # Series removal from the collection
+            if self.name in collection.series.keys():
+                self.remove(logging=False)
+
+            # Change groups and series names
+            name = deepcopy(self.name)
+            self.name = collection.default_name() if new_config.name.values is None \
+                else new_config.name.values
+            self.config.name = new_config.name
+            for group in self:
+                group.name = group.name.replace(name, self.name)
+
+            # Series re-addition to the collection
+            self.add(forced=forced, default=default, cancel=cancel, logging=False)
+
+            # Logging
+            log("'{}' series renamed '{}'.", name, self.name, logging=logging)
+
+        # Any other parameter is modified
+        else:
+
+            # Check if a traceback has already been done
+            self.stop(type(forced) != bool, 'TypeError',
+                "'forced' must be a boolean ({} given).", type(forced))
+            if len(self) > 0:
+
+                # User input
+                if not forced:
+                    forced = None
+                    while forced is None:
+                        choice = input("'{}' series has already been traced back. Do you wish "
+                            "to delete existing groups? (Y/N) ".format(self.name)).lower()
+                        forced = True if choice in ('y', 'yes') \
+                            else False if choice in ('n', 'no') else None
+                        if forced is None:
+                            print("Could not understand '{}'.".format(choice))
+
+                # Updating cancellation
+                if not forced:
+
+                    # Logging
+                    log("'{}' series was not updated because it has already been traced back.",
+                        self.name, logging=logging)
+            else:
+                forced = True
+
+            # Updated series creation
+            if forced:
+                updated_series = Series(
+                    parent=parent, path=path, args=args, addition=False, **parameters)
+
+                # Groups creation, if needed
+                if create:
+                    updated_series.create()
+
+                # Save current series name
+                if 'name' in new_parameters:
+                     name = deepcopy(self.name)
+
+                # Current series removal from the collection
+                if self.name in collection.series.keys():
+                    self.remove(logging=False)
+
+                # Current series re-definition with the updated series
+                del self
+                self = updated_series
+
+                # Updated series addition to the collection
+                self.add(forced=forced, default=default, cancel=cancel, logging=False)
+
+                # Logging
+                if 'name' in new_parameters:
+                    log("'{}' series renamed '{}'.", name, self.name, logging=logging)
+                log("'{}' series updated.", self.name, logging=logging)
 
         return self
 
@@ -632,7 +725,6 @@ class Series(list, Output_Series):
         """
 
         # Self cloning
-        from copy import deepcopy
         clone = deepcopy(self)
 
         # Clone addition to the collection
@@ -720,9 +812,6 @@ class Series(list, Output_Series):
             modeling a group based on simulation parameters.
         """
 
-        # Mode configuration
-        self.configure_mode(mode)
-
         # Check if a traceback has already been done
         self.stop(type(forced) != bool, 'TypeError',
             "'forced' must be a boolean ({} given).", type(forced))
@@ -774,6 +863,12 @@ class Series(list, Output_Series):
             log("'{}' series succesfully traced back.", self.name, logging=logging)
 
             # Scatter age
+            self.uncorrected = np.mean([group.uncorrected for group in self], axis=0)
+            self.uncorrected_age = np.round(np.mean([group.uncorrected_age for group in self]), 3)
+            self.uncorrected_age_error = np.round(np.std([group.uncorrected_age for group in self]), 3)
+            self.uncorrected_min = np.round(np.mean([group.uncorrected_min for group in self]), 3)
+
+            # Scatter age
             self.scatter = np.mean([group.scatter for group in self], axis=0)
             self.scatter_age = np.round(np.mean([group.scatter_age for group in self]), 3)
             self.scatter_age_error = np.round(np.std([group.scatter_age for group in self]), 3)
@@ -814,7 +909,6 @@ class Series(list, Output_Series):
             self.zw_age = np.round(np.mean([group.covariances_age[2] for group in self]), 3)
             self.zw_age_error = np.round(np.std([group.covariances_age[2] for group in self]), 3)
             self.zw_min = np.round(np.mean([group.covariances_min[2] for group in self]), 3)
-
 
     def save(self, file_path=None, forced=False, default=False, cancel=False, logging=True):
         """ Saves a series to a binary file. self.file_path is defined as the actual path to the
@@ -921,8 +1015,14 @@ class Series(list, Output_Series):
         if self.to_file:
             self.save(forced=forced, default=default, cancel=cancel, logging=logging)
 
+    def check_traceback(self):
+        """ Checks whether a traceback has been computed in the series. """
+
+        self.stop(len(self) < 1, 'ValueError', "'{}' series hasn't been traceback. "
+            "Impossible to create an output.", self.name)
+
     def stop(self, condition, error, message, *words, marmalade=False):
-        """ Calls the stop function from tools with self.name, if it has been set. """
+        """ Calls the stop function from collection with self.name, if it has been set. """
 
         # Addition of series name to stop function call
         stop(condition, error, message, *words,

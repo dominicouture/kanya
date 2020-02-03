@@ -18,6 +18,11 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 # Formats ticks label with commas instead of dots for French language publications
 format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)).replace('.', ','))
 
+# Sets rc parameters
+plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
+plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic')
+plt.rc('lines', markersize=4)
+
 def save_figure(name, file_path=None, forced=False, default=False, cancel=False):
     """ Checks whether a path already exists and asks for user input if it does. The base path
         is assumed to be the output directory. Also, if the path does not have an extension, a
@@ -98,19 +103,23 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
 class Output_Series():
     """ Defines output methods from a Series object. """
 
-    def create_size_indicators_plot(self, secondary=False, title=True,
-            forced=False, default=False, cancel=False):
+    def create_size_indicators_plot(
+            self, secondary=False, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of scatter, median absolute deviation, and minimum spanning tree
             branches length mean and median absolute deviation over the entire duration of the
             data.
         """
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
+        self.check_traceback()
         fig = plt.figure(figsize=(5, 4.2), facecolor='w')
         ax = fig.add_subplot(111)
 
         # Scatter
+        ax.plot(self.time, self.uncorrected / self.uncorrected[0], 'g', linewidth=1.5,
+            label='σ : ({} ± {}) Ma'.format(
+                self.uncorrected_age, self.uncorrected_age_error).replace('.', ','))
+
         ax.plot(self.time, self.scatter / self.scatter[0], 'k-', linewidth=1.5,
             label='σ : ({} ± {}) Ma'.format(
                 self.scatter_age, self.scatter_age_error).replace('.', ','))
@@ -173,7 +182,7 @@ class Output_Series():
         """ Creates a plot of X-U, Y-V and Z-W covariances. """
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
+        self.check_traceback()
         fig = plt.figure(figsize=(5, 4.2), facecolor='w')
         ax = fig.add_subplot(111)
 
@@ -221,8 +230,8 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_size_indicators_covariance_plots(self, other, secondary=False,
-            title=True, forced=False, default=False, cancel=False):
+    def create_size_indicators_covariance_plots(
+            self, other, secondary=False, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of scatter, median absolute deviation, and minimum spanning tree
             branches length mean and median absolute deviation over the entire duration of the
             data.
@@ -233,7 +242,7 @@ class Output_Series():
             "'other' must be a Series object ({} given).", type(other))
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
+        self.check_traceback()
         fig, (ax0, ax1) = plt.subplots(
             ncols=2, constrained_layout=True, figsize=(10, 4.2), facecolor='w')
 
@@ -345,7 +354,7 @@ class Output_Series():
         """ Creates an histogram of ages computed in a series. """
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
+        self.check_traceback()
         fig = plt.figure(figsize=(12, 8), facecolor='w')
         ax = fig.add_subplot(111)
 
@@ -374,7 +383,8 @@ class Output_Series():
 class Output_Group():
     """ Defines output methods from a Group object. """
 
-    def create_2D_scatter(self, i, j, step=None, age=None, errors=False, labels=False, mst=False,
+    def create_2D_scatter(
+            self, i, j, step=None, age=None, errors=False, labels=False, mst=False,
             title=True, forced=False, default=False, cancel=False):
         """ Creates a 2D scatter plot of star positions in i and j at a given 'step' or 'age' in
             Myr. If 'age' doesn't match a step, the closest step is used instead. 'age' overrules
@@ -418,9 +428,6 @@ class Output_Group():
             age = round(step * self.series.timestep, 2)
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Roman', family='serif', size='12')
-        plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic')
-        plt.rc('lines', markersize=4)
         fig = plt.figure(figsize=(6, 5.5), facecolor='w')
         ax = fig.add_subplot(111)
 
@@ -481,7 +488,8 @@ class Output_Group():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_3D_scatter(self, step=None, age=None, errors=False, labels=False, mst=False,
+    def create_3D_scatter(
+            self, step=None, age=None, errors=False, labels=False, mst=False,
             title=True, forced=False, default=False, cancel=False):
         """ Creates a 3D scatter plot of star positions in x, y and z at a given 'step' or 'age'
             in Myr. If 'age' doesn't match a step, the closest step is used instead. 'age'
@@ -510,9 +518,6 @@ class Output_Group():
             age = round(step * self.series.timestep.value, 2)
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
-        plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic')
-        plt.rc('lines', markersize=4)
         fig = plt.figure(figsize=(6, 5.5), facecolor='w')
         ax = fig.add_subplot(111, projection='3d')
 
@@ -594,9 +599,6 @@ class Output_Group():
             "'ages' must be have a length of 3 ({} given).", ages)
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
-        plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic')
-        plt.rc('lines', markersize=4)
         self.fig = plt.figure(figsize=(9, 11.15), facecolor='w')
 
         # Axes creation
@@ -604,7 +606,7 @@ class Output_Group():
         row2 = 0.545
         row3 = 0.295
         row4 = 0.035
-        col1 = 0.075
+        col1 = 0.070
         col2 = 0.398
         col3 = 0.730
         self.create_2D_axis('x', 'y', age=ages[0], index=1, left=col1, bottom=row1)
@@ -672,29 +674,41 @@ class Output_Group():
         # Axis initialization
         ax = self.fig.add_subplot(4, 3, index, position=[left, bottom, 0.255, 0.20])
 
-        # Scatter
+        # Star scatter
         ax.scatter(
-            [star.position[step, i] for star in self.stars],
-            [star.position[step, j] for star in self.stars], marker='o', s=8, color='k')
+            [star.relative_position[step, i] for star in self.stars],
+            [star.relative_position[step, j] for star in self.stars],
+            marker='o', s=8, color='k')
+
+        # Outliers scatter
+        ax.scatter(
+            [star.relative_position[step, i] for star in self.outliers],
+            [star.relative_position[step, j] for star in self.outliers],
+            marker='o', s=8, color='#ff2634')
 
         # Error bars
-        for star in self.stars:
-            position = star.position[step]
+        for star in self:
+            position = star.relative_position[step]
             error = star.position_error[step]
+            color = 'k' if not star.outlier else '#ff2634'
 
             # Horizontal error bars
             ax.plot(
                 (position[i] - error[i], position[i] + error[i]),
-                (position[j], position[j]), c='k', linewidth=0.7)
+                (position[j], position[j]), c=color, linewidth=0.7)
 
             # Vertical error bars
             ax.plot(
                 (position[i], position[i]),
-                (position[j] - error[j], position[j] + error[j]), c='k', linewidth=0.7)
+                (position[j] - error[j], position[j] + error[j]), c=color, linewidth=0.7)
 
         # Axes formatting
         ax.set_xlabel('${}$ (pc)'.format(keys[i].upper()))
-        ax.set_ylabel('${}$ (pc)'.format(keys[j].upper()))
+        ax.set_ylabel('${}$ (pc)'.format(keys[j].upper()), labelpad=-12.)
+
+        # Limits
+        ax.set_xlim(-100, 100)
+        ax.set_ylim(-100, 100)
 
     def create_3D_axis(self, step=None, age=None, index=1, left=0, bottom=0):
         """ Creates a 3D axis. """
@@ -723,11 +737,17 @@ class Output_Group():
         ax = self.fig.add_subplot(
             4, 3, index, projection='3d', position=[left, bottom, 0.29, 0.215])
 
-        # Scatter
+        # Star scatter
         ax.scatter(
             [star.relative_position[step, 0] for star in self.stars],
             [star.relative_position[step, 1] for star in self.stars],
             [star.relative_position[step, 2] for star in self.stars], marker='o', c='0.0')
+
+        # Outlier scatter
+        ax.scatter(
+            [star.relative_position[step, 0] for star in self.outliers],
+            [star.relative_position[step, 1] for star in self.outliers],
+            [star.relative_position[step, 2] for star in self.outliers], marker='o', c='#ff2634')
 
         # Branches creation
         for branch in self.mst[step]:
@@ -737,7 +757,7 @@ class Output_Group():
                 (branch.start.relative_position[step, 1],
                     branch.end.relative_position[step, 1]),
                 (branch.start.relative_position[step, 2],
-                    branch.end.relative_position[step, 2]), c='b')
+                    branch.end.relative_position[step, 2]), c='#2635ff')
 
         # Axes formatting
         ax.view_init(azim=45)
@@ -745,7 +765,13 @@ class Output_Group():
         ax.set_ylabel('$Y$ (pc)')
         ax.set_zlabel('$Z$ (pc)')
 
-    def create_covariances_scatter(self, i, j, step=None, age=None, errors=False, labels=False,
+        # Axes limits
+        ax.set_xlim(-100, 100)
+        ax.set_ylim(-100, 100)
+        ax.set_zlim(-100, 100)
+
+    def create_covariances_scatter(
+            self, i, j, step=None, age=None, errors=False, labels=False,
             title=True, forced=False, default=False, cancel=False):
         """ Creates a covariance scatter of star positions and velocities in i and j at a given
             'step' or 'age' in Myr. If 'age' doesn't match a step, the closest step is used
@@ -791,8 +817,6 @@ class Output_Group():
             age = round(step * self.series.timestep, 2)
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Roman', family='serif', size='12')
-        plt.rc('lines', markersize=4)
         fig = plt.figure(figsize=(6, 5.5), facecolor='w')
         ax = fig.add_subplot(111)
 
@@ -852,7 +876,6 @@ class Output_Group():
         """ Creates a Mollweide projection of a traceback. """
 
         # Figure initialization
-        plt.rc('font', serif='Latin Modern Roman', family='serif', size='12')
         fig = plt.figure(figsize=(8, 4), facecolor='w')
         ax = fig.add_subplot(111, projection="mollweide")
 
@@ -865,20 +888,21 @@ class Output_Group():
 
         # Trajectories
         for star in range(len(self)):
+            color = '#2635ff' if not self[star].outlier else '#ff2634'
             if star not in (15, 17):
-                ax.plot(alphas[star], deltas[star], color= '#737cff', lw=1, zorder=2)
+                ax.plot(alphas[star], deltas[star], color=color, lw=1, zorder=2)
             else:
                 limit = len(tuple(filter(lambda i: i <= np.pi and i > 0, alphas[star])))
-                ax.plot(alphas[star, :limit], deltas[star, :limit], color= '#737cff', lw=1, zorder=2)
-                ax.plot(alphas[star, limit:], deltas[star, limit:], color= '#737cff', lw=1, zorder=2)
+                ax.plot(alphas[star, :limit], deltas[star, :limit], color=color, lw=1, zorder=2)
+                ax.plot(alphas[star, limit:], deltas[star, limit:], color=color, lw=1, zorder=2)
 
             # Labels
             if labels:
-                ax.text(alphas[star, 0] + 0.1, deltas[star, 0] + 0.1, star,
+                ax.text(alphas[star, 0] + 0.1, deltas[star, 0] + 0.1, star + 1,
                     horizontalalignment='left', fontsize=7, zorder=2)
 
         # Scatter
-        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color='0.0', zorder=3)
+        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color='k', zorder=3)
 
         # Proper motion arrows
         for star in self.series.data:
@@ -940,8 +964,6 @@ def create_histogram(ages, initial_scatter, number_of_stars, number_of_groups, a
         "'age' must be greater than or equal to 0.0 ({} given).",type(age))
 
     # Figure initialization
-    plt.rc('font', serif='Latin Modern Roman', family='serif', size='12')
-    plt.rc('lines', markersize=4)
     fig = plt.figure(figsize=(6, 5.5), facecolor='w')
     ax = fig.add_subplot(111)
 
@@ -1022,7 +1044,6 @@ def create_color_mesh(initial_scatter, number_of_stars, errors, age, number_of_g
     stop(type(method) != str, 'TypeError', "'method' must a string ({} given).", type(method))
 
     # Figure initialization
-    plt.rc('font', serif='Latin Modern Roman', family='serif', size='12')
     fig = plt.figure(figsize=(5, 4), facecolor='w')
     ax = fig.add_subplot(111)
 
@@ -1058,8 +1079,6 @@ def plot_age_error(title=True, forced=False, default=False, cancel=False):
     """
 
     # Figure initialization
-    plt.rc('font', serif='Latin Modern Math', family='serif', size='14')
-    plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic')
     fig = plt.figure(figsize=(7, 5.8), facecolor='w')
     ax = fig.add_subplot(111)
 
@@ -1124,7 +1143,6 @@ def create_minimum_error_plots(title=True, forced=False, default=False, cancel=F
     """
 
     # Figure initialization
-    plt.rc('font', serif='Latin Modern Roman', family='serif', size='12')
     fig = plt.figure(figsize=(6, 5.5), facecolor='w')
     ax = fig.add_subplot(111)
 
