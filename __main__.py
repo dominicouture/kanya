@@ -27,12 +27,12 @@ collection.create()
 # Output creation
 for series in collection:
     series.create_size_indicators_plot(forced=True, title=False)
-    series.create_size_indicators_covariance_plots(forced=True, title=False)
-    series.create_covariances_plot(forced=True)
+    series.create_covariances_plot(forced=True, title=False)
+    # series.create_size_indicators_covariance_plots(forced=True, title=False)
 
     # Group output
-    for group in series:
-        group.create_map(title=False, forced=True, labels=False)
-        group.create_2D_and_3D_scatter([0,  5,  10], title=False, forced=True)
-        group.create_2D_and_3D_scatter([15, 20, 25], title=False, forced=True)
-        group.create_covariances_scatter('x', 'u', age=0, title=False, errors=True, forced=True)
+    # for group in series:
+        # group.create_map(title=False, forced=True, labels=False)
+        # group.create_2D_and_3D_scatter([0,  5,  10], title=False, forced=True)
+        # group.create_2D_and_3D_scatter([15, 20, 25], title=False, forced=True)
+        # group.create_covariances_scatter('x', 'u', age=0, title=False, errors=True, forced=True)

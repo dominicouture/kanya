@@ -64,7 +64,9 @@ class Group(list, Output_Group):
 
         # Star creation from observables
         for star in self.series.data:
-
+            rv_offset = star.rv_offset if star.rv_offset is not None else self.series.rv_offset.value
+            # rv_offset = self.series.rv_offset.value
+            # print(star.name, 'rv_offset:', round(rv_offset, 3))
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
                 observables_spherical(
@@ -76,7 +78,7 @@ class Group(list, Output_Group):
                     # Velocity and radial velocity offset
                     *(star.velocity.values if self.series.number_of_groups == 1 else
                         np.random.normal(star.velocity.values, star.velocity.errors)) \
-                        + np.array([self.series.rv_offset.value, 0.0, 0.0]),
+                        + np.array([rv_offset, 0.0, 0.0]),
 
                     # Position and velocity errors
                     *star.position.errors, *star.velocity.errors)
@@ -202,12 +204,13 @@ class Group(list, Output_Group):
 
         # Valid stars and outliers lists
         self.stars = list(self)
+        self.number_of_stars = len(self.stars)
         self.outliers = []
+        outliers = True
 
         # Outlier filtering
-        outliers = True
-        while outliers:
-            # self.stars = list(filter(lambda star: not star.outlier, self))
+        while outliers and self.number_of_stars > int(0.8 * self.series.number_of_stars):
+            # self.stars = list(filter(lambda star: not star.outlier, self)) ???
 
             # Coordinates computation
             self.get_stars_coordinates()
@@ -219,15 +222,15 @@ class Group(list, Output_Group):
             self.scatter_uvw = np.std([star.velocity for star in self.stars], axis=0)
 
             # 3D scatter
-            self.uncorrected = np.sum(self.scatter_xyz**2, axis=1)**0.5
-            self.scatter = (np.sum(self.scatter_xyz**2, axis=1) - np.sum(
-                self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
-                * np.expand_dims(self.series.time, axis=0).T**2, axis=1))**0.5
+            self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5
 
-            # Alternative 3D scatter
-            # self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
+            # Alternative 3D scatters
+            # self.scatter = (np.abs(np.sum(self.scatter_xyz**2, axis=1) - np.sum(
             #     self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
-            #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1)**0.5
+            #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1)))**0.5
+            # self.scatter = (np.abs(np.sum(self.scatter_xyz**2, axis=1)**0.5 - np.sum(
+            #     self.avg_position_error[0]**2 + self.avg_velocity_error**2 \
+            #     * np.expand_dims(self.series.time, axis=0).T**2, axis=1))**0.5
 
             # Filter stars beyond the σ cutoff of the average position and loop scatter computation
             outliers = False
@@ -237,10 +240,9 @@ class Group(list, Output_Group):
                     outliers = True
                     self.outliers.append(star)
                     self.stars.remove(star)
+                    self.number_of_stars = len(self.stars)
 
         # Scatter age
-        self.uncorrected_age = self.series.time[np.argmin(self.uncorrected)]
-        self.uncorrected_min = np.min(self.uncorrected)
         self.scatter_age = self.series.time[np.argmin(self.scatter)]
         self.scatter_min = np.min(self.scatter)
 
@@ -255,12 +257,38 @@ class Group(list, Output_Group):
         self.mad_xyz = np.median(
             np.abs(np.array([star.position for star in self.stars]) - self.median_xyz), axis=0)
 
-        # XYZ median absolute deviation
+        # Median absolute deviation
         self.mad = np.sum(self.mad_xyz**2, axis=1)**0.5
 
         # Median absolute deviation age
         self.mad_age = self.series.time[np.argmin(self.mad)]
         self.mad_min = np.min(self.mad)
+
+    # def get_median_absolute_deviation(self):
+    #     """ Computes the XYZ and total median absolute deviation (MAD) of a group and their
+    #         respective errors for all timesteps. The age of the moving is then estimated by
+    #         finding the time at which the median absolute deviation is minimal.
+    #     """
+    #
+    #     print(self.number_of_stars)
+    #     # Jack-knife Monte Carlo
+    #     total = np.zeros((100, len(self.series.time)))
+    #     for i in range(100):
+    #         stars = [self.stars[i] for i in np.random.choice(self.number_of_stars,
+    #             int(self.number_of_stars * 0.8), replace=False)]
+    #
+    #         # XYZ median absolute deviation
+    #         median_xyz = np.median(np.array([star.position for star in stars]), axis=0)
+    #         mad_xyz = np.median(
+    #             np.abs(np.array([star.position for star in stars]) - median_xyz), axis=0)
+    #         total[i] = np.sum(mad_xyz**2, axis=1)**0.5
+    #
+    #     # Median absolute deviation
+    #     self.mad = np.mean(total, axis=0)
+    #
+    #     # Median absolute deviation age
+    #     self.mad_age = self.series.time[np.argmin(self.mad)]
+    #     self.mad_min = np.min(self.mad)
 
     def get_covariances(self):
         """ Computes the X-U, Y-V and Z-W absolute covariances of a group and their respective
@@ -272,7 +300,7 @@ class Group(list, Output_Group):
         self.covariances = np.absolute(np.sum(
             (np.array([star.position for star in self.stars]) - self.avg_position) *
             np.expand_dims(np.array([star.velocity for star in self.stars]) - self.avg_velocity,
-                axis=1), axis=0) /self.number_of_stars)
+                axis=1), axis=0) / self.number_of_stars)
 
         # Covariances age
         self.covariances_age = np.vectorize(
@@ -329,15 +357,31 @@ class Group(list, Output_Group):
             self.mst_lengths[step] = np.vectorize(
                 lambda branch: branch.length[step])(self.mst[step])
 
-        # Minimum spanning tree average branch length and age computation
+        # Minimum spanning tree average branch length and age
         self.mst_mean = np.mean(self.mst_lengths, axis=1)
         self.mst_mean_age = self.series.time[np.argmin(self.mst_mean)]
         self.mst_min = np.min(self.mst_mean)
 
-        # Minimum spanning tree branch length median absolute deviation
-        self.mst_median = np.median(self.mst_lengths, axis=1)
-        self.mst_mad = np.median(
-            np.abs(self.mst_lengths - np.expand_dims(self.mst_median, axis=0).T), axis=1)
+        # Minimum spanning tree branch length median absolute deviation and age
+        # self.mst_median = np.median(self.mst_lengths, axis=1)
+        # self.mst_mad = np.median(
+        #     np.abs(self.mst_lengths - np.expand_dims(self.mst_median, axis=0).T), axis=1)
+        # self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
+        # self.mst_mad_min = np.min(self.mst_mad)
+
+        # Minimum spanning tree branch length median absolute deviation and age
+        # Jack-knife Monte Carlo
+        total = np.zeros((100, len(self.series.time)))
+        for i in range(100):
+            mst_lengths = self.mst_lengths[:, np.random.choice(self.number_of_branches,
+                int(self.number_of_branches * 0.8), replace=False)]
+
+            # Median absolute deviation
+            mst_median = np.median(mst_lengths, axis=1)
+            mst_mad = np.median(np.abs(mst_lengths - np.expand_dims(mst_median, axis=0).T), axis=1)
+            total[i] = mst_mad
+
+        self.mst_mad = np.mean(total, axis=0)
         self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
         self.mst_mad_min = np.min(self.mst_mad)
 
@@ -417,3 +461,16 @@ class Group(list, Output_Group):
             self.speed = np.sum(self.relative_velocity**2, axis=0)**0.5
             self.speed_error = np.sum((self.relative_velocity
                 * self.relative_position_error)**2, axis=0)**0.5 / self.speed
+
+        def shift_rv(self):
+            """ Shifts the radial velocity based on the gravitationnal redshift of the star and
+                current value of the radial velocity.
+            """
+
+            # Gravitationnal constant (pc^3 / M_sol / Myr^2)
+            G = 0.004498706056647732
+
+            # Speed of light (pc/Myr)
+            c = 306601.3937879527
+
+            self.velocity[:,0] = a * (c + self.velocity[:,0]) - c

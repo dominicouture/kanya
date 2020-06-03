@@ -20,14 +20,18 @@ format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)).replace(
 
 # Sets rc parameters
 plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
-plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic')
+plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Math:roman')
 plt.rc('lines', markersize=4)
+plt.rcParams['pdf.fonttype'] = 42
 
 def save_figure(name, file_path=None, forced=False, default=False, cancel=False):
     """ Checks whether a path already exists and asks for user input if it does. The base path
         is assumed to be the output directory. Also, if the path does not have an extension, a
         '.pdf' extension is added.
     """
+
+    # Padding
+    padding = 0.03
 
     # file_path parameter
     file_path = file_path if file_path is not None else output(create=True) + '/'
@@ -79,7 +83,7 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
             if default or choice in ('k', 'keep'):
                 from Traceback.tools import default_name
                 file_path = default_name(file_path)
-                plt.savefig(file_path, bbox_inches='tight', pad_inches=0.05)
+                plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
 
                 # Logging
                 log("'{}': file name changed and figure saved at '{}'.", name, file_path)
@@ -88,14 +92,14 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
         if forced or choice in ('y', 'yes'):
             from os import remove
             remove(file_path)
-            plt.savefig(file_path, bbox_inches='tight', pad_inches=0.05)
+            plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
 
             # Logging
             log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
 
     # Saving
     else:
-        plt.savefig(file_path, bbox_inches='tight', pad_inches=0.05)
+        plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
 
         # Logging
         log("'{}': figure saved at '{}'.", name, file_path)
@@ -114,11 +118,6 @@ class Output_Series():
         self.check_traceback()
         fig = plt.figure(figsize=(5, 4.2), facecolor='w')
         ax = fig.add_subplot(111)
-
-        # Scatter
-        ax.plot(self.time, self.uncorrected / self.uncorrected[0], 'g', linewidth=1.5,
-            label='σ : ({} ± {}) Ma'.format(
-                self.uncorrected_age, self.uncorrected_age_error).replace('.', ','))
 
         ax.plot(self.time, self.scatter / self.scatter[0], 'k-', linewidth=1.5,
             label='σ : ({} ± {}) Ma'.format(
@@ -1053,7 +1052,8 @@ def create_color_mesh(initial_scatter, number_of_stars, errors, age, number_of_g
     grid_z = griddata(np.array([(i, j) for i in initial_scatter for j in number_of_stars]),
         errors.T.flatten(), (grid_x, grid_y), method='linear')
     ax.pcolormesh(grid_x, grid_y, grid_z, cmap=plt.cm.PuBu_r, vmin=0, vmax=6)
-    fig.colorbar(ticks=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], format='%0.1f')
+    fig.colorbar(mappable=plt.cm.ScalarMappable(norm=plt.Normalize(0.0, 6.0), cmap=plt.cm.PuBu_r),
+        ax=ax, ticks=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], format='%0.1f')
 
     # Title formatting
     stop(type(title) != bool, 'TypeError',
@@ -1064,7 +1064,7 @@ def create_color_mesh(initial_scatter, number_of_stars, errors, age, number_of_g
 
     # Axes formatting
     ax.set_xlabel('Dispersion initiale (pc)')
-    ax.set_ylabel("Nombre d'étoiles")
+    ax.set_ylabel("Nombre de membres")
     ax.set_xticks([0.0, 5.0, 10.0, 15.0, 20.0])
     ax.set_yticks([20, 40, 60, 80, 100])
 
@@ -1089,7 +1089,7 @@ def plot_age_error(title=True, forced=False, default=False, cancel=False):
             16.008, 14.202, 12.67, 11.266, 9.732, 8.874, 8.044],
         yerr=[0.376, 0.517, 0.850, 1.062, 1.204, 1.383,
             1.534, 1.612, 1.544, 1.579, 1.576, 1.538, 1.504],
-        fmt='o', color='0.0', ms=6.0, elinewidth=1.0, label='+ 0,0 km/s')
+        fmt='o', color='0.0', ms=6.0, elinewidth=1.0, label='$\\Delta v_{r,grav}$ = 0,0 km/s')
 
     # + 0.5 km/s points
     ax.errorbar(
@@ -1098,7 +1098,7 @@ def plot_age_error(title=True, forced=False, default=False, cancel=False):
             14.749, 13.577, 12.379, 11.222, 10.229, 9.210, 8.446],
         yerr=[0.376, 0.425, 0.641, 0.773, 0.992, 1.136,
             1.129, 1.251, 1.338, 1.331, 1.272, 1.345, 1.323],
-        fmt='D', color='0.2', ms=6.0, elinewidth=1.0, label='+ 0,5 km/s')
+        fmt='D', color='0.33', ms=6.0, elinewidth=1.0, label='$\\Delta v_{r,grav}$ = 0,5 km/s')
 
     # + 1.0 km/s points
     ax.errorbar(
@@ -1107,11 +1107,11 @@ def plot_age_error(title=True, forced=False, default=False, cancel=False):
             13.529, 12.619, 11.751, 10.847, 9.982, 9.353, 8.461],
         yerr=[0.379, 0.453, 0.583, 0.685, 0.864, 0.93,
             0.951, 1.032, 1.147, 1.035, 1.142, 1.187, 1.149],
-        fmt='^', color='0.4', ms=6.0, elinewidth=1.0, label='+ 1,0 km/s')
+        fmt='^', color='0.67', ms=6.0, elinewidth=1.0, label='$\\Delta v_{r,grav}$ = 1,0 km/s')
 
     # β Pictoris typical error line
-    ax.axvline(x=1.0112, ymin=0.0, ymax = 25, linewidth=1, color='k', ls='dashed')
-    ax.text(1.12, 8, 'Erreur typique sur $v_r$ \ndes étoiles de βPMG',
+    ax.axvline(x=1.0105, ymin=0.0, ymax = 25, linewidth=1, color='k', ls='dashed')
+    ax.text(1.15, 6.95, 'Erreur de mesure\nsur $v_r$ typique des\nmembres de $\\beta\\,$PMG',
         horizontalalignment='left', fontsize=14)
 
     # Title formatting
@@ -1119,17 +1119,19 @@ def plot_age_error(title=True, forced=False, default=False, cancel=False):
         "'title' must be a boolean ({} given).", type(title))
     if title:
         ax.set_title(
-            "Measured age of a simulation of 1000 24 Myr-old groups \n"
+            "Measured age of a simulation of 1000 24 Myr-old groups\n"
             "over the measurement error on RV (other errors typical of Gaia DR2)\n")
 
     # Legend and axes formatting
     ax.legend(loc=1, fontsize=14)
     ax.xaxis.set_major_formatter(format_ticks)
     ax.yaxis.set_major_formatter(format_ticks)
-    ax.set_xlabel('Erreur sur $v_r$ (km/s)')
-    ax.set_ylabel('Âge (Ma)')
+    ax.set_xlabel('Erreur de mesure sur $v_r$ (km/s)', fontsize=14)
+    ax.set_ylabel('Âge (Ma)', fontsize=14)
     ax.set_xticks([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
     ax.set_yticks([6.0, 9.0, 12.0, 15.0, 18.0, 21.0, 24.0])
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
     ax.set_xlim(-0.1, 3.1)
     ax.set_ylim(6, 24.5)
 

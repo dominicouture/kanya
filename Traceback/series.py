@@ -863,12 +863,6 @@ class Series(list, Output_Series):
             log("'{}' series succesfully traced back.", self.name, logging=logging)
 
             # Scatter age
-            self.uncorrected = np.mean([group.uncorrected for group in self], axis=0)
-            self.uncorrected_age = np.round(np.mean([group.uncorrected_age for group in self]), 3)
-            self.uncorrected_age_error = np.round(np.std([group.uncorrected_age for group in self]), 3)
-            self.uncorrected_min = np.round(np.mean([group.uncorrected_min for group in self]), 3)
-
-            # Scatter age
             self.scatter = np.mean([group.scatter for group in self], axis=0)
             self.scatter_age = np.round(np.mean([group.scatter_age for group in self]), 3)
             self.scatter_age_error = np.round(np.std([group.scatter_age for group in self]), 3)

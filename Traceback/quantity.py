@@ -7,6 +7,7 @@
 
 import numpy as np
 from astropy import units as u
+from astropy.constants import c, G, M_sun, R_sun
 from Traceback.tools import squeeze, broadcast, full
 
 __author__ = 'Dominic Couture'
@@ -500,7 +501,7 @@ class Unit():
     def __repr__(self):
         """ Returns the label of a unit. """
 
-        return self.label if self.shape == (1,) else self.labels
+        return self.label if self.shape == (1,) else str(self.labels)
 
     def __eq__(self, other):
         """ Tests whether self is not the equal to other. """

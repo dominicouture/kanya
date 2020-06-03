@@ -28,14 +28,14 @@ name.value = 'beta_pictoris'
 # named 'name.values'.series.
 file_path.value = None
 
-# Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 1000
+# Number of groups to be simulated in the serißes (integer, > 0)
+number_of_groups.value = 10
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-number_of_steps.value = 100
+number_of_steps.value = 200
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 50
+number_of_stars.value = 46
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
@@ -82,7 +82,8 @@ avg_velocity_scatter.values = (1.2, 1.2, 1.2)
 avg_velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dict)
-data.value = '../Data/bpic_updated_with_outliers.csv'
+data.value = '../Data/β Pictoris Moving Group - Member Stars.csv'
+# data.value = '../Data/bpic_updated.csv'
 # data.value = '../Data/bpic_Crundall2019.csv'
 data.units = 'observables'
 data.system = 'observables'
@@ -138,13 +139,13 @@ data.axis = 'observables'
 #     [36.5320, -12.264637, 353.12918, 1.38000, -81.8890,  139.260]
 # ]}
 
-# Radial velocity offset applied to all stars (float)
+# Radial velocity offset bias (model) or correction (data) applied to all stars (float)
 # rv_offset.value = -0.5
 rv_offset.value = 0.0
 rv_offset.unit = 'km/s'
 
 # Whether to use actual or simulated measurement errors (boolean)
-data_errors.value = False
+data_errors.value = True
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
-cutoff.value = 3
+cutoff.value = 3.

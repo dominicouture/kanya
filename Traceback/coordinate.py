@@ -22,7 +22,7 @@ class System():
     def __init__(self, name: str, position: tuple, velocity: tuple):
         """ Initializes a System from position and velocity tuples with 3 Variables objects. """
 
-        # Name and index
+        # Name
         self.name = name
 
         # Values
@@ -49,7 +49,8 @@ class System():
         'length': Unit('pc', 'parsec'),
         'speed': Unit('pc/Myr', 'parsec per megayear'),
         'angle': Unit('rad', 'radian'),
-        'angular speed': Unit('rad/Myr', 'radian per megayear')}
+        'angular speed': Unit('rad/Myr', 'radian per megayear'),
+        'mass': Unit('solMass', 'solar mass')}
 
     # Usual units used for observalbes per physical type and magnitude
     usual_units = {
@@ -118,12 +119,14 @@ class System():
         Variable('w', 'w velocity', default_units['speed'], usual_units['speed']),
 
         # Cylindrical coordinate system variable
+        Variable('ρ', 'galactic radius', default_units['length']),
+        Variable('μρ', 'galactic radius', default_units['speed']),
         Variable('θ', 'galactic angle', default_units['angle'], usual_units['angle']),
         Variable('μθ', 'galactic angle motion', default_units['angular speed'],
             usual_units['angular speed']),
 
         # Spherical coordinate system variables
-        Variable('r', 'distance', default_units['length']),
+        Variable('d', 'distance', default_units['length']),
         Variable('δ', 'declination', default_units['angle'], usual_units['angle']),
         Variable('α', 'right ascension', default_units['angle'], usual_units['angle']),
         Variable('rv', 'radial velocity', default_units['speed'], usual_units['speed']),
@@ -145,8 +148,8 @@ class System():
 # Coordinate systems
 systems = {system.name: system for system in (
     System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
-    System('cylindrical', ('r', 'θ', 'z'), ('rv', 'μθ', 'w')),
-    System('spherical', ('r', 'δ', 'α'), ('rv', 'μδ', 'μα')),
+    System('cylindrical', ('ρ', 'θ', 'z'), ('μρ', 'μθ', 'w')),
+    System('spherical', ('d', 'δ', 'α'), ('rv', 'μδ', 'μα')),
     System('observables', ('p', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ')))}
 
 class Coordinate:
@@ -177,6 +180,10 @@ class Coordinate:
 
     # Parallax conversion from radians to parsecs constant
     k = π / 648000
+
+    # Gaia bias correction
+    gaia_bias = 2.618e-10
+    # gaia_bias = 0.0
 
     def __init__(self, position, velocity=None):
         """ Initializes a Coordinate object from a Quantity objects representing n positions
@@ -557,14 +564,14 @@ def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=
     cos_δ = cos(δ)
 
     # Values calculation
-    position = np.array((Coordinate.k / p, δ, α))
+    position = np.array((Coordinate.k / (p + Coordinate.gaia_bias), δ, α))
     velocity = np.array((rv, μδ, μα_cos_δ / cos_δ))
 
     # Errors calculation
     if not np.array((Δp, Δδ, Δα, Δrv, Δμδ, Δμα_cos_δ)).any():
         return position, velocity, np.zeros(3), np.zeros(3)
     else:
-        return position, velocity, np.array((Δp * Coordinate.k / p**2, Δδ, Δα)), \
+        return position, velocity, np.array((Δp * Coordinate.k / (p + Coordinate.gaia_bias)**2, Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ))
 
 def spherical_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
@@ -580,12 +587,12 @@ def spherical_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv
     cos_δ = cos(δ)
 
     # Values calculation
-    position = np.array((Coordinate.k / r, δ, α))
+    position = np.array((Coordinate.k / r - Coordinate.gaia_bias, δ, α))
     velocity = np.array((rv, μδ, μα * cos_δ))
 
     # Errors calculation
     if not np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα)).any():
         return position, velocity, np.zeros(3), np.zeros(3)
     else:
-        return position, velocity, np.array((Δr * Coordinate.k / r**2, Δδ, Δα)), \
+        return position, velocity, np.array((Δr * (Coordinate.k / r**2), Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα / μα)**2 + (Δδ / δ)**2)**0.5 * μα * cos_δ))
