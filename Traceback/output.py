@@ -10,6 +10,7 @@ from os import path
 from matplotlib import pyplot as plt, lines, ticker as tkr
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
+from scipy.stats import linregress
 from Traceback.collection import *
 
 __author__ = 'Dominic Couture'
@@ -107,7 +108,7 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
 class Output_Series():
     """ Defines output methods from a Series object. """
 
-    def create_size_indicators_plot(
+    def create_scatter_mad_mst_plot(
             self, secondary=False, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of scatter, median absolute deviation, and minimum spanning tree
             branches length mean and median absolute deviation over the entire duration of the
@@ -119,6 +120,7 @@ class Output_Series():
         fig = plt.figure(figsize=(5, 4.2), facecolor='w')
         ax = fig.add_subplot(111)
 
+        # Scatter
         ax.plot(self.time, self.scatter / self.scatter[0], 'k-', linewidth=1.5,
             label='σ : ({} ± {}) Ma'.format(
                 self.scatter_age, self.scatter_age_error).replace('.', ','))
@@ -165,7 +167,7 @@ class Output_Series():
                         round(self.rv_offset.to('km/s').value, 2)))
 
         # Legend and axes formatting
-        ax.legend(loc=4, fontsize=9)
+        ax.legend(loc=1, fontsize=9)
         ax.yaxis.set_major_formatter(format_ticks)
         ax.set_xlabel('Temps (Ma)')
         ax.set_ylabel("Indicateurs d'âge")
@@ -177,8 +179,154 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_plot(self, title=True, forced=False, default=False, cancel=False):
-        """ Creates a plot of X-U, Y-V and Z-W covariances. """
+    def create_scatter_mad_xyz_plot(
+            self, secondary=False, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of the XYZ scatter and median absolute deviation over the entire
+            duration of the data.
+        """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Scatter
+        ax.plot(self.time, self.scatter / self.scatter[0], color='k', linewidth=1.5,
+            label='σ : ({} ± {}) Ma'.format(
+                self.scatter_age, self.scatter_age_error).replace('.', ','))
+
+        # Plot X scatter
+        ax.plot(self.time, self.scatter_xyz[:,0].T / self.scatter_xyz[0,0], 'g', linewidth=1.5,
+            label='σ_x : ({} ± {}) Ma'.format(
+                self.scatter_xyz_age[0], self.scatter_xyz_age_error[0]).replace('.', ','))
+
+        # Plot Y scatter
+        ax.plot(self.time, self.scatter_xyz[:,1].T / self.scatter_xyz[0,1], 'b', linewidth=1.5,
+            label='σ_y : ({} ± {}) Ma'.format(
+                self.scatter_xyz_age[1], self.scatter_xyz_age_error[1]).replace('.', ','))
+
+        # Plot Z scatter
+        ax.plot(self.time, self.scatter_xyz[:,2] / self.scatter_xyz[0,2], 'r', linewidth=1.5,
+            label='σ_z : ({} ± {}) Ma'.format(
+                self.scatter_xyz_age[2], self.scatter_xyz_age_error[2]).replace('.', ','))
+
+        # Plot MAD
+        ax.plot(self.time, self.mad / self.mad[0], color='k', linestyle='--', linewidth=1.5,
+            label='MAD : ({} ± {}) Ma'.format(
+                self.mad_age, self.mad_age_error).replace('.', ','))
+
+        # Plot X MAD
+        ax.plot(self.time, self.mad_xyz[:,0].T / self.mad_xyz[0,0], linestyle='--', color='g',
+            linewidth=1.5, label='MAD_X : ({} ± {}) Ma'.format(
+                self.mad_xyz_age[0], self.mad_xyz_age_error[0]).replace('.', ','))
+
+        # Plot Y MAD
+        ax.plot(self.time, self.mad_xyz[:,1].T / self.mad_xyz[0,1], linestyle='--', color='b',
+            linewidth=1.5, label='MAD_Y : ({} ± {}) Ma'.format(
+                self.mad_xyz_age[1], self.mad_xyz_age_error[1]).replace('.', ','))
+
+        # Plot Z MAD
+        ax.plot(self.time, self.mad_xyz[:,2] / self.mad_xyz[0,2], linestyle='--', color='r',
+            linewidth=1.5, label='MAD_Z : ({} ± {}) Ma'.format(
+                self.mad_xyz_age[2], self.mad_xyz_age_error[2]).replace('.', ','))
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title("XYZ scatter of β Pictoris (without outliners) over {} "
+                    "Myr\n with {} km/s redshift correction and actual measurement errors\n".format(
+                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+            elif self.from_model:
+                ax.set_title("Average XYZ scatter of {} moving group simulations with "
+                    "kinematics similar to β Pictoris\n over {} Myr with {} km/s redshift "
+                    "correction and actual measurement errors of Gaia DR2\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=4, fontsize=6)
+        ax.yaxis.set_major_formatter(format_ticks)
+        ax.set_xlabel('Temps (Ma)')
+        ax.set_ylabel("Indicateur d'âge")
+        ax.set_xlim(0, self.final_time.value)
+        ax.set_ylim(0.0, 1.6)
+
+        # Save figure
+        save_figure(self.name, 'XYZ_scatter__MAD_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_scatter_and_mad_rθz_plot(
+            self, secondary=False, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of the rθz scatter over the entire duration of the data. """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Plot r scatter
+        ax.plot(self.time, self.scatter_rθz[:,0].T / self.scatter_rθz[0,0], 'g', linewidth=1.5,
+            label='σ_R : ({} ± {}) Ma'.format(
+                self.mad_rθz_age[0], self.mad_rθz_age_error[0]).replace('.', ','))
+
+        # Plot θ scatter
+        ax.plot(self.time, self.scatter_rθz[:,1].T / self.scatter_rθz[0,1], 'b', linewidth=1.5,
+            label='σ_θ : ({} ± {}) Ma'.format(
+                self.mad_rθz_age[1], self.mad_rθz_age_error[1]).replace('.', ','))
+
+        # Plot z scatter
+        ax.plot(self.time, self.scatter_rθz[:,2] / self.scatter_rθz[0,2], 'r', linewidth=1.5,
+            label='σ_z : ({} ± {}) Ma'.format(
+                self.mad_rθz_age[2], self.mad_rθz_age_error[2]).replace('.', ','))
+
+        # Plot r MAD
+        ax.plot(self.time, self.mad_rθz[:,0].T / self.mad_rθz[0,0], linestyle='--', color='g',
+            linewidth=1.5, label='MAD_R : ({} ± {}) Ma'.format(
+                self.mad_xyz_age[0], self.mad_xyz_age_error[0]).replace('.', ','))
+
+        # Plot θ MAD
+        ax.plot(self.time, self.mad_rθz[:,1].T / self.mad_rθz[0,1], linestyle='--', color='b',
+            linewidth=1.5, label='MAD_θ : ({} ± {}) Ma'.format(
+                self.mad_xyz_age[1], self.mad_xyz_age_error[1]).replace('.', ','))
+
+        # Plot z MAD
+        ax.plot(self.time, self.mad_rθz[:,2] / self.mad_rθz[0,2], linestyle='--', color='r',
+            linewidth=1.5, label='MAD_z : ({} ± {}) Ma'.format(
+                self.mad_xyz_age[2], self.mad_xyz_age_error[2]).replace('.', ','))
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title("rθz scatter of β Pictoris (without outliners) over {} "
+                    "Myr\n with {} km/s redshift correction and actual measurement errors\n".format(
+                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+            elif self.from_model:
+                ax.set_title("Average rθz scatter of {} moving group simulations with "
+                    "kinematics similar to β Pictoris\n over {} Myr with {} km/s redshift "
+                    "correction and actual measurement errors of Gaia DR2\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=4, fontsize=6)
+        ax.yaxis.set_major_formatter(format_ticks)
+        ax.set_xlabel('Temps (Ma)')
+        ax.set_ylabel("Indicateur d'âge")
+        ax.set_xlim(0, self.final_time.value)
+        ax.set_ylim(0.0, 1.6)
+
+        # Save figure
+        save_figure(self.name, 'rθz_scatter__MAD_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_covariances_xyz_plot(self, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of X-X, Y-Y and Z-Z covariances. """
 
         # Figure initialization
         self.check_traceback()
@@ -186,33 +334,167 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Covariance normalization
-        covariances = self.covariances / self.covariances[0]
+        covariances_xyz = self.covariances_xyz / self.covariances_xyz[0]
 
-        # X-U covariance
-        ax.plot(self.time, covariances[:,0], '-', color='0.0', linewidth=1.5,
-            label='X-U : ({} ± {}) Ma'.format(self.xu_age, self.xu_age_error).replace('.', ','))
+        # X-X covariance
+        ax.plot(self.time, covariances_xyz[:,0], '-', color='0.0', linewidth=1.5,
+            label='X-X : ({} ± {}) Ma'.format(
+                self.covariances_xyz_age[0],
+                self.covariances_xyz_age_error[0]).replace('.', ','))
 
-        # Y-V covariance
-        ax.plot(self.time, covariances[:,1], '-.', color='0.2', linewidth=1.5,
-            label='Y-V : ({} ± {}) Ma'.format(self.yv_age, self.yv_age_error).replace('.', ','))
+        # Y-Y covariance
+        ax.plot(self.time, covariances_xyz[:,1], '-.', color='0.2', linewidth=1.5,
+            label='Y-Y : ({} ± {}) Ma'.format(
+                self.covariances_xyz_age[1],
+                self.covariances_xyz_age_error[1]).replace('.', ','))
 
-        # Z-W covariance
-        ax.plot(self.time, covariances[:,2], '--', color='0.4', linewidth=1.5,
-            label='Z-W : ({} ± {}) Ma'.format(self.zw_age, self.zw_age_error).replace('.', ','))
+        # Z-Z covariance
+        ax.plot(self.time, covariances_xyz[:,2], '--', color='0.4', linewidth=1.5,
+            label='Z-Z : ({} ± {}) Ma'.format(
+                self.covariances_xyz_age[2],
+                self.covariances_xyz_age_error[2]).replace('.', ','))
+
+        # XYZ covariance matrix determinant
+        ax.plot(self.time, self.covariances_xyz_matrix_det / self.covariances_xyz_matrix_det[0],
+            '--', color='b', linewidth=1.5, label='Det : ({} ± {}) Ma'.format(
+                self.covariances_xyz_matrix_det_age,
+                self.covariances_xyz_matrix_det_age_error).replace('.', ','))
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
-                ax.set_title("X-U, Y-V and Z-W covariances of β Pictoris (without outliners) "
+                ax.set_title("X-X, Y-Y and Z-Z covariances of β Pictoris (without outliners) "
                     "over {} Myr\nwith {} km/s redshift correction and actual measurement "
                     "errors\n".format(
                         self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
             elif self.from_model:
-                ax.set_title("X-U, Y-V and Z-W covariances of {} moving group simulations with "
+                ax.set_title("X-X, Y-Y and Z-Z covariances of {} moving group simulations with "
                     "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
                     "correction and actual measurement errors of Gaia DR2\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=1, fontsize=9)
+        ax.yaxis.set_major_formatter(format_ticks)
+        ax.set_xlabel('Temps (Ma)')
+        ax.set_ylabel('Covariances')
+        ax.set_xlim(0, self.final_time.value)
+        ax.set_ylim(0, 1.6)
+
+        # Save figure
+        save_figure(self.name, 'Covariances_XYZ_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_cross_covariances_xyz_plot(self, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of X-U, Y-V and Z-W cross covariances. """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Covariance normalization
+        cross_covariances_xyz = self.cross_covariances_xyz / self.cross_covariances_xyz[0]
+
+        # X-U covariance
+        ax.plot(self.time, cross_covariances_xyz[:,0], '-', color='0.0', linewidth=1.5,
+            label='X-U : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_age[0],
+                self.cross_covariances_xyz_age_error[0]).replace('.', ','))
+
+        # Y-V covariance
+        ax.plot(self.time, cross_covariances_xyz[:,1], '-.', color='0.2', linewidth=1.5,
+            label='Y-V : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_age[1],
+                self.cross_covariances_xyz_age_error[1]).replace('.', ','))
+
+        # Z-W covariance
+        ax.plot(self.time, cross_covariances_xyz[:,2], '--', color='0.4', linewidth=1.5,
+            label='Z-W : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_age[2],
+                self.cross_covariances_xyz_age_error[2]).replace('.', ','))
+
+        # Cross covariance matrix determinant
+        ax.plot(self.time, self.cross_covariances_xyz_matrix_det / self.cross_covariances_xyz_matrix_det[0],
+            '--', color='b', linewidth=1.5, label='Det : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_matrix_det_age,
+                self.cross_covariances_xyz_matrix_det_age_error).replace('.', ','))
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title("X-U, Y-V and Z-W cross covariances of β Pictoris (without outliners) "
+                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                    "errors\n".format(
+                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+            elif self.from_model:
+                ax.set_title("X-U, Y-V and Z-W cross covariances of {} moving group simulations "
+                    "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                    "correction and actual measurement errors of Gaia DR2\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=1, fontsize=9)
+        ax.yaxis.set_major_formatter(format_ticks)
+        ax.set_xlabel('Temps (Ma)')
+        ax.set_ylabel('Covariances')
+        ax.set_xlim(0, self.final_time.value)
+        ax.set_ylim(0, 1.6)
+
+        # Save figure
+        save_figure(self.name, 'Covariances_{}.pdf'.format(self.name),
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_cross_covariances_rθz_plot(self, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of ρ-μρ, θ-μθ and z-μz cross covariances. """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Covariance normalization
+        cross_covariances_rθz = self.cross_covariances_rθz / self.cross_covariances_rθz[0]
+
+        # ρ-μρ covariance
+        ax.plot(self.time, cross_covariances_rθz[:,0], '-', color='0.0', linewidth=1.5,
+            label='R-vR : ({} ± {}) Ma'.format(
+                self.cross_covariances_rθz_age[0],
+                self.cross_covariances_rθz_age_error[0]).replace('.', ','))
+
+        # θ-μθ covariance
+        ax.plot(self.time, cross_covariances_rθz[:,1], '-.', color='0.2', linewidth=1.5,
+            label='phi-vT : ({} ± {}) Ma'.format(
+                self.cross_covariances_rθz_age[1],
+                self.cross_covariances_rθz_age_error[1]).replace('.', ','))
+
+        # z-μz covariance
+        ax.plot(self.time, cross_covariances_rθz[:,2], '--', color='0.4', linewidth=1.5,
+            label='z-vz : ({} ± {}) Ma'.format(
+                self.cross_covariances_rθz_age[2],
+                self.cross_covariances_rθz_age_error[2]).replace('.', ','))
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title("R-vR, phi-vT and z-vz cross covariances of β Pictoris (without "
+                    "outliners) over {} Myr\nwith {} km/s redshift correction and actual "
+                    "measurement errors\n".format(
+                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+            elif self.from_model:
+                ax.set_title("R-vR, phi-vT and z-vz cross covariances of {} moving group simu"
+                    "lations with kinematics similar to β Pictoris \n over {} Myr with {} km/s "
+                    "redshift correction and actual measurement errors of Gaia DR2\n".format(
                         self.number_of_groups, self.duration.value,
                         round(self.rv_offset.to('km/s').value, 2)))
 
@@ -225,11 +507,11 @@ class Output_Series():
         ax.set_ylim(0, 1.6)
 
         # Save figure
-        save_figure(self.name, 'Covariances_{}.pdf'.format(self.name),
+        save_figure(self.name, 'Cross_covariances_rθz_{}.pdf'.format(self.name),
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_size_indicators_covariance_plots(
+    def create_scatter_mad_mst_cross_covariances_plots(
             self, other, secondary=False, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of scatter, median absolute deviation, and minimum spanning tree
             branches length mean and median absolute deviation over the entire duration of the
@@ -294,32 +576,39 @@ class Output_Series():
         ax0.set_ylim(0.0, 1.5)
 
         # Covariance normalization
-        covariances = self.covariances / self.covariances[0]
-        other_covariances = other.covariances / other.covariances[0]
+        cross_covariances_xyz = self.cross_covariances_xyz / self.cross_covariances_xyz[0]
+        other_cross_covariances_xyz = other.cross_covariances_xyz / other.cross_covariances_xyz[0]
 
-        # X-U covariance (other)
-        ax1.plot(other.time, other_covariances[:,0], '-', color='k', linewidth=1.5,
-            label='X-U : ({} ± {}) Ma'.format(other.xu_age, other.xu_age_error).replace('.', ','))
+        # X-U cross covariance (other)
+        ax1.plot(other.time, other_cross_covariances_xyz[:,0], '-', color='k', linewidth=1.5,
+            label='X-U : ({} ± {}) Ma'.format(
+                other.cross_covariances_xyz_age[0],
+                other.cross_covariances_xyz_age_error[0]).replace('.', ','))
 
-        # Y-V covariance (other)
-        ax1.plot(other.time, other_covariances[:,1], '-.', color='0.2', linewidth=1.5,
-            label='Y-V : ({} ± {}) Ma'.format(other.yv_age, other.yv_age_error).replace('.', ','))
+        # Y-V cross covariance (other)
+        ax1.plot(other.time, other_cross_covariances_xyz[:,1], '-.', color='0.2', linewidth=1.5,
+            label='Y-V : ({} ± {}) Ma'.format(
+                other.cross_covariances_xyz_age[1], other.cross_covariances_xyz_age_error[1]).replace('.', ','))
 
-        # Z-W covariance (other)
-        ax1.plot(other.time, other_covariances[:,2], '--', color='0.4', linewidth=1.5,
-            label='Z-W : ({} ± {}) Ma'.format(other.zw_age, other.zw_age_error).replace('.', ','))
+        # Z-W cross covariance (other)
+        ax1.plot(other.time, other_cross_covariances_xyz[:,2], '--', color='0.4', linewidth=1.5,
+            label='Z-W : ({} ± {}) Ma'.format(
+                other.cross_covariances_xyz_age[2], other.cross_covariances_xyz_age_error[2]).replace('.', ','))
 
-        # X-U covariance
-        ax1.plot(self.time, covariances[:,0], '-', color='b', linewidth=1.5,
-            label='X-U : ({} ± {}) Ma'.format(self.xu_age, self.xu_age_error).replace('.', ','))
+        # X-U cross covariance
+        ax1.plot(self.time, cross_covariances_xyz[:,0], '-', color='b', linewidth=1.5,
+            label='X-U : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_age[0], self.cross_covariances_xyz_age_error[0]).replace('.', ','))
 
-        # Y-V covariance
-        ax1.plot(self.time, covariances[:,1], '-.', color='#2635ff', linewidth=1.5,
-            label='Y-V : ({} ± {}) Ma'.format(self.yv_age, self.yv_age_error).replace('.', ','))
+        # Y-V cross covariance
+        ax1.plot(self.time, cross_covariances_xyz[:,1], '-.', color='#2635ff', linewidth=1.5,
+            label='Y-V : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_age[1], self.cross_covariances_xyz_age_error[1]).replace('.', ','))
 
-        # Z-W covariance
-        ax1.plot(self.time, covariances[:,2], '--', color='#4d58ff', linewidth=1.5,
-            label='Z-W : ({} ± {}) Ma'.format(self.zw_age, self.zw_age_error).replace('.', ','))
+        # Z-W cross covariance
+        ax1.plot(self.time, cross_covariances_xyz[:,2], '--', color='#4d58ff', linewidth=1.5,
+            label='Z-W : ({} ± {}) Ma'.format(
+                self.cross_covariances_xyz_age[2], self.cross_covariances_xyz_age_error[2]).replace('.', ','))
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
@@ -381,6 +670,76 @@ class Output_Series():
 
 class Output_Group():
     """ Defines output methods from a Group object. """
+
+    def trajectory(self, title=True, forced=False, default=False, cancel=False):
+        """ Draw the trajectory of stars """
+
+        # Figure initialization
+        fig = plt.figure(figsize=(6, 5.5), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Scatter
+        for star in self.stars:
+            ax.plot(star.position.T[0] / 1000, star.position.T[1] / 1000, c='k', linewidth=0.7)
+            ax.plot(star.position_linear.T[0] / 1000, star.position_linear.T[1] / 1000,
+                c='b', linewidth=0.7)
+
+        # Title formatting
+        self.series.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            ax.set_title("Trajectories of stars in βPMG")
+
+        # Axes formatting
+        ax.set_xlabel('X (kpc)')
+        ax.set_ylabel('Y (kpc)')
+        ax.set_aspect('equal')
+        ax.set_adjustable('datalim')
+
+        # Save figure
+        save_figure(self.name, 'Trajectories.pdf', forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def trajectory_XYZR(self, title=True, forced=False, default=False, cancel=False):
+        """ Draw the avrage XYZ trajectory of stars """
+
+        # Figure initialization
+        fig = plt.figure(figsize=(6, 5.5), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Scatter
+        from Traceback.coordinate import Coordinate
+        ax.plot(self.series.time, self.avg_position[:,0].T / 1000, c='k', linewidth=1.5, label='$X$')
+        ax.plot(self.series.time, self.avg_position[:,1].T / 1000, c='b', linewidth=1.5, label='$Y$')
+        ax.plot(self.series.time, (self.avg_rθz[:,2].T - Coordinate.sun_position[2]) / 1000, c='r', linewidth=1.5, label='$Z - Z_\\odot$')
+        ax.plot(self.series.time, (self.avg_rθz[:,0].T - Coordinate.sun_position[0]) / 1000, c='g', linewidth=1.5, label='$R - R_\\odot$ ')
+
+        # Title formatting
+        self.series.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            ax.set_title("Trajectories of stars in βPMG")
+
+        # Legend and axes formatting
+        ax.legend(loc=1, fontsize=9.2)
+        ax.set_xlabel('Time (Myr)')
+        ax.set_ylabel('Position  (kpc)')
+        # ax.set_aspect('equal')
+        # ax.set_adjustable('datalim')
+
+        # Secondary x axis
+        slope, intercept, r_value, p_value, std_err = linregress(
+            self.series.time, self.avg_rθz[:,1].T * 180 / np.pi)
+        def time_to_θ(t):
+            return slope * t + intercept
+        def θ_to_time(θ):
+            return (θ - intercept) / slope
+        ax2 = ax.secondary_xaxis('top', functions=(time_to_θ, θ_to_time))
+        ax2.set_xlabel('θ (°)')
+
+        # Save figure
+        save_figure(self.name, 'Trajectories_XYZ.pdf', forced=forced, default=default, cancel=cancel)
+        # plt.show()
 
     def create_2D_scatter(
             self, i, j, step=None, age=None, errors=False, labels=False, mst=False,
@@ -769,11 +1128,11 @@ class Output_Group():
         ax.set_ylim(-100, 100)
         ax.set_zlim(-100, 100)
 
-    def create_covariances_scatter(
+    def create_cross_covariances_scatter(
             self, i, j, step=None, age=None, errors=False, labels=False,
             title=True, forced=False, default=False, cancel=False):
-        """ Creates a covariance scatter of star positions and velocities in i and j at a given
-            'step' or 'age' in Myr. If 'age' doesn't match a step, the closest step is used
+        """ Creates a cross covariance scatter of star positions and velocities in i and j at a
+            given 'step' or 'age' in Myr. If 'age' doesn't match a step, the closest step is used
             instead. 'age' overrules 'steps' if both are given. 'labels' adds the stars' name
             and 'mst' adds the minimum spanning tree branches.
         """

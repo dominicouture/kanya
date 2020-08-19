@@ -161,8 +161,9 @@ class Data(list):
             self.series.stop(self.header, 'ValueError', "The data doesn't have a header.")
 
         # Checks for the presence of a unit header in self.table
-        self.unit_header = np.vectorize(
+        self.unit_header = not np.vectorize(
             lambda unit: unit.replace('.', '').replace(',', '').isdigit())(self.table[1]).any()
+        # !!! Autre vérification pour voir si toute les valeurs non nulles peuvent être transformée en unit !!!
 
         # Units from a unit header, if present
         if self.data.units is None:
@@ -246,7 +247,7 @@ class Data(list):
         for label in self.error_variables.keys():
             if label not in self.columns.keys():
                 self.columns[label] = self.Column(self, self.columns[label[1:]].column, True)
-            if self.columns[label].unit == None:
+            if self.columns[label].unit is None:
                 self.columns[label].unit = self.columns[label[1:]].unit
 
     class Column:

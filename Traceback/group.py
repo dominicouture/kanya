@@ -9,6 +9,8 @@
 """
 
 import numpy as np
+import galpy.util.bovy_coords as gpcooords
+from galpy.orbit import Orbit
 from Traceback.data import Data
 from Traceback.output import Output_Group
 from Traceback.coordinate import *
@@ -34,6 +36,10 @@ class Group(list, Output_Group):
         self.series = series
         self.name = name
 
+        # Milky Way potential
+        from galpy.potential import MWPotential2014
+        self.potential = MWPotential2014
+
         # Stars from data
         if series.from_data:
             self.stars_from_data()
@@ -48,11 +54,11 @@ class Group(list, Output_Group):
         # Median absolute deviation
         self.get_median_absolute_deviation()
 
-        # X-U, Y-V and Z-W covariances
-        self.get_covariances()
-
         # Minimum spanning tree
         self.get_minimum_spanning_tree()
+
+        # X-U, Y-V and Z-W covariances
+        self.get_covariances()
 
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
@@ -65,8 +71,7 @@ class Group(list, Output_Group):
         # Star creation from observables
         for star in self.series.data:
             rv_offset = star.rv_offset if star.rv_offset is not None else self.series.rv_offset.value
-            # rv_offset = self.series.rv_offset.value
-            # print(star.name, 'rv_offset:', round(rv_offset, 3))
+
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rvμδμα, position_rδα_error, velocity_rvμδμα_error) = \
                 observables_spherical(
@@ -91,15 +96,16 @@ class Group(list, Output_Group):
 
             # Star creation
             self.append(self.Star(
-                self, outlier=False, name=star.name,
+                self, name=star.name, backward=True,
                 velocity=velocity_uvw, velocity_error=velocity_uvw_error,
                 position=position_xyz, position_error=position_xyz_error))
 
-            # Stars creation from cartesian coordinates
-            # self.append(self.Star(
-            #     self, outlier=False, name=star.name,
-            #     velocity=star.velocity.values, velocity_error=star.velocity.values,
-            #     position=star.position.values, position_error=star.position.values))
+        # Stars creation from cartesian coordinates
+        # for star in self.series.data:
+        #     self.append(self.Star(
+        #         self, name=star.name, backward=True,
+        #         velocity=star.velocity.values, velocity_error=star.velocity.values,
+        #         position=star.position.values, position_error=star.position.values))
 
     def stars_from_model(self):
         """ Creates an artificial model of star for a given number of stars and age based on
@@ -108,29 +114,35 @@ class Group(list, Output_Group):
             velocity offset is also added.
         """
 
-        # Velocity arrays creation and conversion
-        avg_velocity = self.series.avg_velocity.values
+        # Model backward orbit integration
+        average_model_star = self.Star(
+            self, name='model_average_star', backward=True, model=True,
+            velocity=self.series.avg_velocity.values, velocity_error=np.zeros(3),
+            position=self.series.avg_position.values, position_error=np.zeros(3))
+
+        # Average velocity arrays
+        avg_velocity = average_model_star.velocity_new[-1]
         avg_velocity_error = self.series.avg_velocity_error.values
         avg_velocity_scatter = self.series.avg_velocity_scatter.values
 
-        # Position arrays creation
-        avg_position = self.series.avg_position.values
+        # Average position arrays
+        avg_position = average_model_star.position[-1]
         avg_position_error = self.series.avg_position_error.values
         avg_position_scatter = self.series.avg_position_scatter.values
 
         # Stars creation from a model
         for star in range(self.series.number_of_stars):
 
-            # Velocity and a position based average values and scatters
-            # Positions are projected forward in time centered around the average position
-            velocity_uvw = np.random.normal(avg_velocity, avg_velocity_scatter)
-            position_xyz = np.random.normal((0., 0., 0.), avg_position_scatter) + (
-                velocity_uvw - avg_velocity) * self.series.age.values + avg_position
+            # Model star forward galactic orbit integration
+            model_star = self.Star(
+                self, name='model_star_{}'.format(star + 1), backward=False, model=True,
+                velocity=np.random.normal(avg_velocity, avg_velocity_scatter), velocity_error=np.zeros(3),
+                position=np.random.normal(avg_position, avg_position_scatter), position_error=np.zeros(3))
 
             # Velocity and possition conversion to equatorial spherical coordinates
-            velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*position_xyz, *velocity_uvw)[0]
-            velocity_rvμδμα = velocity_rvμδμα + np.array([self.series.rv_offset.value, 0.0, 0.0])
-            position_rδα = galactic_xyz_equatorial_rδα(*position_xyz)[0]
+            velocity_rvμδμα = galactic_uvw_equatorial_rvμδμα(*model_star.position[-1], *model_star.velocity_new[-1])[0]
+            velocity_rvμδμα += np.array([self.series.rv_offset.value, 0.0, 0.0])
+            position_rδα = galactic_xyz_equatorial_rδα(*model_star.position[-1])[0]
 
             # Velocity and position conversion to observables
             position_obs, velocity_obs = spherical_observables(*position_rδα, *velocity_rvμδμα)[:2]
@@ -162,12 +174,9 @@ class Group(list, Output_Group):
 
             # Star creation
             self.append(self.Star(
-                self, outlier=False,
-                name='star_{}'.format(star + 1),
-                velocity=velocity_uvw,
-                velocity_error=position_xyz_error,
-                position=position_xyz,
-                position_error=velocity_uvw_error))
+                self, name='star_{}'.format(star + 1), backward=True,
+                velocity=velocity_uvw, velocity_error=velocity_uvw_error,
+                position=position_xyz, position_error=position_xyz_error))
 
     def get_stars_coordinates(self):
         """ Computes the number of stars that aren't ouliers, the stars average velocity and
@@ -179,16 +188,25 @@ class Group(list, Output_Group):
         self.number_of_stars = len(self.stars)
 
         # Average velocity, excluding outliers
-        self.avg_velocity = np.sum(np.array(
-            [star.velocity for star in self.stars]), axis=0) / self.number_of_stars
+        self.avg_velocity_new = np.mean([star.velocity_new for star in self.stars], axis=0)
         self.avg_velocity_error = np.sum(np.array(
             [star.velocity_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
 
         # Average position, excluding outliers
-        self.avg_position = np.sum(np.array(
-            [star.position for star in self.stars]), axis=0) / self.number_of_stars
+        self.avg_position = np.mean([star.position for star in self.stars], axis=0)
         self.avg_position_error = np.sum(np.array(
             [star.position_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
+
+        # Average rθz position, excluding outliers
+        self.avg_rθz = np.mean([star.position_rθz for star in self.stars], axis=0)
+
+        # Average μρμθw velocity, excluding outliers
+        self.avg_μρμθw = np.mean([star.velocity_μρμθw for star in self.stars], axis=0)
+
+        # Linear position and velocity, excluding outliers
+        self.avg_velocity = np.mean([star.velocity for star in self.stars], axis=0)
+        self.avg_position_linear = np.mean(np.array(
+            [star.position_linear for star in self.stars]), axis=0)
 
         # Stars relative position and velocity, distance and speed of all stars (outliers or not)
         for star in self:
@@ -218,9 +236,6 @@ class Group(list, Output_Group):
             # XYZ scatter
             self.scatter_xyz = np.std([star.position for star in self.stars], axis=0)
 
-            # UVW scatter
-            self.scatter_uvw = np.std([star.velocity for star in self.stars], axis=0)
-
             # 3D scatter
             self.scatter = np.sum(self.scatter_xyz**2, axis=1)**0.5
 
@@ -242,9 +257,28 @@ class Group(list, Output_Group):
                     self.stars.remove(star)
                     self.number_of_stars = len(self.stars)
 
-        # Scatter age
+        # UVW position scatter
+        self.scatter_uvw = np.std([star.velocity for star in self.stars], axis=0)
+
+        # rθz position scatter
+        self.scatter_rθz = np.std([star.position_rθz for star in self.stars], axis=0)
+
+        # μρμθw velocity scatter
+        self.scatter_μρμθw = np.std([star.velocity_μρμθw for star in self.stars], axis=0)
+
+        # Position scatter age
         self.scatter_age = self.series.time[np.argmin(self.scatter)]
         self.scatter_min = np.min(self.scatter)
+
+        # XYZ position scatter age
+        self.scatter_xyz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.scatter_xyz, axis=0))
+        self.scatter_xyz_min = np.min(self.scatter_xyz, axis=0)
+
+        # rθz position scatter age
+        self.scatter_rθz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.scatter_rθz, axis=0))
+        self.scatter_rθz_min = np.min(self.scatter_rθz, axis=0)
 
     def get_median_absolute_deviation(self):
         """ Computes the XYZ and total median absolute deviation (MAD) of a group and their
@@ -252,43 +286,48 @@ class Group(list, Output_Group):
             finding the time at which the median absolute deviation is minimal.
         """
 
-        # XYZ median absolute deviation
-        self.median_xyz = np.median(np.array([star.position for star in self.stars]), axis=0)
-        self.mad_xyz = np.median(
-            np.abs(np.array([star.position for star in self.stars]) - self.median_xyz), axis=0)
+        # Single median absolute deviation
+        # median_xyz = np.median(np.array([star.position for star in self.stars]), axis=0)
+        # self.mad_xyz = np.median(
+        #     np.abs(np.array([star.position for star in self.stars]) - median_xyz), axis=0)
+        # self.mad = np.sum(self.mad_xyz**2, axis=1)**0.5
 
-        # Median absolute deviation
-        self.mad = np.sum(self.mad_xyz**2, axis=1)**0.5
+        # Jack-knife Monte Carlo
+        n = 500
+        total_mad_xyz = np.zeros((n, len(self.series.time), 3))
+        total_mad = np.zeros((n, len(self.series.time)))
+        for i in range(n):
+            stars = [self.stars[i] for i in np.random.choice(self.number_of_stars,
+                int(self.number_of_stars * 0.8), replace=False)]
+
+            # Median absolute deviation
+            median_xyz = np.median(np.array([star.position for star in stars]), axis=0)
+            total_mad_xyz[i] = np.median(
+                np.abs(np.array([star.position for star in stars]) - median_xyz), axis=0)
+            total_mad[i] = np.sum(total_mad_xyz[i]**2, axis=1)**0.5
+
+        # Average median absolute deviation
+        self.mad_xyz = np.mean(total_mad_xyz, axis=0)
+        self.mad = np.mean(total_mad, axis=0)
+
+        # rθz median absolute deviation
+        median_rθz = np.median(np.array([star.position_rθz for star in self.stars]), axis=0)
+        self.mad_rθz = np.median(
+            np.abs(np.array([star.position_rθz for star in self.stars]) - median_rθz), axis=0)
 
         # Median absolute deviation age
         self.mad_age = self.series.time[np.argmin(self.mad)]
         self.mad_min = np.min(self.mad)
 
-    # def get_median_absolute_deviation(self):
-    #     """ Computes the XYZ and total median absolute deviation (MAD) of a group and their
-    #         respective errors for all timesteps. The age of the moving is then estimated by
-    #         finding the time at which the median absolute deviation is minimal.
-    #     """
-    #
-    #     print(self.number_of_stars)
-    #     # Jack-knife Monte Carlo
-    #     total = np.zeros((100, len(self.series.time)))
-    #     for i in range(100):
-    #         stars = [self.stars[i] for i in np.random.choice(self.number_of_stars,
-    #             int(self.number_of_stars * 0.8), replace=False)]
-    #
-    #         # XYZ median absolute deviation
-    #         median_xyz = np.median(np.array([star.position for star in stars]), axis=0)
-    #         mad_xyz = np.median(
-    #             np.abs(np.array([star.position for star in stars]) - median_xyz), axis=0)
-    #         total[i] = np.sum(mad_xyz**2, axis=1)**0.5
-    #
-    #     # Median absolute deviation
-    #     self.mad = np.mean(total, axis=0)
-    #
-    #     # Median absolute deviation age
-    #     self.mad_age = self.series.time[np.argmin(self.mad)]
-    #     self.mad_min = np.min(self.mad)
+        # XYZ median absolute deviation age
+        self.mad_xyz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.mad_xyz, axis=0))
+        self.mad_xyz_min = np.min(self.mad_xyz, axis=0)
+
+        # rθz median absolute deviation age
+        self.mad_rθz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.mad_rθz, axis=0))
+        self.mad_rθz_min = np.min(self.mad_rθz, axis=0)
 
     def get_covariances(self):
         """ Computes the X-U, Y-V and Z-W absolute covariances of a group and their respective
@@ -296,16 +335,70 @@ class Group(list, Output_Group):
             at which the covariances is minimal.
         """
 
-        # Covariances calculation
-        self.covariances = np.absolute(np.sum(
-            (np.array([star.position for star in self.stars]) - self.avg_position) *
-            np.expand_dims(np.array([star.velocity for star in self.stars]) - self.avg_velocity,
-                axis=1), axis=0) / self.number_of_stars)
+        # XYZ positions and UVW velocities
+        positions = np.array([star.position for star in self.stars]) - self.avg_position
+        velocities = np.array([star.velocity_new for star in self.stars]) - self.avg_velocity_new
 
-        # Covariances age
-        self.covariances_age = np.vectorize(
-            lambda step: self.series.time[step])(np.argmin(self.covariances, axis=0))
-        self.covariances_min = np.min(self.covariances, axis=0)
+        # XYZ covariance matrix
+        self.covariances_xyz_matrix = np.mean(np.swapaxes(
+            np.array([
+                [positions[:,:,0], positions[:,:,0], positions[:,:,0]],
+                [positions[:,:,1], positions[:,:,1], positions[:,:,1]],
+                [positions[:,:,2], positions[:,:,2], positions[:,:,2]]]) *
+            np.array([
+                [positions[:,:,0], positions[:,:,1], positions[:,:,2]],
+                [positions[:,:,0], positions[:,:,1], positions[:,:,2]],
+                [positions[:,:,0], positions[:,:,1], positions[:,:,2]]]) , 0, 1), axis=2).T
+
+        # X-X, Y-Y, Z-Z absolute covariances ages
+        self.covariances_xyz = np.absolute(self.covariances_xyz_matrix[:, (0, 1, 2), (0, 1, 2)])
+        self.covariances_xyz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.covariances_xyz, axis=0))
+        self.covariances_xyz_min = np.min(self.covariances_xyz, axis=0)
+
+        # XYZ covariance matrix determinant age
+        self.covariances_xyz_matrix_det = np.linalg.det(self.covariances_xyz_matrix)
+        self.covariances_xyz_matrix_det_age = self.series.time[np.argmin(self.covariances_xyz_matrix_det)]
+        self.covariances_xyz_matrix_det_min = np.min(self.covariances_xyz_matrix_det)
+
+        # XYZ cross covariance matrix
+        self.cross_covariances_xyz_matrix = np.mean(np.swapaxes(
+            np.array([
+                [positions[:,:,0], positions[:,:,0], positions[:,:,0]],
+                [positions[:,:,1], positions[:,:,1], positions[:,:,1]],
+                [positions[:,:,2], positions[:,:,2], positions[:,:,2]]]) *
+            np.array([
+                [velocities[:,:,0], velocities[:,:,1], velocities[:,:,2]],
+                [velocities[:,:,0], velocities[:,:,1], velocities[:,:,2]],
+                [velocities[:,:,0], velocities[:,:,1], velocities[:,:,2]]]) , 0, 1), axis=2).T
+
+        # Diagonal elements set to 0. and determinant
+        cross_covariances_xyz_matrix_zero_diag = self.cross_covariances_xyz_matrix.copy()
+        cross_covariances_xyz_matrix_zero_diag[:, (0, 1, 2), (0, 1, 2)] = 0.
+        self.cross_covariances_xyz_matrix_det = np.linalg.det(cross_covariances_xyz_matrix_zero_diag)
+
+        # Cross covariance matrix determinant age
+        self.cross_covariances_xyz_matrix_det_age = self.series.time[
+            np.argmin(self.cross_covariances_xyz_matrix_det)]
+        self.cross_covariances_xyz_matrix_det_min = np.min(self.cross_covariances_xyz_matrix_det)
+
+        # X-U, Y-V, Z-W absolute cross covariances
+        self.cross_covariances_xyz = np.absolute(self.cross_covariances_xyz_matrix[:, (0, 1, 2), (0, 1, 2)])
+
+        # X-U, Y-V, Z-W cross absolute covariances age
+        self.cross_covariances_xyz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.cross_covariances_xyz, axis=0))
+        self.cross_covariances_xyz_min = np.min(self.cross_covariances_xyz, axis=0)
+
+        # Cylindrical absolute cross covariances
+        self.cross_covariances_rθz = np.absolute(np.mean(
+            (np.array([star.position_rθz for star in self.stars]) - self.avg_rθz) *
+            (np.array([star.velocity_μρμθw for star in self.stars]) - self.avg_μρμθw), axis=0))
+
+        # Cylindrical absolute cross covariances age
+        self.cross_covariances_rθz_age = np.vectorize(
+            lambda step: self.series.time[step])(np.argmin(self.cross_covariances_rθz, axis=0))
+        self.cross_covariances_rθz_min = np.min(self.cross_covariances_rθz, axis=0)
 
     def get_minimum_spanning_tree(self):
         """ Builds the minimum spanning tree (MST) of a group for all timesteps using a Kruskal
@@ -357,22 +450,20 @@ class Group(list, Output_Group):
             self.mst_lengths[step] = np.vectorize(
                 lambda branch: branch.length[step])(self.mst[step])
 
-        # Minimum spanning tree average branch length and age
+        # Minimum spanning tree average branch length age
         self.mst_mean = np.mean(self.mst_lengths, axis=1)
         self.mst_mean_age = self.series.time[np.argmin(self.mst_mean)]
         self.mst_min = np.min(self.mst_mean)
 
-        # Minimum spanning tree branch length median absolute deviation and age
+        # Single minimum spanning tree branch length median absolute deviation
         # self.mst_median = np.median(self.mst_lengths, axis=1)
         # self.mst_mad = np.median(
         #     np.abs(self.mst_lengths - np.expand_dims(self.mst_median, axis=0).T), axis=1)
-        # self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
-        # self.mst_mad_min = np.min(self.mst_mad)
 
-        # Minimum spanning tree branch length median absolute deviation and age
         # Jack-knife Monte Carlo
-        total = np.zeros((100, len(self.series.time)))
-        for i in range(100):
+        n = 500
+        total = np.zeros((n, len(self.series.time)))
+        for i in range(n):
             mst_lengths = self.mst_lengths[:, np.random.choice(self.number_of_branches,
                 int(self.number_of_branches * 0.8), replace=False)]
 
@@ -381,7 +472,10 @@ class Group(list, Output_Group):
             mst_mad = np.median(np.abs(mst_lengths - np.expand_dims(mst_median, axis=0).T), axis=1)
             total[i] = mst_mad
 
+        # Average minimum spanning tree branch length median absolute deviation
         self.mst_mad = np.mean(total, axis=0)
+
+        # Minimum spanning tree branch length median absolute deviation age
         self.mst_mad_age = self.series.time[np.argmin(self.mst_mad)]
         self.mst_mad_min = np.min(self.mst_mad)
 
@@ -422,24 +516,98 @@ class Group(list, Output_Group):
             """ Initializes a Star object with at least a name, velocity, velocity error, initial
                 position and position error. More values can be added (when initializing from a
                 file for instance). If a traceback is needed, the star's position and velocity
-                overtime is computed with galpy. !!! Add galactic orbits computation here !!!
+                overtime is computed with galpy.
             """
 
             # Initialization
             self.group = group
             self.outlier = False
+            self.model = False
             vars(self).update(values)
 
-            # Positions from traceback
-            self.position = self.position - self.velocity * np.expand_dims(
+            # Positions and errors from linear traceback
+            self.position_linear = self.position - (self.velocity - Coordinate.sun_velocity) * np.expand_dims(
                 self.group.series.time, axis=0).T
             self.position_error = (self.position_error**2 + (self.velocity_error
                 * np.expand_dims(self.group.series.time, axis=0).T)**2)**0.5
 
-        def __repr__(self):
-            """ Returns a string of name of the star. """
+            # Orbit integration
+            self.get_orbit()
 
-            return self.name
+        def get_orbit(self):
+            """ Computes a star's backward of forward galactic orbit using Galpy. """
+
+            # Other position and velocity computations
+            self.position_rθz_other, self.position_rθz_error_other = galactic_xyz_galactocentric_ρθz(
+                *self.position)
+            self.velocity_μρμθw_other, self.velocity_μρμθw_error_other = galactic_uvw_galactocentric_ρθz(
+                *self.position, *self.velocity)
+
+            # Initial position in galactocentric cylindrical coordinates (rθz)
+            self.position_rθz = np.array(gpcooords.XYZ_to_galcencyl(
+                *self.position,
+                Xsun=Coordinate.sun_position[0],
+                Zsun=Coordinate.sun_position[2],
+                _extra_rot=False))
+
+            # Initial velocity in galactocentric cylindrical coordinates (μρμθw)
+            self.velocity_μρμθw = np.array(gpcooords.vxvyvz_to_galcencyl(
+                *self.velocity,
+                *np.array(gpcooords.XYZ_to_galcenrect(
+                    *self.position,
+                    Xsun=Coordinate.sun_position[0],
+                    Zsun=Coordinate.sun_position[2],
+                    _extra_rot=False)),
+                vsun=Coordinate.sun_velocity * np.array([-1, 1, 1]),
+                Xsun=Coordinate.sun_position[0],
+                Zsun=Coordinate.sun_position[2],
+                galcen=False, _extra_rot=False))
+
+            # Time for a model star or traceback
+            if self.model:
+                self.time = np.linspace(0., (-self.group.series.age.value if self.backward
+                    else self.group.series.age.value), 1000)
+            else:
+                self.time = -self.group.series.time if self.backward else self.group.series.time
+
+            # Unit conversion
+            self.time *= Coordinate.sun_velocity[1] / Coordinate.sun_position[0]
+            self.position_rθz /= np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
+            self.velocity_μρμθw /= Coordinate.sun_velocity[1]
+
+            # Orbit initialization and integration
+            orbit = Orbit([
+                self.position_rθz[0], self.velocity_μρμθw[0], self.velocity_μρμθw[1],
+                self.position_rθz[2], self.velocity_μρμθw[2], self.position_rθz[1]])
+            orbit.integrate(self.time, self.group.potential, method='odeint')
+
+            # Orbital rθz positions and unit conversion
+            self.position_rθz = np.array([
+                orbit.R(self.time),
+                orbit.phi(self.time),
+                orbit.z(self.time)]).T * np.array(
+                    [Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
+
+            # Orbital μρμθw velocities and unit conversion
+            self.velocity_μρμθw = np.array([
+                orbit.vR(self.time),
+                orbit.vT(self.time),
+                orbit.vz(self.time)]).T * Coordinate.sun_velocity[1]
+
+            # XYZ positions
+            self.position = gpcooords.galcencyl_to_XYZ(
+                *self.position_rθz.T,
+                Xsun=Coordinate.sun_position[0],
+                Zsun=Coordinate.sun_position[2],
+                _extra_rot=False)
+
+            # UVW velocities
+            self.velocity_new = gpcooords.galcencyl_to_vxvyvz(
+                *self.velocity_μρμθw.T, self.position_rθz.T[1],
+                vsun=Coordinate.sun_velocity * np.array([-1, 1, 1]),
+                Xsun=Coordinate.sun_position[0],
+                Zsun=Coordinate.sun_position[2],
+                _extra_rot=False)
 
         def get_relative_coordinates(self):
             """ Computes relative position and velocity, the distance and the speed from the
@@ -461,6 +629,11 @@ class Group(list, Output_Group):
             self.speed = np.sum(self.relative_velocity**2, axis=0)**0.5
             self.speed_error = np.sum((self.relative_velocity
                 * self.relative_position_error)**2, axis=0)**0.5 / self.speed
+
+        def __repr__(self):
+            """ Returns a string of name of the star. """
+
+            return self.name
 
         def shift_rv(self):
             """ Shifts the radial velocity based on the gravitationnal redshift of the star and

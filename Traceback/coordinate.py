@@ -120,9 +120,9 @@ class System():
 
         # Cylindrical coordinate system variable
         Variable('ρ', 'galactic radius', default_units['length']),
-        Variable('μρ', 'galactic radius', default_units['speed']),
+        Variable('μρ', 'galactic radial velocity', default_units['speed']),
         Variable('θ', 'galactic angle', default_units['angle'], usual_units['angle']),
-        Variable('μθ', 'galactic angle motion', default_units['angular speed'],
+        Variable('μθ', 'galactic angular velocity', default_units['angular speed'],
             usual_units['angular speed']),
 
         # Spherical coordinate system variables
@@ -157,9 +157,34 @@ class Coordinate:
         their errors and units, and methods to transform a coordinate from one system to another.
     """
 
-    # J2000.0 Galactic-equatorial rotation matrix from Liu et al. (2018) 1010.3773
-    # Rotates a vector from equatorial to galactic reference frame
+    # Sun position (pc) and velocity (pc/Myr) in the Galaxy, along with current errors from
+    # Quillen et al. (2020, 2006.01723) in a galactocentric frame of reference
+    sun_position = np.array([8122, 0., 20.8])
+    sun_position_error = np.array([0., 0., 0.])
+    # sun_position_error = np.array([31, 0., 0.3])
+    sun_velocity = np.array([-11.352, -12.518 + 238.292, 7.415])
+    sun_velocity_error = np.array([0., 0., 0.])
+
+    # Distance to the galactic center and theta angle trigonometric ratios
+    distance_galactic_center = (sun_position[0]**2 + sun_position[2]**2)**0.5
+    costheta = sun_position[0] / distance_galactic_center
+    sintheta = sun_position[2] / distance_galactic_center
+    galactic_center = np.array([-distance_galactic_center, 0., 0.])
+    galactic_center_error = np.array([0., 0., 0.])
+
     # !!! This part should be moved to Axis !!!
+    # Galactic-galactocentric rotation matrix
+    # Rotates a vector from galactic to galactocentric right-handed reference frame
+    ggrm = np.array([
+        [  costheta,   0.  , sintheta ],
+        [     0.   ,   1.  ,     0.    ],
+        [ -sintheta,   0.  , costheta ]])
+
+    galactic_velocity = np.dot(ggrm.T, sun_velocity)
+    galactic_velocity_error = np.array([0., 0., 0.])
+
+    # J2000.0 Galactic-equatorial rotation matrix from Liu et al. (2018) 1010.3773
+    # Rotates a vector from equatorial to galactic right-handed reference frame
     germ = np.array([
         [-0.054875657707, -0.873437051953, -0.483835073621],
         [ 0.494109437203, -0.444829721222,  0.746982183981],
@@ -182,7 +207,7 @@ class Coordinate:
     k = π / 648000
 
     # Gaia bias correction
-    gaia_bias = 2.618e-10
+    gaia_bias = -2.618e-10
     # gaia_bias = 0.0
 
     def __init__(self, position, velocity=None):
@@ -258,6 +283,101 @@ class Coordinate:
 
         pass
 
+
+# Vector translation functions
+
+def translate(x, y, z, Δx=0, Δy=0, Δz=0, origin_vector=np.zeros(3), origin_vector_error=np.zeros(3)):
+    """ Translates a cartesian XYZ position (pc) or UVW velocity (pc/Myr) vector to a new origin
+        using the 'origin_vector' (pc or pc/Myr).
+    """
+
+    # Coordinate calculation
+    values = np.array((x, y , z)) + origin_vector
+
+    # Errors calculation
+    if not np.array((Δx, Δy, Δz)).any():
+        return values, np.zeros(values.shape)
+    else:
+        errors = (np.array((Δx, Δy, Δz))**2 + origin_vector_error**2)**0.5
+        return values, errors
+
+def heliocentric_galactocentric_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Translates a cartesian XYZ position vector (pc) from a heliocentric to a galactocentric
+        origin.
+    """
+
+    return translate(x, y, z, Δx, Δy, Δz, Coordinate.galactic_center, Coordinate.galactic_center_error)
+
+def heliocentric_galactocentric_uvw(u, v, w, Δu=0, Δv=0, Δw=0):
+    """ Translates a cartesian UVW velocity vector (pc) from a heliocentric to a galactocentric
+        reference frame.
+    """
+
+    return translate(u, v, w, Δu, Δv, Δw, Coordinate.sun_velocity, Coordinate.sun_velocity_error)
+
+def galactocentric_heliocentric_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Translates a cartesian XYZ position vector (pc) from a galactocentric to a heliocentric
+        origin.
+    """
+
+    return translate(x, y, z, Δx, Δy, Δz, -Coordinate.galactic_center, Coordinate.galactic_center_error)
+
+def galactocentric_heliocentric_uvw(u, v, w, Δu=0, Δv=0, Δw=0):
+    """ Translates a cartesian UVW velocity vector (pc) from a heliocentric to a galactocentric
+        reference frame.
+    """
+
+    return translate(u, v, w, Δu, Δv, Δw, -Coordinate.sun_velocity, Coordinate.sun_velocity_error)
+
+
+# Vector rotation functions
+
+def rotate(x, y, z, Δx=0, Δy=0, Δz=0, rotation_matrix=np.identity(3)):
+    """ Rotates a cartesian XYZ position (pc) or UVW velocity (pc/Myr) vector to a new reference
+        plane using the 'rotation_matrix'.
+    """
+
+    # Coordinate calculation
+    values = np.dot(rotation_matrix, np.array((x, y, z)))
+
+    # Errors calculation
+    if not np.array((Δx, Δy, Δz)).any():
+        return values, np.zeros(values.shape)
+    else:
+        errors = np.dot(rotation_matrix**2, np.array((Δx, Δy, Δz))**2)**0.5
+        return values, errors
+
+def equatorial_galactic_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Rotates a cartesian XYZ position or UVW velocity vector from an equatorial to a galactic
+        plane. All arguments must have the same units.
+    """
+
+    return rotate(x, y, z, Δx, Δy, Δz, Coordinate.germ)
+
+def galactic_equatorial_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Rotates a cartesian XYZ position or UVW velocity vector from a galactic to an equatorial
+        plane. All arguments must have the same units.
+    """
+
+    return rotate(x, y, z, Δx, Δy, Δz, Coordinate.germ.T)
+
+def galactic_galactocentric_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Rotates a cartesian XYZ position or UVW velocity vector from a galactic to a galactocentric
+        plane. All arguments must have the same units.
+    """
+
+    return rotate(x, y, z, Δx, Δy, Δz, Coordinate.ggrm)
+
+def galactocentric_galactic_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Rotates a cartesian XYZ position or UVW velocity vector from a galactocentric to a galactic
+        plane. All arguments must have the same units.
+    """
+
+    return rotate(x, y, z, Δx, Δy, Δz, Coordinate.ggrm.T)
+
+
+# Cartesian and spherical coordinates transformation functions
+
 def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Converts a XYZ cartesian coordinate position vector (pc) to a rδα, distance (r; pc),
         declination (δ, DEC; rad) and right ascension (α, RA; rad), spherical coordinate position
@@ -269,11 +389,11 @@ def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     norm, norm_xy = norm_2**0.5, norm_xy_2**0.5
 
     # Distance and angles calculation
-    values = np.array((norm, asin(z / norm), atan2(y, x) + (2 * π if y < 0.0 else 0.0)))
+    values = np.array((norm, asin(z / norm), atan2(y, x) + (2 * π * (y < 0))))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
-        return values, np.zeros(3)
+        return values, np.zeros(values.shape)
     else:
         errors = np.dot(np.array((
 
@@ -289,7 +409,7 @@ def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
         return values, errors
 
 def rδα_to_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
-    """ Converts a rδα , distance (r; pc), declination (δ, DEC; rad) and right ascension
+    """ Converts a rδα, distance (r; pc), declination (δ, DEC; rad) and right ascension
         (α, RA; rad), spherical coordinate position vector (observables) to a XYZ cartesian
         coordinate position vector (pc), along with measurement errors.
     """
@@ -302,11 +422,11 @@ def rδα_to_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
 
     # Errors calculation
     if not np.array((Δr, Δδ, Δα)).any():
-        return values, np.zeros(3)
+        return values, np.zeros(values.shape)
     else:
         errors = np.dot(np.array((
 
-            # Partial derivatives of x: dx/dr, dr/dδ and dx/dα
+            # Partial derivatives of x: dx/dr, dx/dδ and dx/dα
             (cos_δ * cos_α, r * sin_δ * cos_α, -r * cos_δ * sin_α),
 
             # Partial derivatives of y: dy/dr, dy/dδ and dy/dα
@@ -338,7 +458,7 @@ def uvw_to_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz, Δu, Δv, Δw)).any():
-        return values, np.zeros(3)
+        return values, np.zeros(values.shape)
     else:
         errors = np.dot(np.array((
 
@@ -387,7 +507,7 @@ def rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, 
 
     # Errors calculation
     if not np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα)).any():
-        return values, np.zeros(3)
+        return values, np.zeros(values.shape)
     else:
         errors = np.dot(np.array((
 
@@ -411,35 +531,128 @@ def rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, 
         )**2, np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα))**2)**0.5
         return values, errors
 
-def equatorial_galactic_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
-    """ Rotates a cartesian XYZ position or UVW velocity from an equatorial to a galactic plane.
-        All arguments must have the same units.
+
+# Cartesian and cylindrical coordinates transformation functions
+
+def xyz_to_ρθz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Converts a XYZ cartesian coordinate position vector (pc) to a ρθz, radius (ρ; pc), angle
+        (θ; rad) and heigth (z; pc), cylindrical coordinate position vector (galactocentric),
+        along with measurement errors. 'x', 'y' and 'z' can't all be null.
     """
 
-    # Coordinate calculation
-    values = np.dot(Coordinate.germ, np.array((x, y, z)))
+    # Position calculation
+    values = np.array(((x**2 + y**2)**0.5, atan2(y, x) + (2 * π * (y < 0)), z))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
-        return values, np.zeros(3)
+        return values, np.zeros(values.shape)
     else:
-        errors = np.dot(Coordinate.germ**2, np.array((Δx, Δy, Δz))**2)**0.5
+        errors = np.dot(np.array((
+
+            # Partial derivatives of ρ: dρ/dx, dρ/dy and dρ/dz
+            (0., 0., 0.),
+
+            # Partial derivatives of θ: dθ/dx, dθ/dy and dθ/dz
+            (0., 0., 0.),
+
+            # Partial derivatives of z: dz/dx, dz/dy and dz/dz
+            (0., 0., 0.))
+        )**2, np.array((Δx, Δy, Δz))**2)**0.5
         return values, errors
 
-def galactic_equatorial_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
-    """ Rotates a cartesian XYZ position or UVW velocity from an  galactic to an equatorial plane.
-        All arguments must have the same units.
+def ρθz_to_xyz(ρ, θ, z, Δρ=0, Δθ=0, Δz=0):
+    """ Converts a ρθz, radius (ρ; pc), angle (θ; rad) and heigth (z; pc), cylindrical coordinate
+        position vector (galactocentric) to a XYZ cartesian coordinate position vector (pc), along
+        with measurement errors.
     """
 
-    # Coordinate calculation
-    values = np.dot(Coordinate.germ.T, np.array((x, y, z)))
+    # Cosine and sine calculation
+    cos_θ, sin_θ = cos(θ), sin(θ)
+
+    # Position calculation
+    values = np.array((ρ * cos_θ, ρ * sin_θ, z))
 
     # Errors calculation
-    if not np.array((Δx, Δy, Δz)).any():
-        return values, np.zeros(3)
+    if not np.array((Δρ, Δθ, Δz)).any():
+        return values, np.zeros(values.shape)
     else:
-        errors = np.dot(Coordinate.germ.T**2, np.array((Δx, Δy, Δz))**2)**0.5
+        errors = np.dot(np.array((
+
+            # Partial derivatives of x: dx/dρ, dx/dθ and dx/dz
+            (0., 0., 0.),
+
+            # Partial derivatives of y: dy/dρ, dy/dθ and dy/dz
+            (0., 0., 0.),
+
+            # Partial derivatives of z: dz/dρ, dz/dθ and dz/dz
+            (0., 0., 0.))
+        )**2, np.array((Δρ, Δθ, Δz))**2)**0.5
         return values, errors
+
+def uvw_to_μρμθw(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0):
+    """ Converts a UVW cartesian coordinate velocity vector (pc/Myr) to a μρμθw, radial velocity
+        (μρ; pc/Myr), angular velocity (μθ; rad/Myr) and W velocity (w; pc/Myr), cylindrical
+        coordinate velocity vector (galactocentric), along with measurement errors. 'x', 'y' and
+        'z' (pc) can't all be null.
+    """
+
+    # Norms calculation
+    norm_xy_2 = x**2 + y**2
+    norm_xy = norm_xy_2**0.5
+
+    # Velocity calculation
+    # values = np.array((((u * x) + (v * y)) / norm_xy, ((v * x) - (u * y)) / norm_xy_2, w))
+    # Tangantial velocity instead
+    values = np.array((((u * x) + (v * y)) / norm_xy, ((v * x) - (u * y)) / norm_xy, w))
+
+    # Errors calculation
+    if not np.array((Δx, Δy, Δz, Δu, Δv, Δw)).any():
+        return values, np.zeros(values.shape)
+    else:
+        errors = np.dot(np.array((
+
+            # Partial derivatives of ρ: dρ/dx, dρ/dy, dρ/dz, dρ/du, dρ/dv, dρ/dw
+            (0., 0., 0., 0., 0., 0.),
+
+            # Partial derivatives of θ: dθ/dx, dθ/dy, dθ/dz, dθ/du, dθ/dv, dθ/dw
+            (0., 0., 0., 0., 0., 0.),
+
+            # Partial derivatives of z: dz/dx, dz/dy, dz/dz, dz/du, dz/dv, dz/dz
+            (0., 0., 0., 0., 0., 0.))
+        )**2, np.array((Δx, Δy, Δz, Δu, Δv, Δw))**2)**0.5
+        return values, errors
+
+def μρμθw_to_uvw(ρ, θ, z, μρ, μθ, w, Δρ=0, Δθ=0, Δz=0, Δμρ=0, Δμθ=0, Δw=0):
+    """ Converts a μρμθw, radial velocity (μρ; pc/Myr), angular velocity (μθ; rad/Myr) and W
+        velocity (w; pc/Myr), cylindrical coordinate velocity vector (galactocentric) to an UVW
+        cartesian coordinate velocity vector (pc/Myr), along with measurement errors.
+    """
+
+    # Cosine and sine calculation
+    cos_θ, sin_θ = cos(θ), sin(θ)
+
+    # Velocity calculation
+    values = np.array((μρ * cos_θ - μθ * (ρ * sin_θ), μρ * sin_θ + μθ * (ρ * cos_θ), w))
+
+    # Errors calculation
+    if not np.array((Δρ, Δθ, Δz, Δμρ, Δμθ, Δw)).any():
+        return values, np.zeros(values.shape)
+    else:
+        errors = np.dot(np.array((
+
+            # Partial derivatives of ρ: dρ/dx, dρ/dy, dρ/dz, dρ/du, dρ/dv, dρ/dw
+            (0., 0., 0., 0., 0., 0.),
+
+            # Partial derivatives of θ: dθ/dx, dθ/dy, dθ/dz, dθ/du, dθ/dv, dθ/dw
+            (0., 0., 0., 0., 0., 0.),
+
+            # Partial derivatives of z: dz/dx, dz/dy, dz/dz, dz/du, dz/dv, dz/dz
+            (0., 0., 0., 0., 0., 0.))
+        )**2, np.array((Δρ, Δθ, Δz, Δμρ, Δμθ, Δw))**2)**0.5
+        return values, errors
+
+
+# Cartesian galactic and spherical equatorial coordinates transformation decorator functions
 
 def galactic_xyz_equatorial_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Converts a XYZ (pc) galactic cartesian coordinate position vector to a rδα, distance
@@ -481,6 +694,9 @@ def equatorial_rvμδμα_galactic_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0,
     values, errors = rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr, Δδ, Δα, Δrv, Δμδ, Δμα)
     return equatorial_galactic_xyz(*values, *errors)
 
+
+# Cartesian equatorial and spherical galactic coordinates transformation decorator functions
+
 def equatorial_xyz_galactic_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Converts a XYZ (pc) equatorial cartesian coordinate position vector to a rδα, distance
         (r; pc), declination (δ, DEC; rad) and right ascension (α, RA; rad), galactic spherical
@@ -521,6 +737,9 @@ def galactic_rvµδµα_equatorial_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0,
     values, errors = rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr, Δδ, Δα, Δrv, Δμδ, Δμα)
     return galactic_equatorial_xyz(*values, *errors)
 
+
+# Spherical equatorial and galactic coordinates rotation decorator functions
+
 def equatorial_galactic_rδα(r, δ, α, Δr=0, Δδ=0, Δα=0):
     """ Rotates an equatorial coordinate rδα vector to a galactic coordinate rδα vector. """
 
@@ -551,6 +770,75 @@ def galactic_equatorial_rvμδμα(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δ�
 
     return uvw_to_rvμδμα(*position_values, *velocity_values, *position_errors, *velocity_errors)
 
+
+# Cartesian galactic and cylindrical galactocentric transformation decorator function
+
+def galactic_xyz_galactocentric_ρθz(x, y, z, Δx=0, Δy=0, Δz=0):
+    """ Converts a XYZ (pc) galactic cartesian coordinate position vector to a ρθz, radius (ρ; pc),
+        angle (θ; rad) and heigth (z; pc), cylindrical coordinate position vector (galactocentric),
+        along with measurement errors. 'x', 'y' and 'z' can't all be null.
+    """
+
+    # Translation, rotation and left-handed cylindrical coordinates system
+    values, errors = heliocentric_galactocentric_xyz(x, y, z, Δx, Δy, Δz)
+    values, errors = galactic_galactocentric_xyz(*values, *errors)
+    values[0] = -values[0]
+
+    return xyz_to_ρθz(*values, *errors)
+
+def galactocentric_ρθz_galactic_xyz(ρ, θ, z, Δρ=0, Δθ=0, Δz=0):
+    """ Converts a ρθz, radius (ρ; pc), angle (θ; rad) and heigth (z; pc), cylindrical coordinate
+        position vector (galactocentric) to a XYZ (pc) galactic cartesian coordinate position
+        vector, along with measurement errors.
+    """
+
+    # Cartesian right-handed coordinates system, rotation and translation
+    values, errors = ρθz_to_xyz(ρ, θ, z, Δρ, Δθ, Δz)
+    values[0] = -values[0]
+    values, errors = galactocentric_galactic_xyz(*values, *errors)
+    return galactocentric_heliocentric_xyz(*values, *errors)
+
+def galactic_uvw_galactocentric_ρθz(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0):
+    """ Converts an UVW (pc/Myr) galactic cartesian coordinate velocity vector to a μρμθw, radial
+        velocity (μρ; pc/Myr), angular velocity (μθ; rad/Myr) and W velocity (w; pc/Myr),
+        cylindrical coordinate velocity vector (galactocentric), along with measurement errors.
+    """
+
+    # Position translation, rotation and left-handed system
+    position_values, position_errors = heliocentric_galactocentric_xyz(x, y, z, Δx, Δy, Δz)
+    position_values, position_errors = galactic_galactocentric_xyz(*position_values, *position_errors)
+    position_values[0] = -position_values[0]
+
+    # Velocity rotation, translation and left-handed system
+    velocity_values, velocity_errors = galactic_galactocentric_xyz(u, v, w, Δu, Δw, Δz)
+    velocity_values, velocity_errors = heliocentric_galactocentric_uvw(*velocity_values, *velocity_errors)
+    velocity_values[0] = -velocity_values[0]
+
+    import galpy.util.bovy_coords as gp
+    velocity_values2 = np.array(gp.vxvyvz_to_galcenrect(
+        u, v, w,
+        vsun=Coordinate.sun_velocity * np.array([-1, 1, 1]),
+        Xsun=Coordinate.sun_position[0],
+        Zsun=Coordinate.sun_position[2],
+        _extra_rot=False))
+
+    # Cylindrical coordinates system
+    return uvw_to_μρμθw(*position_values, *velocity_values, *position_errors, *velocity_errors)
+
+def galactocentric_ρθz_galactic_uvw(ρ, θ, z, μρ, μθ, w, Δρ=0, Δθ=0, Δz=0, Δμρ=0, Δμθ=0, Δw=0):
+    """ Converts a μρμθw, radial velocity (μρ; pc/Myr), angular velocity (μθ; rad/Myr) and W
+        velocity (w; pc/Myr), cylindrical coordinate velocity vector (galactocentric) to an UVW
+        (pc/Myr) galactic cartesian coordinate velocity vector, along with measurement errors.
+    """
+
+    # Cartesian right-handed coordinates system, rotation and translation
+    values, errors = μρμθw_to_uvw(ρ, θ, z, μρ, μθ, w, Δρ, Δθ, Δz, Δμρ, Δμθ, Δw)
+    values[0] = -values[0]
+    values, errors = galactocentric_galactic_xyz(*values, *errors)
+    return galactocentric_heliocentric_uvw(*values, *errors)
+
+# Observatables and spherical coordinates transformation functions
+
 def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα_cos_δ=0):
     """ Converts observables, paralax (p; rad), declination (δ, DEC; rad), right ascension
         (α, RA; rad), radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and
@@ -569,7 +857,7 @@ def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=
 
     # Errors calculation
     if not np.array((Δp, Δδ, Δα, Δrv, Δμδ, Δμα_cos_δ)).any():
-        return position, velocity, np.zeros(3), np.zeros(3)
+        return position, velocity, np.zeros(position.shape), np.zeros(velocity.shape)
     else:
         return position, velocity, np.array((Δp * Coordinate.k / (p + Coordinate.gaia_bias)**2, Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ))
@@ -592,7 +880,7 @@ def spherical_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv
 
     # Errors calculation
     if not np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα)).any():
-        return position, velocity, np.zeros(3), np.zeros(3)
+        return position, velocity, np.zeros(position.shape), np.zeros(velocity.shape)
     else:
         return position, velocity, np.array((Δr * (Coordinate.k / r**2), Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα / μα)**2 + (Δδ / δ)**2)**0.5 * μα * cos_δ))

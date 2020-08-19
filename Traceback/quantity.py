@@ -463,7 +463,7 @@ class Unit():
 
         # Units import
         if type(units) in (str, type(None), u.core.PrefixUnit, u.core.CompositeUnit,
-                u.core.IrreducibleUnit, u.core.NamedUnit, u.core.Unit):
+                u.core.IrreducibleUnit, u.core.NamedUnit, u.core.Unit, np.str_, np.unicode_):
             units = [units]
         if type(units) == Unit:
             vars(self).update(vars(units))
