@@ -323,23 +323,23 @@ class Series(list, Output_Series):
         self.stop(self.age.value < 0.0, 'ValueError',
             "'age' must be greater than or equal to 0.0 Myr ({} given).", self.age)
 
-        # avg_position parameter
-        self.avg_position = self.configure_coordinate(self.config.avg_position)
+        # position parameter
+        self.position = self.configure_coordinate(self.config.position)
 
-        # avg_position_error parameter
-        self.avg_position_error = self.configure_coordinate(self.config.avg_position_error)
+        # position_error parameter
+        self.position_error = self.configure_coordinate(self.config.position_error)
 
-        # avg_position_scatter parameter
-        self.avg_position_scatter = self.configure_coordinate(self.config.avg_position_scatter)
+        # position_scatter parameter
+        self.position_scatter = self.configure_coordinate(self.config.position_scatter)
 
-        # avg_velocity parameter
-        self.avg_velocity = self.configure_coordinate(self.config.avg_velocity)
+        # velocity parameter
+        self.velocity = self.configure_coordinate(self.config.velocity)
 
-        # avg_velocity_error parameter
-        self.avg_velocity_error = self.configure_coordinate(self.config.avg_velocity_error)
+        # velocity_error parameter
+        self.velocity_error = self.configure_coordinate(self.config.velocity_error)
 
-        # avg_velocity_scatter parameter
-        self.avg_velocity_scatter = self.configure_coordinate(self.config.avg_velocity_scatter)
+        # velocity_scatter parameter
+        self.velocity_scatter = self.configure_coordinate(self.config.velocity_scatter)
 
         # data_errors parameter
         self.data_errors = self.config.data_errors.values
@@ -807,6 +807,42 @@ class Series(list, Output_Series):
             # Logging
             log("'{}' series loaded from '{}'.", self.name, self.file_path, logging=logging)
 
+    class Indicator():
+        """ Age indicator including its average values, age error, age at minimum and minimum. """
+
+        def __init__(self, series, indicator):
+            """ Initializes an average age indicator. """
+
+            # Initialization
+            self.series = series
+
+            # Indicator for star from data
+            if self.series.from_data:
+                self.values = vars(self.series[0])[indicator].values
+                self.values_error = np.std([vars(group)[indicator].values for group in self.series[1:]],
+                    axis=0) if self.series.number_of_groups > 1 else np.zeros(self.values.shape)
+                self.age = np.round(vars(self.series[0])[indicator].age, 3)
+                self.age_error = np.round(np.std([vars(group)[indicator].age for group in self.series[1:]],
+                    axis=0), 3) if self.series.number_of_groups > 1 else np.zeros(self.age.shape)
+                self.min = np.round(vars(self.series[0])[indicator].min, 3)
+                self.min_error = np.round(np.std([vars(group)[indicator].min for group in self.series[1:]],
+                    axis=0), 3) if self.series.number_of_groups > 1 else np.zeros(self.min.shape)
+
+            # Average indicator for star from a model
+            elif self.series.from_model:
+                self.values = np.mean(
+                    [vars(group)[indicator].values for group in self.series], axis=0)
+                self.values_error = np.std(
+                    [vars(group)[indicator].values for group in self.series], axis=0)
+                self.age = np.round(np.mean(
+                    [vars(group)[indicator].age for group in self.series], axis=0), 3)
+                self.age_error = np.round(np.std(
+                    [vars(group)[indicator].age for group in self.series], axis=0), 3)
+                self.min = np.round(np.mean(
+                    [vars(group)[indicator].min for group in self.series], axis=0), 3)
+                self.min_error = np.round(np.std(
+                    [vars(group)[indicator].min for group in self.series], axis=0), 3)
+
     def traceback(self, forced=False, logging=True, mode=None):
         """ Traces back Group and embeded Star objects using either imported data or by
             modeling a group based on simulation parameters.
@@ -850,101 +886,34 @@ class Series(list, Output_Series):
             self.configure_traceback()
 
             # Traceback
-            for name in ['{}-{}'.format(self.name, i) for i in range(1, self.number_of_groups + 1)]:
+            for number in range(1, self.number_of_groups + 1):
+
+                # Group name
+                name = '{}-{}'.format(self.name, number)
 
                 # Logging
                 log("Tracing back '{}' group from {}.", name,
                     'data' if self.from_data else 'a model', display=True, logging=logging)
 
                 # Group traceback
-                self.append(Group(self, name))
+                self.append(Group(self, number, name))
 
             # Logging
             log("'{}' series succesfully traced back.", self.name, logging=logging)
 
-            # XYZ scatters ages
-            self.scatter_xyz = np.mean([group.scatter_xyz for group in self], axis=0)
-            self.scatter_xyz_age = np.round(np.mean([group.scatter_xyz_age for group in self], axis=0), 3)
-            self.scatter_xyz_age_error = np.round(np.std([group.scatter_xyz_age for group in self], axis=0), 3)
-            self.scatter_xyz_min = np.round(np.mean([group.scatter_xyz_min for group in self], axis=0), 3)
+            # Age indicators average values, errors, age, error on age, minimum and error on minimum
+            for indicator in (
+                    'scatter_xyz', 'scatter_xyz_total',
+                    'scatter_rθz', 'scatter_rθz_total',
+                    'mad_xyz', 'mad_xyz_total',
+                    'mad_rθz', 'mad_rθz_total',
+                    'covariances_xyz', 'covariances_xyz_matrix_det',
+                    'cross_covariances_xyz', 'cross_covariances_xyz_matrix_det',
+                    'covariances_rθz', 'covariances_rθz_matrix_det',
+                    'cross_covariances_rθz', 'cross_covariances_rθz_matrix_det',
+                    'mst_mean', 'mst_mad',):
+                vars(self)[indicator] = self.Indicator(self, indicator)
 
-            # Scatter age
-            self.scatter = np.mean([group.scatter for group in self], axis=0)
-            self.scatter_age = np.round(np.mean([group.scatter_age for group in self]), 3)
-            self.scatter_age_error = np.round(np.std([group.scatter_age for group in self]), 3)
-            self.scatter_min = np.round(np.mean([group.scatter_min for group in self]), 3)
-
-            # rθz scatters ages
-            self.scatter_rθz = np.mean([group.scatter_rθz for group in self], axis=0)
-            self.scatter_rθz_age = np.round(np.mean([group.scatter_rθz_age for group in self], axis=0), 3)
-            self.scatter_rθz_age_error = np.round(np.std([group.scatter_rθz_age for group in self], axis=0), 3)
-            self.scatter_rθz_min = np.round(np.mean([group.scatter_rθz_min for group in self], axis=0), 3)
-
-            # XYZ median absolute deviations ages
-            self.mad_xyz = np.mean([group.mad_xyz for group in self], axis=0)
-            self.mad_xyz_age = np.round(np.mean([group.mad_xyz_age for group in self], axis=0), 3)
-            self.mad_xyz_age_error = np.round(np.std([group.mad_xyz_age for group in self], axis=0), 3)
-            self.mad_xyz_min = np.round(np.mean([group.mad_xyz_min for group in self], axis=0), 3)
-
-            # Median absolute deviation age
-            self.mad = np.mean([group.mad for group in self], axis=0)
-            self.mad_age = np.round(np.mean([group.mad_age for group in self]), 3)
-            self.mad_age_error = np.round(np.std([group.mad_age for group in self]), 3)
-            self.mad_min = np.round(np.mean([group.mad_min for group in self]), 3)
-
-            # rθz median absolute deviations ages
-            self.mad_rθz = np.mean([group.mad_rθz for group in self], axis=0)
-            self.mad_rθz_age = np.round(np.mean([group.mad_rθz_age for group in self], axis=0), 3)
-            self.mad_rθz_age_error = np.round(np.std([group.mad_rθz_age for group in self], axis=0), 3)
-            self.mad_rθz_min = np.round(np.mean([group.mad_rθz_min for group in self], axis=0), 3)
-
-            # Minimum spanning tree mean branch length age
-            self.mst_mean = np.mean([group.mst_mean for group in self], axis=0)
-            self.mst_mean_age = np.round(np.mean([group.mst_mean_age for group in self]), 3)
-            self.mst_mean_age_error = np.round(np.std([group.mst_mean_age for group in self]), 3)
-            self.mst_mean_min = np.round(np.mean([group.mst_mean for group in self]), 3)
-
-            # Minimum spanning tree median absolute deviation branch length age
-            self.mst_mad = np.mean([group.mst_mad for group in self], axis=0)
-            self.mst_mad_age = np.round(np.mean([group.mst_mad_age for group in self]), 3)
-            self.mst_mad_age_error = np.round(np.std([group.mst_mad_age for group in self]), 3)
-            self.mst_mad_min = np.round(np.mean([group.mst_mad for group in self]), 3)
-
-            # XYZ covariances ages
-            self.covariances_xyz = np.mean([group.covariances_xyz for group in self], axis=0)
-            self.covariances_xyz_age = np.round(np.mean([group.covariances_xyz_age for group in self], axis=0), 3)
-            self.covariances_xyz_age_error = np.round(np.std([group.covariances_xyz_age for group in self], axis=0), 3)
-            self.covariances_xyz_min = np.round(np.mean([group.covariances_xyz_min for group in self], axis=0), 3)
-
-            # XYZ covariance matrix determinant age
-            self.covariances_xyz_matrix_det = np.mean([group.covariances_xyz_matrix_det for group in self], axis=0)
-            self.covariances_xyz_matrix_det_age = np.round(np.mean([group.covariances_xyz_matrix_det_age for group in self]), 3)
-            self.covariances_xyz_matrix_det_age_error = np.round(np.std([group.covariances_xyz_matrix_det_age for group in self]), 3)
-            self.covariances_xyz_matrix_det_min = np.round(np.mean([group.covariances_xyz_matrix_det_min for group in self]), 3)
-
-            # rθz covariances ages
-
-            # rθz covariance matrix determinant age
-
-            # X-U, Y-V and Z-W cross covariances ages
-            self.cross_covariances_xyz = np.mean([group.cross_covariances_xyz for group in self], axis=0)
-            self.cross_covariances_xyz_age = np.round(np.mean([group.cross_covariances_xyz_age for group in self], axis=0), 3)
-            self.cross_covariances_xyz_age_error = np.round(np.std([group.cross_covariances_xyz_age for group in self], axis=0), 3)
-            self.cross_covariances_xyz_min = np.round(np.mean([group.cross_covariances_xyz_min for group in self], axis=0), 3)
-
-            # X-U, Y-V and Z-W cross covariance matrix determinant ages
-            self.cross_covariances_xyz_matrix_det = np.mean([group.cross_covariances_xyz_matrix_det for group in self], axis=0)
-            self.cross_covariances_xyz_matrix_det_age = np.round(np.mean([group.cross_covariances_xyz_matrix_det_age for group in self]), 3)
-            self.cross_covariances_xyz_matrix_det_age_error = np.round(np.std([group.cross_covariances_xyz_matrix_det_age for group in self]), 3)
-            self.cross_covariances_xyz_matrix_det_min = np.round(np.mean([group.cross_covariances_xyz_matrix_det_min for group in self]), 3)
-
-            # rθz cross covariances ages
-            self.cross_covariances_rθz = np.mean([group.cross_covariances_rθz for group in self], axis=0)
-            self.cross_covariances_rθz_age = np.round(np.mean([group.cross_covariances_rθz_age for group in self], axis=0), 3)
-            self.cross_covariances_rθz_age_error = np.round(np.std([group.cross_covariances_rθz_age for group in self], axis=0), 3)
-            self.cross_covariances_rθz_min = np.round(np.mean([group.cross_covariances_rθz_min for group in self], axis=0), 3)
-
-            # rθz cross covariances matrix determinant
 
     def save(self, file_path=None, forced=False, default=False, cancel=False, logging=True):
         """ Saves a series to a binary file. self.file_path is defined as the actual path to the

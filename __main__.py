@@ -26,10 +26,12 @@ collection.create()
 
 # Output creation
 for series in collection:
-    series.create_scatter_mad_mst_plot(forced=True, title=False)
+    series.create_scatter_mad_mst_plot(title=False, forced=True)
+    series.create_scatter_mad_mst_cross_covariances_plots(series, title=False, forced=True)
     series.create_scatter_mad_xyz_plot(title=False, forced=True)
-    series.create_scatter_and_mad_rθz_plot(title=False, forced=True)
+    series.create_scatter_mad_rθz_plot(title=False, forced=True)
     series.create_covariances_xyz_plot(forced=True, title=False)
+    series.create_covariances_rθz_plot(forced=True, title=False)
     series.create_cross_covariances_xyz_plot(forced=True, title=False)
     series.create_cross_covariances_rθz_plot(forced=True, title=False)
 

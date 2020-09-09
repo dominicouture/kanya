@@ -96,12 +96,12 @@ class Config():
         Parameter(label='initial_time', name='Initial time', values=0.0, **null_time),
         Parameter(label='final_time', name='Final time', **null_time),
         Parameter(label='age', name='Age', **null_time),
-        Parameter(label='avg_position', name='Average position', **null_position),
-        Parameter(label='avg_position_error', name='Average position error', **null_position),
-        Parameter(label='avg_position_scatter', name='Average position scatter', **null_position),
-        Parameter(label='avg_velocity', name='Average velocity', **null_velocity),
-        Parameter(label='avg_velocity_error', name='Average velocity error', **null_velocity),
-        Parameter(label='avg_velocity_scatter', name='Average velocity scatter', **null_velocity),
+        Parameter(label='position', name='Average position', **null_position),
+        Parameter(label='position_error', name='Average position error', **null_position),
+        Parameter(label='position_scatter', name='Average position scatter', **null_position),
+        Parameter(label='velocity', name='Average velocity', **null_velocity),
+        Parameter(label='velocity_error', name='Average velocity error', **null_velocity),
+        Parameter(label='velocity_scatter', name='Average velocity scatter', **null_velocity),
         Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
         Parameter(label='data_errors', name='Data errors', values=False),
         Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
@@ -109,8 +109,8 @@ class Config():
         Parameter(label='cutoff', name='Cutoff'))}
 
     # Position and velocity paramaters
-    position_parameters = ('avg_position', 'avg_position_error', 'avg_position_scatter')
-    velocity_parameters = ('avg_velocity', 'avg_velocity_error', 'avg_velocity_scatter')
+    position_parameters = ('position', 'position_error', 'position_scatter')
+    velocity_parameters = ('velocity', 'velocity_error', 'velocity_scatter')
 
     def __init__(self, parent=None, path=None, args=False, **parameters):
         """ Configures a Config objects from, in order, 'parent', an existing Config object,
