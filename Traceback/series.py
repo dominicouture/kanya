@@ -250,7 +250,7 @@ class Series(list, Output_Series):
         self.duration = self.final_time - self.initial_time
         self.timestep = self.duration / (self.number_of_steps - 1)
         self.time = np.linspace(
-            self.initial_time.values[0], self.final_time.values[0], self.number_of_steps)
+            self.initial_time.value, self.final_time.value, self.number_of_steps)
 
         # Radial velocity offset paramater
         self.rv_offset = self.configure_quantity(self.config.rv_offset)
@@ -843,6 +843,23 @@ class Series(list, Output_Series):
                 self.min_error = np.round(np.std(
                     [vars(group)[indicator].min for group in self.series], axis=0), 3)
 
+            # Box size (Myr) converted to the corresponding number of steps
+            # box_size = 1. # Transform in to parameter
+            box_size = 0.01
+            box_size = int(box_size * self.series.number_of_steps / (
+                self.series.final_time.value - self.series.initial_time.value))
+            if box_size > 1:
+                box = np.squeeze(np.tile(
+                    np.ones(box_size) / box_size, (1 if self.values.ndim == 1 else 3, 1))).T
+                box = np.ones(box_size) / box_size
+
+                # Smoothing with moving average
+                if self.values.ndim == 1:
+                    self.values = np.convolve(self.values, box, mode='same')
+                else:
+                    self.values = np.apply_along_axis(
+                        lambda x: np.convolve(x, box, mode='same'), axis=0, arr=self.values)
+
     def traceback(self, forced=False, logging=True, mode=None):
         """ Traces back Group and embeded Star objects using either imported data or by
             modeling a group based on simulation parameters.
@@ -904,14 +921,16 @@ class Series(list, Output_Series):
             # Age indicators average values, errors, age, error on age, minimum and error on minimum
             for indicator in (
                     'scatter_xyz', 'scatter_xyz_total',
-                    'scatter_rθz', 'scatter_rθz_total',
+                    'scatter_ξηζ', 'scatter_ξηζ_total',
                     'mad_xyz', 'mad_xyz_total',
-                    'mad_rθz', 'mad_rθz_total',
+                    'mad_ξηζ', 'mad_ξηζ_total',
                     'covariances_xyz', 'covariances_xyz_matrix_det',
                     'cross_covariances_xyz', 'cross_covariances_xyz_matrix_det',
-                    'covariances_rθz', 'covariances_rθz_matrix_det',
-                    'cross_covariances_rθz', 'cross_covariances_rθz_matrix_det',
-                    'mst_mean', 'mst_mad',):
+                    'covariances_ξηζ', 'covariances_ξηζ_matrix_det',
+                    'cross_covariances_ξηζ', 'cross_covariances_ξηζ_matrix_det',
+                    'mst_mean', 'mst_mad',
+                    'covariances_ξηζ_robust', 'covariances_ξηζ_matrix_robust_det',
+                    'covariances_ξηζ_matrix_trace', 'covariances_ξηζ_matrix_robust_trace'):
                 vars(self)[indicator] = self.Indicator(self, indicator)
 
 

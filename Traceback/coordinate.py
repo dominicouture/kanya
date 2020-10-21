@@ -157,13 +157,32 @@ class Coordinate:
         their errors and units, and methods to transform a coordinate from one system to another.
     """
 
-    # Sun position (pc) and velocity (pc/Myr) in the Galaxy at the current, along with current
-    # errors from Quillen et al. (2020, 2006.01723) in a left-handed galactocentric frame of reference
-    sun_position = np.array([8122, 0., 20.8])
+    # Sun position (pc) and velocity (pc/Myr) in the Galaxy at the current epoch, along with current
+    # errors from Quillen et al. (2020) in a left-handed galactocentric frame of reference (X points
+    # away from the galactic center
+    # sun_position = np.array([8122, 0., 20.8]) # Bennett & Bovy 2019
+    sun_position = np.array([8400, 0., 0.])
     sun_position_error = np.array([0., 0., 0.])
-    sun_velocity = np.array([-11.370952123669653, -12.518 + 238.292, 7.385903925804384])
-    sun_velocity_error = np.array([0., 0., 0.])
     # sun_position_error = np.array([31, 0., 0.3])
+
+    # Sun peculiar velocity
+    sun_velocity_peculiar_kms = np.array([11.1, 12.24, 7.25]) # Galpy assumes right-handed coordinates
+    # Should ajusted with matrix rotation to account for zo != 0.0 ???
+    sun_velocity_peculiar = np.array([-11.352, 12.518, 7.41]) # Schöenrich et al. 2010
+
+    # Local Standard of Rest (LSR) velocity
+    # sun_angular_frequency = 0.029464 # 1/Myr
+    sun_angular_frequency = 0.029443681828643653 # 1/Myr
+    lsr_velocity = np.array([0., sun_position[0] * sun_angular_frequency, 0.]) # Irrgang et al. 2013
+
+    # Sun total velocity
+    sun_velocity = lsr_velocity + sun_velocity_peculiar
+    sun_velocity_error = np.array([0., 0., 0.])
+
+    # Galpy's ro (kpc), vo (km/s) and zo (kpc) values used for orbit integration
+    ro = sun_position[0] / 1000
+    vo = lsr_velocity[1] * 0.9777922216731283
+    zo = sun_position[2] / 1000
 
     # Distance to the galactic center and theta angle trigonometric ratios
     distance_galactic_center = (sun_position[0]**2 + sun_position[2]**2)**0.5
@@ -172,7 +191,7 @@ class Coordinate:
 
     # !!! This part should be moved to Axis !!!
     # Galactic-galactocentric rotation matrix
-    # Rotates a vector from galactic to galactocentric right-handed reference frame
+    # Rotates a vector from a galactic to a galactocentric right-handed reference frame
     ggrm = np.array([
         [  costheta,   0.  , sintheta ],
         [     0.   ,   1.  ,     0.    ],
@@ -210,6 +229,8 @@ class Coordinate:
     # Gaia bias correction
     gaia_bias = -2.618e-10
     # gaia_bias = 0.0
+    # sun_velocity = np.array([-11.370952123669653, -12.518 + 238.292, 7.385903925804384])
+    # sun_velocity = np.array([-11.370952123669653, -12.518 + 247.50, 7.385903925804384])
 
     def __init__(self, position, velocity=None):
         """ Initializes a Coordinate object from a Quantity objects representing n positions
@@ -887,8 +908,10 @@ def position_rθz_ξηζ(r, θ, z, t):
         (z; pc) galactocentric curvilinear coordinate position vector, at a given epoch t (Myr).
     """
 
-    return np.array([Coordinate.sun_position[0] - r,
-        Coordinate.sun_position[0] * θ - Coordinate.sun_velocity[1] * t, z]).T
+    return np.dot(Coordinate.ggrm.T, np.array([
+        r - Coordinate.sun_position[0],
+        Coordinate.sun_position[0] * (θ - Coordinate.sun_angular_frequency * t),
+        z - Coordinate.sun_position[2]])).T
 
 def position_ξηζ_rθz(ξ, η, ζ, t):
     """ Converts a ξηζ, radius (ξ; pc), arc (η; pc) and height (z; pc) galactocentric curvilinear
@@ -896,8 +919,10 @@ def position_ξηζ_rθz(ξ, η, ζ, t):
         galactocentric cylindrical coordinate position vector, at a given epoch t (Myr).
     """
 
-    return np.array([Coordinate.sun_position[0] - ξ,
-        (η + Coordinate.sun_velocity[1] * t) / Coordinate.sun_position[0], ζ]).T
+    return np.dot(Coordinate.ggrm, np.array([
+        ξ + Coordinate.sun_position[0],
+        η / Coordinate.sun_position[0] + Coordinate.sun_angular_frequency * t,
+        ζ + Coordinate.sun_position[2]])).T
 
 def velocity_rθz_ξηζ(vr, vt, vz, t):
     """ Converts a rθz, radial velocity (vr; pc/Myr), tangantial velocity (vt; pc/Myr) and heigth
@@ -906,7 +931,9 @@ def velocity_rθz_ξηζ(vr, vt, vz, t):
         galactocentric curvilinear coordinate velocity vector, at a given epoch t (Myr).
     """
 
-    return np.array([-vr, vt - Coordinate.sun_velocity[1], vz]).T
+    vr, vt, vz = np.dot(Coordinate.ggrm.T, np.array([vr, vt - Coordinate.sun_velocity[1], vz]))
+
+    return np.array([-vr, vt, vz]).T
 
 def velocity_ξηζ_rθz(vξ, vη, vζ, t):
     """ Converts a ξηζ, radial velocity (vξ; pc/Myr), arc velocity (vη; pc/Myr) and height velocity

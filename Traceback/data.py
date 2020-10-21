@@ -109,7 +109,7 @@ class Data(list):
                         "must be a list, tuple or np.ndarray. ('{}' given).",
                         self.series.name, type(self.data.values[self.series.name]))
             else:
-                self.series.stop(True, 'ValueError' "Group '{}' is not in the data dictionary.",
+                self.series.stop(True, 'ValueError', "Group '{}' is not in the data dictionary.",
                     self.series.name)
 
         # Data import of a list, tuple or np.ndarray
@@ -484,7 +484,8 @@ class Data(list):
 
             # Name column
             self.name = self.values['name'].strip() if 'name' in self.data.columns \
-                and self.values['name'].strip()  != '' else 'Star_{}'.format(str(self.row))
+                and self.values['name'].strip()  != '' else 'Star_{}'.format(
+                    str(self.row - 1) if self.data.unit_header else str(self.row))
 
             # Spectral type column
             self.type = self.values['type'].strip() if 'type' in self.data.columns \
