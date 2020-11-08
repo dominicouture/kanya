@@ -204,7 +204,7 @@ class Coordinate:
     galactic_velocity_error = np.array([0., 0., 0.])
 
     # J2000.0 Galactic-equatorial rotation matrix from Liu et al. (2018) 1010.3773
-    # Rotates a vector from equatorial to galactic right-handed reference frame
+    # Rotates a vector from an equatorial to a galactic right-handed reference frame
     germ = np.array([
         [-0.054875657707, -0.873437051953, -0.483835073621],
         [ 0.494109437203, -0.444829721222,  0.746982183981],

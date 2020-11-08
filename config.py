@@ -21,8 +21,8 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Name of series of groups
-# name.value = 'beta_pictoris_Miret-Roig'
 name.value = 'beta_pictoris'
+# name.value = 'beta_pictoris_Miret-Roig'
 
 # Path to the file or directory used as input or output relative the base directory (str). If the
 # is None or absent, by default, the  data is loaded or saved to a file in the output directory
@@ -54,8 +54,8 @@ age.value = 24.0
 position.values = (15.19443946, -4.93616248, -17.07422231)
 
 # Average position error of the simulated sample of stars (tuple)
-# position_error.values = (0.19846, 0.0, 0.0)
-position_error.values = (0.0, 0.0, 0.0)
+position_error.values = (0.19846, 0.0, 0.0)
+# position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'mas'
 position_error.system = 'observables'
 position_error.axis = 'equatorial'
@@ -71,8 +71,8 @@ velocity.values = (-11.3442, -11.3442, -11.3442)
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-# velocity_error.values = (1.0112, 0.30754, 0.26432)
-velocity_error.values = (0.0, 0.0, 0.0)
+velocity_error.values = (1.0112, 0.30754, 0.26432)
+# velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
@@ -183,7 +183,7 @@ rv_offset.unit = 'km/s'
 data_errors.value = True
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
-cutoff.value = 4.
+cutoff.value = 3.
 
 # !!! Number of Jack-Knife Monte Carlo iterations (integer, ≥ 0) !!!
 
