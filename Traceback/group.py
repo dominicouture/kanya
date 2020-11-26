@@ -53,7 +53,7 @@ class Group(list, Output_Group):
             self.stars_from_model()
 
         # Average velocity and position and filter outliers
-        self.get_stars_coordinates()
+        self.filter_outlier()
 
         # Jack Knife Monte Carlo parameters
         self.set_jack_knife_Monte_Carlo()
@@ -85,7 +85,7 @@ class Group(list, Output_Group):
 
             # Observables conversion into equatorial spherical coordinates
             (position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error) = \
-                observables_spherical(
+                position_obs_rδα(
 
                     # Position
                     *(star.position.values if self.number == 0 else
@@ -157,14 +157,14 @@ class Group(list, Output_Group):
             position_rδα = galactic_xyz_equatorial_rδα(*model_star.position_xyz[-1])[0]
 
             # Velocity and position conversion to observables
-            position_obs, velocity_obs = spherical_observables(*position_rδα, *velocity_rδα)[:2]
+            position_obs, velocity_obs = position_rδα_obs(*position_rδα, *velocity_rδα)[:2]
 
             # Observables conversion back into equatorial spherical coordinates
             # Velocity and position scrambling based on actual measurement errors
             if self.series.data_errors:
                 star_errors = star - star // len(self.series.data) * len(self.series.data)
                 (position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error) = \
-                        observables_spherical(
+                        position_obs_rδα(
                     *np.random.normal(position_obs, self.series.data[star_errors].position.errors),
                     *np.random.normal(velocity_obs, self.series.data[star_errors].velocity.errors),
                     *self.series.data[star_errors].position.errors,
@@ -173,7 +173,7 @@ class Group(list, Output_Group):
             # Velocity and position scrambling based on average measurement errors
             else:
                 (position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error) = \
-                        observables_spherical(
+                        position_obs_rδα(
                     *np.random.normal(position_obs, position_error),
                     *np.random.normal(velocity_obs, velocity_error),
                     *position_error, *velocity_error)
@@ -197,89 +197,126 @@ class Group(list, Output_Group):
             outliers, an error is raised.
         """
 
-        # Valid stars and outliers lists
-        self.stars = list(self)
+        # Number of stars remaining, excluding outliers
         self.number_of_stars = len(self.stars)
+
+        # Average position, excluding outliers
+        self.position_xyz = np.mean([star.position_xyz for star in self.stars], axis=0)
+
+        # Average linear position and errors, excluding outliers
+        self.position_xyz_linear = np.mean(
+            np.array([star.position_xyz_linear for star in self.stars]), axis=0)
+        self.position_xyz_linear_error = np.sum(
+            np.array([star.position_xyz_linear_error for star in self.stars])**2,
+            axis=0)**0.5 / self.number_of_stars
+
+        # Average ξηζ position, excluding outliers
+        self.position_ξηζ = np.mean([star.position_ξηζ for star in self.stars], axis=0)
+
+        # Average velocity, excluding outliers
+        self.velocity_xyz = np.mean([star.velocity_xyz for star in self.stars], axis=0)
+
+        # Average linear velocity and errors, excluding outliers
+        self.velocity_xyz_linear = np.mean([star.velocity_xyz_linear for star in self.stars], axis=0)
+        self.velocity_xyz_linear_error = np.sum(np.array(
+            [star.velocity_xyz_linear_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
+
+        # Average ξηζ velocity, excluding outliers
+        self.velocity_ξηζ = np.mean([star.velocity_ξηζ for star in self.stars], axis=0)
+
+        # Stars relative position and velocity, distance and speed, including outliers
+        for star in self:
+            star.get_relative_coordinates()
+
+        # ξηζ position and velocity scatters for outlier filtering
+        self.scatter_ξηζ = np.std([star.position_ξηζ for star in self.stars], axis=0)
+        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.stars], axis=0)
+
+    def filter_outlier(self):
+        """ Filters outliers from the data based on ξηζ position and velocity scatter. """
+
+        # Initialize valid stars and outliers lists
+        self.stars = list(self)
         self.outliers = []
-        outliers = True
 
-        # Outlier filtering
-        while outliers and self.number_of_stars > int(0.8 * self.series.number_of_stars):
+        # Filter outliers for the first group
+        if self.number == 0:
 
-            # Number of stars remaining, excluding outliers
-            self.number_of_stars = len(self.stars)
+            # Iteratively valid stars coordinates
+            outliers = True
+            no_outliers = True
+            while outliers and len(self.stars) > int(0.8 * self.series.number_of_stars):
+                self.get_stars_coordinates()
 
-            # Average position, excluding outliers
-            self.position_xyz = np.mean([star.position_xyz for star in self.stars], axis=0)
+                # Remove stars beyond the σ cutoff of the average position or velocity
+                outliers = False
+                for star in self.stars:
+                    position_outlier = (np.abs(star.relative_position_ξηζ)
+                        > (self.scatter_ξηζ * self.series.cutoff)).any()
+                    velocity_outlier = (np.abs(star.relative_velocity_ξηζ)
+                        > (self.scatter_velocity_ξηζ * self.series.cutoff)).any()
+                    if position_outlier or velocity_outlier:
+                        star.outlier = True
+                        self.outliers.append(star)
+                        self.stars.remove(star)
+                        outliers = True
 
-            # Average linear position and errors, excluding outliers
-            self.position_xyz_linear = np.mean(
-                np.array([star.position_xyz_linear for star in self.stars]), axis=0)
-            self.position_xyz_linear_error = np.sum(
-                np.array([star.position_xyz_linear_error for star in self.stars])**2,
-                axis=0)**0.5 / self.number_of_stars
+                        # Display message if an outlier is found
+                        if no_outliers:
+                            print(f'Outliers found in {self.series.name}:')
+                        print(star.name, f"({'P' if position_outlier else ''}{'V' if velocity_outlier else ''})")
+                        no_outliers = False
 
-            # Average ξηζ position, excluding outliers
-            self.position_ξηζ = np.mean([star.position_ξηζ for star in self.stars], axis=0)
+                # Display message if no outliers are found
+                if no_outliers:
+                    print(f'No outliers found in {self.series.name}')
 
-            # Average velocity, excluding outliers
-            self.velocity_xyz = np.mean([star.velocity_xyz for star in self.stars], axis=0)
-
-            # Average linear velocity and errors, excluding outliers
-            self.velocity_xyz_linear = np.mean([star.velocity_xyz_linear for star in self.stars], axis=0)
-            self.velocity_xyz_linear_error = np.sum(np.array(
-                [star.velocity_xyz_linear_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
-
-            # Average ξηζ velocity, excluding outliers
-            self.velocity_ξηζ = np.mean([star.velocity_ξηζ for star in self.stars], axis=0)
-
-            # Stars relative position and velocity, distance and speed, including outliers
-            for star in self:
-                star.get_relative_coordinates()
-
-            # ξηζ position scatter
-            self.scatter_ξηζ = np.std([star.position_ξηζ for star in self.stars], axis=0)
-
-            # Filter stars beyond the σ cutoff of the average position and loop scatter computation
-            outliers = False
+        # Use the same outliers as the first group for other groups
+        else:
+            outliers = [star.name for star in self.series[0].outliers]
             for star in self.stars:
-                if (np.abs(star.relative_position_ξηζ) > (
-                        self.scatter_ξηζ * self.series.cutoff)).any():
+                if star.name in outliers:
                     star.outlier = True
-                    print(star.name)
-                    outliers = True
                     self.outliers.append(star)
                     self.stars.remove(star)
-                    self.number_of_stars = len(self.stars)
+
+            # Compute valid stars coordinates
+            self.get_stars_coordinates()
 
     def set_jack_knife_Monte_Carlo(self):
         """ Sets the parameters to compute Jack-Knife Monte-Carlo of age indicators. """
 
-        # Select stars for Jack-Knife Monte-Carlo
-        stars = np.array([np.random.choice(self.number_of_stars,
-            int(self.number_of_stars * self.series.jack_knife_fraction), replace=False)
-                for i in range(self.series.jack_knife_number)])
+        # Select stars for Jack-Knife Monte-Carlo for the first group
+        if self.number == 0:
+            self.stars_monte_carlo = np.array([np.random.choice(self.number_of_stars,
+                int(self.number_of_stars * self.series.jack_knife_fraction), replace=False)
+                    for i in range(self.series.jack_knife_number)])
+
+        # Use the same stars for Jack-Knife Monte-Carlo as the first group for other groups
+        else:
+            self.stars_monte_carlo = self.series[0].stars_monte_carlo
 
         # Create selected stars xyz and ξηζ positions and velocities arrays
         self.positions_xyz = np.array([
-            star.position_xyz for star in self.stars])[stars,:,:].swapaxes(0, 1)
+            star.position_xyz for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
         self.positions_ξηζ = np.array([
-            star.position_ξηζ for star in self.stars])[stars,:,:].swapaxes(0, 1)
+            star.position_ξηζ for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
         self.velocities_xyz = np.array([
-            star.velocity_xyz for star in self.stars])[stars,:,:].swapaxes(0, 1)
+            star.velocity_xyz for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
         self.velocities_ξηζ = np.array([
-            star.velocity_ξηζ for star in self.stars])[stars,:,:].swapaxes(0, 1)
+            star.velocity_ξηζ for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
 
     class Indicator():
         """ Age indicator including its values, age at minimum and minimum. Computes errors on
             values, age and minium using a Jack-Knife Monte-Carlo Method. """
 
-        def __init__(self, group, values):
+        def __init__(self, group, values, valid=True):
             """ Initializes an age indicator. """
 
             # Group and values
             self.group = group
             self.values = values
+            self.valid = valid
             self.group.indicators.append(self)
 
             # Average values
@@ -302,12 +339,12 @@ class Group(list, Output_Group):
         """
 
         # xyz position scatter
-        self.scatter_xyz = self.Indicator(self, np.std(self.positions_xyz, axis=0))
-        self.scatter_xyz_total = self.Indicator(self, np.sum(self.scatter_xyz.values**2, axis=2)**0.5)
+        self.scatter_xyz = self.Indicator(self, np.std(self.positions_xyz, axis=0), valid=False)
+        self.scatter_xyz_total = self.Indicator(self, np.sum(self.scatter_xyz.values**2, axis=2)**0.5, valid=False)
 
         # ξηζ position scatter
-        self.scatter_ξηζ = self.Indicator(self, np.std(self.positions_ξηζ, axis=0))
-        self.scatter_ξηζ_total = self.Indicator(self, np.sum(self.scatter_ξηζ.values**2, axis=2)**0.5)
+        self.scatter_ξηζ = self.Indicator(self, np.std(self.positions_ξηζ, axis=0), valid=False)
+        self.scatter_ξηζ_total = self.Indicator(self, np.sum(self.scatter_ξηζ.values**2, axis=2)**0.5, valid=False)
 
         # xyz velocity scatter
         self.scatter_velocity_xyz = np.std([star.velocity_xyz for star in self.stars], axis=0)
@@ -325,8 +362,8 @@ class Group(list, Output_Group):
 
         # xyz median absolute deviation age
         self.mad_xyz = self.Indicator(self,
-            np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0))
-        self.mad_xyz_total = self.Indicator(self, np.sum(self.mad_xyz.values**2, axis=2)**0.5)
+            np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0), valid=False)
+        self.mad_xyz_total = self.Indicator(self, np.sum(self.mad_xyz.values**2, axis=2)**0.5, valid=False)
 
         # ξηζ median absolute deviation age
         self.mad_ξηζ = self.Indicator(self,
@@ -339,25 +376,25 @@ class Group(list, Output_Group):
             at which the covariances is minimal.
         """
 
-        # xyz position covariance matrix and determinant ages
+        # xyz position covariance matrix, determinant and trace ages
         self.covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz')
         self.covariances_xyz = self.Indicator(
-            self, np.abs(self.covariances_xyz_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
+            self, np.abs(self.covariances_xyz_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5, valid=False)
         self.covariances_xyz_matrix_det = self.Indicator(
-            self, np.abs(np.linalg.det(self.covariances_xyz_matrix))**(1/6))
+            self, np.abs(np.linalg.det(self.covariances_xyz_matrix))**(1/6), valid=False)
         self.covariances_xyz_matrix_trace = self.Indicator(
-            self, (np.trace(self.covariances_xyz_matrix, axis1=2, axis2=3) / 3)**0.5)
+            self, (np.trace(self.covariances_xyz_matrix, axis1=2, axis2=3) / 3)**0.5, valid=False)
 
-        # xyz position and velocity cross covariance matrix and determinant ages
+        # xyz position and velocity cross covariance matrix, determinant and trace ages
         self.cross_covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz', 'velocities_xyz')
         self.cross_covariances_xyz = self.Indicator(
-            self, np.abs(self.cross_covariances_xyz_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
+            self, np.abs(self.cross_covariances_xyz_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5, valid=False)
         self.cross_covariances_xyz_matrix_det = self.Indicator(
-            self, np.abs(np.linalg.det(self.cross_covariances_xyz_matrix))**(1/6))
+            self, np.abs(np.linalg.det(self.cross_covariances_xyz_matrix))**(1/6), valid=False)
         self.cross_covariances_xyz_matrix_trace = self.Indicator(
-            self, np.abs(np.trace(self.cross_covariances_xyz_matrix, axis1=2, axis2=3) / 3)**0.5)
+            self, np.abs(np.trace(self.cross_covariances_xyz_matrix, axis1=2, axis2=3) / 3)**0.5, valid=False)
 
-        # ξηζ position covariance matrix and determinant ages
+        # ξηζ position covariance matrix, determinant and trace ages
         self.covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ')
         self.covariances_ξηζ = self.Indicator(
             self, np.abs(self.covariances_ξηζ_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
@@ -366,7 +403,7 @@ class Group(list, Output_Group):
         self.covariances_ξηζ_matrix_trace = self.Indicator(
             self, (np.trace(self.covariances_ξηζ_matrix, axis1=2, axis2=3) / 3)**0.5)
 
-        # ξηζ position and velocity cross covariance matrix and determinant ages
+        # ξηζ position and velocity cross covariance matrix, determinant and trace ages
         self.cross_covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ', 'velocities_ξηζ')
         self.cross_covariances_ξηζ = self.Indicator(
             self, np.abs(self.cross_covariances_ξηζ_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
@@ -375,7 +412,7 @@ class Group(list, Output_Group):
         self.cross_covariances_ξηζ_matrix_trace = self.Indicator(
             self, np.abs(np.trace(self.cross_covariances_ξηζ_matrix, axis1=2, axis2=3) / 3)**0.5)
 
-        # ξηζ position robust covariance matrix and determinant ages
+        # ξηζ position robust covariance matrix, determinant and trace ages
         self.covariances_ξηζ_robust_matrix = self.get_covariance_robust_matrix('position_ξηζ')
         self.covariances_ξηζ_robust = self.Indicator(self, np.repeat(np.expand_dims(
             np.abs(self.covariances_ξηζ_robust_matrix[:, (0, 1, 2), (0, 1, 2)])**0.5, axis=0),
@@ -480,11 +517,11 @@ class Group(list, Output_Group):
                 for i in range(self.series.jack_knife_number)]).swapaxes(0, 1)
 
         # Minimum spanning tree average branch length age
-        self.mst_mean = self.Indicator(self, np.mean(mst_lengths, axis=0))
+        self.mst_mean = self.Indicator(self, np.mean(mst_lengths, axis=0), valid=False)
 
         # Minimum spanning tree branch length median absolute deviation age
         self.mst_mad = self.Indicator(self,
-            np.median(np.abs(mst_lengths - np.median(mst_lengths, axis=0)), axis=0))
+            np.median(np.abs(mst_lengths - np.median(mst_lengths, axis=0)), axis=0), valid=False)
 
     class Branch:
         """ Line connecting two stars used for the calculation of the minimum spanning tree. """
@@ -546,8 +583,10 @@ class Group(list, Output_Group):
                 * np.expand_dims(self.group.series.time, axis=0).T)**2)**0.5
 
             # Linear UVW velocity
-            self.velocity_xyz_linear = self.velocity_xyz
-            self.velocity_xyz_linear_error = self.velocity_xyz_error
+            self.velocity_xyz_linear = np.repeat(
+                np.expand_dims(self.velocity_xyz, axis=0), self.group.series.time.size, axis=0)
+            self.velocity_xyz_linear_error = np.repeat(np.expand_dims(
+                self.velocity_xyz_error, axis=0), self.group.series.time.size, axis=0)
 
         def get_orbit(self):
             """ Computes a star's backward or forward galactic orbit using Galpy. """
@@ -646,17 +685,21 @@ class Group(list, Output_Group):
                 average position and velocity, and their respective errors for all timesteps.
             """
 
-            # Relative position and distance from the average group position
+            # Relative xyz position and distance from the average group position
             self.relative_position_xyz = self.position_xyz - self.group.position_xyz
             self.distance_xyz = np.sum(self.relative_position_xyz**2, axis=1)**0.5
 
-            # Relative velocity and speed from the average group velocity
+            # Relative xyz velocity and speed from the average group velocity
             self.relative_velocity_xyz = self.velocity_xyz - self.group.velocity_xyz
             self.speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=0)**0.5
 
-            # Relative ξηζ position from the average group position
+            # Relative ξηζ position and distance from the average group position
             self.relative_position_ξηζ = self.position_ξηζ - self.group.position_ξηζ
             self.distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
+
+            # Relative ξηζ velocity and speed from the average group velocity
+            self.relative_velocity_ξηζ = self.velocity_ξηζ - self.group.velocity_ξηζ
+            self.speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
 
             # Linear relative position and distance from the average group position
             self.relative_position_xyz_linear = self.position_xyz_linear - self.group.position_xyz_linear

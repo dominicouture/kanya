@@ -834,6 +834,7 @@ class Series(list, Output_Series):
                      if self.series.number_of_groups > 1
                         else np.expand_dims(vars(self.series[0])[indicator].values, axis=0))
                 self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
+                self.value_error_quad = np.atleast_1d((self.value_int_error**2 + self.value_ext_error**2)**0.5)
 
                 # Age and errors
                 self.age = vars(self.series[0])[indicator].age
@@ -844,6 +845,7 @@ class Series(list, Output_Series):
                      if self.series.number_of_groups > 1
                         else np.expand_dims(vars(self.series[0])[indicator].ages, axis=0))
                 self.age_error = np.atleast_1d(np.std(self.ages, axis=(0, 1)))
+                self.age_error_quad = np.atleast_1d((self.age_int_error**2 + self.age_ext_error**2)**0.5)
 
                 # Minimum and errors
                 self.min = vars(self.series[0])[indicator].min
@@ -854,6 +856,13 @@ class Series(list, Output_Series):
                      if self.series.number_of_groups > 1
                         else np.expand_dims(vars(self.series[0])[indicator].minima, axis=0))
                 self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
+                self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
+
+                # Minimum change
+                self.min_change = (self.min / self.value[0] - 1.) * 100.
+
+                # Validity
+                self.valid = vars(self.series[0])[indicator].valid
 
             # Average indicator for stars from a model
             elif self.series.from_model:
@@ -947,7 +956,7 @@ class Series(list, Output_Series):
             for number in range(self.number_of_groups):
 
                 # Group name
-                name = '{}-{}'.format(self.name, number)
+                name = f'{self.name}-{number}'
 
                 # Logging
                 log("Tracing back '{}' group from {}.", name,

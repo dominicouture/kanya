@@ -8,7 +8,7 @@
 """
 
 import numpy as np
-from math import cos, sin, asin, atan2, pi as π, degrees, radians
+from math import cos, sin, asin, atan2, pi, degrees, radians
 from Traceback.quantity import *
 
 __author__ = 'Dominic Couture'
@@ -119,14 +119,14 @@ class System():
         Variable('w', 'w velocity', default_units['speed'], usual_units['speed']),
 
         # Cylindrical coordinate system variable
-        Variable('ρ', 'galactic radius', default_units['length']),
+        Variable('r', 'galactic radius', default_units['length']),
         Variable('μρ', 'galactic radial velocity', default_units['speed']),
         Variable('θ', 'galactic angle', default_units['angle'], usual_units['angle']),
         Variable('μθ', 'galactic angular velocity', default_units['angular speed'],
             usual_units['angular speed']),
 
         # Spherical coordinate system variables
-        Variable('d', 'distance', default_units['length']),
+        Variable('ρ', 'distance', default_units['length']),
         Variable('δ', 'declination', default_units['angle'], usual_units['angle']),
         Variable('α', 'right ascension', default_units['angle'], usual_units['angle']),
         Variable('rv', 'radial velocity', default_units['speed'], usual_units['speed']),
@@ -136,7 +136,7 @@ class System():
             usual_units['angular speed']),
 
         # Observables coordinate system variables
-        Variable('p', 'parallax', default_units['angle'], usual_units['small angle']),
+        Variable('π', 'parallax', default_units['angle'], usual_units['small angle']),
         Variable('μαcosδ', 'right ascension proper motion * cos(declination)',
             default_units['angular speed'], usual_units['angular speed']))}
 
@@ -148,9 +148,9 @@ class System():
 # Coordinate systems
 systems = {system.name: system for system in (
     System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
-    System('cylindrical', ('ρ', 'θ', 'z'), ('μρ', 'μθ', 'w')),
-    System('spherical', ('d', 'δ', 'α'), ('rv', 'μδ', 'μα')),
-    System('observables', ('p', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ')))}
+    System('cylindrical', ('r', 'θ', 'z'), ('μρ', 'μθ', 'w')),
+    System('spherical', ('ρ', 'δ', 'α'), ('rv', 'μδ', 'μα')),
+    System('observables', ('π', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ')))}
 
 class Coordinate:
     """ Contains the values and related methods of a coordinate, including its position, velocity,
@@ -224,7 +224,7 @@ class Coordinate:
     l_galaxy = radians(122.931925267)
 
     # Parallax conversion from radians to parsecs constant
-    k = π / 648000
+    k = pi / 648000
 
     # Gaia bias correction
     gaia_bias = -2.618e-10
@@ -411,7 +411,7 @@ def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
     norm, norm_xy = norm_2**0.5, norm_xy_2**0.5
 
     # Distance and angles calculation
-    values = np.array((norm, asin(z / norm), atan2(y, x) + (2 * π * (y < 0))))
+    values = np.array((norm, asin(z / norm), atan2(y, x) + (2 * pi * (y < 0))))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
@@ -563,7 +563,7 @@ def xyz_to_ρθz(x, y, z, Δx=0, Δy=0, Δz=0):
     """
 
     # Position calculation
-    values = np.array(((x**2 + y**2)**0.5, atan2(y, x) + (2 * π * (y < 0)), z))
+    values = np.array(((x**2 + y**2)**0.5, atan2(y, x) + (2 * pi * (y < 0)), z))
 
     # Errors calculation
     if not np.array((Δx, Δy, Δz)).any():
@@ -853,7 +853,7 @@ def galactocentric_ρθz_galactic_uvw(ρ, θ, z, μρ, μθ, w, Δρ=0, Δθ=0, 
 
 # Observatables and spherical coordinates transformation functions
 
-def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα_cos_δ=0):
+def position_obs_rδα(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα_cos_δ=0):
     """ Converts observables, paralax (p; rad), declination (δ, DEC; rad), right ascension
         (α, RA; rad), radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and
         and right ascension proper motion * cos(δ) (μα_cos_δ; rad/Myr), into an equatorial
@@ -876,7 +876,7 @@ def observables_spherical(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=
         return position, velocity, np.array((Δp * Coordinate.k / (p + Coordinate.gaia_bias)**2, Δδ, Δα)), \
             np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ))
 
-def spherical_observables(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
+def position_rδα_obs(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
     """ Converts an equatorial spherical coordinate, distance (r; pc), declination (δ, DEC; rad)
         and right ascension (α, RA; rad), radial velocity (rv; pc/Myr), declination proper motion
         (µδ; rad/Myr) and right ascension proper motion (μα_cos_δ; rad/Myr)) into observables,
