@@ -27,16 +27,17 @@ collection.create()
 # Output creation
 for series in collection:
     series.show_errors() # Valid
-    series.create_scatter_xyz_plot(title=False, forced=True)
-    series.create_scatter_ξηζ_plot(title=False, forced=True)
-    series.create_mad_xyz_plot(title=False, forced=True)
+    # series.create_scatter_xyz_plot(title=False, forced=True)
+    # series.create_scatter_ξηζ_plot(title=False, forced=True)
+    # series.create_mad_xyz_plot(title=False, forced=True)
     series.create_mad_ξηζ_plot(title=False, forced=True) # Valid
-    series.create_covariances_xyz_plot(forced=True, title=False)
+    # series.create_covariances_xyz_plot(forced=True, title=False)
     series.create_covariances_ξηζ_plot(forced=True, title=False) # Valid
+    series.create_covariances_ξηζ_2_plot(forced=True, title=False) # Valid
     series.create_robust_covariances_ξηζ_plot(forced=True, title=False) # Valid
-    series.create_cross_covariances_xyz_plot(forced=True, title=False)
+    # series.create_cross_covariances_xyz_plot(forced=True, title=False)
     series.create_cross_covariances_ξηζ_plot(forced=True, title=False) # Valid
-    series.create_scatter_mad_mst_plot(title=False, forced=True)
+    # series.create_scatter_mad_mst_plot(title=False, forced=True)
 
     # Group output
     for group in series:
@@ -44,7 +45,7 @@ for series in collection:
             group.trajectory(title=False, forced=True)
             group.trajectory_xyz(title=False, forced=True)
             group.trajectory_ξηζ(title=False, forced=True) # Valid
-            group.create_map(title=False, forced=True, labels=False)
-            group.create_2D_and_3D_scatter([0,  5,  10], title=False, forced=True)
-            group.create_2D_and_3D_scatter([15, 20, 25], title=False, forced=True)
-            group.create_cross_covariances_scatter('x', 'u', age=10, title=False, errors=True, forced=True)
+            # group.create_map(title=False, forced=True, labels=False)
+            # group.create_2D_and_3D_scatter([0,  5,  10], title=False, forced=True)
+            # group.create_2D_and_3D_scatter([15, 20, 25], title=False, forced=True)
+            # group.create_cross_covariances_scatter('x', 'u', age=10, title=False, errors=True, forced=True)

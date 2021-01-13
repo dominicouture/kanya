@@ -350,6 +350,10 @@ class Series(list, Output_Series):
         if self.data_errors:
             self.configure_data()
 
+            # Check if the data length matches the number of stars
+            self.stop(len(self.data) == 0, 'ValueError',
+                "If 'data_errors' is True, the data length must be greater than 0.")
+
         # Data set to None because measurement errors are simulated
         else:
             self.data = None
@@ -858,16 +862,10 @@ class Series(list, Output_Series):
                 self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
                 self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
 
-                # Minimum change
-                self.min_change = (self.min / self.value[0] - 1.) * 100.
-
-                # Validity
-                self.valid = vars(self.series[0])[indicator].valid
-
             # Average indicator for stars from a model
             elif self.series.from_model:
-                self.values = np.mean(
-                    [vars(group)[indicator].values for group in self.series], axis=0)
+                # self.values = np.mean(
+                #     [vars(group)[indicator].values for group in self.series], axis=0)
 
                 # Value and errors
                 self.value = np.mean(
@@ -876,6 +874,10 @@ class Series(list, Output_Series):
                     [vars(group)[indicator].value_int_error for group in self.series], axis=0)
                 self.value_ext_error = np.std(
                     [vars(group)[indicator].value for group in self.series], axis=0)
+                self.values = np.array([vars(group)[indicator].values for group in self.series])
+                self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
+                self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
+                self.value_error_quad = np.atleast_1d((self.value_int_error**2 + self.value_ext_error**2)**0.5)
 
                 # Age and errors
                 self.age = np.mean(
@@ -884,6 +886,9 @@ class Series(list, Output_Series):
                     [vars(group)[indicator].age_int_error for group in self.series], axis=0)
                 self.age_ext_error = np.std(
                     [vars(group)[indicator].age for group in self.series], axis=0)
+                self.ages = np.array([vars(group)[indicator].ages for group in self.series])
+                self.age_error = np.atleast_1d(np.std(self.ages, axis=(0, 1)))
+                self.age_error_quad = np.atleast_1d((self.age_int_error**2 + self.age_ext_error**2)**0.5)
 
                 # Minimum and errors
                 self.min = np.mean(
@@ -892,23 +897,32 @@ class Series(list, Output_Series):
                     [vars(group)[indicator].min_int_error for group in self.series], axis=0)
                 self.min_ext_error = np.std(
                     [vars(group)[indicator].min for group in self.series], axis=0)
+                self.minima = np.array([vars(group)[indicator].minima for group in self.series])
+                self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
+                self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
+
+            # Minimum change
+            self.min_change = (self.min / self.value[0] - 1.) * 100.
+
+            # Validity
+            self.valid = vars(self.series[0])[indicator].valid
 
             # Box size (Myr) converted to the corresponding number of steps
             # box_size = 1. # Transform in to parameter
-            box_size = 0.01
-            box_size = int(box_size * self.series.number_of_steps / (
-                self.series.final_time.value - self.series.initial_time.value))
-            if box_size > 1:
-                box = np.squeeze(np.tile(
-                    np.ones(box_size) / box_size, (1 if self.values.ndim == 1 else 3, 1))).T
-                box = np.ones(box_size) / box_size
-
-                # Smoothing with moving average
-                if self.values.ndim == 1:
-                    self.values = np.convolve(self.values, box, mode='same')
-                else:
-                    self.values = np.apply_along_axis(
-                        lambda x: np.convolve(x, box, mode='same'), axis=0, arr=self.values)
+            # box_size = 0.01
+            # box_size = int(box_size * self.series.number_of_steps / (
+            #     self.series.final_time.value - self.series.initial_time.value))
+            # if box_size > 1:
+            #     box = np.squeeze(np.tile(
+            #         np.ones(box_size) / box_size, (1 if self.values.ndim == 1 else 3, 1))).T
+            #     box = np.ones(box_size) / box_size
+            #
+            #     # Smoothing with moving average
+            #     if self.values.ndim == 1:
+            #         self.values = np.convolve(self.values, box, mode='same')
+            #     else:
+            #         self.values = np.apply_along_axis(
+            #             lambda x: np.convolve(x, box, mode='same'), axis=0, arr=self.values)
 
     def traceback(self, forced=False, logging=True, mode=None):
         """ Traces back Group and embeded Star objects using either imported data or by
@@ -976,8 +990,9 @@ class Series(list, Output_Series):
                     'covariances_xyz', 'covariances_xyz_matrix_det', 'covariances_xyz_matrix_trace',
                     'cross_covariances_xyz', 'cross_covariances_xyz_matrix_det', 'cross_covariances_xyz_matrix_trace',
                     'covariances_ξηζ', 'covariances_ξηζ_matrix_det', 'covariances_ξηζ_matrix_trace',
-                    'cross_covariances_ξηζ', 'cross_covariances_ξηζ_matrix_det', 'cross_covariances_ξηζ_matrix_trace',
+                    'covariances_ξηζ_2', 'covariances_ξηζ_matrix_det_2', 'covariances_ξηζ_matrix_trace_2',
                     'covariances_ξηζ_robust', 'covariances_ξηζ_matrix_robust_det', 'covariances_ξηζ_matrix_robust_trace',
+                    'cross_covariances_ξηζ', 'cross_covariances_ξηζ_matrix_det', 'cross_covariances_ξηζ_matrix_trace',
                     'mst_mean', 'mst_mad'):
                 vars(self)[indicator] = self.Indicator(self, indicator)
                 # vars(self)[indicator] = vars(self[0])[indicator]

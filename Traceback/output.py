@@ -599,6 +599,93 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
+    def create_covariances_ξηζ_2_plot(self, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of ξ-ξ, η-η and ζ-ζ covariances 2, and determinant and trace. """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # ξηζ covariance matrix determinant
+        ax.plot(-self.time, self.covariances_ξηζ_matrix_det_2.value,
+            linestyle='-', color=colors[0], linewidth=1.5, label=(
+                f'Det 2 : ({self.covariances_ξηζ_matrix_det_2.age[0]:.2f}'
+                f' ± {self.covariances_ξηζ_matrix_det_2.age_error[0]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_ξηζ_matrix_det_2.value - self.covariances_ξηζ_matrix_det_2.value_error,
+            self.covariances_ξηζ_matrix_det_2.value + self.covariances_ξηζ_matrix_det_2.value_error,
+            color=colors[0], alpha=0.3, linewidth=0.)
+
+        # ξηζ covariance matrix trace
+        ax.plot(-self.time, self.covariances_ξηζ_matrix_trace_2.value,
+            linestyle='--', color=colors[1], linewidth=1.5, label=(
+                f'Trace 2 : ({self.covariances_ξηζ_matrix_trace_2.age[0]:.2f} '
+                f'± {self.covariances_ξηζ_matrix_trace_2.age_error[0]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_ξηζ_matrix_trace_2.value - self.covariances_ξηζ_matrix_trace_2.value_error,
+            self.covariances_ξηζ_matrix_trace_2.value + self.covariances_ξηζ_matrix_trace_2.value_error,
+            color=colors[1], alpha=0.3, linewidth=0.)
+
+        # ξ-ξ covariance
+        ax.plot(-self.time, self.covariances_ξηζ_2.value[:,0],
+            linestyle='-', color=colors[2], linewidth=1.5, label=(
+                f'$ξ\prime$-$ξ\prime$ 2 : ({self.covariances_ξηζ_2.age[0]:.2f} '
+                f'± {self.covariances_ξηζ_2.age_error[0]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_ξηζ_2.value[:,0].T - self.covariances_ξηζ_2.value_error[:,0].T,
+            self.covariances_ξηζ_2.value[:,0].T + self.covariances_ξηζ_2.value_error[:,0].T,
+            color=colors[2], alpha=0.3, linewidth=0.)
+
+        # η-η covariance
+        ax.plot(-self.time, self.covariances_ξηζ_2.value[:,1],
+            linestyle='--', color=colors[3], linewidth=1.5, label=(
+                f'$η\prime$-$η\prime$ 2 : ({self.covariances_ξηζ_2.age[1]:.2f} '
+                f'± {self.covariances_ξηζ_2.age_error[1]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_ξηζ_2.value[:,1].T - self.covariances_ξηζ_2.value_error[:,1].T,
+            self.covariances_ξηζ_2.value[:,1].T + self.covariances_ξηζ_2.value_error[:,1].T,
+            color=colors[3], alpha=0.3, linewidth=0.)
+
+        # ζ-ζ covariance
+        ax.plot(-self.time, self.covariances_ξηζ_2.value[:,2],
+            linestyle=':', color=colors[4], linewidth=1.5, label=(
+                f'$ζ\prime$-$ζ\prime$ 2 : ({self.covariances_ξηζ_2.age[2]:.2f} '
+                f'± {self.covariances_ξηζ_2.age_error[2]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_ξηζ_2.value[:,2].T - self.covariances_ξηζ_2.value_error[:,2].T,
+            self.covariances_ξηζ_2.value[:,2].T + self.covariances_ξηζ_2.value_error[:,2].T,
+            color=colors[4], alpha=0.3, linewidth=0.)
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title(" ξ-ξ, η-η and ζ-ζ covariances of β Pictoris (without outliners) "
+                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                    "errors\n".format(
+                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+            elif self.from_model:
+                ax.set_title(" ξ-ξ, η-η and z-z covariances of {} moving group simulations with "
+                    "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                    "correction and actual measurement errors of Gaia DR2\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=2, fontsize=6)
+        ax.set_xlabel('Time (Myr)')
+        ax.set_ylabel('Size (pc)')
+        ax.set_xlim(-self.final_time.value + 20., 0.)
+        ax.set_ylim(0., 30.)
+        # ax.yaxis.set_major_formatter(format_ticks)
+
+        # Save figure
+        save_figure(self.name, f'Covariances_ξηζ_2_{self.name}.pdf',
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
     def create_robust_covariances_ξηζ_plot(self, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of ξ-ξ, η-η and ζ-ζ robust covariances, and determinant and trace. """
 
@@ -852,7 +939,7 @@ class Output_Series():
         ax.set_xlabel('Time (Myr)')
         ax.set_ylabel('Size (pc)')
         ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 10.)
+        ax.set_ylim(0., 2.5)
         # ax.yaxis.set_major_formatter(format_ticks)
 
         # Save figure
@@ -1201,7 +1288,7 @@ class Output_Group():
     """ Defines output methods from a Group object. """
 
     def trajectory(self, title=True, forced=False, default=False, cancel=False):
-        """ Draws the average XYZ and ξηζ trajectory of stars over time. """
+        """ Draws the average XYZ and ξηζ trajectory of stars in the group over time. """
 
         # Figure initialization
         fig = plt.figure(figsize=(6, 5.5), facecolor='w')
@@ -1245,12 +1332,12 @@ class Output_Group():
         # ax2.set_xlabel('θ (°)')
 
         # Save figure
-        save_figure(self.name, f'Trajectories_xyz_{self.name}.pdf',
+        save_figure(self.name, f'Trajectory_{self.name}.pdf',
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def trajectory_xyz(self, title=True, forced=False, default=False, cancel=False):
-        """ Draw the XY trajectory of stars """
+        """ Draw the XYZ trajectory of stars in the group over time. """
 
         # Figure initialization
         fig = plt.figure(figsize=(10, 9.5), facecolor='w')
@@ -1327,11 +1414,11 @@ class Output_Group():
             fig.suptitle("Trajectories ξηζ of stars in βPMG")
 
         # Save figure
-        save_figure(self.name, f'Trajectories_xyz_{self.name}.pdf',
+        save_figure(self.name, f'Trajectory_xyz_{self.name}.pdf',
             forced=forced, default=default, cancel=cancel)
 
     def trajectory_ξηζ(self, title=True, forced=False, default=False, cancel=False):
-        """ Draws the ξηζ trajectory of stars. """
+        """ Draws the ξηζ trajectory of stars in the group over time. """
 
         # Figure initialization
         fig = plt.figure(figsize=(10, 9.5), facecolor='w')
@@ -1348,11 +1435,11 @@ class Output_Group():
 
             # Plot current and birth positions
             ax1.scatter([star.position_ξηζ[0,0]], [star.position_ξηζ[0,1]], marker='s', color='k', zorder=2)
-            ax1.scatter([star.position_ξηζ[t,0]], [star.position_ξηζ[t,1]], marker='o', color='b', zorder=2)
+            ax1.scatter([star.position_ξηζ[t,0]], [star.position_ξηζ[t,1]], marker='o', color='r' if star.outlier else 'b', zorder=2)
             ax2.scatter([star.position_ξηζ[0,2]], [star.position_ξηζ[0,1]], marker='s', color='k', zorder=2)
-            ax2.scatter([star.position_ξηζ[t,2]], [star.position_ξηζ[t,1]], marker='o', color='b', zorder=2)
+            ax2.scatter([star.position_ξηζ[t,2]], [star.position_ξηζ[t,1]], marker='o', color='r' if star.outlier else 'b', zorder=2)
             ax3.scatter([star.position_ξηζ[0,0]], [star.position_ξηζ[0,2]], marker='s', color='k', zorder=2)
-            ax3.scatter([star.position_ξηζ[t,0]], [star.position_ξηζ[t,2]], marker='o', color='b', zorder=2)
+            ax3.scatter([star.position_ξηζ[t,0]], [star.position_ξηζ[t,2]], marker='o', color='r' if star.outlier else 'b', zorder=2)
 
         # Axes formatting
         ax1.set_xticklabels([])
@@ -1382,7 +1469,7 @@ class Output_Group():
             fig.suptitle("Trajectories ξηζ of stars in βPMG")
 
         # Save figure
-        save_figure(self.name, f'Trajectories_ξηζ_{self.name}.pdf',
+        save_figure(self.name, f'Trajectory_ξηζ_{self.name}.pdf',
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
