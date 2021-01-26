@@ -272,6 +272,11 @@ class Series(list, Output_Series):
         if self.from_model:
             self.configure_model()
 
+        # Milky Way gravitational potential
+        # from galpy.potential import MWPotential2014
+        from galpy.potential.mwpotentials import Irrgang13I
+        self.potential = Irrgang13I
+
         # Logging
         log("'{}' series ready for traceback.", self.name)
 
@@ -822,90 +827,91 @@ class Series(list, Output_Series):
             """
 
             # Initialization
-            self.name = indicator
             self.series = series
-            self.series.indicators.append(self)
+            self.name = indicator.name
+            self.valid = indicator.valid
 
             # Indicator for stars from data
             if self.series.from_data:
 
                 # Value and errors
-                self.value = vars(self.series[0])[indicator].value
-                self.value_int_error = vars(self.series[0])[indicator].value_int_error
-                self.value_ext_error = (np.std([vars(group)[indicator].value for group in self.series[1:]], axis=0)
+                self.value = vars(self.series[0])[self.name].value
+                self.value_int_error = vars(self.series[0])[self.name].value_int_error
+                self.value_ext_error = (np.std([vars(group)[self.name].value for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.value.shape))
-                self.values = (np.array([vars(group)[indicator].values for group in self.series[1:]])
+                self.values = (np.array([vars(group)[self.name].values for group in self.series[1:]])
                      if self.series.number_of_groups > 1
-                        else np.expand_dims(vars(self.series[0])[indicator].values, axis=0))
+                        else np.expand_dims(vars(self.series[0])[self.name].values, axis=0))
                 self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
                 self.value_error_quad = np.atleast_1d((self.value_int_error**2 + self.value_ext_error**2)**0.5)
 
                 # Age and errors
-                self.age = vars(self.series[0])[indicator].age
-                self.age_int_error = vars(self.series[0])[indicator].age_int_error
-                self.age_ext_error = (np.std([vars(group)[indicator].age for group in self.series[1:]], axis=0)
+                self.age = vars(self.series[0])[self.name].age
+                self.age_int_error = vars(self.series[0])[self.name].age_int_error
+                self.age_ext_error = (np.std([vars(group)[self.name].age for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.age.shape))
-                self.ages = (np.array([vars(group)[indicator].ages for group in self.series[1:]])
+                self.ages = (np.array([vars(group)[self.name].ages for group in self.series[1:]])
                      if self.series.number_of_groups > 1
-                        else np.expand_dims(vars(self.series[0])[indicator].ages, axis=0))
+                        else np.expand_dims(vars(self.series[0])[self.name].ages, axis=0))
                 self.age_error = np.atleast_1d(np.std(self.ages, axis=(0, 1)))
                 self.age_error_quad = np.atleast_1d((self.age_int_error**2 + self.age_ext_error**2)**0.5)
 
                 # Minimum and errors
-                self.min = vars(self.series[0])[indicator].min
-                self.min_int_error = vars(self.series[0])[indicator].min_int_error
-                self.min_ext_error = (np.std([vars(group)[indicator].min for group in self.series[1:]], axis=0)
+                self.min = vars(self.series[0])[self.name].min
+                self.min_int_error = vars(self.series[0])[self.name].min_int_error
+                self.min_ext_error = (np.std([vars(group)[self.name].min for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.min.shape))
-                self.minima = (np.array([vars(group)[indicator].minima for group in self.series[1:]])
+                self.minima = (np.array([vars(group)[self.name].minima for group in self.series[1:]])
                      if self.series.number_of_groups > 1
-                        else np.expand_dims(vars(self.series[0])[indicator].minima, axis=0))
+                        else np.expand_dims(vars(self.series[0])[self.name].minima, axis=0))
                 self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
                 self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
 
             # Average indicator for stars from a model
             elif self.series.from_model:
-                # self.values = np.mean(
-                #     [vars(group)[indicator].values for group in self.series], axis=0)
+                self.values = np.mean(
+                    [vars(group)[self.name].values for group in self.series], axis=0)
 
                 # Value and errors
                 self.value = np.mean(
-                    [vars(group)[indicator].value for group in self.series], axis=0)
+                    [vars(group)[self.name].value for group in self.series], axis=0)
                 self.value_int_error = np.mean(
-                    [vars(group)[indicator].value_int_error for group in self.series], axis=0)
+                    [vars(group)[self.name].value_int_error for group in self.series], axis=0)
                 self.value_ext_error = np.std(
-                    [vars(group)[indicator].value for group in self.series], axis=0)
-                self.values = np.array([vars(group)[indicator].values for group in self.series])
+                    [vars(group)[self.name].value for group in self.series], axis=0)
+                self.values = np.array([vars(group)[self.name].values for group in self.series])
                 self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
                 self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
                 self.value_error_quad = np.atleast_1d((self.value_int_error**2 + self.value_ext_error**2)**0.5)
 
                 # Age and errors
                 self.age = np.mean(
-                    [vars(group)[indicator].age for group in self.series], axis=0)
+                    [vars(group)[self.name].age for group in self.series], axis=0)
                 self.age_int_error = np.mean(
-                    [vars(group)[indicator].age_int_error for group in self.series], axis=0)
+                    [vars(group)[self.name].age_int_error for group in self.series], axis=0)
                 self.age_ext_error = np.std(
-                    [vars(group)[indicator].age for group in self.series], axis=0)
-                self.ages = np.array([vars(group)[indicator].ages for group in self.series])
+                    [vars(group)[self.name].age for group in self.series], axis=0)
+                self.ages = np.array([vars(group)[self.name].ages for group in self.series])
                 self.age_error = np.atleast_1d(np.std(self.ages, axis=(0, 1)))
                 self.age_error_quad = np.atleast_1d((self.age_int_error**2 + self.age_ext_error**2)**0.5)
 
                 # Minimum and errors
                 self.min = np.mean(
-                    [vars(group)[indicator].min for group in self.series], axis=0)
+                    [vars(group)[self.name].min for group in self.series], axis=0)
                 self.min_int_error = np.mean(
-                    [vars(group)[indicator].min_int_error for group in self.series], axis=0)
+                    [vars(group)[self.name].min_int_error for group in self.series], axis=0)
                 self.min_ext_error = np.std(
-                    [vars(group)[indicator].min for group in self.series], axis=0)
-                self.minima = np.array([vars(group)[indicator].minima for group in self.series])
+                    [vars(group)[self.name].min for group in self.series], axis=0)
+                self.minima = np.array([vars(group)[self.name].minima for group in self.series])
                 self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
                 self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
 
             # Minimum change
             self.min_change = (self.min / self.value[0] - 1.) * 100.
 
-            # Validity
-            self.valid = vars(self.series[0])[indicator].valid
+            # Add indicator to the series
+            vars(self.series)[self.name] = self
+            self.series.indicators.append(self)
 
             # Box size (Myr) converted to the corresponding number of steps
             # box_size = 1. # Transform in to parameter
@@ -982,20 +988,10 @@ class Series(list, Output_Series):
             # Logging
             log("'{}' series succesfully traced back.", self.name, logging=logging)
 
-            # Age indicators average values, errors, age, error on age, minimum and error on minimum
+            # Average age indicators
             self.indicators = []
-            for indicator in (
-                    'scatter_xyz', 'scatter_xyz_total', 'scatter_ξηζ', 'scatter_ξηζ_total',
-                    'mad_xyz', 'mad_xyz_total', 'mad_ξηζ', 'mad_ξηζ_total',
-                    'covariances_xyz', 'covariances_xyz_matrix_det', 'covariances_xyz_matrix_trace',
-                    'cross_covariances_xyz', 'cross_covariances_xyz_matrix_det', 'cross_covariances_xyz_matrix_trace',
-                    'covariances_ξηζ', 'covariances_ξηζ_matrix_det', 'covariances_ξηζ_matrix_trace',
-                    'covariances_ξηζ_2', 'covariances_ξηζ_matrix_det_2', 'covariances_ξηζ_matrix_trace_2',
-                    'covariances_ξηζ_robust', 'covariances_ξηζ_matrix_robust_det', 'covariances_ξηζ_matrix_robust_trace',
-                    'cross_covariances_ξηζ', 'cross_covariances_ξηζ_matrix_det', 'cross_covariances_ξηζ_matrix_trace',
-                    'mst_mean', 'mst_mad'):
-                vars(self)[indicator] = self.Indicator(self, indicator)
-                # vars(self)[indicator] = vars(self[0])[indicator]
+            for indicator in self[0].indicators:
+                self.Indicator(self, indicator)
 
     def save(self, file_path=None, forced=False, default=False, cancel=False, logging=True):
         """ Saves a series to a binary file. self.file_path is defined as the actual path to the
