@@ -24,7 +24,6 @@ plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
 plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Math:roman')
 plt.rc('lines', markersize=4)
 plt.rc('pdf', fonttype=42)
-# plt.rcParams['pdf.fonttype'] = 42
 
 # Set colors
 greys = ('#000000', '#333333', '#666666', '#999999', '#cccccc')
@@ -860,6 +859,93 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
+    def create_covariances_xyz_robust_plot(self, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of ξ-ξ, η-η and ζ-ζ robust covariances, and determinant and trace. """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # ξηζ robust covariance matrix determinant
+        ax.plot(-self.time, self.covariances_xyz_robust_matrix_det.value,
+            linestyle='-', color=colors[0], linewidth=1.5, label=(
+                f'Det (robust) : ({self.covariances_xyz_robust_matrix_det.age[0]:.2f}'
+                f' ± {self.covariances_xyz_robust_matrix_det.age_error[0]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_xyz_robust_matrix_det.value - self.covariances_xyz_robust_matrix_det.value_error,
+            self.covariances_xyz_robust_matrix_det.value + self.covariances_xyz_robust_matrix_det.value_error,
+            color=colors[0], alpha=0.3, linewidth=0.)
+
+        # ξηζ robust covariance matrix trace
+        ax.plot(-self.time, self.covariances_xyz_robust_matrix_trace.value,
+            linestyle='--', color=colors[1], linewidth=1.5, label=(
+                f'Trace (robust) : ({self.covariances_xyz_robust_matrix_trace.age[0]:.2f} '
+                f'± {self.covariances_xyz_robust_matrix_trace.age_error[0]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_xyz_robust_matrix_trace.value - self.covariances_xyz_robust_matrix_trace.value_error,
+            self.covariances_xyz_robust_matrix_trace.value + self.covariances_xyz_robust_matrix_trace.value_error,
+            color=colors[1], alpha=0.3, linewidth=0.)
+
+        # ξ-ξ robust covariance
+        ax.plot(-self.time, self.covariances_xyz_robust.value[:,0],
+            linestyle='-', color=colors[2], linewidth=1.5, label=(
+                f'$x$-$ξx$ (robust) : ({self.covariances_xyz_robust.age[0]:.2f} '
+                f'± {self.covariances_xyz_robust.age_error[0]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_xyz_robust.value[:,0].T - self.covariances_xyz_robust.value_error[:,0].T,
+            self.covariances_xyz_robust.value[:,0].T + self.covariances_xyz_robust.value_error[:,0].T,
+            color=colors[2], alpha=0.3, linewidth=0.)
+
+        # η-η robust covariance
+        ax.plot(-self.time, self.covariances_xyz_robust.value[:,1],
+            linestyle='--', color=colors[3], linewidth=1.5, label=(
+                f'$y$-$y$ (robust) : ({self.covariances_xyz_robust.age[1]:.2f} '
+                f'± {self.covariances_xyz_robust.age_error[1]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_xyz_robust.value[:,1].T - self.covariances_xyz_robust.value_error[:,1].T,
+            self.covariances_xyz_robust.value[:,1].T + self.covariances_xyz_robust.value_error[:,1].T,
+            color=colors[3], alpha=0.3, linewidth=0.)
+
+        # ζ-ζ robust covariance
+        ax.plot(-self.time, self.covariances_xyz_robust.value[:,2],
+            linestyle=':', color=colors[4], linewidth=1.5, label=(
+                f'$ζz$-$ζz$ (robust) : ({self.covariances_xyz_robust.age[2]:.2f} '
+                f'± {self.covariances_xyz_robust.age_error[2]:.2f}) Myr'))
+        ax.fill_between(-self.time,
+            self.covariances_xyz_robust.value[:,2].T - self.covariances_xyz_robust.value_error[:,2].T,
+            self.covariances_xyz_robust.value[:,2].T + self.covariances_xyz_robust.value_error[:,2].T,
+            color=colors[4], alpha=0.3, linewidth=0.)
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title(" ξ-ξ, η-η and ζ-ζ robust covariances of β Pictoris (without outliners) "
+                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                    "errors\n".format(
+                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+            elif self.from_model:
+                ax.set_title(" ξ-ξ, η-η and z-z robust covariances of {} moving group simulations "
+                    "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                    "correction and actual measurement errors of Gaia DR2\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=2, fontsize=6)
+        ax.set_xlabel('Time (Myr)')
+        ax.set_ylabel('Size (pc)')
+        ax.set_xlim(-self.final_time.value + 20., 0.)
+        ax.set_ylim(0., 30.)
+        # ax.yaxis.set_major_formatter(format_ticks)
+
+        # Save figure
+        save_figure(self.name, f'Covariances_xyz_robust_{self.name}.pdf',
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
     def create_covariances_ξηζ_sklearn_plot(self, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of ξ-ξ, η-η and ζ-ζ sklearn covariances, and determinant and trace. """
 
@@ -1261,34 +1347,56 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def show_errors(self):
-        """ Displays all errors of a series. """
+    def show_metrics(self):
+        """ Displays all metrics of a series. """
+
+        def convert(value):
+            """ Returns a converted, rounded string for display. """
+
+            return str(np.round(value, 2)).replace('[', '').replace(']', '')
+
+        def create_line(indicator, valid=True):
+            """ Creates a single metric (i) line. """
+
+            valid = np.copy(indicator.valid) if valid else np.invert(indicator.valid)
+
+            for i in filter(lambda i: valid[i], np.arange(valid.size)):
+                print(f"{indicator.verbose_name[i]:<50}"
+                    f"{convert(indicator.age_ajusted[i]):>15}"
+                    f"{convert(indicator.age_int_error[i]):>20}"
+                    f"{convert(indicator.age_ext_error[i]):>20}"
+                    f"{convert(indicator.age_error[i]):>15}"
+                    f"{convert(indicator.min_change[i]):>20}"
+                    f"{convert(indicator.age_offset[i]):>15}")
+
+        # Set precision and order
+        np.set_printoptions(precision=2)
+        order = np.argsort([i.name for i in self.indicators])
 
         # Display header
-        print(f"{'':-<150}")
-        print(f"{'Indicator':<45}{'Age':>20}{'error_int':>20}"
-            f"{'error_ext':>20}{'error_total':>20}{'min_change':>25}")
-        print(f"{'[Myr]':>65}{'[Myr]':>20}{'[Myr]':>20}{'[Myr]':>20}{'[%]':>25}")
-        print(f"{'':-<150}")
+        print(f"{'':-<155}")
+        print(f"{'Metric':<50}{'Age':>15}{'Jackknife Error':>20}{'Measurement Error':>20}"
+            f"{'Total Error':>15}{'Minimum Change':>20}{'Offset':>15}")
+        print(f"{'[Myr]':>65}{'[Myr]':>20}{'[Myr]':>20}{'[Myr]':>15}{'[%]':>20}{'[Myr]':>15}")
+        print(f"{'':-<155}")
 
-        # Display errors on age
-        np.set_printoptions(precision=2)
-        for i in filter(lambda i: i.valid, self.indicators):
-            print(
-                f"{i.name:<45}{str(np.round(i.age, 2)).replace('[', '').replace(']', ''):>20}"
-                f"{str(np.round(i.age_int_error, 2)).replace('[', '').replace(']', ''):>20}"
-                f"{str(np.round(i.age_ext_error, 2)).replace('[', '').replace(']', ''):>20}"
-                f"{str(np.round(i.age_error, 2)).replace('[', '').replace(']', ''):>20}"
-                f"{str(np.round(i.min_change, 2)).replace('[', '').replace(']', ''):>25}")
+        # Display errors on age of valid indicators
+        print('Valid\n' f"{'':-<155}")
+        for i in order:
+            create_line(self.indicators[i], valid=True)
+        print(f"{'':-<155}")
 
-        # Display footer
-        print(f"{'':-<150}")
+        # Display errors on age of invalid indicators
+        print('Rejected\n' f"{'':-<155}")
+        for i in order:
+            create_line(self.indicators[i], valid=False)
+        print(f"{'':-<155}")
 
 class Output_Group():
     """ Defines output methods from a Group object. """
 
     def trajectory(self, title=True, forced=False, default=False, cancel=False):
-        """ Draws the average XYZ and ξηζ trajectory of stars in the group over time. """
+        """ Draws the average xyz and ξηζ trajectory of stars in the group over time. """
 
         # Figure initialization
         fig = plt.figure(figsize=(6, 5.5), facecolor='w')
@@ -1336,8 +1444,85 @@ class Output_Group():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
+    def trajectory_time_xyz(self, linear=False, title=True, forced=False, default=False, cancel=False):
+        """ Draws the x, y, z trajectories as a function of time of stars. """
+
+        # Figure initialization
+        fig = plt.figure(figsize=(6, 12), facecolor='w')
+        ax1 = fig.add_subplot(313)
+        ax2 = fig.add_subplot(312, sharex=ax1)
+        ax3 = fig.add_subplot(311, sharex=ax1)
+
+        # Plot trajectories
+        for star in self:
+            color = '#ff0000' if star.outlier else greys[0]
+            position_xyz = (star.position_xyz - self.position_xyz if not linear
+                else star.position_xyz_linear - self.position_xyz_linear).T
+            ax1.plot(self.series.time, position_xyz[2], color=color, linewidth=0.4, zorder=2)
+            ax2.plot(self.series.time, position_xyz[1], color=color, linewidth=0.4, zorder=2)
+            ax3.plot(self.series.time, position_xyz[0], color=color, linewidth=0.4, zorder=2)
+
+        # Title formatting
+        self.series.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            ax.set_title("XYZ trajectories of stars in βPMG")
+
+        # Axes formatting
+        ax1.set_xlabel('Time (Myr)')
+        ax1.set_ylabel('Z (pc)')
+        ax2.set_ylabel('Y (pc)')
+        ax3.set_ylabel('X (pc)')
+
+        # Axes limits
+        ax1.set_xlim(np.min(self.series.time), np.max(self.series.time))
+
+        # Save figure
+        save_figure(self.name, f"Trajectory_time_XYZ{'_linear' if linear else ''}_{self.name}.pdf",
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def trajectory_time_ξηζ(self, title=True, forced=False, default=False, cancel=False):
+        """ Draws the ξηζ trajectories as a function of time of stars. """
+
+        # Figure initialization
+        fig = plt.figure(figsize=(6, 12), facecolor='w')
+        ax1 = fig.add_subplot(313)
+        ax2 = fig.add_subplot(312, sharex=ax1)
+        ax3 = fig.add_subplot(311, sharex=ax1)
+
+        # Plot trajectories
+        for star in self:
+            color = '#ff0000' if star.outlier else greys[0]
+            ax1.plot(self.series.time, star.position_ξηζ.T[2] - self.position_ξηζ.T[2],
+                color=color, linewidth=0.4, zorder=2)
+            ax2.plot(self.series.time, star.position_ξηζ.T[1] - self.position_ξηζ.T[1],
+                color=color, linewidth=0.4, zorder=2)
+            ax3.plot(self.series.time, star.position_ξηζ.T[0] - self.position_ξηζ.T[0],
+                color=color, linewidth=0.4, zorder=2)
+
+        # Title formatting
+        self.series.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            ax.set_title("xyz trajectories of stars in βPMG")
+
+        # Axes formatting
+        ax1.set_xlabel('Time (Myr)')
+        ax1.set_ylabel('$ζ\prime$ (pc)')
+        ax2.set_ylabel('$η\prime$ (pc)')
+        ax3.set_ylabel('$ξ\prime$ (pc)')
+
+        # Axes limits
+        ax1.set_xlim(np.min(self.series.time), np.max(self.series.time))
+
+        # Save figure
+        save_figure(self.name, f'Trajectory_time_ξηζ_{self.name}.pdf',
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
     def trajectory_xyz(self, title=True, forced=False, default=False, cancel=False):
-        """ Draw the XYZ trajectory of stars in the group over time. """
+        """ Draw the xyz trajectory of stars in the group over time. """
 
         # Figure initialization
         fig = plt.figure(figsize=(10, 9.5), facecolor='w')
@@ -1411,7 +1596,7 @@ class Output_Group():
         self.series.stop(type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
-            fig.suptitle("Trajectories ξηζ of stars in βPMG")
+            fig.suptitle("Trajectories xyz of stars in βPMG")
 
         # Save figure
         save_figure(self.name, f'Trajectory_xyz_{self.name}.pdf',
@@ -1589,14 +1774,14 @@ class Output_Group():
 
         # Scatter
         ax.scatter(
-            [star.position_xyz[step, i] for star in self.stars],
-            [star.position_xyz[step, j] for star in self.stars], marker='o', color='0.0')
+            [star.position_xyz[step, i] for star in self.sample],
+            [star.position_xyz[step, j] for star in self.sample], marker='o', color='0.0')
 
         # Error bars
         self.series.stop(type(errors) != bool, 'TypeError',
             "'error' must be a boolean ({} given).", type(errors))
         if errors:
-            for star in self.stars:
+            for star in self.sample:
                 position = star.position_xyz[step]
                 error = star.position_xyz_linear_error[step]
 
@@ -1614,7 +1799,7 @@ class Output_Group():
         self.series.stop(type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
         if labels:
-            for star in self.stars:
+            for star in self.sample:
                 ax.text(star.position_xyz[step, i] + 1, star.position_xyz[step, j] + 1, star.name,
                 horizontalalignment='left', fontsize=7)
 
@@ -1679,15 +1864,15 @@ class Output_Group():
 
         # Scatter
         ax.scatter(
-            [star.relative_position_xyz[step, 0] for star in self.stars],
-            [star.relative_position_xyz[step, 1] for star in self.stars],
-            [star.relative_position_xyz[step, 2] for star in self.stars], marker='o', color='0.0')
+            [star.relative_position_xyz[step, 0] for star in self.sample],
+            [star.relative_position_xyz[step, 1] for star in self.sample],
+            [star.relative_position_xyz[step, 2] for star in self.sample], marker='o', color='0.0')
 
         # Error bars
         self.series.stop(type(errors) != bool, 'TypeError',
             "'error' must be a boolean ({} given).", type(errors))
         if errors:
-            for star in self.stars:
+            for star in self.sample:
                 position = star.relative_position_xyz[step]
                 error = star.relative_position_xyz_error[step]
 
@@ -1710,7 +1895,7 @@ class Output_Group():
         self.series.stop(type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
         if labels:
-            for star in self.stars:
+            for star in self.sample:
                 ax.text(star.position_xyz[step, 0] + 2, star.position_xyz[step, 1] + 2,
                     star.position_xyz[step, 2] + 2, star.name, horizontalalignment='left', fontsize=7)
 
@@ -1833,8 +2018,8 @@ class Output_Group():
 
         # Star scatter
         ax.scatter(
-            [star.relative_position_xyz[step, i] for star in self.stars],
-            [star.relative_position_xyz[step, j] for star in self.stars],
+            [star.relative_position_xyz[step, i] for star in self.sample],
+            [star.relative_position_xyz[step, j] for star in self.sample],
             marker='o', s=8, color='k')
 
         # Outliers scatter
@@ -1896,9 +2081,9 @@ class Output_Group():
 
         # Star scatter
         ax.scatter(
-            [star.relative_position_xyz[step, 0] for star in self.stars],
-            [star.relative_position_xyz[step, 1] for star in self.stars],
-            [star.relative_position_xyz[step, 2] for star in self.stars], marker='o', color='0.0')
+            [star.relative_position_xyz[step, 0] for star in self.sample],
+            [star.relative_position_xyz[step, 1] for star in self.sample],
+            [star.relative_position_xyz[step, 2] for star in self.sample], marker='o', color='0.0')
 
         # Outlier scatter
         ax.scatter(
@@ -1979,14 +2164,14 @@ class Output_Group():
 
         # Scatter
         ax.scatter(
-            [star.position_xyz[step, i] for star in self.stars],
-            [star.velocity_xyz[step, j] for star in self.stars], marker='o', color='0.0')
+            [star.position_xyz[step, i] for star in self.sample],
+            [star.velocity_xyz[step, j] for star in self.sample], marker='o', color='0.0')
 
         # Error bars
         self.series.stop(type(errors) != bool, 'TypeError',
             "'error' must be a boolean ({} given).", type(errors))
         if errors:
-            for star in self.stars:
+            for star in self.sample:
                 position = star.position_xyz[step]
                 position_error = star.position_xyz_linear_error[step]
                 velocity = star.velocity_xyz[step]
@@ -2008,7 +2193,7 @@ class Output_Group():
         self.series.stop(type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
         if labels:
-            for star in self.stars:
+            for star in self.sample:
                 ax.text(star.position_xyz[step, i] + 1, star.velocity_xyz[step, j] + 1, star.name,
                 horizontalalignment='left', fontsize=7)
 

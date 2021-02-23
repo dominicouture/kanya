@@ -829,6 +829,7 @@ class Series(list, Output_Series):
             # Initialization
             self.series = series
             self.name = indicator.name
+            self.verbose_name = indicator.verbose_name
             self.valid = indicator.valid
 
             # Indicator for stars from data
@@ -866,6 +867,10 @@ class Series(list, Output_Series):
                         else np.expand_dims(vars(self.series[0])[self.name].minima, axis=0))
                 self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
                 self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
+
+                # Age age_offset based on simulation
+                self.age_offset = self.series.age_offset[self.name]
+                self.age_ajusted = self.age + self.age_offset
 
             # Average indicator for stars from a model
             elif self.series.from_model:
@@ -906,10 +911,14 @@ class Series(list, Output_Series):
                 self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
                 self.min_error_quad = np.atleast_1d((self.min_int_error**2 + self.min_ext_error**2)**0.5)
 
+                # Age age_offset based on simulation
+                self.age_offset = self.series.age_offset[self.name]
+                self.age_ajusted = self.age
+
             # Minimum change
             self.min_change = (self.min / self.value[0] - 1.) * 100.
 
-            # Add indicator to the series
+            # Add the indicator to the series
             vars(self.series)[self.name] = self
             self.series.indicators.append(self)
 
@@ -987,6 +996,46 @@ class Series(list, Output_Series):
 
             # Logging
             log("'{}' series succesfully traced back.", self.name, logging=logging)
+
+            # Temporary age offset dictionary
+            self.age_offset = {
+                'mad_xyz': np.array([1.0, 1.0, 1.0]),
+                'mad_xyz_total': np.array([1.0]),
+                'mad_ξηζ': np.array([1.0, 1.0, 1.0]),
+                'mad_ξηζ_total': np.array([1.0]),
+                'covariances_xyz': np.array([1.0, 1.0, 1.0]),
+                'covariances_xyz_matrix_det': np.array([1.0]),
+                'covariances_xyz_matrix_trace': np.array([1.0]),
+                'cross_covariances_xyz': np.array([1.0, 1.0, 1.0]),
+                'cross_covariances_xyz_matrix_det': np.array([1.0]),
+                'cross_covariances_xyz_matrix_trace': np.array([1.0]),
+                'covariances_ξηζ': np.array([1.0, 1.0, 1.0]),
+                'covariances_ξηζ_matrix_det': np.array([1.0]),
+                'covariances_ξηζ_matrix_trace': np.array([1.0]),
+                'cross_covariances_ξηζ': np.array([1.0, 1.0, 1.0]),
+                'cross_covariances_ξηζ_matrix_det': np.array([1.0]),
+                'cross_covariances_ξηζ_matrix_trace': np.array([1.0]),
+                'covariances_xyz_robust': np.array([1.0, 1.0, 1.0]),
+                'covariances_xyz_robust_matrix_det': np.array([1.0]),
+                'covariances_xyz_robust_matrix_trace': np.array([1.0]),
+                'cross_covariances_xyz_robust': np.array([1.0, 1.0, 1.0]),
+                'cross_covariances_xyz_robust_matrix_det': np.array([1.0]),
+                'cross_covariances_xyz_robust_matrix_trace': np.array([1.0]),
+                'covariances_ξηζ_robust': np.array([1.0, 1.0, 1.0]),
+                'covariances_ξηζ_robust_matrix_det': np.array([1.0]),
+                'covariances_ξηζ_robust_matrix_trace': np.array([1.0]),
+                'cross_covariances_ξηζ_robust': np.array([1.0, 1.0, 1.0]),
+                'cross_covariances_ξηζ_robust_matrix_det': np.array([1.0]),
+                'cross_covariances_ξηζ_robust_matrix_trace': np.array([1.0]),
+                'covariances_ξηζ_sklearn': np.array([1.0, 1.0, 1.0]),
+                'covariances_ξηζ_sklearn_matrix_det': np.array([1.0]),
+                'covariances_ξηζ_sklearn_matrix_trace': np.array([1.0]),
+                'mst_xyz_mean': np.array([1.0]),
+                'mst_ξηζ_mean': np.array([1.0]),
+                'mst_xyz_mean_robust': np.array([1.0]),
+                'mst_ξηζ_mean_robust': np.array([1.0]),
+                'mst_xyz_mad': np.array([1.0]),
+                'mst_ξηζ_mad': np.array([1.0])}
 
             # Average age indicators
             self.indicators = []

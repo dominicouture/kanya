@@ -76,8 +76,7 @@ class Group(list, Output_Group):
 
         # Radial velocity offset due to gravitational redshift
         for star in self.series.data:
-            # rv_offset = self.series.rv_offset.value
-            rv_offset = star.rv_offset if star.rv_offset is not None else self.series.rv_offset.value
+            print(star.name, star.rv_offset)
 
             # Observables conversion into equatorial spherical coordinates
             if self.series.data.data.system.name == 'observables':
@@ -90,8 +89,9 @@ class Group(list, Output_Group):
                         np.random.normal(star.velocity.values, star.velocity.errors)),
                     *star.position.errors, *star.velocity.errors)
 
-                # Apply radial velocity offset
-                velocity_rδα += np.array([rv_offset, 0., 0.])
+                # Apply radial velocity offset and error
+                velocity_rδα += np.array([star.rv_offset.value, 0., 0.])
+                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_offset.error**2)**0.5
 
                 # Compute equatorial xyz position and velocity
                 position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
@@ -202,52 +202,52 @@ class Group(list, Output_Group):
             outliers, an error is raised.
         """
 
-        # Create core, stars and outliers lists
-        self.core = list(filter(lambda star: star.core, self))
-        self.stars = list(filter(lambda star: not star.outlier, self))
+        # Create sample, subsample and outliers lists
+        self.subsample = list(filter(lambda star: star.subsample, self))
+        self.sample = list(filter(lambda star: not star.outlier, self))
         self.outliers =list(filter(lambda star: star.outlier, self))
 
         # Number of remaining stars, excluding outliers
-        self.numbre_in_core = len(self.core)
-        self.number_of_stars = len(self.stars)
+        self.number_in_subsample = len(self.subsample)
+        self.sample_size = len(self.sample)
         self.number_of_outliers = len(self.outliers)
 
         # Average position, excluding outliers
-        self.position_xyz = np.mean([star.position_xyz for star in self.stars], axis=0)
+        self.position_xyz = np.mean([star.position_xyz for star in self.sample], axis=0)
 
         # Average linear position and errors, excluding outliers
         self.position_xyz_linear = np.mean(
-            np.array([star.position_xyz_linear for star in self.stars]), axis=0)
+            np.array([star.position_xyz_linear for star in self.sample]), axis=0)
         self.position_xyz_linear_error = np.sum(
-            np.array([star.position_xyz_linear_error for star in self.stars])**2,
-            axis=0)**0.5 / self.number_of_stars
+            np.array([star.position_xyz_linear_error for star in self.sample])**2,
+            axis=0)**0.5 / self.sample_size
 
         # Average ξηζ position, excluding outliers
-        self.position_ξηζ = np.mean([star.position_ξηζ for star in self.stars], axis=0)
+        self.position_ξηζ = np.mean([star.position_ξηζ for star in self.sample], axis=0)
 
         # Average velocity, excluding outliers
-        self.velocity_xyz = np.mean([star.velocity_xyz for star in self.stars], axis=0)
+        self.velocity_xyz = np.mean([star.velocity_xyz for star in self.sample], axis=0)
 
         # Average linear velocity and errors, excluding outliers
-        self.velocity_xyz_linear = np.mean([star.velocity_xyz_linear for star in self.stars], axis=0)
+        self.velocity_xyz_linear = np.mean([star.velocity_xyz_linear for star in self.sample], axis=0)
         self.velocity_xyz_linear_error = np.sum(np.array(
-            [star.velocity_xyz_linear_error for star in self.stars])**2, axis=0)**0.5 / self.number_of_stars
+            [star.velocity_xyz_linear_error for star in self.sample])**2, axis=0)**0.5 / self.sample_size
 
         # Average ξηζ velocity, excluding outliers
-        self.velocity_ξηζ = np.mean([star.velocity_ξηζ for star in self.stars], axis=0)
+        self.velocity_ξηζ = np.mean([star.velocity_ξηζ for star in self.sample], axis=0)
 
         # Stars relative position and velocity, distance and speed, including outliers
         for star in self:
             star.get_relative_coordinates()
 
         # ξηζ position and velocity scatters for outlier filtering
-        self.scatter_ξηζ = np.std([star.position_ξηζ for star in self.stars], axis=0)
-        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.stars], axis=0)
+        self.scatter_ξηζ = np.std([star.position_ξηζ for star in self.sample], axis=0)
+        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.sample], axis=0)
 
     def filter_outliers(self):
         """ Filters outliers from the data based on ξηζ position and velocity scatter over time.
-            Next, a core sample is determined based on a robust covariance matrix estimator using
-            the scikit-learn (Sklearn) Python package.
+            Next, a core subsample is determined based on a robust covariance matrix estimator
+            using the scikit-learn (Sklearn) Python package.
         """
 
         # Filter outliers for the first group
@@ -258,11 +258,11 @@ class Group(list, Output_Group):
 
             # Iteratively validate stars coordinates
             outliers = True
-            while outliers and len(self.stars) > int(0.8 * self.series.number_of_stars):
+            while outliers and len(self.sample) > int(0.8 * self.series.number_of_stars):
 
                 # Remove stars beyond the σ cutoff of the average position or velocity
                 outliers = False
-                for star in self.stars:
+                for star in self.sample:
                     position_outlier = (np.abs(star.relative_position_ξηζ)
                         > (self.scatter_ξηζ * self.series.cutoff)).any()
                     velocity_outlier = (np.abs(star.relative_velocity_ξηζ)
@@ -286,37 +286,37 @@ class Group(list, Output_Group):
             else:
                 print(f'No outliers found in {self.series.name}.')
 
-            # Robust covariance matrix and support fraction
-            a = np.array([star.position_ξηζ for star in self.stars])
-            a = np.swapaxes(a, 0, 1)
-            robust_covariance_matrix = []
-            support_fraction = []
+            # # Robust covariance matrix and support fraction
+            # a = np.array([star.position_ξηζ for star in self.sample])
+            # a = np.swapaxes(a, 0, 1)
+            # robust_covariance_matrix = []
+            # support_fraction = []
+            #
+            # # Iteration over time
+            # for i in range(a.shape[0]):
+            #     b = MinCovDet(assume_centered=False).fit(a[i])
+            #     # print(i, b[i].shape, b.support_.size, b.support_.nonzero()[0].size, b.dist_.size)
+            #     robust_covariance_matrix.append(b.covariance_)
+            #     support_fraction.append(b.support_)
+            #
+            # # Array conversion
+            # robust_covariance_matrix = np.array(robust_covariance_matrix)
+            # support_fraction = np.array(support_fraction)
+            # support_fraction_all = np.sum(support_fraction, axis=0) / self.series.number_of_steps > 0.7
+            #
+            # # Core creation
+            # for i in range(self.sample_size):
+            #     if support_fraction_all[i]:
+            #         self.sample[i].subsample = True
+            #     else:
+            #         self.sample[i].subsample = False
+            #         self.sample[i].outlier = True
+            #         print(self.sample[i].name)
+            #
+            # # Temporary reasignment of subsample to stars
+            # self.get_stars_coordinates()
 
-            # Iteration over time
-            for i in range(a.shape[0]):
-                b = MinCovDet(assume_centered=False).fit(a[i])
-                # print(i, b[i].shape, b.support_.size, b.support_.nonzero()[0].size, b.dist_.size)
-                robust_covariance_matrix.append(b.covariance_)
-                support_fraction.append(b.support_)
-
-            # Array conversion
-            robust_covariance_matrix = np.array(robust_covariance_matrix)
-            support_fraction = np.array(support_fraction)
-            support_fraction_all = np.sum(support_fraction, axis=0) / self.series.number_of_steps > 0.7
-
-            # Core creation
-            for i in range(self.number_of_stars):
-                if support_fraction_all[i]:
-                    self.stars[i].core = True
-                else:
-                    self.stars[i].core = False
-                    self.stars[i].outlier = True
-                    print(self.stars[i].name)
-
-            # Temporary reasignment of core to stars
-            self.get_stars_coordinates()
-
-        # Use the same outliers and core as the first group for other groups
+        # Use the same outliers, sample and subsample as the first group for other groups
         else:
             outliers = [star.name for star in self.series[0].outliers]
             for star in filter(lambda star: star.name in outliers, self):
@@ -324,6 +324,34 @@ class Group(list, Output_Group):
 
             # Compute valid stars coordinates
             self.get_stars_coordinates()
+
+        # Covariance matrix
+        # a = np.array([star.position_xyz for star in self.sample]) - self.position_xyz
+        # a = np.tile(a.T, (a.shape[-1], 1, 1, 1))
+        # b = np.swapaxes(a, 0, 1)
+        # covariance_matrix = np.mean(a * b, axis=3).T
+        # eigen_values, eigen_vectors = np.linalg.eig(covariance_matrix)
+        # R = np.linalg.inv(eigen_vectors)
+
+        # for star in self:
+            # np.squeeze(np.matmul(np.swapaxes(R, 1, 2), np.expand_dims(star.position_xyz, axis=2)))
+            # star.position_xyz = np.squeeze(np.matmul(np.expand_dims(star.position_xyz, axis=1), R))
+
+        self.get_stars_coordinates()
+
+        # self.Indicator(self, 'eigen_values', np.repeat(np.expand_dims(
+        #     np.sum(eigen_values**2, axis=1)**0.5, axis=0),
+        #     self.series.jack_knife_number, axis=0), valid=True)
+
+        # Compute Mahalanobis distance
+        self.positions_xyz = np.expand_dims(np.array([
+            star.position_xyz for star in self.sample]), axis=1)
+        self.sample_size_jack_knife = 1
+        self.Mahalanobis_xyz = self.get_Mahalanobis_distance('positions_xyz')
+        self.weights = np.exp(-1 * self.Mahalanobis_xyz)
+
+        for i in range(len(self.sample)):
+            self.sample[i].weight = self.weights[i]
 
     def set_indicators(self):
         """ Sets the parameters to compute age indicators including Jack-Knife Monte-Carlo. """
@@ -333,39 +361,54 @@ class Group(list, Output_Group):
 
         # Select stars for Jack-Knife Monte-Carlo for the first group
         if self.number == 0:
-            self.number_of_stars_jack_knife = int(self.number_of_stars * self.series.jack_knife_fraction)
-            self.stars_monte_carlo = np.array([np.random.choice(self.number_of_stars,
-                self.number_of_stars_jack_knife, replace=False)
+            self.sample_size_jack_knife = int(self.sample_size * self.series.jack_knife_fraction)
+            self.stars_monte_carlo = np.array([np.random.choice(self.sample_size,
+                self.sample_size_jack_knife, replace=False)
                     for i in range(self.series.jack_knife_number)])
 
         # Use the same stars for Jack-Knife Monte-Carlo as the first group for other groups
         else:
-            self.number_of_stars_jack_knife = self.series[0].number_of_stars_jack_knife
+            self.sample_size_jack_knife = self.series[0].sample_size_jack_knife
             self.stars_monte_carlo = self.series[0].stars_monte_carlo
 
         # Create selected stars xyz and ξηζ positions and velocities arrays
         self.positions_xyz = np.array([
-            star.position_xyz for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
+            star.position_xyz for star in self.sample])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
         self.positions_ξηζ = np.array([
-            star.position_ξηζ for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
+            star.position_ξηζ for star in self.sample])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
         self.velocities_xyz = np.array([
-            star.velocity_xyz for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
+            star.velocity_xyz for star in self.sample])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
         self.velocities_ξηζ = np.array([
-            star.velocity_ξηζ for star in self.stars])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
+            star.velocity_ξηζ for star in self.sample])[self.stars_monte_carlo,:,:].swapaxes(0, 1)
+
+        # def cov_matrix(positions, velocities):
+        #     a = positions - np.mean(positions, axis=0)
+        #     a = np.tile(a.T, (a.shape[-1], 1, 1, 1, 1))
+        #     b = np.swapaxes(a, 0, 1)
+        #     covariance_matrix = np.mean(a * b, axis=4).T
+        #     eigen_values, eigen_vectors = np.linalg.eig(covariance_matrix)
+        #     R = np.linalg.inv(eigen_vectors)
+        #
+        #     return (np.squeeze(np.matmul(np.expand_dims(positions, axis=3), np.expand_dims(R, axis=0))),
+        #         np.squeeze(np.matmul(np.expand_dims(velocities, axis=3), np.expand_dims(R, axis=0))))
+
+        # self.positions_xyz, self.velocities_xyz = cov_matrix(self.positions_xyz, self.velocities_xyz)
+        # self.positions_ξηζ, self.velocities_ξηζ = cov_matrix(self.positions_ξηζ, self.velocities_ξηζ)
 
     class Indicator():
         """ Age indicator including its values, age at minimum and minimum. Computes errors on
             values, age and minium using a Jack-Knife Monte-Carlo method.
         """
 
-        def __init__(self, group, name, values, valid=True):
+        def __init__(self, group, name, values, verbose_name, valid=True):
             """ Initializes an age indicator. """
 
             # Initialization
             self.group = group
             self.name = name
             self.values = values
-            self.valid = valid
+            self.verbose_name = np.atleast_1d(verbose_name)
+            self.valid = np.atleast_1d(valid)
 
             # Average values
             self.value = np.atleast_1d(np.mean(self.values, axis=0))
@@ -393,19 +436,19 @@ class Group(list, Output_Group):
         """
 
         # xyz position scatter
-        self.Indicator(self, 'scatter_xyz', np.std(self.positions_xyz, axis=0), valid=False)
-        self.Indicator(self, 'scatter_xyz_total', np.sum(self.scatter_xyz.values**2, axis=2)**0.5, valid=False)
+        # self.Indicator(self, 'scatter_xyz', np.std(self.positions_xyz, axis=0), valid=False)
+        # self.Indicator(self, 'scatter_xyz_total', np.sum(self.scatter_xyz.values**2, axis=2)**0.5, valid=False)
 
         # ξηζ position scatter
-        self.Indicator(self, 'scatter_ξηζ', np.std(self.positions_ξηζ, axis=0), valid=False)
-        self.Indicator(self, 'scatter_ξηζ_total', np.sum(self.scatter_ξηζ.values**2, axis=2)**0.5, valid=False)
+        # self.Indicator(self, 'scatter_ξηζ', np.std(self.positions_ξηζ, axis=0), valid=False)
+        # self.Indicator(self, 'scatter_ξηζ_total', np.sum(self.scatter_ξηζ.values**2, axis=2)**0.5, valid=False)
 
         # xyz velocity scatter
-        self.scatter_velocity_xyz = np.std([star.velocity_xyz for star in self.stars], axis=0)
+        self.scatter_velocity_xyz = np.std([star.velocity_xyz for star in self.sample], axis=0)
         self.scatter_velocity_xyz_total = np.sum(self.velocity_xyz**2, axis=0)**0.5
 
         # ξηζ velocity scatter
-        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.stars], axis=0)
+        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.sample], axis=0)
         self.scatter_velocity_ξηζ_total = np.sum(self.velocity_ξηζ**2, axis=0)**0.5
 
     def get_median_absolute_deviation(self):
@@ -416,13 +459,17 @@ class Group(list, Output_Group):
 
         # xyz median absolute deviation age
         self.Indicator(self, 'mad_xyz',
-            np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0), valid=False)
-        self.Indicator(self, 'mad_xyz_total', np.sum(self.mad_xyz.values**2, axis=2)**0.5, valid=False)
+            np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0),
+            np.array(['X MAD', 'Y MAD', 'Z MAD']), valid=np.full(3, False))
+        self.Indicator(self, 'mad_xyz_total', np.sum(self.mad_xyz.values**2, axis=2)**0.5,
+            'Total XYZ MAD', valid=False)
 
         # ξηζ median absolute deviation age
         self.Indicator(self, 'mad_ξηζ',
-            np.median(np.abs(self.positions_ξηζ - np.median(self.positions_ξηζ, axis=0)), axis=0))
-        self.Indicator(self, 'mad_ξηζ_total', np.sum(self.mad_ξηζ.values**2, axis=2)**0.5)
+            np.median(np.abs(self.positions_ξηζ - np.median(self.positions_ξηζ, axis=0)), axis=0),
+            np.array(['ξ MAD', 'η MAD', 'ζ MAD']), valid=np.full(3, False))
+        self.Indicator(self, 'mad_ξηζ_total', np.sum(self.mad_ξηζ.values**2, axis=2)**0.5,
+            'Total ξηζ MAD', valid=False)
 
     def get_covariances(self):
         """ Computes the xyz and ξηζ position covariance matrices, and xyz and ξηζ position and
@@ -432,19 +479,31 @@ class Group(list, Output_Group):
 
         # xyz position covariance matrix, determinant and trace ages
         self.covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz')
-        self.get_covariance_indicators(self.covariances_xyz_matrix, 'covariances_xyz', valid=False)
+        self.get_covariance_indicators(self.covariances_xyz_matrix, 'covariances_xyz',
+            [np.array(['X Variance', 'Y Variance', 'Z Variance']),
+                'XYZ Covariance Matrix Determinant','XYZ Covariance Matrix Trace'],
+             valid=[np.array([True, False, False]), False, False])
 
         # xyz position and velocity cross covariance matrix, determinant and trace ages
         self.cross_covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz', 'velocities_xyz')
-        self.get_covariance_indicators(self.cross_covariances_xyz_matrix, 'cross_covariances_xyz', valid=False)
+        self.get_covariance_indicators(self.cross_covariances_xyz_matrix, 'cross_covariances_xyz',
+            [np.array(['X-U Cross Covariance', 'Y-V Cross Covariance', 'Z-W Cross Covariance']),
+                'XYZ Cross Covariance Matrix Determinant','XYZ Cross Covariance Matrix Trace'],
+            valid=[np.array([False, False, False]), False, False])
 
         # ξηζ position covariance matrix, determinant and trace ages
         self.covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ')
-        self.get_covariance_indicators(self.covariances_ξηζ_matrix, 'covariances_ξηζ')
+        self.get_covariance_indicators(self.covariances_ξηζ_matrix, 'covariances_ξηζ',
+            [np.array(['ξ Variance', 'η Variance', 'ζ Variance']),
+                'ξηζ Covariance Matrix Determinant','ξηζ Covariance Matrix Trace'],
+            valid=[np.array([True, False, False]), False, False])
 
         # ξηζ position and velocity cross covariance matrix, determinant and trace ages
         self.cross_covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ', 'velocities_ξηζ')
-        self.get_covariance_indicators(self.cross_covariances_ξηζ_matrix, 'cross_covariances_ξηζ')
+        self.get_covariance_indicators(self.cross_covariances_ξηζ_matrix, 'cross_covariances_ξηζ',
+            [np.array(['ξ-vξ Cross Covariance', 'η-vη Cross Covariance', 'ζ-vζ Cross Covariance']),
+                'ξηζ Cross Covariance Matrix Determinant','ξηζ Cross covariance Matrix Trace'],
+            valid=[np.array([False, False, False]), False, False])
 
     def get_covariances_robust(self):
         """ Computes the xyz and ξηζ position robust covariance matrices, and xyz and ξηζ position
@@ -459,32 +518,46 @@ class Group(list, Output_Group):
             'positions_xyz', covariance_matrix=self.covariances_xyz_matrix)
         self.covariances_xyz_robust_matrix = self.get_covariance_matrix(
             'positions_xyz', robust=True, Mahalanobis_distance=self.Mahalanobis_xyz)
-        self.get_covariance_indicators(self.covariances_xyz_robust_matrix, 'covariances_xyz_robust')
+        self.get_covariance_indicators(self.covariances_xyz_robust_matrix, 'covariances_xyz_robust',
+            [np.array(['X Variance (robust)', 'Y Variance (robust)', 'Z Variance (robust)']),
+                'XYZ Covariance Matrix Determinant (robust)','XYZ Covariance Matrix Trace (robust)'],
+            valid=[np.array([True, False, False]), False, False])
 
         # xyz position and velocity robust cross covariance matrix and determinant ages
         self.Mahalanobis_cross_xyz = self.get_Mahalanobis_distance(
             'positions_xyz', 'velocities_xyz', covariance_matrix=self.cross_covariances_xyz_matrix)
         self.cross_covariances_xyz_robust_matrix = self.get_covariance_matrix(
             'positions_xyz', 'velocities_xyz', robust=True,
-            Mahalanobis_distance=self.Mahalanobis_cross_xyz)
-        # self.get_covariance_indicators(self.cross_covariances_xyz_robust_matrix,
-        #     'cross_covariances_xyz_robust')
+            Mahalanobis_distance=self.Mahalanobis_xyz)
+        self.get_covariance_indicators(self.cross_covariances_xyz_robust_matrix,
+            'cross_covariances_xyz_robust', [np.array(['X-U Cross Covariance (robust)',
+                    'Y-V Cross Covariance (robust)', 'Z-W Cross Covariance (robust)']),
+                'XYZ Cross Covariance Matrix Determinant (robust)',
+                'XYZ Cross Covariance Matrix Trace (robust)'],
+            valid=[np.array([False, False, False]), False, False])
 
         # ξηζ position robust covariance matrix, determinant and trace ages
         self.Mahalanobis_ξηζ = self.get_Mahalanobis_distance(
             'positions_ξηζ', covariance_matrix=self.covariances_ξηζ_matrix)
         self.covariances_ξηζ_robust_matrix = self.get_covariance_matrix(
             'positions_ξηζ', robust=True, Mahalanobis_distance=self.Mahalanobis_ξηζ)
-        self.get_covariance_indicators(self.covariances_ξηζ_robust_matrix, 'covariances_ξηζ_robust')
+        self.get_covariance_indicators(self.covariances_ξηζ_robust_matrix, 'covariances_ξηζ_robust',
+            [np.array(['ξ Variance (robust)', 'η Variance (robust)', 'ζ Variance (robust)']),
+                'ξηζ Covariance Matrix Determinant (robust)','ξηζ Covariance Matrix Trace (robust)'],
+            valid=[np.array([True, False, False]), False, False])
 
         # ξηζ position and velocity robust cross covariance matrix and determinant ages
         self.Mahalanobis_cross_ξηζ = self.get_Mahalanobis_distance(
             'positions_ξηζ', 'velocities_ξηζ', covariance_matrix=self.cross_covariances_ξηζ_matrix)
         self.cross_covariances_ξηζ_robust_matrix = self.get_covariance_matrix(
             'positions_ξηζ', 'velocities_ξηζ', robust=True,
-            Mahalanobis_distance=self.Mahalanobis_cross_ξηζ)
-        # self.get_covariance_indicators(self.cross_covariances_ξηζ_robust_matrix,
-        #     'cross_covariances_ξηζ_robust')
+            Mahalanobis_distance=self.Mahalanobis_ξηζ)
+        self.get_covariance_indicators(self.cross_covariances_ξηζ_robust_matrix,
+            'cross_covariances_ξηζ_robust', [np.array(['ξ-vξ Cross Covariance (robust)',
+                    'η-vη Cross Covariance (robust)', 'ζ-vζ Cross Covariance (robust)']),
+                'ξηζ Cross Covariance Matrix Determinant (robust)',
+                'ξηζ Cross Covariance Matrix Trace (robust)'],
+            valid=[np.array([False, False, False]), False, False])
 
     def get_covariances_sklearn(self):
         """ Computes the ξηζ position covariance matrix using the sklearn package. The age of the
@@ -497,7 +570,7 @@ class Group(list, Output_Group):
 
             # Initialization
             from sklearn.covariance import MinCovDet
-            a = np.array([vars(star)[a] for star in self.stars])
+            a = np.array([vars(star)[a] for star in self.sample])
             a = np.swapaxes(a, 0, 1)
 
             # sklearn covariance matrix
@@ -511,14 +584,18 @@ class Group(list, Output_Group):
         # ξηζ position covariance matrix with SKlearn, determinant and trace ages
         self.covariances_ξηζ_sklearn_matrix = get_covariance_sklearn_matrix('position_ξηζ')
         self.Indicator(self, 'covariances_ξηζ_sklearn', np.repeat(np.expand_dims(
-            np.abs(self.covariances_ξηζ_sklearn_matrix[:, (0, 1, 2), (0, 1, 2)])**0.5, axis=0),
-                self.series.jack_knife_number, axis=0))
+                np.abs(self.covariances_ξηζ_sklearn_matrix[:, (0, 1, 2), (0, 1, 2)])**0.5, axis=0),
+                    self.series.jack_knife_number, axis=0),
+            np.array(['ξ Variance (sklearn)', 'η Variance (sklearn)', 'ζ Variance (sklearn)']),
+            valid=np.array([False, False, False]))
         self.Indicator(self, 'covariances_ξηζ_sklearn_matrix_det', np.repeat(np.expand_dims(
-            np.abs(np.linalg.det(self.covariances_ξηζ_sklearn_matrix))**(1/6), axis=0),
-                self.series.jack_knife_number, axis=0))
+                np.abs(np.linalg.det(self.covariances_ξηζ_sklearn_matrix))**(1/6), axis=0),
+                    self.series.jack_knife_number, axis=0),
+            'ξηζ Covariance Matrix Determinant (sklearn)', valid=False)
         self.Indicator(self, 'covariances_ξηζ_sklearn_matrix_trace', np.repeat(np.expand_dims(
-            np.abs(np.trace(self.covariances_ξηζ_sklearn_matrix, axis1=1, axis2=2) / 3)**0.5, axis=0),
-                self.series.jack_knife_number, axis=0))
+                np.abs(np.trace(self.covariances_ξηζ_sklearn_matrix, axis1=1, axis2=2) / 3)**0.5, axis=0),
+                    self.series.jack_knife_number, axis=0),
+            'ξηζ Covariance Matrix Trace (sklearn)', valid=False)
 
     def get_covariance_matrix(self, a, b=None, robust=False, Mahalanobis_distance=None):
         """ Computes the robust covariance matrix with variable weights of a Star parameter, 'a',
@@ -536,10 +613,6 @@ class Group(list, Output_Group):
             # Compute weights
             weights = np.exp(-2 * Mahalanobis_distance)
             weights = np.tile(weights.T, (weights.shape[-1], 1, 1, 1, 1))
-
-            print(np.min(Mahalanobis_distance), np.max(Mahalanobis_distance))
-            print(np.min(weights), np.max(weights))
-            print(Mahalanobis_distance.shape)
 
         # Covariance matrix
         a = vars(self)[a] - np.mean(vars(self)[a], axis=0)
@@ -566,33 +639,42 @@ class Group(list, Output_Group):
             covariance_matrix = self.get_covariance_matrix(a, b)
         covariances_matrix_invert = np.repeat(
             np.expand_dims(np.squeeze(np.linalg.inv(covariance_matrix)), axis=0),
-            self.number_of_stars_jack_knife, axis=0)
+            self.sample_size_jack_knife, axis=0)
 
         # Compute Mahalanobis distances
         if b is None:
             b = a
-        c = (np.expand_dims(vars(self)[a] - np.mean(vars(self)[a], axis=0), axis=4) +
-            np.expand_dims(vars(self)[b] - np.mean(vars(self)[b], axis=0), axis=4)) / 2
+        c = np.expand_dims(vars(self)[a] - np.mean(vars(self)[a], axis=0), axis=4)
+        # d = np.expand_dims(vars(self)[b] - np.mean(vars(self)[b], axis=0), axis=4)
+        # d = c
+        # c = (np.expand_dims(vars(self)[a] - np.mean(vars(self)[a], axis=0), axis=4) +
+        #     np.expand_dims(vars(self)[b] - np.mean(vars(self)[b], axis=0), axis=4)) / 2
 
         return np.sqrt(np.abs(np.squeeze(np.matmul(
             np.swapaxes(c, 3, 4), np.matmul(covariances_matrix_invert, c)))))
 
-    def get_covariance_indicators(self, covariance_matrix, indicator, valid=True):
+    def get_covariance_indicators(self, covariance_matrix, indicator, verbose_names, valid=True):
         """ Computes the covariances, and the determinant and trace of the covariance matrix for
             a given covariance matrix and indicator.
         """
 
+        if type(valid) == bool:
+            valid = np.full(3, valid)
+
         # Covariances
         self.Indicator(self, indicator,
-            np.abs(covariance_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5, valid=valid)
+            np.abs(covariance_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5,
+            verbose_names[0], valid=valid[0])
 
         # Covariance matrix determinant
         self.Indicator(self, f'{indicator}_matrix_det',
-            np.abs(np.linalg.det(covariance_matrix))**(1/6), valid=valid)
+            np.abs(np.linalg.det(covariance_matrix))**(1/6),
+            verbose_names[1], valid=valid[1])
 
         # Covariance matrix trace
         self.Indicator(self, f'{indicator}_matrix_trace',
-            np.abs(np.trace(covariance_matrix, axis1=2, axis2=3) / 3)**0.5, valid=valid)
+            np.abs(np.trace(covariance_matrix, axis1=2, axis2=3) / 3)**0.5,
+            verbose_names[2], valid=valid[2])
 
     def get_minimum_spanning_tree(self):
         """ Builds the minimum spanning tree (MST) of a group for all timesteps using a Kruskal
@@ -601,26 +683,64 @@ class Group(list, Output_Group):
             the time at which these value are minimal.
         """
 
-        # Branches creation
+        # Branches initialization
         self.branches = []
-        self.number_of_branches = self.number_of_stars - 1
+        self.number_of_branches = self.sample_size - 1
         for start in range(self.number_of_branches):
             for end in range(start + 1, self.number_of_branches + 1):
-                self.branches.append(self.Branch(self.stars[start], self.stars[end]))
+                self.branches.append(self.Branch(self.sample[start], self.sample[end]))
 
-        # Minimum spanning tree initialization
-        self.mst = np.empty(
-            (self.series.number_of_steps, self.number_of_branches), dtype=object)
-        self.mst_lengths = np.zeros(self.mst.shape)
+        # Create minimum spanning tree
+        self.mst_xyz, self.mst_xyz_lengths, self.mst_xyz_weights = self.get_branches('length_xyz')
+        self.mst_ξηζ, self.mst_ξηζ_lengths, self.mst_ξηζ_weights = self.get_branches('length_ξηζ')
+
+        # Jack-knife Monte Carlo branch lengths
+        sample_size_jack_knife = int(self.number_of_branches * self.series.jack_knife_fraction)
+        branches_monte_carlo = np.array([np.random.choice(
+            self.number_of_branches, sample_size_jack_knife, replace=False)
+                for i in range(self.series.jack_knife_number)])
+        mst_xyz_lengths = self.mst_xyz_lengths.T[branches_monte_carlo].swapaxes(0, 1)
+        mst_xyz_weights = self.mst_xyz_weights.T[branches_monte_carlo].swapaxes(0, 1)
+        mst_ξηζ_lengths = self.mst_ξηζ_lengths.T[branches_monte_carlo].swapaxes(0, 1)
+        mst_ξηζ_weights = self.mst_ξηζ_weights.T[branches_monte_carlo].swapaxes(0, 1)
+
+        # Minimum spanning tree average branch length age
+        self.Indicator(self, 'mst_xyz_mean', np.mean(mst_xyz_lengths, axis=0),
+            'XYZ MST Mean', valid=False)
+        self.Indicator(self, 'mst_ξηζ_mean', np.mean(mst_ξηζ_lengths, axis=0),
+            'ξηζ MST Mean', valid=False)
+
+        # Robust minimum spanning tree average branch length age
+        self.Indicator(self, 'mst_xyz_mean_robust',
+            np.average(mst_xyz_lengths, weights=mst_xyz_weights, axis=0),
+            'XYZ MST Mean (robust)', valid=False)
+        self.Indicator(self, 'mst_ξηζ_mean_robust',
+            np.average(mst_ξηζ_lengths, weights=mst_ξηζ_weights, axis=0),
+            'ξηζ MST Mean (robust)', valid=False)
+
+        # Minimum spanning tree branch length median absolute deviation age
+        self.Indicator(self, 'mst_xyz_mad',
+            np.median(np.abs(mst_xyz_lengths - np.median(mst_xyz_lengths, axis=0)), axis=0),
+            'XYZ MST MAD', valid=False)
+        self.Indicator(self, 'mst_ξηζ_mad',
+            np.median(np.abs(mst_ξηζ_lengths - np.median(mst_ξηζ_lengths, axis=0)), axis=0),
+            'ξηζ MST MAD', valid=False)
+
+    def get_branches(self, length):
+        """ Computes the branches, lengths and weights of a minimum spanning tree. """
+
+        mst = np.empty((self.series.number_of_steps, self.number_of_branches), dtype=object)
+        mst_lengths = np.zeros(mst.shape)
+        mst_weights = np.zeros(mst.shape)
 
         # Minimum spanning tree computation for every timestep
         for step in range(self.series.number_of_steps):
 
             # Sort by length
-            self.branches.sort(key = lambda branch: branch.length[step])
+            self.branches.sort(key=lambda branch: vars(branch)[length][step])
 
             # Nodes, tree and branch number initialization
-            for star in self.stars:
+            for star in self.sample:
                 star.node = self.Node()
             i = 0
             j = 0
@@ -637,24 +757,16 @@ class Group(list, Output_Group):
                 # Branch confirmation if both stars have different parent nodes
                 if branch.start.node != branch.end.node:
                     branch.start.node.parent = branch.end.node.parent = self.Node()
-                    self.mst[step, j] = branch
+                    mst[step, j] = branch
                     j += 1
 
             # Minimum spanning tree branches length
-            self.mst_lengths[step] = np.vectorize(
-                lambda branch: branch.length[step])(self.mst[step])
+            mst_lengths[step] = np.vectorize(
+                lambda branch: vars(branch)[length][step])(mst[step])
+            mst_weights[step] = np.vectorize(
+                lambda branch: branch.weight[step])(mst[step])
 
-        # Jack-knife Monte Carlo branch lengths
-        mst_lengths = np.array([self.mst_lengths.T[np.random.choice(self.number_of_branches,
-            int(self.number_of_branches * self.series.jack_knife_fraction), replace=False)]
-                for i in range(self.series.jack_knife_number)]).swapaxes(0, 1)
-
-        # Minimum spanning tree average branch length age
-        self.Indicator(self, 'mst_mean', np.mean(mst_lengths, axis=0), valid=True)
-
-        # Minimum spanning tree branch length median absolute deviation age
-        self.Indicator(self, 'mst_mad',
-            np.median(np.abs(mst_lengths - np.median(mst_lengths, axis=0)), axis=0), valid=True)
+        return mst, mst_lengths, mst_weights
 
     class Branch:
         """ Line connecting two stars used for the calculation of the minimum spanning tree. """
@@ -666,7 +778,9 @@ class Group(list, Output_Group):
 
             self.start = start
             self.end = end
-            self.length = np.sum((self.start.position_xyz - self.end.position_xyz)**2, axis=1)**0.5
+            self.length_xyz = np.sum((self.start.position_xyz - self.end.position_xyz)**2, axis=1)**0.5
+            self.length_ξηζ = np.sum((self.start.position_ξηζ - self.end.position_ξηζ)**2, axis=1)**0.5
+            self.weight = np.mean(np.vstack((self.start.weight, self.end.weight)), axis=0)
 
         def __repr__(self):
             """ Returns a string of name of the branch. """
@@ -699,7 +813,7 @@ class Group(list, Output_Group):
             # Initialization
             self.group = group
             self.outlier = False
-            self.core = False
+            self.subsample = False
             self.model = False
             self.age = None
             vars(self).update(values)

@@ -22,7 +22,7 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Name of series of groups
 name.value = 'beta_pictoris'
-name.value = 'beta_pictoris_eDR3'
+# name.value = 'beta_pictoris_eDR3'
 # name.value = 'beta_pictoris_Miret-Roig'
 
 # Path to the file or directory used as input or output relative the base directory (str). If the
@@ -31,7 +31,7 @@ name.value = 'beta_pictoris_eDR3'
 file_path.value = None
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 1
+number_of_groups.value = 10
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 250
@@ -62,7 +62,8 @@ position_error.system = 'observables'
 position_error.axis = 'equatorial'
 
 # Average position scatter of the simulated sample of stars (tuple)
-position_scatter.values = (5.0, 5.0, 5.0)
+# position_scatter.values = (5.0, 5.0, 5.0)
+position_scatter.values = (0.1, 0.1, 0.1)
 # position_scatter.values = (29.3, 14.0, 9.0)
 
 # Average velocity of the simulated sample of stars (tuple)
@@ -80,7 +81,8 @@ velocity_error.system = 'observables'
 velocity_error.axis = 'equatorial'
 
 # Average velocity scatter of the simulated sample of stars (tuple)
-velocity_scatter.values = (1.6805, 1.6805, 1.6805)
+# velocity_scatter.values = (1.6805, 1.6805, 1.6805)
+velocity_scatter.values = (0.1, 0.1, 0.1)
 # velocity_scatter.values = (2.21753, 1.36009, 1.57355)
 velocity_scatter.units = 'km/s'
 
@@ -88,7 +90,8 @@ velocity_scatter.units = 'km/s'
 # data.value = '../Data/bpic_updated.csv'
 # data.value = '../Data/bpic_Crundall2019.csv'
 # data.value = '../Data/β Pictoris Moving Group - Member Stars (no outliers).csv'
-data.value = '../Data/β Pictoris Moving Group - Core Sample (eDR3).csv'
+# data.value = '../Data/β Pictoris Moving Group - Core Sample (eDR3).csv'
+data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3).csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -175,13 +178,13 @@ data.axis = 'observables'
 #     [ 19.57, -18.94, -24.54, -10.25, -15.84,  -7.98,   0.73,     0.83]]}
 
 # Radial velocity offset bias (model) or correction (data) applied to all stars (float)
-rv_offset.value = -0.5
+# rv_offset.value = -0.5
 # rv_offset.value = 0.5
-# rv_offset.value = 0.0
+rv_offset.value = 0.0
 rv_offset.unit = 'km/s'
 
 # Whether to use actual or simulated measurement errors (boolean)
-data_errors.value = True
+data_errors.value = False
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
 cutoff.value = 3.
@@ -189,3 +192,9 @@ cutoff.value = 3.
 # !!! Number of Jack-Knife Monte Carlo iterations (integer, ≥ 0) !!!
 
 # !!! Fraction of stars included in every Jack-Kinfe Monte Carlo iteration !!!
+
+# !!! data_rv_offset : Whether to use rv_offset from data or configuration !!!
+
+# !!! mst_fraction : fraction of step for which a new MST is computed !!!
+
+# !!! sample : whether to use the full sample (with or without outliers) or the subsample !!!

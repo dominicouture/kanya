@@ -321,8 +321,10 @@ class Data(list):
         # Advanced label permutations
         advanced_permutations = {
             ' ': '',
+            '(s)': '',
             'none': '',
             'fixed': '',
+            'new': '',
             'name': 'n',
             'series': 'g',
             'movinggroup': 'g',
@@ -332,6 +334,8 @@ class Data(list):
             'spectraltype': 't',
             'mass': 'm',
             'radius': 'r',
+            'dvr': 'drv',
+            'rvoffset': 'drv',
             'star': '',
             'stellar': '',
             'distance': 'ρ',
@@ -357,7 +361,8 @@ class Data(list):
             'err': 'Δ'}
 
         # Label matches
-        matches = {'n': 'name', 'g': 'group', 't': 'type', 'm': 'mass', 'r': 'radius'}
+        matches = {'n': 'name', 'g': 'group', 't': 'type', 'm': 'mass', 'r': 'radius',
+            'drv': 'rv_offset', 'Δdrv': 'rv_offset_error'}
 
         def identify(self, data, label, missing=False):
             """ Identifies a 'label' and returns a matching wanted label or, including coordinates
@@ -372,7 +377,7 @@ class Data(list):
             old_label = label
 
             # Wanted labels
-            wanted = ('name', 'group', 'id', 'type', 'mass', 'radius',
+            wanted = ('name', 'group', 'id', 'type', 'mass', 'radius', 'rv_offset', 'rv_offset_error',
                 *data.value_variables.keys(), *data.error_variables.keys())
 
             # Advanced permutations to match a wanted label
@@ -466,11 +471,11 @@ class Data(list):
 
             # Float conversion
             for label in list(self.data.variables.keys()) + [
-                label for label in ('mass', 'radius') if label in self.data.columns]:
+                label for label in ('mass', 'radius', 'rv_offset', 'rv_offset_error') if label in self.data.columns]:
                     # ['mass'] if 'mass' in self.data.columns else []]:
 
                 # Empty '' values
-                if self.values[label] == '':
+                if self.values[label] in ('', '...'):
                     self.values[label] = 0.
 
                 # Numerical values
@@ -503,11 +508,35 @@ class Data(list):
             self.radius = Quantity(self.values['radius'], self.data.columns['radius'].unit) \
                 if 'radius' in self.data.columns and self.values['radius'] != 0. else None
 
-            if self.mass is not None and self.radius is not None:
-                self.rv_offset = c.value * ((1 - 2 * G.value * self.mass.value * M_sun.value / (
+            # Radial velocity offset from a column
+            if 'rv_offset' in self.data.columns:
+                default_unit = Unit('km/s')
+                unit = self.data.columns['rv_offset'].unit
+
+                # Radial velocity offset error
+                if 'rv_offset_error' in self.data.columns:
+                    error = self.values['rv_offset_error']
+                    error_unit =self.data.columns['rv_offset_error'].unit
+                else:
+                    error = None
+                    error_unit = None
+
+                # Unit conversion
+                self.rv_offset = Quantity(
+                    -1.0 * self.values['rv_offset'],
+                    default_unit if unit is None else unit,
+                    0.0 if error is None else error,
+                    default_unit if error_unit is None else error_unit).to()
+
+            # Radial velocity offset from mass and radius columns
+            elif self.mass is not None and self.radius is not None:
+                rv_offset = c.value * ((1 - 2 * G.value * self.mass.value * M_sun.value / (
                     c.value**2 * self.radius.value * R_sun.value))**0.5 - 1) / 1000
+                self.rv_offset = Quantity(rv_offset, Unit('km/s'), 0.0)
+
+            # Default radial velocity offset otherwise
             else:
-                self.rv_offset = None
+                 self.rv_offset = self.series.rv_offset
 
             # Position columns and unit conversion
             self.position = Quantity(
