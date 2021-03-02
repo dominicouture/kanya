@@ -39,21 +39,15 @@ class Group(list, Output_Group):
         self.name = name
 
         # Stars from data
-        if series.from_data:
+        if self.series.from_data:
             self.stars_from_data()
 
         # Stars from model
-        elif series.from_model:
+        elif self.series.from_model:
             self.stars_from_model()
-
-        # Average velocity and position and filter outliers
-        self.filter_outliers()
 
         # Indicators
         self.set_indicators()
-
-        # Scatter
-        self.get_scatter()
 
         # Median absolute deviation
         self.get_median_absolute_deviation()
@@ -61,14 +55,14 @@ class Group(list, Output_Group):
         # Covariances
         self.get_covariances()
         self.get_covariances_robust()
-        self.get_covariances_sklearn()
+        # self.get_covariances_sklearn()
 
         # Minimum spanning tree
         self.get_minimum_spanning_tree()
 
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
-            parameters including the name of the stars, their xyz positions and UVW velocities,
+            parameters including the name of the stars, their xyz positions and uvw velocities,
             and their respective measurement errors. Radial velocity offset is also added. If
             only one group is created in the series, actual values are used. If multiple groups
             are created, positions and velocities are scrambled based on measurement errors.
@@ -123,45 +117,58 @@ class Group(list, Output_Group):
                 velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
                 position_xyz=position_xyz, position_xyz_error=position_xyz_error))
 
+        # Compute stars coordinates
+        self.get_stars_coordinates()
+
+        # Filter outliers
+        self.filter_outliers()
+
     def stars_from_model(self):
         """ Creates an artificial model of star for a given number of stars and age based on
-            the intial average xyz position and UVW velocity, and their respective errors
+            the intial average xyz position and uvw velocity, and their respective errors
             and scatters. The sample is then moved forward in time for the given age and radial
             velocity offset is also added.
         """
 
         # Model backward orbit integration from current to star formation epoch
-        average_model_star = self.Star(
+        self.average_model_star = self.Star(
             self, name='average_model_star',
             backward=True, model=True, age=self.series.age.value,
             velocity_xyz=self.series.velocity.values, velocity_xyz_error=np.zeros(3),
             position_xyz=self.series.position.values, position_xyz_error=np.zeros(3))
 
         # Average velocity at the epoch of star formation
-        velocity = average_model_star.velocity_xyz[-1]
+        velocity = self.average_model_star.velocity_xyz[-1]
         velocity_error = self.series.velocity_error.values
         velocity_scatter = self.series.velocity_scatter.values
 
         # Average position at the epoch of star formation
-        position = average_model_star.position_xyz[-1]
+        position = self.average_model_star.position_xyz[-1]
         position_error = self.series.position_error.values
         position_scatter = self.series.position_scatter.values
 
+        print('Position scatter:', position_scatter)
+        print('Velocity scatter:', velocity_scatter)
+        print('Position error:', position_error)
+        print('Velocity error:', velocity_error)
+
         # Stars creation from a model
+        self.model_stars = []
         for star in range(self.series.number_of_stars):
 
             # Model star forward galactic orbit integration
-            model_star = self.Star(
+            self.model_star = self.Star(
                 self, name='model_star_{}'.format(star + 1),
                 backward=False, model=True, age=self.series.age.value,
                 velocity_xyz=np.random.normal(velocity, velocity_scatter), velocity_xyz_error=np.zeros(3),
                 position_xyz=np.random.normal(position, position_scatter), position_xyz_error=np.zeros(3))
+            self.model_stars.append(self.model_star)
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rδα = galactic_uvw_equatorial_rvμδμα(
-                *model_star.position_xyz[-1], *model_star.velocity_xyz[-1])[0]
+                *self.model_star.position_xyz[-1], *self.model_star.velocity_xyz[-1])[0]
             velocity_rδα += np.array([self.series.rv_offset.value, 0.0, 0.0])
-            position_rδα = galactic_xyz_equatorial_rδα(*model_star.position_xyz[-1])[0]
+            position_rδα = galactic_xyz_equatorial_rδα(*self.model_star.position_xyz[-1])[0]
 
             # Velocity and position conversion to observables
             position_obs, velocity_obs = position_rδα_obs(*position_rδα, *velocity_rδα)[:2]
@@ -195,6 +202,9 @@ class Group(list, Output_Group):
                 velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
                 position_xyz=position_xyz, position_xyz_error=position_xyz_error))
 
+        # Compute stars coordinates
+        self.get_stars_coordinates()
+
     def get_stars_coordinates(self):
         """ Computes the number of stars that aren't outliers, the stars average xyz and ξηζ
             velocity and position, excluding outliers, and the stars relative positions and
@@ -207,54 +217,47 @@ class Group(list, Output_Group):
         self.sample = list(filter(lambda star: not star.outlier, self))
         self.outliers =list(filter(lambda star: star.outlier, self))
 
-        # Number of remaining stars, excluding outliers
-        self.number_in_subsample = len(self.subsample)
+        # Number of remaining stars
+        self.subsample_size = len(self.subsample)
         self.sample_size = len(self.sample)
         self.number_of_outliers = len(self.outliers)
 
-        # Average position, excluding outliers
+        # Average xyz positions and velocities, excluding outliers
         self.position_xyz = np.mean([star.position_xyz for star in self.sample], axis=0)
-
-        # Average linear position and errors, excluding outliers
-        self.position_xyz_linear = np.mean(
-            np.array([star.position_xyz_linear for star in self.sample]), axis=0)
-        self.position_xyz_linear_error = np.sum(
-            np.array([star.position_xyz_linear_error for star in self.sample])**2,
-            axis=0)**0.5 / self.sample_size
-
-        # Average ξηζ position, excluding outliers
-        self.position_ξηζ = np.mean([star.position_ξηζ for star in self.sample], axis=0)
-
-        # Average velocity, excluding outliers
+        self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
         self.velocity_xyz = np.mean([star.velocity_xyz for star in self.sample], axis=0)
+        self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-        # Average linear velocity and errors, excluding outliers
-        self.velocity_xyz_linear = np.mean([star.velocity_xyz_linear for star in self.sample], axis=0)
-        self.velocity_xyz_linear_error = np.sum(np.array(
-            [star.velocity_xyz_linear_error for star in self.sample])**2, axis=0)**0.5 / self.sample_size
-
-        # Average ξηζ velocity, excluding outliers
+        # Average ξηζ positions and velocities, excluding outliers
+        self.position_ξηζ = np.mean([star.position_ξηζ for star in self.sample], axis=0)
+        self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
         self.velocity_ξηζ = np.mean([star.velocity_ξηζ for star in self.sample], axis=0)
+        self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
+
+        # xyz position and velocity scatter, excluding outliers
+        self.scatter_position_xyz = np.std([star.position_xyz for star in self.sample], axis=0)
+        self.scatter_position_xyz_total = np.sum(self.scatter_position_xyz**2, axis=1)**0.5
+        self.scatter_velocity_xyz = np.std([star.velocity_xyz for star in self.sample], axis=0)
+        self.scatter_velocity_xyz_total = np.sum(self.scatter_velocity_xyz**2, axis=1)**0.5
+
+        # ξηζ position and velocity scatters, excluding outliers
+        self.scatter_position_ξηζ = np.std([star.position_ξηζ for star in self.sample], axis=0)
+        self.scatter_position_ξηζ_total = np.sum(self.scatter_position_ξηζ**2, axis=1)**0.5
+        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.sample], axis=0)
+        self.scatter_velocity_ξηζ_total = np.sum(self.scatter_velocity_ξηζ**2, axis=1)**0.5
 
         # Stars relative position and velocity, distance and speed, including outliers
         for star in self:
             star.get_relative_coordinates()
 
-        # ξηζ position and velocity scatters for outlier filtering
-        self.scatter_ξηζ = np.std([star.position_ξηζ for star in self.sample], axis=0)
-        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.sample], axis=0)
-
     def filter_outliers(self):
         """ Filters outliers from the data based on ξηζ position and velocity scatter over time.
             Next, a core subsample is determined based on a robust covariance matrix estimator
-            using the scikit-learn (Sklearn) Python package.
+            using the scikit-learn (sklearn) Python package. This step is
         """
 
         # Filter outliers for the first group
         if self.number == 0:
-
-            # Compute all stars coordinates
-            self.get_stars_coordinates()
 
             # Iteratively validate stars coordinates
             outliers = True
@@ -264,7 +267,7 @@ class Group(list, Output_Group):
                 outliers = False
                 for star in self.sample:
                     position_outlier = (np.abs(star.relative_position_ξηζ)
-                        > (self.scatter_ξηζ * self.series.cutoff)).any()
+                        > (self.scatter_position_ξηζ * self.series.cutoff)).any()
                     velocity_outlier = (np.abs(star.relative_velocity_ξηζ)
                         > (self.scatter_velocity_ξηζ * self.series.cutoff)).any()
                     if position_outlier or velocity_outlier:
@@ -286,35 +289,36 @@ class Group(list, Output_Group):
             else:
                 print(f'No outliers found in {self.series.name}.')
 
-            # # Robust covariance matrix and support fraction
-            # a = np.array([star.position_ξηζ for star in self.sample])
-            # a = np.swapaxes(a, 0, 1)
-            # robust_covariance_matrix = []
-            # support_fraction = []
-            #
-            # # Iteration over time
-            # for i in range(a.shape[0]):
-            #     b = MinCovDet(assume_centered=False).fit(a[i])
-            #     # print(i, b[i].shape, b.support_.size, b.support_.nonzero()[0].size, b.dist_.size)
-            #     robust_covariance_matrix.append(b.covariance_)
-            #     support_fraction.append(b.support_)
-            #
-            # # Array conversion
-            # robust_covariance_matrix = np.array(robust_covariance_matrix)
-            # support_fraction = np.array(support_fraction)
-            # support_fraction_all = np.sum(support_fraction, axis=0) / self.series.number_of_steps > 0.7
-            #
-            # # Core creation
-            # for i in range(self.sample_size):
-            #     if support_fraction_all[i]:
-            #         self.sample[i].subsample = True
-            #     else:
-            #         self.sample[i].subsample = False
-            #         self.sample[i].outlier = True
-            #         print(self.sample[i].name)
-            #
-            # # Temporary reasignment of subsample to stars
-            # self.get_stars_coordinates()
+            # Robust covariance matrix and support fraction
+            if False:
+                a = np.array([star.position_ξηζ for star in self.sample])
+                a = np.swapaxes(a, 0, 1)
+                robust_covariance_matrix = []
+                support_fraction = []
+
+                # Iteration over time
+                for i in range(a.shape[0]):
+                    b = MinCovDet(assume_centered=False).fit(a[i])
+                    # print(i, b[i].shape, b.support_.size, b.support_.nonzero()[0].size, b.dist_.size)
+                    robust_covariance_matrix.append(b.covariance_)
+                    support_fraction.append(b.support_)
+
+                # Array conversion
+                robust_covariance_matrix = np.array(robust_covariance_matrix)
+                support_fraction = np.array(support_fraction)
+                support_fraction_all = np.sum(support_fraction, axis=0) / self.series.number_of_steps > 0.7
+
+                # Core creation
+                for i in range(self.sample_size):
+                    if support_fraction_all[i]:
+                        self.sample[i].subsample = True
+                    else:
+                        self.sample[i].subsample = False
+                        self.sample[i].outlier = True
+                        print(self.sample[i].name)
+
+            # Temporary reasignment of subsample to stars
+            self.get_stars_coordinates()
 
         # Use the same outliers, sample and subsample as the first group for other groups
         else:
@@ -322,7 +326,7 @@ class Group(list, Output_Group):
             for star in filter(lambda star: star.name in outliers, self):
                 star.outlier == True
 
-            # Compute valid stars coordinates
+            # Compute stars coordinates
             self.get_stars_coordinates()
 
         # Covariance matrix
@@ -337,38 +341,41 @@ class Group(list, Output_Group):
             # np.squeeze(np.matmul(np.swapaxes(R, 1, 2), np.expand_dims(star.position_xyz, axis=2)))
             # star.position_xyz = np.squeeze(np.matmul(np.expand_dims(star.position_xyz, axis=1), R))
 
-        self.get_stars_coordinates()
-
         # self.Indicator(self, 'eigen_values', np.repeat(np.expand_dims(
         #     np.sum(eigen_values**2, axis=1)**0.5, axis=0),
-        #     self.series.jack_knife_number, axis=0), valid=True)
+        #     self.series.jackknife_number, axis=0), valid=True)
+
+    def set_indicators(self):
+        """ Sets the parameters to compute age indicators including weights based on the Mahalanobis
+            distance using the empirical covariance matrix and Jackknife Monte-Carlo itrations.
+        """
 
         # Compute Mahalanobis distance
         self.positions_xyz = np.expand_dims(np.array([
             star.position_xyz for star in self.sample]), axis=1)
-        self.sample_size_jack_knife = 1
+        self.sample_size_jackknife = 1
         self.Mahalanobis_xyz = self.get_Mahalanobis_distance('positions_xyz')
-        self.weights = np.exp(-1 * self.Mahalanobis_xyz)
 
+        # Compute weights
+        self.weights = np.exp(-1 * self.Mahalanobis_xyz)
         for i in range(len(self.sample)):
             self.sample[i].weight = self.weights[i]
 
-    def set_indicators(self):
-        """ Sets the parameters to compute age indicators including Jack-Knife Monte-Carlo. """
-
         # Indicators list
         self.indicators = []
+        for indicator in self.series.indicators:
+            self.Indicator(self, indicator)
 
-        # Select stars for Jack-Knife Monte-Carlo for the first group
+        # Select stars for Jackknife Monte-Carlo for the first group
         if self.number == 0:
-            self.sample_size_jack_knife = int(self.sample_size * self.series.jack_knife_fraction)
+            self.sample_size_jackknife = int(self.sample_size * self.series.jackknife_fraction)
             self.stars_monte_carlo = np.array([np.random.choice(self.sample_size,
-                self.sample_size_jack_knife, replace=False)
-                    for i in range(self.series.jack_knife_number)])
+                self.sample_size_jackknife, replace=False)
+                    for i in range(self.series.jackknife_number)])
 
-        # Use the same stars for Jack-Knife Monte-Carlo as the first group for other groups
+        # Use the same stars for Jackknife Monte-Carlo as the first group for other groups
         else:
-            self.sample_size_jack_knife = self.series[0].sample_size_jack_knife
+            self.sample_size_jackknife = self.series[0].sample_size_jackknife
             self.stars_monte_carlo = self.series[0].stars_monte_carlo
 
         # Create selected stars xyz and ξηζ positions and velocities arrays
@@ -397,59 +404,40 @@ class Group(list, Output_Group):
 
     class Indicator():
         """ Age indicator including its values, age at minimum and minimum. Computes errors on
-            values, age and minium using a Jack-Knife Monte-Carlo method.
+            values, age and minium using a Jackknife Monte-Carlo method.
         """
 
-        def __init__(self, group, name, values, verbose_name, valid=True):
+        def __init__(self, group, indicator):
             """ Initializes an age indicator. """
 
             # Initialization
             self.group = group
-            self.name = name
-            self.values = values
-            self.verbose_name = np.atleast_1d(verbose_name)
-            self.valid = np.atleast_1d(valid)
+            self.indicator = indicator
 
-            # Average values
+            # Add the indicator to the group
+            vars(self.group)[self.indicator.label] = self
+            self.group.indicators.append(self)
+
+        def __call__(self, values):
+            """ Computes errors on values, age and minium using a Jackknife Monte-Carlo method. """
+
+            # Average values and errors
+            self.values = values
             self.value = np.atleast_1d(np.mean(self.values, axis=0))
             self.value_int_error = np.atleast_1d(np.std(self.values, axis=0))
 
-            # Average age at the minimal value
+            # Average age at the minimal value and error
             self.ages = np.atleast_1d(self.group.series.time[np.argmin(self.values, axis=1)])
             self.age = np.atleast_1d(self.group.series.time[np.argmin(self.value, axis=0)])
             self.age_int_error = np.atleast_1d(np.std(self.ages, axis=0))
 
-            # Average minimal value
+            # Average minimal value and error
             self.minima = np.atleast_1d(np.min(self.values, axis=1))
             self.min = np.atleast_1d(np.min(self.value, axis=0))
             self.min_int_error = np.atleast_1d(np.std(self.minima, axis=0))
 
-            # Add the indicator to the group
-            self.group.indicators.append(self)
-            vars(self.group)[self.name] = self
-
-    def get_scatter(self):
-        """ Computes the xyz and ξηζ position and velocity scatter of a group. The age of the
-            moving group is then estimated by finding the time at which the position scatter is
-            minimal, although the age estimate is depreciated by the use of the xyz and ξηζ
-            position and velocity covariance.
-        """
-
-        # xyz position scatter
-        # self.Indicator(self, 'scatter_xyz', np.std(self.positions_xyz, axis=0), valid=False)
-        # self.Indicator(self, 'scatter_xyz_total', np.sum(self.scatter_xyz.values**2, axis=2)**0.5, valid=False)
-
-        # ξηζ position scatter
-        # self.Indicator(self, 'scatter_ξηζ', np.std(self.positions_ξηζ, axis=0), valid=False)
-        # self.Indicator(self, 'scatter_ξηζ_total', np.sum(self.scatter_ξηζ.values**2, axis=2)**0.5, valid=False)
-
-        # xyz velocity scatter
-        self.scatter_velocity_xyz = np.std([star.velocity_xyz for star in self.sample], axis=0)
-        self.scatter_velocity_xyz_total = np.sum(self.velocity_xyz**2, axis=0)**0.5
-
-        # ξηζ velocity scatter
-        self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.sample], axis=0)
-        self.scatter_velocity_ξηζ_total = np.sum(self.velocity_ξηζ**2, axis=0)**0.5
+            # Set status
+            self.indicator.status = True
 
     def get_median_absolute_deviation(self):
         """ Computes the xyz and ξηζ, partial and total median absolute deviations (MAD) of a group
@@ -458,18 +446,14 @@ class Group(list, Output_Group):
         """
 
         # xyz median absolute deviation age
-        self.Indicator(self, 'mad_xyz',
-            np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0),
-            np.array(['X MAD', 'Y MAD', 'Z MAD']), valid=np.full(3, False))
-        self.Indicator(self, 'mad_xyz_total', np.sum(self.mad_xyz.values**2, axis=2)**0.5,
-            'Total XYZ MAD', valid=False)
+        self.mad_xyz(
+            np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0))
+        self.mad_xyz_total(np.sum(self.mad_xyz.values**2, axis=2)**0.5)
 
         # ξηζ median absolute deviation age
-        self.Indicator(self, 'mad_ξηζ',
-            np.median(np.abs(self.positions_ξηζ - np.median(self.positions_ξηζ, axis=0)), axis=0),
-            np.array(['ξ MAD', 'η MAD', 'ζ MAD']), valid=np.full(3, False))
-        self.Indicator(self, 'mad_ξηζ_total', np.sum(self.mad_ξηζ.values**2, axis=2)**0.5,
-            'Total ξηζ MAD', valid=False)
+        self.mad_ξηζ(
+            np.median(np.abs(self.positions_ξηζ - np.median(self.positions_ξηζ, axis=0)), axis=0))
+        self.mad_ξηζ_total(np.sum(self.mad_ξηζ.values**2, axis=2)**0.5)
 
     def get_covariances(self):
         """ Computes the xyz and ξηζ position covariance matrices, and xyz and ξηζ position and
@@ -479,31 +463,19 @@ class Group(list, Output_Group):
 
         # xyz position covariance matrix, determinant and trace ages
         self.covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz')
-        self.get_covariance_indicators(self.covariances_xyz_matrix, 'covariances_xyz',
-            [np.array(['X Variance', 'Y Variance', 'Z Variance']),
-                'XYZ Covariance Matrix Determinant','XYZ Covariance Matrix Trace'],
-             valid=[np.array([True, False, False]), False, False])
+        self.get_covariance_indicators(self.covariances_xyz_matrix, 'covariances_xyz')
 
         # xyz position and velocity cross covariance matrix, determinant and trace ages
         self.cross_covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz', 'velocities_xyz')
-        self.get_covariance_indicators(self.cross_covariances_xyz_matrix, 'cross_covariances_xyz',
-            [np.array(['X-U Cross Covariance', 'Y-V Cross Covariance', 'Z-W Cross Covariance']),
-                'XYZ Cross Covariance Matrix Determinant','XYZ Cross Covariance Matrix Trace'],
-            valid=[np.array([False, False, False]), False, False])
+        self.get_covariance_indicators(self.cross_covariances_xyz_matrix, 'cross_covariances_xyz')
 
         # ξηζ position covariance matrix, determinant and trace ages
         self.covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ')
-        self.get_covariance_indicators(self.covariances_ξηζ_matrix, 'covariances_ξηζ',
-            [np.array(['ξ Variance', 'η Variance', 'ζ Variance']),
-                'ξηζ Covariance Matrix Determinant','ξηζ Covariance Matrix Trace'],
-            valid=[np.array([True, False, False]), False, False])
+        self.get_covariance_indicators(self.covariances_ξηζ_matrix, 'covariances_ξηζ')
 
         # ξηζ position and velocity cross covariance matrix, determinant and trace ages
         self.cross_covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ', 'velocities_ξηζ')
-        self.get_covariance_indicators(self.cross_covariances_ξηζ_matrix, 'cross_covariances_ξηζ',
-            [np.array(['ξ-vξ Cross Covariance', 'η-vη Cross Covariance', 'ζ-vζ Cross Covariance']),
-                'ξηζ Cross Covariance Matrix Determinant','ξηζ Cross covariance Matrix Trace'],
-            valid=[np.array([False, False, False]), False, False])
+        self.get_covariance_indicators(self.cross_covariances_ξηζ_matrix, 'cross_covariances_ξηζ')
 
     def get_covariances_robust(self):
         """ Computes the xyz and ξηζ position robust covariance matrices, and xyz and ξηζ position
@@ -518,10 +490,7 @@ class Group(list, Output_Group):
             'positions_xyz', covariance_matrix=self.covariances_xyz_matrix)
         self.covariances_xyz_robust_matrix = self.get_covariance_matrix(
             'positions_xyz', robust=True, Mahalanobis_distance=self.Mahalanobis_xyz)
-        self.get_covariance_indicators(self.covariances_xyz_robust_matrix, 'covariances_xyz_robust',
-            [np.array(['X Variance (robust)', 'Y Variance (robust)', 'Z Variance (robust)']),
-                'XYZ Covariance Matrix Determinant (robust)','XYZ Covariance Matrix Trace (robust)'],
-            valid=[np.array([True, False, False]), False, False])
+        self.get_covariance_indicators(self.covariances_xyz_robust_matrix, 'covariances_xyz_robust')
 
         # xyz position and velocity robust cross covariance matrix and determinant ages
         self.Mahalanobis_cross_xyz = self.get_Mahalanobis_distance(
@@ -529,22 +498,14 @@ class Group(list, Output_Group):
         self.cross_covariances_xyz_robust_matrix = self.get_covariance_matrix(
             'positions_xyz', 'velocities_xyz', robust=True,
             Mahalanobis_distance=self.Mahalanobis_xyz)
-        self.get_covariance_indicators(self.cross_covariances_xyz_robust_matrix,
-            'cross_covariances_xyz_robust', [np.array(['X-U Cross Covariance (robust)',
-                    'Y-V Cross Covariance (robust)', 'Z-W Cross Covariance (robust)']),
-                'XYZ Cross Covariance Matrix Determinant (robust)',
-                'XYZ Cross Covariance Matrix Trace (robust)'],
-            valid=[np.array([False, False, False]), False, False])
+        self.get_covariance_indicators(self.cross_covariances_xyz_robust_matrix, 'cross_covariances_xyz_robust')
 
         # ξηζ position robust covariance matrix, determinant and trace ages
         self.Mahalanobis_ξηζ = self.get_Mahalanobis_distance(
             'positions_ξηζ', covariance_matrix=self.covariances_ξηζ_matrix)
         self.covariances_ξηζ_robust_matrix = self.get_covariance_matrix(
             'positions_ξηζ', robust=True, Mahalanobis_distance=self.Mahalanobis_ξηζ)
-        self.get_covariance_indicators(self.covariances_ξηζ_robust_matrix, 'covariances_ξηζ_robust',
-            [np.array(['ξ Variance (robust)', 'η Variance (robust)', 'ζ Variance (robust)']),
-                'ξηζ Covariance Matrix Determinant (robust)','ξηζ Covariance Matrix Trace (robust)'],
-            valid=[np.array([True, False, False]), False, False])
+        self.get_covariance_indicators(self.covariances_ξηζ_robust_matrix, 'covariances_ξηζ_robust')
 
         # ξηζ position and velocity robust cross covariance matrix and determinant ages
         self.Mahalanobis_cross_ξηζ = self.get_Mahalanobis_distance(
@@ -552,12 +513,7 @@ class Group(list, Output_Group):
         self.cross_covariances_ξηζ_robust_matrix = self.get_covariance_matrix(
             'positions_ξηζ', 'velocities_ξηζ', robust=True,
             Mahalanobis_distance=self.Mahalanobis_ξηζ)
-        self.get_covariance_indicators(self.cross_covariances_ξηζ_robust_matrix,
-            'cross_covariances_ξηζ_robust', [np.array(['ξ-vξ Cross Covariance (robust)',
-                    'η-vη Cross Covariance (robust)', 'ζ-vζ Cross Covariance (robust)']),
-                'ξηζ Cross Covariance Matrix Determinant (robust)',
-                'ξηζ Cross Covariance Matrix Trace (robust)'],
-            valid=[np.array([False, False, False]), False, False])
+        self.get_covariance_indicators(self.cross_covariances_ξηζ_robust_matrix, 'cross_covariances_ξηζ_robust')
 
     def get_covariances_sklearn(self):
         """ Computes the ξηζ position covariance matrix using the sklearn package. The age of the
@@ -566,7 +522,7 @@ class Group(list, Output_Group):
         """
 
         def get_covariance_sklearn_matrix(a):
-            """ Computes a robust covariance determinant with SKlearn (slow). """
+            """ Computes a robust covariance determinant with sklearn (slow). """
 
             # Initialization
             from sklearn.covariance import MinCovDet
@@ -581,21 +537,17 @@ class Group(list, Output_Group):
 
             return np.array(sklearn_covariance_matrix)
 
-        # ξηζ position covariance matrix with SKlearn, determinant and trace ages
+        # ξηζ position sklearn covariance matrix, determinant and trace ages
         self.covariances_ξηζ_sklearn_matrix = get_covariance_sklearn_matrix('position_ξηζ')
-        self.Indicator(self, 'covariances_ξηζ_sklearn', np.repeat(np.expand_dims(
-                np.abs(self.covariances_ξηζ_sklearn_matrix[:, (0, 1, 2), (0, 1, 2)])**0.5, axis=0),
-                    self.series.jack_knife_number, axis=0),
-            np.array(['ξ Variance (sklearn)', 'η Variance (sklearn)', 'ζ Variance (sklearn)']),
-            valid=np.array([False, False, False]))
-        self.Indicator(self, 'covariances_ξηζ_sklearn_matrix_det', np.repeat(np.expand_dims(
-                np.abs(np.linalg.det(self.covariances_ξηζ_sklearn_matrix))**(1/6), axis=0),
-                    self.series.jack_knife_number, axis=0),
-            'ξηζ Covariance Matrix Determinant (sklearn)', valid=False)
-        self.Indicator(self, 'covariances_ξηζ_sklearn_matrix_trace', np.repeat(np.expand_dims(
-                np.abs(np.trace(self.covariances_ξηζ_sklearn_matrix, axis1=1, axis2=2) / 3)**0.5, axis=0),
-                    self.series.jack_knife_number, axis=0),
-            'ξηζ Covariance Matrix Trace (sklearn)', valid=False)
+        self.covariances_ξηζ_sklearn(np.repeat(np.expand_dims(
+            np.abs(self.covariances_ξηζ_sklearn_matrix[:, (0, 1, 2), (0, 1, 2)])**0.5, axis=0),
+                self.series.jackknife_number, axis=0))
+        self.covariances_ξηζ_matrix_det_sklearn(np.repeat(np.expand_dims(
+            np.abs(np.linalg.det(self.covariances_ξηζ_sklearn_matrix))**(1/6), axis=0),
+                self.series.jackknife_number, axis=0))
+        self.covariances_ξηζ_matrix_trace_sklearn(np.repeat(np.expand_dims(
+            np.abs(np.trace(self.covariances_ξηζ_sklearn_matrix, axis1=1, axis2=2) / 3)**0.5, axis=0),
+                self.series.jackknife_number, axis=0))
 
     def get_covariance_matrix(self, a, b=None, robust=False, Mahalanobis_distance=None):
         """ Computes the robust covariance matrix with variable weights of a Star parameter, 'a',
@@ -631,7 +583,7 @@ class Group(list, Output_Group):
 
     def get_Mahalanobis_distance(self, a, b=None, covariance_matrix=None):
         """ Computes the Mahalanobis distances using the covariance matrix of a of all stars in
-            the group for all jack-knife iterations.
+            the group for all jackknife iterations.
         """
 
         # Compute the covariance and inverse covariance matrices
@@ -639,7 +591,7 @@ class Group(list, Output_Group):
             covariance_matrix = self.get_covariance_matrix(a, b)
         covariances_matrix_invert = np.repeat(
             np.expand_dims(np.squeeze(np.linalg.inv(covariance_matrix)), axis=0),
-            self.sample_size_jack_knife, axis=0)
+            self.sample_size_jackknife, axis=0)
 
         # Compute Mahalanobis distances
         if b is None:
@@ -653,28 +605,20 @@ class Group(list, Output_Group):
         return np.sqrt(np.abs(np.squeeze(np.matmul(
             np.swapaxes(c, 3, 4), np.matmul(covariances_matrix_invert, c)))))
 
-    def get_covariance_indicators(self, covariance_matrix, indicator, verbose_names, valid=True):
+    def get_covariance_indicators(self, covariance_matrix, indicator):
         """ Computes the covariances, and the determinant and trace of the covariance matrix for
             a given covariance matrix and indicator.
         """
 
-        if type(valid) == bool:
-            valid = np.full(3, valid)
-
         # Covariances
-        self.Indicator(self, indicator,
-            np.abs(covariance_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5,
-            verbose_names[0], valid=valid[0])
+        vars(self)[indicator](np.abs(covariance_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
 
         # Covariance matrix determinant
-        self.Indicator(self, f'{indicator}_matrix_det',
-            np.abs(np.linalg.det(covariance_matrix))**(1/6),
-            verbose_names[1], valid=valid[1])
+        indicator, robust = (indicator[:-7], '_robust') if indicator[-7:] == '_robust' else (indicator, '')
+        vars(self)[f'{indicator}_matrix_det{robust}'](np.abs(np.linalg.det(covariance_matrix))**(1/6))
 
         # Covariance matrix trace
-        self.Indicator(self, f'{indicator}_matrix_trace',
-            np.abs(np.trace(covariance_matrix, axis1=2, axis2=3) / 3)**0.5,
-            verbose_names[2], valid=valid[2])
+        vars(self)[f'{indicator}_matrix_trace{robust}'](np.abs(np.trace(covariance_matrix, axis1=2, axis2=3) / 3)**0.5)
 
     def get_minimum_spanning_tree(self):
         """ Builds the minimum spanning tree (MST) of a group for all timesteps using a Kruskal
@@ -694,37 +638,27 @@ class Group(list, Output_Group):
         self.mst_xyz, self.mst_xyz_lengths, self.mst_xyz_weights = self.get_branches('length_xyz')
         self.mst_ξηζ, self.mst_ξηζ_lengths, self.mst_ξηζ_weights = self.get_branches('length_ξηζ')
 
-        # Jack-knife Monte Carlo branch lengths
-        sample_size_jack_knife = int(self.number_of_branches * self.series.jack_knife_fraction)
+        # Jackknife Monte Carlo branch lengths
+        sample_size_jackknife = int(self.number_of_branches * self.series.jackknife_fraction)
         branches_monte_carlo = np.array([np.random.choice(
-            self.number_of_branches, sample_size_jack_knife, replace=False)
-                for i in range(self.series.jack_knife_number)])
+            self.number_of_branches, sample_size_jackknife, replace=False)
+                for i in range(self.series.jackknife_number)])
         mst_xyz_lengths = self.mst_xyz_lengths.T[branches_monte_carlo].swapaxes(0, 1)
         mst_xyz_weights = self.mst_xyz_weights.T[branches_monte_carlo].swapaxes(0, 1)
         mst_ξηζ_lengths = self.mst_ξηζ_lengths.T[branches_monte_carlo].swapaxes(0, 1)
         mst_ξηζ_weights = self.mst_ξηζ_weights.T[branches_monte_carlo].swapaxes(0, 1)
 
-        # Minimum spanning tree average branch length age
-        self.Indicator(self, 'mst_xyz_mean', np.mean(mst_xyz_lengths, axis=0),
-            'XYZ MST Mean', valid=False)
-        self.Indicator(self, 'mst_ξηζ_mean', np.mean(mst_ξηζ_lengths, axis=0),
-            'ξηζ MST Mean', valid=False)
+        # Minimum spanning tree average branch length ages
+        self.mst_xyz_mean(np.mean(mst_xyz_lengths, axis=0))
+        self.mst_ξηζ_mean(np.mean(mst_ξηζ_lengths, axis=0))
 
-        # Robust minimum spanning tree average branch length age
-        self.Indicator(self, 'mst_xyz_mean_robust',
-            np.average(mst_xyz_lengths, weights=mst_xyz_weights, axis=0),
-            'XYZ MST Mean (robust)', valid=False)
-        self.Indicator(self, 'mst_ξηζ_mean_robust',
-            np.average(mst_ξηζ_lengths, weights=mst_ξηζ_weights, axis=0),
-            'ξηζ MST Mean (robust)', valid=False)
+        # Minimum spanning tree robust average branch length ages
+        self.mst_xyz_mean_robust(np.average(mst_xyz_lengths, weights=mst_xyz_weights, axis=0))
+        self.mst_ξηζ_mean_robust(np.average(mst_ξηζ_lengths, weights=mst_ξηζ_weights, axis=0))
 
-        # Minimum spanning tree branch length median absolute deviation age
-        self.Indicator(self, 'mst_xyz_mad',
-            np.median(np.abs(mst_xyz_lengths - np.median(mst_xyz_lengths, axis=0)), axis=0),
-            'XYZ MST MAD', valid=False)
-        self.Indicator(self, 'mst_ξηζ_mad',
-            np.median(np.abs(mst_ξηζ_lengths - np.median(mst_ξηζ_lengths, axis=0)), axis=0),
-            'ξηζ MST MAD', valid=False)
+        # Minimum spanning tree branch length median absolute deviation ages
+        self.mst_xyz_mad(np.median(np.abs(mst_xyz_lengths - np.median(mst_xyz_lengths, axis=0)), axis=0))
+        self.mst_ξηζ_mad(np.median(np.abs(mst_ξηζ_lengths - np.median(mst_ξηζ_lengths, axis=0)), axis=0))
 
     def get_branches(self, length):
         """ Computes the branches, lengths and weights of a minimum spanning tree. """
@@ -818,9 +752,16 @@ class Group(list, Output_Group):
             self.age = None
             vars(self).update(values)
 
+            # Forward or backward time
+            self.time = (-1 if self.backward else 1) * (self.group.series.time
+                if self.age is None else np.linspace(0., self.group.series.age.value, 172))
+            # self.time = (-1 if self.backward else 1) * self.group.series.time
+
             # Trajectory integration
-            self.get_linear()
-            self.get_orbit()
+            if self.group.series.potential is None:
+                self.get_linear()
+            else:
+                self.get_orbit()
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """ Sets the star as an outlier. """
@@ -832,42 +773,64 @@ class Group(list, Output_Group):
         def get_linear(self):
             """ Computes a star's backward or forward linear trajectory. """
 
-            # Linear xyz position
-            self.position_xyz_linear = self.position_xyz - (self.velocity_xyz
-                + Coordinate.galactic_velocity) * np.expand_dims(self.group.series.time, axis=0).T
-            self.position_xyz_linear_error = (self.position_xyz_error**2 + (self.velocity_xyz_error
-                * np.expand_dims(self.group.series.time, axis=0).T)**2)**0.5
+            # Linear xyz positions and velocities
+            self.position_xyz = self.position_xyz + (self.velocity_xyz
+                + Coordinate.galactic_velocity) * np.expand_dims(self.time, axis=0).T
+            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
+            self.velocity_xyz = np.repeat(
+                np.expand_dims(self.velocity_xyz, axis=0), self.time.size, axis=0)
+            self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-            # Linear UVW velocity
-            self.velocity_xyz_linear = np.repeat(
-                np.expand_dims(self.velocity_xyz, axis=0), self.group.series.time.size, axis=0)
-            self.velocity_xyz_linear_error = np.repeat(np.expand_dims(
-                self.velocity_xyz_error, axis=0), self.group.series.time.size, axis=0)
+            # Linear rθz positions and velocities
+            position_rθz = np.array(gpcooords.XYZ_to_galcencyl(
+                *self.position_xyz.T,
+                Xsun=Coordinate.sun_position[0],
+                Zsun=Coordinate.sun_position[2],
+                _extra_rot=False))
+            velocity_rθz = np.array(gpcooords.vxvyvz_to_galcencyl(
+                *self.velocity_xyz.T,
+                *np.array(gpcooords.XYZ_to_galcenrect(
+                    *self.position_xyz.T,
+                    Xsun=Coordinate.sun_position[0],
+                    Zsun=Coordinate.sun_position[2],
+                    _extra_rot=False)).T,
+                vsun=Coordinate.sun_velocity,
+                Xsun=Coordinate.sun_position[0],
+                Zsun=Coordinate.sun_position[2],
+                _extra_rot=False))
+
+            # Linear ξηζ positions and velocities
+            if not self.backward:
+                time = self.time[::-1] * -1
+            else:
+                time = self.time
+            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, time)
+            self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
+            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, time)
+            self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
         def get_orbit(self):
             """ Computes a star's backward or forward galactic orbit using Galpy. """
 
             # New method to check previous method
-            from astropy import units as u
-            self.position_rδα, self.position_rδα_error = xyz_to_rδα(*self.position_xyz)
-            r, δ, α = self.position_rδα[0] * u.Unit('pc'), self.position_rδα[1] * u.Unit('rad'), self.position_rδα[2] * u.Unit('rad')
-            u, v, w = self.velocity_xyz * 0.9777922216731283
+            # from astropy import units as u
+            # self.position_rδα, self.position_rδα_error = xyz_to_rδα(*self.position_xyz)
+            # r, δ, α = self.position_rδα[0] * u.Unit('pc'), self.position_rδα[1] * u.Unit('rad'), self.position_rδα[2] * u.Unit('rad')
+            # u, v, w = self.velocity_xyz * 0.9777922216731283
 
             # Other position and velocity computations
-            self.position_rθz_other, self.position_rθz_error_other = galactic_xyz_galactocentric_ρθz(
-                *self.position_xyz)
-            self.velocity_rθz_other, self.velocity_rθz_error_other = galactic_uvw_galactocentric_ρθz(
-                *self.position_xyz, *self.velocity_xyz)
+            # self.position_rθz_other, self.position_rθz_error_other = galactic_xyz_galactocentric_ρθz(
+            #     *self.position_xyz)
+            # self.velocity_rθz_other, self.velocity_rθz_error_other = galactic_uvw_galactocentric_ρθz(
+            #     *self.position_xyz, *self.velocity_xyz)
 
-            # Initial rθz position in galactocentric cylindrical coordinates
-            self.position_rθz = np.array(gpcooords.XYZ_to_galcencyl(
+            # Initial rθz position and velocity in galactocentric cylindrical coordinates
+            position_rθz = np.array(gpcooords.XYZ_to_galcencyl(
                 *self.position_xyz,
                 Xsun=Coordinate.sun_position[0],
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False))
-
-            # Initial rθz velocity in galactocentric cylindrical coordinates
-            self.velocity_rθz = np.array(gpcooords.vxvyvz_to_galcencyl(
+            velocity_rθz = np.array(gpcooords.vxvyvz_to_galcencyl(
                 *self.velocity_xyz,
                 *np.array(gpcooords.XYZ_to_galcenrect(
                     *self.position_xyz,
@@ -883,94 +846,68 @@ class Group(list, Output_Group):
             # if self.name == 'Star_30':
             #     print(self.velocity_rθz_other - self.velocity_rθz)
 
-            # Forward or backward time in Myr
-            self.time_Myr = (-1 if self.backward else 1) * (self.group.series.time
-                if self.age is None else np.array([0., self.group.series.age.value]))
-
-            # Unit conversion to natural units
-            self.time = self.time_Myr * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
-            self.position_rθz /= np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
-            self.velocity_rθz /= Coordinate.lsr_velocity[1]
+            # Conversion to natural units
+            time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
+            position_rθz /= np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
+            velocity_rθz /= Coordinate.lsr_velocity[1]
 
             # Orbit initialization and integration
             orbit = Orbit([
-                self.position_rθz[0], self.velocity_rθz[0], self.velocity_rθz[1],
-                self.position_rθz[2], self.velocity_rθz[2], self.position_rθz[1]],
+                position_rθz[0], velocity_rθz[0], velocity_rθz[1],
+                position_rθz[2], velocity_rθz[2], position_rθz[1]],
                 ro=Coordinate.ro, vo=Coordinate.vo, zo=Coordinate.zo,
                 solarmotion=Coordinate.sun_velocity_peculiar_kms)
             orbit.turn_physical_off()
-            orbit.integrate(self.time, self.group.series.potential, method='odeint')
+            orbit.integrate(time, self.group.series.potential, method='odeint')
 
-            # Orbital rθz positions and unit conversion to physical units
-            self.position_rθz = np.array([
-                orbit.R(self.time),
-                orbit.phi(self.time),
-                orbit.z(self.time)]).T * np.array(
+            # rθz positions and velocities, and conversion to physical units
+            position_rθz = np.array([
+                orbit.R(time), orbit.phi(time), orbit.z(time)]).T * np.array(
                     [Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
+            velocity_rθz = np.array([
+                orbit.vR(time), orbit.vT(time), orbit.vz(time)]).T * Coordinate.lsr_velocity[1]
 
-            # Orbital rθz velocities and unit conversion
-            self.velocity_rθz = np.array([
-                orbit.vR(self.time),
-                orbit.vT(self.time),
-                orbit.vz(self.time)]).T * Coordinate.lsr_velocity[1]
-
-            # xyz positions
+            # xyz positions and velocities
             self.position_xyz = gpcooords.galcencyl_to_XYZ(
-                *self.position_rθz.T,
+                *position_rθz.T,
                 Xsun=Coordinate.sun_position[0],
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False)
-
-            # xyz velocities
+            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
             self.velocity_xyz = gpcooords.galcencyl_to_vxvyvz(
-                *self.velocity_rθz.T, self.position_rθz.T[1],
+                *velocity_rθz.T, position_rθz.T[1],
                 vsun=Coordinate.sun_velocity,
                 Xsun=Coordinate.sun_position[0],
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False)
+            self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-            # ξηζ positions
-            self.position_ξηζ = position_rθz_ξηζ(*self.position_rθz.T, self.time_Myr)
-
-            # ξηζ velocities
-            self.velocity_ξηζ = velocity_rθz_ξηζ(*self.velocity_rθz.T, self.time_Myr)
+            # ξηζ positions and velocities
+            if not self.backward:
+                time = self.time[::-1] * -1
+            else:
+                time = self.time
+            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, time)
+            self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
+            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, time)
+            self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
         def get_relative_coordinates(self):
             """ Computes relative position and velocity, the distance and the speed from the
                 average position and velocity, and their respective errors for all timesteps.
             """
 
-            # Relative xyz position and distance from the average group position
+            # Relative xyz positions and velocities from the average group position
             self.relative_position_xyz = self.position_xyz - self.group.position_xyz
-            self.distance_xyz = np.sum(self.relative_position_xyz**2, axis=1)**0.5
-
-            # Relative xyz velocity and speed from the average group velocity
+            self.relative_distance_xyz = np.sum(self.relative_position_xyz**2, axis=1)**0.5
             self.relative_velocity_xyz = self.velocity_xyz - self.group.velocity_xyz
-            self.speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=0)**0.5
+            self.relative_speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=0)**0.5
 
-            # Relative ξηζ position and distance from the average group position
+            # Relative ξηζ positions and velocities from the average group position
             self.relative_position_ξηζ = self.position_ξηζ - self.group.position_ξηζ
-            self.distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
-
-            # Relative ξηζ velocity and speed from the average group velocity
+            self.relative_distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
             self.relative_velocity_ξηζ = self.velocity_ξηζ - self.group.velocity_ξηζ
-            self.speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
-
-            # Linear relative position and distance from the average group position
-            self.relative_position_xyz_linear = self.position_xyz_linear - self.group.position_xyz_linear
-            self.relative_position_xyz_linear_error = (
-                self.position_xyz_linear_error**2 + self.group.position_xyz_linear_error**2)**0.5
-            self.distance_xyz_linear = np.sum(self.relative_position_xyz_linear**2, axis=1)**0.5
-            self.distance_xyz_linear_error = np.sum((self.relative_position_xyz_linear
-                * self.relative_position_xyz_linear_error)**2, axis=1)**0.5 / self.distance_xyz_linear
-
-            # Linear relative velocity and speed from the average velocity
-            self.relative_velocity_xyz_linear = self.velocity_xyz_linear - self.group.velocity_xyz_linear
-            self.relative_velocity_xyz_linear_error = (
-                self.velocity_xyz_linear_error**2 + self.group.velocity_xyz_linear_error**2)**0.5
-            self.speed_xyz_linear = np.sum(self.relative_velocity_xyz_linear_error**2, axis=0)**0.5
-            self.speed_xyz_linear_error = np.sum((self.relative_velocity_xyz_linear_error
-                * self.relative_position_xyz_linear_error)**2, axis=0)**0.5 / self.speed_xyz_linear
+            self.relative_speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
 
         def __repr__(self):
             """ Returns a string of name of the star. """

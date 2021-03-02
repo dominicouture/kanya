@@ -31,7 +31,7 @@ name.value = 'beta_pictoris'
 file_path.value = None
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 10
+number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 250
@@ -55,8 +55,8 @@ age.value = 24.0
 position.values = (15.19443946, -4.93616248, -17.07422231)
 
 # Average position error of the simulated sample of stars (tuple)
-position_error.values = (0.19846, 0.0, 0.0)
-# position_error.values = (0.0, 0.0, 0.0)
+# position_error.values = (0.19846, 0.0, 0.0)
+position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'mas'
 position_error.system = 'observables'
 position_error.axis = 'equatorial'
@@ -73,8 +73,8 @@ velocity.values = (-11.3442, -11.3442, -11.3442)
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-velocity_error.values = (1.0112, 0.30754, 0.26432)
-# velocity_error.values = (0.0, 0.0, 0.0)
+# velocity_error.values = (1.0112, 0.30754, 0.26432)
+velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
@@ -189,12 +189,18 @@ data_errors.value = False
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
 cutoff.value = 3.
 
-# !!! Number of Jack-Knife Monte Carlo iterations (integer, ≥ 0) !!!
+# Number of Jackknife Monte Carlo iterations (integer, ≥ 0) !!!
+jackknife_number.value = 500
 
-# !!! Fraction of stars included in every Jack-Kinfe Monte Carlo iteration !!!
+# Fraction of stars included in every Jack-Kinfe Monte Carlo iteration (0 < float ≤ 1)
+jackknife_fraction.value = 0.5
 
-# !!! data_rv_offset : Whether to use rv_offset from data or configuration !!!
+# !!! data_rv_offset : Whether to use rv_offset from data or configuration (boolean) !!!
 
-# !!! mst_fraction : fraction of step for which a new MST is computed !!!
+# !!! mst_fraction : fraction of step for which a new MST is computed (0 < float ≤ 1) !!!
 
-# !!! sample : whether to use the full sample (with or without outliers) or the subsample !!!
+# !!! sample : whether to use the full sample (with or without outliers) or the subsample (str) !!!
+
+# Galactic potential to be use (str or None)
+potential.value = 'Irrgang13I'
+# potential.value = None

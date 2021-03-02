@@ -19,6 +19,148 @@ class Config():
         A config object can then be used as the input of a Series object.
     """
 
+    class Indicator():
+        """ Contains the data of a given size indicator. """
+
+        def __init__(self, label, name, valid, order):
+            """ Initializes a Parameter object with the given 'components'. """
+
+            self.label = label
+            self.name = np.atleast_1d(name)
+            self.valid = np.atleast_1d(valid)
+            self.order = order
+
+    # Size indicators
+    indicators = {indicator.label: indicator for indicator in (
+
+        # xyz median absolution deviation indicators
+        Indicator('mad_xyz', np.array(['X MAD', 'Y MAD', 'Z MAD']), False, 26),
+        Indicator('mad_xyz_total', 'Total XYZ MAD', False, 27),
+        Indicator('mad_ξηζ', np.array(['ξ MAD', 'η MAD', 'ζ MAD']), False, 28),
+        Indicator('mad_ξηζ_total', 'Total ξηζ MAD', False, 29),
+
+        # xyz position covariance matrix, determinant and trace indicators
+        Indicator(
+            'covariances_xyz',
+            np.array(['X Variance', 'Y Variance', 'Z Variance']),
+            np.array([True, False, False]), 0),
+        Indicator(
+            'covariances_xyz_matrix_det',
+            'XYZ Covariance Matrix Determinant', False, 2),
+        Indicator(
+            'covariances_xyz_matrix_trace',
+            'XYZ Covariance Matrix Trace', False, 4),
+
+        # ξηζ position covariance matrix, determinant and trace indicators
+        Indicator(
+            'covariances_ξηζ',
+            np.array(['ξ Variance', 'η Variance', 'ζ Variance']),
+            np.array([True, False, False]), 6),
+        Indicator(
+            'covariances_ξηζ_matrix_det',
+            'ξηζ Covariance Matrix Determinant', False, 8),
+        Indicator(
+            'covariances_ξηζ_matrix_trace',
+            'ξηζ Covariance Matrix Trace', False, 10),
+
+        # xyz position and velocity cross covariance matrix, determinant and trace indicators
+        Indicator(
+            'cross_covariances_xyz',
+            np.array(['X-U Cross Covariance', 'Y-V Cross Covariance', 'Z-W Cross Covariance']),
+            np.array([False, False, False]), 12),
+        Indicator(
+            'cross_covariances_xyz_matrix_det',
+            'XYZ Cross Covariance Matrix Determinant', False, 14),
+        Indicator(
+            'cross_covariances_xyz_matrix_trace',
+            'XYZ Cross Covariance Matrix Trace', False, 16),
+
+        # ξηζ position and velocity cross covariance matrix, determinant and trace indicators
+        Indicator(
+            'cross_covariances_ξηζ',
+            np.array(['ξ-vξ Cross Covariance', 'η-vη Cross Covariance', 'ζ-vζ Cross Covariance']),
+            np.array([False, False, False]), 18),
+        Indicator(
+            'cross_covariances_ξηζ_matrix_det',
+            'ξηζ Cross Covariance Matrix Determinant', False, 20),
+        Indicator(
+            'cross_covariances_ξηζ_matrix_trace',
+            'ξηζ Cross Covariance Matrix Trace', False, 22),
+
+        # xyz position robust covariance matrix, determinant and trace indicators
+        Indicator(
+            'covariances_xyz_robust',
+            np.array(['X Variance (robust)', 'Y Variance (robust)', 'Z Variance (robust)']),
+            np.array([True, False, False]), 1),
+        Indicator(
+            'covariances_xyz_matrix_det_robust',
+            'XYZ Covariance Matrix Determinant (robust)', False, 3),
+        Indicator(
+            'covariances_xyz_matrix_trace_robust',
+            'XYZ Covariance Matrix Trace (robust)', False, 5),
+
+        # ξηζ position robust covariance matrix, determinant and trace indicators
+        Indicator(
+            'covariances_ξηζ_robust',
+            np.array(['ξ Variance (robust)', 'η Variance (robust)', 'ζ Variance (robust)']),
+            np.array([True, False, False]), 7),
+        Indicator(
+            'covariances_ξηζ_matrix_det_robust',
+            'ξηζ Covariance Matrix Determinant (robust)', False, 9),
+        Indicator(
+            'covariances_ξηζ_matrix_trace_robust',
+            'ξηζ Covariance Matrix Trace (robust)', False, 11),
+
+        # xyz position and velocity robust cross covariance matrix, determinant and trace indicators
+        Indicator(
+            'cross_covariances_xyz_robust',
+            np.array(['X-U Cross Covariance (robust)', 'Y-V Cross Covariance (robust)',
+                'Z-W Cross Covariance (robust)']),
+            np.array([False, False, False]), 13),
+        Indicator(
+            'cross_covariances_xyz_matrix_det_robust',
+            'XYZ Cross Covariance Matrix Determinant (robust)', False, 15),
+        Indicator(
+            'cross_covariances_xyz_matrix_trace_robust',
+            'XYZ Cross Covariance Matrix Trace (robust)', False, 17),
+
+        # ξηζ position and velocity robust cross covariance matrix, determinant and trace indicators
+        Indicator(
+            'cross_covariances_ξηζ_robust',
+            np.array(['ξ-vξ Cross Covariance (robust)', 'η-vη Cross Covariance (robust)',
+                'ζ-vζ Cross Covariance (robust)']),
+            np.array([False, False, False]), 21),
+        Indicator(
+            'cross_covariances_ξηζ_matrix_det_robust',
+            'ξηζ Cross Covariance Matrix Determinant (robust)', False, 23),
+        Indicator(
+            'cross_covariances_ξηζ_matrix_trace_robust',
+            'ξηζ Cross Covariance Matrix Trace (robust)', False, 25),
+
+        # ξηζ position sklearn covariance matrix, determinant and trace indicators
+        Indicator(
+            'covariances_ξηζ_sklearn',
+            np.array(['ξ Variance (sklearn)', 'η Variance (sklearn)', 'ζ Variance (sklearn)']),
+            np.array([False, False, False]), 7.5),
+        Indicator(
+            'covariances_ξηζ_matrix_det_sklearn',
+            'ξηζ Covariance Matrix Determinant (sklearn)', False, 9.5),
+        Indicator(
+            'covariances_ξηζ_matrix_trace_sklearn',
+            'ξηζ Covariance Matrix Trace (sklearn)', False, 11.5),
+
+        # Minimum spanning tree average branch length indicators
+        Indicator('mst_xyz_mean', 'XYZ MST Mean', False, 30),
+        Indicator('mst_ξηζ_mean', 'ξηζ MST Mean', False, 31),
+
+        # Minimum spanning tree robust average branch length indicators
+        Indicator('mst_xyz_mean_robust', 'XYZ MST Mean (robust)', False, 32),
+        Indicator('mst_ξηζ_mean_robust', 'ξηζ MST Mean (robust)', False, 33),
+
+        # Minimum spanning tree branch length median absolute deviation indicators
+        Indicator('mst_xyz_mad', 'XYZ MST MAD', False, 34),
+        Indicator('mst_ξηζ_mad', 'ξηζ MST MAD', False, 35))}
+
     class Parameter():
         """ Contains the components of a given configuration parameter. """
 
@@ -106,7 +248,10 @@ class Config():
         Parameter(label='data_errors', name='Data errors', values=False),
         Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
             units=System.default_units['speed'].label, system='cartesian'),
-        Parameter(label='cutoff', name='Cutoff'))}
+        Parameter(label='cutoff', name='Cutoff'),
+        Parameter(label='jackknife_number', name='Jackknife Number', values=1),
+        Parameter(label='jackknife_fraction', name='Jackknife Fraction', values=1.0),
+        Parameter(label='potential', name='Galactic Potential', values=None))}
 
     # Position and velocity paramaters
     position_parameters = ('position', 'position_error', 'position_scatter')
