@@ -21,8 +21,8 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Name of series of groups
-name.value = 'beta_pictoris'
-# name.value = 'beta_pictoris_eDR3'
+# name.value = 'beta_pictoris'
+name.value = 'beta_pictoris_eDR3'
 # name.value = 'beta_pictoris_Miret-Roig'
 
 # Path to the file or directory used as input or output relative the base directory (str). If the
@@ -38,7 +38,7 @@ number_of_groups.value = 1
 number_of_steps.value = 171
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 46
+number_of_stars.value = 26
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
@@ -51,38 +51,40 @@ final_time.value = 50.1951006
 age.value = 24.0
 
 # Average position of the simulated sample of stars (tuple)
+position.values = (18.726, -4.500, -18.938) # new
+# position.values = (15.194, -4.936, -17.074)
 # position.values = (0.0, 0.0, 0.0)
-position.values = (15.19443946, -4.93616248, -17.07422231)
 
 # Average position error of the simulated sample of stars (tuple)
-# position_error.values = (0.19846, 0.0, 0.0)
-position_error.values = (0.0, 0.0, 0.0)
+position_error.values = (0.19846, 0.0, 0.0)
+# position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'mas'
 position_error.system = 'observables'
 position_error.axis = 'equatorial'
 
 # Average position scatter of the simulated sample of stars (tuple)
-# position_scatter.values = (5.0, 5.0, 5.0)
-position_scatter.values = (0.1, 0.1, 0.1)
+position_scatter.values = (3.0, 3.0, 3.0)
 # position_scatter.values = (29.3, 14.0, 9.0)
 
 # Average velocity of the simulated sample of stars (tuple)
-velocity.values = (-11.3442, -11.3442, -11.3442)
-# velocity.values = (-10.54893, -15.88653,  -8.71138)
+# velocity.values = (-10.278, -15.726, -8.759) # new
+velocity.values = (-10.549, -15.889,  -8.711)
 # velocity.values = (-10.93, -15.79,  -8.94)
+# velocity.values = (-11.344, -11.344, -11.344)
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-# velocity_error.values = (1.0112, 0.30754, 0.26432)
-velocity_error.values = (0.0, 0.0, 0.0)
+velocity_error.values = (1.0112, 0.30754, 0.26432)
+# velocity_error.values = (0.0, 0.30754, 0.26432)
+# velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
 velocity_error.axis = 'equatorial'
 
 # Average velocity scatter of the simulated sample of stars (tuple)
-# velocity_scatter.values = (1.6805, 1.6805, 1.6805)
-velocity_scatter.values = (0.1, 0.1, 0.1)
+velocity_scatter.values = (1.6805, 1.6805, 1.6805)
+# velocity_scatter.values = (0.3, 0.3, 0.3)
 # velocity_scatter.values = (2.21753, 1.36009, 1.57355)
 velocity_scatter.units = 'km/s'
 
@@ -183,24 +185,30 @@ data.axis = 'observables'
 rv_offset.value = 0.0
 rv_offset.unit = 'km/s'
 
+# Whether to use actual of simulated rv offsets (boolean)
+data_rv_offsets.value = False
+
 # Whether to use actual or simulated measurement errors (boolean)
 data_errors.value = False
+
+# Number of Jackknife Monte Carlo iterations (integer, ≥ 0)
+jackknife_number.value = 500
+
+# Fraction of stars included in every Jackkinfe Monte Carlo iteration (0 < float ≤ 1)
+jackknife_fraction.value = 0.5
+
+# Fraction of step for which a new MST is computed (0 < float ≤ 1)
+mst_fraction.value = 1.0
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
 cutoff.value = 3.
 
-# Number of Jackknife Monte Carlo iterations (integer, ≥ 0) !!!
-jackknife_number.value = 500
+# Whether to use the full (with outliers), standard sample or the subsample (str)
+sample.value = 'full'
+sample.value = 'sample'
+sample.value = 'subsample'
 
-# Fraction of stars included in every Jack-Kinfe Monte Carlo iteration (0 < float ≤ 1)
-jackknife_fraction.value = 0.5
-
-# !!! data_rv_offset : Whether to use rv_offset from data or configuration (boolean) !!!
-
-# !!! mst_fraction : fraction of step for which a new MST is computed (0 < float ≤ 1) !!!
-
-# !!! sample : whether to use the full sample (with or without outliers) or the subsample (str) !!!
-
-# Galactic potential to be use (str or None)
-potential.value = 'Irrgang13I'
-# potential.value = None
+# Galactic potential used for orbit integration (str or None)
+potential.value = None
+# potential.value = 'MWPotential2014'
+# potential.value = 'Irrgang13I'

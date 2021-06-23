@@ -167,7 +167,7 @@ class Coordinate:
 
     # Sun peculiar velocity
     sun_velocity_peculiar_kms = np.array([11.1, 12.24, 7.25]) # Galpy assumes right-handed coordinates
-    # Should ajusted with matrix rotation to account for zo != 0.0 ???
+    # ??? Should be ajusted with matrix rotation to account for zo != 0.0 ???
     sun_velocity_peculiar = np.array([-11.352, 12.518, 7.41]) # Schöenrich et al. 2010
 
     # Local Standard of Rest (LSR) velocity

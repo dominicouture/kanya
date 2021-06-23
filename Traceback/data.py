@@ -516,7 +516,7 @@ class Data(list):
                 # Radial velocity offset error
                 if 'rv_offset_error' in self.data.columns:
                     error = self.values['rv_offset_error']
-                    error_unit =self.data.columns['rv_offset_error'].unit
+                    error_unit = self.data.columns['rv_offset_error'].unit
                 else:
                     error = None
                     error_unit = None

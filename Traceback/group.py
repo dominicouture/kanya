@@ -22,7 +22,7 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 class Group(list, Output_Group):
     """ Contains the values and related methods of a moving group and a list of Star objets that
         are part of it. Stars are can be imported from a raw data file or modeled base on
-        simulation parameters
+        simulation parameters.
     """
 
     def __init__(self, series, number, name):
@@ -70,7 +70,6 @@ class Group(list, Output_Group):
 
         # Radial velocity offset due to gravitational redshift
         for star in self.series.data:
-            print(star.name, star.rv_offset)
 
             # Observables conversion into equatorial spherical coordinates
             if self.series.data.data.system.name == 'observables':
@@ -157,18 +156,18 @@ class Group(list, Output_Group):
         for star in range(self.series.number_of_stars):
 
             # Model star forward galactic orbit integration
-            self.model_star = self.Star(
+            model_star = self.Star(
                 self, name='model_star_{}'.format(star + 1),
                 backward=False, model=True, age=self.series.age.value,
                 velocity_xyz=np.random.normal(velocity, velocity_scatter), velocity_xyz_error=np.zeros(3),
                 position_xyz=np.random.normal(position, position_scatter), position_xyz_error=np.zeros(3))
-            self.model_stars.append(self.model_star)
+            self.model_stars.append(model_star)
 
             # Velocity and possition conversion to equatorial spherical coordinates
             velocity_rδα = galactic_uvw_equatorial_rvμδμα(
-                *self.model_star.position_xyz[-1], *self.model_star.velocity_xyz[-1])[0]
+                *model_star.position_xyz[-1], *model_star.velocity_xyz[-1])[0]
             velocity_rδα += np.array([self.series.rv_offset.value, 0.0, 0.0])
-            position_rδα = galactic_xyz_equatorial_rδα(*self.model_star.position_xyz[-1])[0]
+            position_rδα = galactic_xyz_equatorial_rδα(*model_star.position_xyz[-1])[0]
 
             # Velocity and position conversion to observables
             position_obs, velocity_obs = position_rδα_obs(*position_rδα, *velocity_rδα)[:2]
@@ -176,7 +175,7 @@ class Group(list, Output_Group):
             # Observables conversion back into equatorial spherical coordinates
             # Velocity and position scrambling based on actual measurement errors
             if self.series.data_errors:
-                star_errors = star - star // len(self.series.data) * len(self.series.data)
+                star_errors = star - (star // len(self.series.data)) * len(self.series.data)
                 position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
                     *np.random.normal(position_obs, self.series.data[star_errors].position.errors),
                     *np.random.normal(velocity_obs, self.series.data[star_errors].velocity.errors),
@@ -251,16 +250,16 @@ class Group(list, Output_Group):
             star.get_relative_coordinates()
 
     def filter_outliers(self):
-        """ Filters outliers from the data based on ξηζ position and velocity scatter over time.
-            Next, a core subsample is determined based on a robust covariance matrix estimator
-            using the scikit-learn (sklearn) Python package. This step is
+        """ Filters outliers from the full sample based on ξηζ position and velocity scatter over
+            time. A core subsample is created based on a robust covariance matrix estimator using
+            the scikit-learn (sklearn) Python package.
         """
 
         # Filter outliers for the first group
         if self.number == 0:
 
             # Iteratively validate stars coordinates
-            outliers = True
+            outliers = False if self.series.cutoff is None else True
             while outliers and len(self.sample) > int(0.8 * self.series.number_of_stars):
 
                 # Remove stars beyond the σ cutoff of the average position or velocity
@@ -286,7 +285,7 @@ class Group(list, Output_Group):
                         f"{'V' if star.velocity_outlier else ''})")
 
             # Display message if no outliers are found
-            else:
+            elif self.series.cutoff is not None:
                 print(f'No outliers found in {self.series.name}.')
 
             # Robust covariance matrix and support fraction
@@ -323,11 +322,12 @@ class Group(list, Output_Group):
         # Use the same outliers, sample and subsample as the first group for other groups
         else:
             outliers = [star.name for star in self.series[0].outliers]
-            for star in filter(lambda star: star.name in outliers, self):
-                star.outlier == True
+            if len(outliers) > 0:
+                for star in filter(lambda star: star.name in outliers, self):
+                    star.outlier == True
 
-            # Compute stars coordinates
-            self.get_stars_coordinates()
+                # Compute stars coordinates
+                self.get_stars_coordinates()
 
         # Covariance matrix
         # a = np.array([star.position_xyz for star in self.sample]) - self.position_xyz
@@ -721,7 +721,7 @@ class Group(list, Output_Group):
 
             return "'{}' to '{}' branch".format(self.start.name, self.end.name)
 
-    class Node(object):
+    class Node:
         """ Node of a star. """
 
         def __init__(self):
@@ -735,7 +735,7 @@ class Group(list, Output_Group):
             return 'None' if self.parent is None else self.parent
 
     class Star:
-        """ Contains the values and related methods of a star in a moving group. """
+        """ Parameters and methods of a star in a moving group. """
 
         def __init__(self, group, **values):
             """ Initializes a Star object with at least a name, velocity, velocity error, initial
@@ -752,10 +752,10 @@ class Group(list, Output_Group):
             self.age = None
             vars(self).update(values)
 
-            # Forward or backward time
-            self.time = (-1 if self.backward else 1) * (self.group.series.time
-                if self.age is None else np.linspace(0., self.group.series.age.value, 172))
-            # self.time = (-1 if self.backward else 1) * self.group.series.time
+            # Forward or backward, and model or data time
+            self.time = (np.copy(self.group.series.time) if not self.model
+                else np.linspace(0., self.age, 100))
+            self.time *= (-1 if self.backward else 1)
 
             # Trajectory integration
             if self.group.series.potential is None:
@@ -799,11 +799,13 @@ class Group(list, Output_Group):
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False))
 
-            # Linear ξηζ positions and velocities
-            if not self.backward:
-                time = self.time[::-1] * -1
+            # Change time for forward computation
+            if not self.backward and self.model:
+                time = self.time - self.age
             else:
                 time = self.time
+
+            # Linear ξηζ positions and velocities
             self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, time)
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
             self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, time)
@@ -882,11 +884,13 @@ class Group(list, Output_Group):
                 _extra_rot=False)
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-            # ξηζ positions and velocities
-            if not self.backward:
-                time = self.time[::-1] * -1
+            # Change time for forward orbital computation
+            if not self.backward and self.model:
+                time = self.time - self.age
             else:
                 time = self.time
+
+            # ξηζ positions and velocities
             self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, time)
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
             self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, time)

@@ -23,7 +23,7 @@ class Config():
         """ Contains the data of a given size indicator. """
 
         def __init__(self, label, name, valid, order):
-            """ Initializes a Parameter object with the given 'components'. """
+            """ Initializes an Indicator object. """
 
             self.label = label
             self.name = np.atleast_1d(name)
@@ -248,10 +248,13 @@ class Config():
         Parameter(label='data_errors', name='Data errors', values=False),
         Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
             units=System.default_units['speed'].label, system='cartesian'),
-        Parameter(label='cutoff', name='Cutoff'),
-        Parameter(label='jackknife_number', name='Jackknife Number', values=1),
-        Parameter(label='jackknife_fraction', name='Jackknife Fraction', values=1.0),
-        Parameter(label='potential', name='Galactic Potential', values=None))}
+        Parameter(label='data_rv_offsets', name='Data radial velocity offset', values=False),
+        Parameter(label='jackknife_number', name='Jackknife number', values=1),
+        Parameter(label='jackknife_fraction', name='Jackknife fraction', values=1.0, units=''),
+        Parameter(label='mst_fraction', name='Minimum spanning tree fraction', values=1.0, units=''),
+        Parameter(label='cutoff', name='Cutoff', values=None),
+        Parameter(label='sample', name='Sample', values=None),
+        Parameter(label='potential', name='Galactic potential', values=None))}
 
     # Position and velocity paramaters
     position_parameters = ('position', 'position_error', 'position_scatter')

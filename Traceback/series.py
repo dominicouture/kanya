@@ -162,7 +162,7 @@ class Series(list, Output_Series):
             self.stop(vars(self)[argument] is None, 'NameError',
                 "Required parameter '{}' is missing in the configuration.", argument)
             self.stop(type(vars(self)[argument]) != bool, 'TypeError',
-                "'{}' must be a boolean value ({} given).", argument, type(vars(self)[argument]))
+                "'{}' must be a boolean ({} given).", argument, type(vars(self)[argument]))
 
         # self.to_file parameter set to False if self.from_file is True
         if self.from_file and self.to_file:
@@ -257,10 +257,41 @@ class Series(list, Output_Series):
         self.time = np.linspace(
             self.initial_time.value, self.final_time.value, self.number_of_steps)
 
-        # Radial velocity offset paramater
+        # rv_offset paramater
         self.rv_offset = self.configure_quantity(self.config.rv_offset)
 
-        # σ cutoff parameter
+        # data_errors parameter
+        self.data_rv_offsets = self.config.data_rv_offsets.values
+        self.stop(self.data_rv_offsets is None, 'NameError',
+            "Required traceback parameter 'data_rv_offsets' is missing in the configuration.")
+        self.stop(type(self.data_rv_offsets) != bool, 'TypeError',
+            "'data_rv_offsets' must be a boolean ({} given).", type(self.data_rv_offsets))
+
+        # data_errors parameter
+        self.data_errors = self.config.data_errors.values
+        self.stop(self.data_errors is None, 'NameError',
+            "Required traceback parameter 'data_errors' is missing in the configuration.")
+        self.stop(type(self.data_errors) != bool, 'TypeError',
+            "'data_errors' must be a boolean ({} given).", type(self.data_errors))
+
+        # jackknife_fraction parameter
+        self.jackknife_number = self.configure_integer(self.config.jackknife_number)
+        self.stop(self.jackknife_number <= 0, 'ValueError',
+            "'jackknife_number' must be greater to 0 ({} given).", self.jackknife_number)
+
+        # jackknife_fraction parameter
+        self.jackknife_fraction = self.configure_quantity(self.config.jackknife_fraction).value
+        # self.jackknife_fraction = self.config.jackknife_fraction
+        self.stop(self.jackknife_fraction <= 0 or self.jackknife_fraction > 1, 'ValueError',
+            "'jackknife_number' must be between 0 and 1 ({} given).", self.jackknife_number)
+
+        # mst_fraction parameter
+        self.mst_fraction = self.configure_quantity(self.config.mst_fraction).value
+        # self.mst_fraction = self.config.mst_fraction
+        self.stop(self.mst_fraction <= 0 or self.mst_fraction > 1, 'ValueError',
+            "'mst_fraction' must be between 0 and 1 ({} given).", self.mst_fraction)
+
+        # cutoff parameter
         if self.config.cutoff.values is not None:
             self.stop(type(self.config.cutoff.values) not in (int, float),
                 'TypeError', "'{}' must be an integer, float or None ({} given).",
@@ -269,17 +300,30 @@ class Series(list, Output_Series):
                 "'cutoff' must be greater to 0.0 ({} given).", self.config.cutoff.values)
         self.cutoff = self.config.cutoff.values
 
-        # Temporary jackknife parameters
-        self.jackknife_number = 500
-        self.jackknife_fraction = 0.5
+        # sample parameter
+        self.sample = self.config.sample.values
+        self.stop(self.sample is None, 'NameError',
+            "Required traceback parameter 'sample' is missing in the configuration.")
+        self.stop(type(self.sample) != str, 'TypeError',
+            "'sample' must be a string ({} given).", type(self.sample))
+        self.sample = self.sample.lower()
+        self.stop(self.sample not in ('outliers', 'sample', 'subsample'), 'ValueError',
+            "'sample' must be outliers, sample or subsample ({} given).", self.sample)
 
-        # Milky Way gravitational potential
-        # from galpy.potential import MWPotential2014
-        if self.config.potential.values is not None:
-            from galpy.potential.mwpotentials import Irrgang13I
-            self.potential = Irrgang13I
-        else:
-            self.potential = None
+        # potential parameter
+        self.potential = self.config.potential.values
+        if self.potential is not None:
+            self.stop(type(self.potential) != str, 'TypeError',
+                "'potential' must be a string or None ({} given).", type(self.potential))
+
+            # Converts the potential string to a galpy.potential object
+            try:
+                exec(f'from galpy.potential.mwpotentials import {self.potential} as potential',
+                    globals())
+            except:
+                self.stop(True, 'ValueError',
+                    "'potenial' is invalid ({} given).", self.potential)
+            self.potential = potential
 
         # Data configuration
         if self.from_data:
@@ -318,7 +362,6 @@ class Series(list, Output_Series):
             for parameter in ('age', *self.config.position_parameters,
                     *self.config.velocity_parameters):
                 vars(self)[parameter] = None
-            self.data_errors = False
 
     def configure_model(self):
         """ Checks if traceback and output from a model is possible. """
@@ -327,8 +370,8 @@ class Series(list, Output_Series):
         log("Initializing '{}' series from a model.", self.name)
 
         # Check if all the necessary parameters are present
-        for parameter in ('number_of_stars', 'age', 'data_errors', *self.config.position_parameters,
-                *self.config.velocity_parameters):
+        for parameter in ('number_of_stars', 'age',
+                *self.config.position_parameters, *self.config.velocity_parameters):
             self.stop(vars(self.config)[parameter].values is None, 'NameError',
                 "Required simulation parameter '{}' is missing in the configuration.", parameter)
 
@@ -358,20 +401,15 @@ class Series(list, Output_Series):
         # velocity_scatter parameter
         self.velocity_scatter = self.configure_coordinate(self.config.velocity_scatter)
 
-        # data_errors parameter
-        self.data_errors = self.config.data_errors.values
-        self.stop(type(self.data_errors) != bool, 'TypeError',
-            "'data_errors' must be a boolean value ({} given).", type(self.data_errors))
-
-        # Data configured to use actual error measurements
-        if self.data_errors:
+        # Data configured to use actual error measurements or rv offset
+        if self.data_errors or self.data_rv_offsets:
             self.configure_data()
 
             # Check if the data length matches the number of stars
-            self.stop(len(self.data) == 0, 'ValueError',
-                "If 'data_errors' is True, the data length must be greater than 0.")
+            self.stop(len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_offset' "
+                 "is True, the data length must be greater than 0.")
 
-        # Data set to None because measurement errors are simulated
+        # Data set to None because measurement errors and rv offsets are simulated
         else:
             self.data = None
 
@@ -1063,43 +1101,43 @@ class Series(list, Output_Series):
 
             # Temporary age offset dictionary
             self.age_offset = {
-                'mad_xyz': np.array([1.0, 1.0, 1.0]),
-                'mad_xyz_total': np.array([1.0]),
-                'mad_ξηζ': np.array([1.0, 1.0, 1.0]),
-                'mad_ξηζ_total': np.array([1.0]),
-                'covariances_xyz': np.array([1.0, 1.0, 1.0]),
-                'covariances_xyz_matrix_det': np.array([1.0]),
-                'covariances_xyz_matrix_trace': np.array([1.0]),
-                'cross_covariances_xyz': np.array([1.0, 1.0, 1.0]),
-                'cross_covariances_xyz_matrix_det': np.array([1.0]),
-                'cross_covariances_xyz_matrix_trace': np.array([1.0]),
-                'covariances_ξηζ': np.array([1.0, 1.0, 1.0]),
-                'covariances_ξηζ_matrix_det': np.array([1.0]),
-                'covariances_ξηζ_matrix_trace': np.array([1.0]),
-                'cross_covariances_ξηζ': np.array([1.0, 1.0, 1.0]),
-                'cross_covariances_ξηζ_matrix_det': np.array([1.0]),
-                'cross_covariances_ξηζ_matrix_trace': np.array([1.0]),
-                'covariances_xyz_robust': np.array([1.0, 1.0, 1.0]),
-                'covariances_xyz_matrix_det_robust': np.array([1.0]),
-                'covariances_xyz_matrix_trace_robust': np.array([1.0]),
-                'cross_covariances_xyz_robust': np.array([1.0, 1.0, 1.0]),
-                'cross_covariances_xyz_matrix_det_robust': np.array([1.0]),
-                'cross_covariances_xyz_matrix_trace_robust': np.array([1.0]),
-                'covariances_ξηζ_robust': np.array([1.0, 1.0, 1.0]),
-                'covariances_ξηζ_matrix_det_robust': np.array([1.0]),
-                'covariances_ξηζ_matrix_trace_robust': np.array([1.0]),
-                'cross_covariances_ξηζ_robust': np.array([1.0, 1.0, 1.0]),
-                'cross_covariances_ξηζ_matrix_det_robust': np.array([1.0]),
-                'cross_covariances_ξηζ_matrix_trace_robust': np.array([1.0]),
-                'covariances_ξηζ_sklearn': np.array([1.0, 1.0, 1.0]),
-                'covariances_ξηζ_matrix_det_sklearn': np.array([1.0]),
-                'covariances_ξηζ_matrix_trace_sklearn': np.array([1.0]),
-                'mst_xyz_mean': np.array([1.0]),
-                'mst_ξηζ_mean': np.array([1.0]),
-                'mst_xyz_mean_robust': np.array([1.0]),
-                'mst_ξηζ_mean_robust': np.array([1.0]),
-                'mst_xyz_mad': np.array([1.0]),
-                'mst_ξηζ_mad': np.array([1.0])}
+                'mad_xyz': np.array([0.0, 0.0, 0.0]),
+                'mad_xyz_total': np.array([0.0]),
+                'mad_ξηζ': np.array([0.0, 0.0, 0.0]),
+                'mad_ξηζ_total': np.array([0.0]),
+                'covariances_xyz': np.array([0.0, 0.0, 0.0]),
+                'covariances_xyz_matrix_det': np.array([0.0]),
+                'covariances_xyz_matrix_trace': np.array([0.0]),
+                'cross_covariances_xyz': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_xyz_matrix_det': np.array([0.0]),
+                'cross_covariances_xyz_matrix_trace': np.array([0.0]),
+                'covariances_ξηζ': np.array([0.0, 0.0, 0.0]),
+                'covariances_ξηζ_matrix_det': np.array([0.0]),
+                'covariances_ξηζ_matrix_trace': np.array([0.0]),
+                'cross_covariances_ξηζ': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_ξηζ_matrix_det': np.array([0.0]),
+                'cross_covariances_ξηζ_matrix_trace': np.array([0.0]),
+                'covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
+                'covariances_xyz_matrix_det_robust': np.array([0.0]),
+                'covariances_xyz_matrix_trace_robust': np.array([0.0]),
+                'cross_covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_xyz_matrix_det_robust': np.array([0.0]),
+                'cross_covariances_xyz_matrix_trace_robust': np.array([0.0]),
+                'covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
+                'covariances_ξηζ_matrix_det_robust': np.array([0.0]),
+                'covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
+                'cross_covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_ξηζ_matrix_det_robust': np.array([0.0]),
+                'cross_covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
+                'covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
+                'covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
+                'covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),
+                'mst_xyz_mean': np.array([0.0]),
+                'mst_ξηζ_mean': np.array([0.0]),
+                'mst_xyz_mean_robust': np.array([0.0]),
+                'mst_ξηζ_mean_robust': np.array([0.0]),
+                'mst_xyz_mad': np.array([0.0]),
+                'mst_ξηζ_mad': np.array([0.0])}
 
             # Update indicators
             for indicator in self.indicators:
