@@ -34,9 +34,15 @@ class Config():
     indicators = {indicator.label: indicator for indicator in (
 
         # xyz median absolution deviation indicators
-        Indicator('mad_xyz', np.array(['X MAD', 'Y MAD', 'Z MAD']), False, 26),
+        Indicator(
+            'mad_xyz',
+            np.array(['X MAD', 'Y MAD', 'Z MAD']),
+            np.array([False, False, False]), 26),
         Indicator('mad_xyz_total', 'Total XYZ MAD', False, 27),
-        Indicator('mad_ξηζ', np.array(['ξ MAD', 'η MAD', 'ζ MAD']), False, 28),
+        Indicator(
+            'mad_ξηζ',
+            np.array(['ξ MAD', 'η MAD', 'ζ MAD']),
+            np.array([False, False, False]), 28),
         Indicator('mad_ξηζ_total', 'Total ξηζ MAD', False, 29),
 
         # xyz position covariance matrix, determinant and trace indicators
@@ -82,10 +88,10 @@ class Config():
             np.array([False, False, False]), 18),
         Indicator(
             'cross_covariances_ξηζ_matrix_det',
-            'ξηζ Cross Covariance Matrix Determinant', False, 20),
+            'ξηζ Cross Covariance Matrix Determinant', False, 22),
         Indicator(
             'cross_covariances_ξηζ_matrix_trace',
-            'ξηζ Cross Covariance Matrix Trace', False, 22),
+            'ξηζ Cross Covariance Matrix Trace', False, 24),
 
         # xyz position robust covariance matrix, determinant and trace indicators
         Indicator(

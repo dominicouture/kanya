@@ -163,7 +163,7 @@ class Data(list):
         # Checks for the presence of a unit header in self.table
         self.unit_header = not np.vectorize(
             lambda unit: unit.replace('.', '').replace(',', '').isdigit())(self.table[1]).any()
-        # !!! Autre vérification pour voir si toute les valeurs non nulles peuvent être transformée en unit !!!
+        # !!! Autre vérification pour voir si toutes les valeurs non nulles peuvent être transformée en unit !!!
 
         # Units from a unit header, if present
         if self.data.units is None:
@@ -361,6 +361,7 @@ class Data(list):
             'err': 'Δ'}
 
         # Label matches
+        # Add mass and radius error
         matches = {'n': 'name', 'g': 'group', 't': 'type', 'm': 'mass', 'r': 'radius',
             'drv': 'rv_offset', 'Δdrv': 'rv_offset_error'}
 

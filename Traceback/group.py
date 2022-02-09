@@ -9,7 +9,7 @@
 """
 
 import numpy as np
-import galpy.util.bovy_coords as gpcooords
+import galpy.util.coords as coords
 from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
 from Traceback.data import Data
@@ -146,11 +146,6 @@ class Group(list, Output_Group):
         position_error = self.series.position_error.values
         position_scatter = self.series.position_scatter.values
 
-        print('Position scatter:', position_scatter)
-        print('Velocity scatter:', velocity_scatter)
-        print('Position error:', position_error)
-        print('Velocity error:', velocity_error)
-
         # Stars creation from a model
         self.model_stars = []
         for star in range(self.series.number_of_stars):
@@ -250,9 +245,10 @@ class Group(list, Output_Group):
             star.get_relative_coordinates()
 
     def filter_outliers(self):
-        """ Filters outliers from the full sample based on ξηζ position and velocity scatter over
-            time. A core subsample is created based on a robust covariance matrix estimator using
-            the scikit-learn (sklearn) Python package.
+        """ Filters outliers from the sample based on ξηζ position and velocity scatter over
+            time. A core sample is created based on a robust covariance matrix estimator using
+            the scikit-learn (sklearn) Python package, leaving other stars as part of the extended
+            sample.
         """
 
         # Filter outliers for the first group
@@ -314,7 +310,6 @@ class Group(list, Output_Group):
                     else:
                         self.sample[i].subsample = False
                         self.sample[i].outlier = True
-                        print(self.sample[i].name)
 
             # Temporary reasignment of subsample to stars
             self.get_stars_coordinates()
@@ -404,7 +399,7 @@ class Group(list, Output_Group):
 
     class Indicator():
         """ Age indicator including its values, age at minimum and minimum. Computes errors on
-            values, age and minium using a Jackknife Monte-Carlo method.
+            values, age and minium using a Jack-knife Monte Carlo method.
         """
 
         def __init__(self, group, indicator):
@@ -419,22 +414,22 @@ class Group(list, Output_Group):
             self.group.indicators.append(self)
 
         def __call__(self, values):
-            """ Computes errors on values, age and minium using a Jackknife Monte-Carlo method. """
+            """ Computes errors on values, age and minium using a Jackknife Monte Carlo method. """
 
             # Average values and errors
-            self.values = values
-            self.value = np.atleast_1d(np.mean(self.values, axis=0))
-            self.value_int_error = np.atleast_1d(np.std(self.values, axis=0))
+            self.values = np.atleast_3d(values)
+            self.value = np.mean(self.values, axis=0)
+            self.value_int_error = np.std(self.values, axis=0)
 
             # Average age at the minimal value and error
-            self.ages = np.atleast_1d(self.group.series.time[np.argmin(self.values, axis=1)])
-            self.age = np.atleast_1d(self.group.series.time[np.argmin(self.value, axis=0)])
-            self.age_int_error = np.atleast_1d(np.std(self.ages, axis=0))
+            self.ages = self.group.series.time[np.argmin(self.values, axis=1)]
+            self.age = self.group.series.time[np.argmin(self.value, axis=0)]
+            self.age_int_error = np.std(self.ages, axis=0)
 
             # Average minimal value and error
-            self.minima = np.atleast_1d(np.min(self.values, axis=1))
-            self.min = np.atleast_1d(np.min(self.value, axis=0))
-            self.min_int_error = np.atleast_1d(np.std(self.minima, axis=0))
+            self.minima = np.min(self.values, axis=1)
+            self.min = np.min(self.value, axis=0)
+            self.min_int_error = np.std(self.minima, axis=0)
 
             # Set status
             self.indicator.status = True
@@ -583,7 +578,7 @@ class Group(list, Output_Group):
 
     def get_Mahalanobis_distance(self, a, b=None, covariance_matrix=None):
         """ Computes the Mahalanobis distances using the covariance matrix of a of all stars in
-            the group for all jackknife iterations.
+            the group for all jack-knife iterations.
         """
 
         # Compute the covariance and inverse covariance matrices
@@ -782,14 +777,14 @@ class Group(list, Output_Group):
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
             # Linear rθz positions and velocities
-            position_rθz = np.array(gpcooords.XYZ_to_galcencyl(
+            position_rθz = np.array(coords.XYZ_to_galcencyl(
                 *self.position_xyz.T,
                 Xsun=Coordinate.sun_position[0],
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False))
-            velocity_rθz = np.array(gpcooords.vxvyvz_to_galcencyl(
+            velocity_rθz = np.array(coords.vxvyvz_to_galcencyl(
                 *self.velocity_xyz.T,
-                *np.array(gpcooords.XYZ_to_galcenrect(
+                *np.array(coords.XYZ_to_galcenrect(
                     *self.position_xyz.T,
                     Xsun=Coordinate.sun_position[0],
                     Zsun=Coordinate.sun_position[2],
@@ -827,14 +822,14 @@ class Group(list, Output_Group):
             #     *self.position_xyz, *self.velocity_xyz)
 
             # Initial rθz position and velocity in galactocentric cylindrical coordinates
-            position_rθz = np.array(gpcooords.XYZ_to_galcencyl(
+            position_rθz = np.array(coords.XYZ_to_galcencyl(
                 *self.position_xyz,
                 Xsun=Coordinate.sun_position[0],
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False))
-            velocity_rθz = np.array(gpcooords.vxvyvz_to_galcencyl(
+            velocity_rθz = np.array(coords.vxvyvz_to_galcencyl(
                 *self.velocity_xyz,
-                *np.array(gpcooords.XYZ_to_galcenrect(
+                *np.array(coords.XYZ_to_galcenrect(
                     *self.position_xyz,
                     Xsun=Coordinate.sun_position[0],
                     Zsun=Coordinate.sun_position[2],
@@ -870,13 +865,13 @@ class Group(list, Output_Group):
                 orbit.vR(time), orbit.vT(time), orbit.vz(time)]).T * Coordinate.lsr_velocity[1]
 
             # xyz positions and velocities
-            self.position_xyz = gpcooords.galcencyl_to_XYZ(
+            self.position_xyz = coords.galcencyl_to_XYZ(
                 *position_rθz.T,
                 Xsun=Coordinate.sun_position[0],
                 Zsun=Coordinate.sun_position[2],
                 _extra_rot=False)
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
-            self.velocity_xyz = gpcooords.galcencyl_to_vxvyvz(
+            self.velocity_xyz = coords.galcencyl_to_vxvyvz(
                 *velocity_rθz.T, position_rθz.T[1],
                 vsun=Coordinate.sun_velocity,
                 Xsun=Coordinate.sun_position[0],

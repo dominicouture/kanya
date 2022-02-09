@@ -40,7 +40,7 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
     """
 
     # Padding
-    padding = 0.03
+    padding = 0.01
 
     # file_path parameter
     file_path = file_path if file_path is not None else output(create=True) + '/'
@@ -109,6 +109,7 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
     # Saving
     else:
         plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
+        # plt.savefig(file_path)
 
         # Logging
         log("'{}': file saved at '{}'.", name, file_path)
@@ -116,55 +117,36 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
 class Output_Series():
     """ Defines output methods from a Series object. """
 
-    def create_mad_xyz_plot(self, title=True, forced=False, default=False, cancel=False):
+    def plot_indicator(self, ax, time, indicator, index, label, linestyle, color):
+        """ Draws the indicator's value over time on a given axis along with an enveloppe to
+            display the uncertainty. The display is further customized with the 'label',
+            'linestyle' and 'color' parameters.
+        """
+
+        ax.plot(time, indicator.value.T[index],
+            linestyle=linestyle, color=color, linewidth=1.5, label=(
+                f'{label} : ({indicator.age[index]:.2f}'
+                f' ± {indicator.age_error[index]:.2f}) Myr'))
+        ax.fill_between(time,
+            indicator.value.T[index] - indicator.value_error.T[index],
+            indicator.value.T[index] + indicator.value_error.T[index],
+            color=color, alpha=0.3, linewidth=0.)
+
+    def create_mad_xyz_plot(self, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of the xyz median absolute deviation over the entire duration of
             the data.
         """
 
         # Figure initialization
         self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax = fig.add_subplot(111)
 
-        # Plot xyz MAD
-        ax.plot(-self.time, self.mad_xyz_total.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'MAD${{}}_{{xyz}}$ : ({self.mad_xyz_total.age[0]:.2f}'
-                f' ± {self.mad_xyz_total.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_xyz_total.value - self.mad_xyz_total.value_error,
-            self.mad_xyz_total.value + self.mad_xyz_total.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
-
-        # Plot x MAD
-        ax.plot(-self.time, self.mad_xyz.value[:,0].T,
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'MAD${{}}_{{x}}$ : ({self.mad_xyz.age[0]:.2f}'
-                f' ± {self.mad_xyz.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_xyz.value[:,0].T - self.mad_xyz.value_error[:,0].T,
-            self.mad_xyz.value[:,0].T + self.mad_xyz.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # Plot y MAD
-        ax.plot(-self.time, self.mad_xyz.value[:,1].T,
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'MAD${{}}_{{y}}$ : ({self.mad_xyz.age[1]:.2f}'
-                f' ± {self.mad_xyz.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_xyz.value[:,1].T - self.mad_xyz.value_error[:,1].T,
-            self.mad_xyz.value[:,1].T + self.mad_xyz.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # Plot z MAD
-        ax.plot(-self.time, self.mad_xyz.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'MAD${{}}_{{z}}$ : ({self.mad_xyz.age[2]:.2f}'
-                f' ± {self.mad_xyz.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_xyz.value[:,2].T - self.mad_xyz.value_error[:,2].T,
-            self.mad_xyz.value[:,2].T + self.mad_xyz.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
+        # Plot total xyz MAD, x MAD, y and z MAD
+        self.plot_indicator(ax, -self.time, self.mad_xyz_total, 0, 'MAD${{}}_{{XYZ}}$', '-', colors[0])
+        self.plot_indicator(ax, -self.time, self.mad_xyz, 0, 'MAD${{}}_{{x}}$', '-', colors[2])
+        self.plot_indicator(ax, -self.time, self.mad_xyz, 1, 'MAD${{}}_{{y}}$', '--', colors[3])
+        self.plot_indicator(ax, -self.time, self.mad_xyz, 2, 'MAD${{}}_{{z}}$', ':', colors[4])
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
@@ -182,11 +164,12 @@ class Output_Series():
                         round(self.rv_offset.to('km/s').value, 2)))
 
         # Legend and axes formatting
-        ax.legend(loc=1, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Time (Myr)', fontsize=8)
+        ax.set_ylabel('Size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
         # ax.yaxis.set_major_formatter(format_ticks)
 
         # Save figure
@@ -194,55 +177,21 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_mad_ξηζ_plot(self, title=True, forced=False, default=False, cancel=False):
+    def create_mad_ξηζ_plot(self, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of the ξηζ median absolute deviation over the entire duration of
             the data.
         """
 
         # Figure initialization
         self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax = fig.add_subplot(111)
 
-        # Plot ξηζ MAD
-        ax.plot(-self.time, self.mad_ξηζ_total.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'MAD${{}}_{{ξ\prime η\prime ζ\prime}}$ : ({self.mad_ξηζ_total.age[0]:.2f}'
-                f' ± {self.mad_ξηζ_total.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_ξηζ_total.value - self.mad_ξηζ_total.value_error,
-            self.mad_ξηζ_total.value + self.mad_ξηζ_total.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
-
-        # Plot ξ MAD
-        ax.plot(-self.time, self.mad_ξηζ.value[:,0].T,
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'MAD${{}}_{{ξ\prime}}$ : ({self.mad_ξηζ.age[0]:.2f}'
-                f' ± {self.mad_ξηζ.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_ξηζ.value[:,0].T - self.mad_ξηζ.value_error[:,0].T,
-            self.mad_ξηζ.value[:,0].T + self.mad_ξηζ.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # Plot η MAD
-        ax.plot(-self.time, self.mad_ξηζ.value[:,1].T,
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'MAD${{}}_{{η\prime}}$ : ({self.mad_ξηζ.age[1]:.2f}'
-                f' ± {self.mad_ξηζ.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_ξηζ.value[:,1].T - self.mad_ξηζ.value_error[:,1].T,
-            self.mad_ξηζ.value[:,1].T + self.mad_ξηζ.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # Plot ζ MAD
-        ax.plot(-self.time, self.mad_ξηζ.value[:,2].T,
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'MAD${{}}_{{ζ\prime}}$ : ({self.mad_ξηζ.age[2]:.2f}'
-                f' ± {self.mad_ξηζ.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.mad_ξηζ.value[:,2].T - self.mad_ξηζ.value_error[:,2].T,
-            self.mad_ξηζ.value[:,2].T + self.mad_ξηζ.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
+        # Plot total ξηζ MAD, ξ MAD, η MAD and ζ MAD
+        self.plot_indicator(ax, -self.time, self.mad_ξηζ_total, 0, 'MAD${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '-', colors[0])
+        self.plot_indicator(ax, -self.time, self.mad_ξηζ, 0, 'MAD${{}}_{{ξ^\prime}}$', '-', colors[2])
+        self.plot_indicator(ax, -self.time, self.mad_ξηζ, 1, 'MAD${{}}_{{η^\prime}}$', '--', colors[3])
+        self.plot_indicator(ax, -self.time, self.mad_ξηζ, 2, 'MAD${{}}_{{ζ^\prime}}$', ':', colors[4])
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
@@ -260,11 +209,12 @@ class Output_Series():
                         round(self.rv_offset.to('km/s').value, 2)))
 
         # Legend and axes formatting
-        ax.legend(loc=1, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Time (Myr)', fontsize=8)
+        ax.set_ylabel('Size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
         # ax.yaxis.set_major_formatter(format_ticks)
 
         # Save figure
@@ -272,150 +222,172 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_xyz_plot(self, title=True, forced=False, default=False, cancel=False):
+    def create_covariances_xyz_plot(self, robust=False, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of X-X, Y-Y and Z-Z covariances, and determinant and trace. """
 
         # Figure initialization
         self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax = fig.add_subplot(111)
 
-        # xyz covariance matrix determinant
-        ax.plot(-self.time, self.covariances_xyz_matrix_det.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'Det${{}}_{{xyz}}$ : ({self.covariances_xyz_matrix_det.age[0]:.2f} '
-                f'± {self.covariances_xyz_matrix_det.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_matrix_det.value - self.covariances_xyz_matrix_det.value_error,
-            self.covariances_xyz_matrix_det.value + self.covariances_xyz_matrix_det.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
+        # Select empirical or robust indicators
+        if robust:
+            covariances_xyz_matrix_det = self.covariances_xyz_matrix_det_robust
+            covariances_xyz_matrix_trace = self.covariances_xyz_matrix_trace_robust
+            covariances_xyz = self.covariances_xyz_robust
+        else:
+            covariances_xyz_matrix_det = self.covariances_xyz_matrix_det
+            covariances_xyz_matrix_trace = self.covariances_xyz_matrix_trace
+            covariances_xyz = self.covariances_xyz
 
-        # xyz covariance matrix trace
-        ax.plot(-self.time, self.covariances_xyz_matrix_trace.value,
-            linestyle='--', color=colors[1], linewidth=1.5, label=(
-                f'Trace${{}}_{{xyz}}$ : ({self.covariances_xyz_matrix_trace.age[0]:.2f} '
-                f'± {self.covariances_xyz_matrix_trace.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_matrix_trace.value - self.covariances_xyz_matrix_trace.value_error,
-            self.covariances_xyz_matrix_trace.value + self.covariances_xyz_matrix_trace.value_error,
-            color=colors[1], alpha=0.3, linewidth=0.)
-
-        # X-X covariance
-        ax.plot(-self.time, self.covariances_xyz.value[:,0],
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'$X$-$X$ : ({self.covariances_xyz.age[0]:.2f} '
-                f'± {self.covariances_xyz.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz.value[:,0].T - self.covariances_xyz.value_error[:,0].T,
-            self.covariances_xyz.value[:,0].T + self.covariances_xyz.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # Y-Y covariance
-        ax.plot(-self.time, self.covariances_xyz.value[:,1],
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'$Y$-$Y$ : ({self.covariances_xyz.age[1]:.2f} '
-                f'± {self.covariances_xyz.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz.value[:,1].T - self.covariances_xyz.value_error[:,1].T,
-            self.covariances_xyz.value[:,1].T + self.covariances_xyz.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # Z-Z covariance
-        ax.plot(-self.time, self.covariances_xyz.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'$Z$-$Z$ : ({self.covariances_xyz.age[2]:.2f} '
-                f'± {self.covariances_xyz.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz.value[:,2].T - self.covariances_xyz.value_error[:,2].T,
-            self.covariances_xyz.value[:,2].T + self.covariances_xyz.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
+        # Plot xyz covariance matrix determinant and trace, x-x covariance, y-y covariance and z-z covariance
+        self.plot_indicator(
+            ax, -self.time, covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', colors[0])
+        self.plot_indicator(
+            ax, -self.time, covariances_xyz_matrix_trace, 0, 'Trace${{}}_{{XYZ}}$', '--', colors[1])
+        self.plot_indicator(ax, -self.time, covariances_xyz, 0, '$X$-$X$', '-', colors[2])
+        self.plot_indicator(ax, -self.time, covariances_xyz, 1, '$Y$-$Y$', '--', colors[3])
+        self.plot_indicator(ax, -self.time, covariances_xyz, 2, '$Z$-$Z$', ':', colors[4])
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
-            if self.from_data:
-                ax.set_title("X-X, Y-Y and Z-Z covariances of β Pictoris (without outliners) "
-                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
-            elif self.from_model:
-                ax.set_title("X-X, Y-Y and Z-Z covariances of {} moving group simulations with "
-                    "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia DR2\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)))
+            if robust:
+                if self.from_data:
+                    ax.set_title(" X-X, Y-Y and Z-Z robust covariances of β Pictoris (without outliners) "
+                        "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                        "errors\n".format(
+                            self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+                elif self.from_model:
+                    ax.set_title(" X-X, Y-Y and Z-Z robust covariances of {} moving group simulations "
+                        "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                        "correction and actual measurement errors of Gaia DR2\n".format(
+                            self.number_of_groups, self.duration.value,
+                            round(self.rv_offset.to('km/s').value, 2)))
+            else:
+                if self.from_data:
+                    ax.set_title("X-X, Y-Y and Z-Z covariances of β Pictoris (without outliners) "
+                        "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                        "errors\n".format(
+                            self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+                elif self.from_model:
+                    ax.set_title("X-X, Y-Y and Z-Z covariances of {} moving group simulations with "
+                        "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                        "correction and actual measurement errors of Gaia DR2\n".format(
+                            self.number_of_groups, self.duration.value,
+                            round(self.rv_offset.to('km/s').value, 2)))
 
         # Legend and axes formatting
-        ax.legend(loc=4, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Time (Myr)', fontsize=8)
+        ax.set_ylabel('Size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 30.)
+        ax.set_ylim(0., 40.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
         # ax.yaxis.set_major_formatter(format_ticks)
 
         # Save figure
-        save_figure(self.name, f'Covariances_xyz_{self.name}.pdf',
+        save_figure(self.name, f"Covariances_xyz_{self.name}{'_robust' if robust else ''}.pdf",
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_cross_covariances_xyz_plot(self, title=True, forced=False, default=False, cancel=False):
+    def create_covariances_ξηζ_plot(self, robust=False, title=False, forced=False, default=False, cancel=False):
+        """ Creates a plot of ξ-ξ, η-η and ζ-ζ covariances, and determinant and trace. """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Select empirical or robust indicators
+        if robust:
+            covariances_ξηζ_matrix_det = self.covariances_ξηζ_matrix_det_robust
+            covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace_robust
+            covariances_ξηζ = self.covariances_ξηζ_robust
+        else:
+            covariances_ξηζ_matrix_det = self.covariances_ξηζ_matrix_det
+            covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace
+            covariances_ξηζ = self.covariances_ξηζ
+
+        # Plot total ξηζ covariance matrix determinant and trace, ξ-ξ covariance, η-η covariance and ζ-ζ covariance
+        self.plot_indicator(
+            ax, -self.time, covariances_ξηζ_matrix_det, 0, 'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '-', colors[0])
+        self.plot_indicator(
+            ax, -self.time, covariances_ξηζ_matrix_trace, 0, 'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '--', colors[1])
+        self.plot_indicator(ax, -self.time, covariances_ξηζ, 0, '$ξ^\prime$-$ξ^\prime$', '-', colors[2])
+        self.plot_indicator(ax, -self.time, covariances_ξηζ, 1, '$η^\prime$-$η^\prime$', '--', colors[3])
+        self.plot_indicator(ax, -self.time, covariances_ξηζ, 2, '$ζ^\prime$-$ζ^\prime$', ':', colors[4])
+
+        # Title formatting
+        self.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if robust:
+                if self.from_data:
+                    ax.set_title(" ξ-ξ, η-η and ζ-ζ robust covariances of β Pictoris (without outliners) "
+                        "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                        "errors\n".format(
+                            self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+                elif self.from_model:
+                    ax.set_title(" ξ-ξ, η-η and ζ-ζ robust covariances of {} moving group simulations "
+                        "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                        "correction and actual measurement errors of Gaia DR2\n".format(
+                            self.number_of_groups, self.duration.value,
+                            round(self.rv_offset.to('km/s').value, 2)))
+            else:
+                if self.from_data:
+                    ax.set_title(" ξ-ξ, η-η and ζ-ζ covariances of β Pictoris (without outliners) "
+                        "over {} Myr\nwith {} km/s redshift correction and actual measurement "
+                        "errors\n".format(
+                            self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
+                elif self.from_model:
+                    ax.set_title(" ξ-ξ, η-η and ζ-ζ covariances of {} moving group simulations with "
+                        "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                        "correction and actual measurement errors of Gaia DR2\n".format(
+                            self.number_of_groups, self.duration.value,
+                            round(self.rv_offset.to('km/s').value, 2)))
+
+        # Legend and axes formatting
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Time (Myr)', fontsize=8)
+        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlim(-self.final_time.value + 20., 0.)
+        ax.set_ylim(0., 40.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
+        # ax.yaxis.set_major_formatter(format_ticks)
+
+        # Save figure
+        save_figure(self.name, f"Covariances_ξηζ_{self.name}{'_robust' if robust else ''}.pdf",
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_cross_covariances_xyz_plot(self, robust=False, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of x-u, y-v and z-w cross covariances, and determinant and trace. """
 
         # Figure initialization
         self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax = fig.add_subplot(111)
 
-        # xyz cross covariance matrix determinant
-        ax.plot(-self.time, self.cross_covariances_xyz_matrix_det.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'Det${{}}_{{xyz}}$ : ({self.cross_covariances_xyz_matrix_det.age[0]:.2f} '
-                f'± {self.cross_covariances_xyz_matrix_det.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_xyz_matrix_det.value - self.cross_covariances_xyz_matrix_det.value_error,
-            self.cross_covariances_xyz_matrix_det.value + self.cross_covariances_xyz_matrix_det.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
+        # Select empirical or robust indicators
+        if robust:
+            cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det_robust
+            cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace_robust
+            cross_covariances_xyz = self.cross_covariances_xyz_robust
+        else:
+            cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det
+            cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace
+            cross_covariances_xyz = self.cross_covariances_xyz
 
-        # xyz cross covariance matrix trace
-        ax.plot(-self.time, self.cross_covariances_xyz_matrix_trace.value,
-            linestyle='--', color=colors[1], linewidth=1.5, label=(
-                f'Trace${{}}_{{xyz}}$ : ({self.cross_covariances_xyz_matrix_trace.age[0]:.2f} '
-                f'± {self.cross_covariances_xyz_matrix_trace.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_xyz_matrix_trace.value - self.cross_covariances_xyz_matrix_trace.value_error,
-            self.cross_covariances_xyz_matrix_trace.value + self.cross_covariances_xyz_matrix_trace.value_error,
-            color=colors[1], alpha=0.3, linewidth=0.)
-
-        # x-u covariance
-        ax.plot(-self.time, self.cross_covariances_xyz.value[:,0],
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'$X$-$U$ : ({self.cross_covariances_xyz.age[0]:.2f} '
-                f'± {self.cross_covariances_xyz.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_xyz.value[:,0].T - self.cross_covariances_xyz.value_error[:,0].T,
-            self.cross_covariances_xyz.value[:,0].T + self.cross_covariances_xyz.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # y-v covariance
-        ax.plot(-self.time, self.cross_covariances_xyz.value[:,1],
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'$Y$-$V$ : ({self.cross_covariances_xyz.age[1]:.2f} '
-                f'± {self.cross_covariances_xyz.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_xyz.value[:,1].T - self.cross_covariances_xyz.value_error[:,1].T,
-            self.cross_covariances_xyz.value[:,1].T + self.cross_covariances_xyz.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # z-w covariance
-        ax.plot(-self.time, self.cross_covariances_xyz.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'$Z$-$W$ : ({self.cross_covariances_xyz.age[2]:.2f} '
-                f'± {self.cross_covariances_xyz.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_xyz.value[:,2].T - self.cross_covariances_xyz.value_error[:,2].T,
-            self.cross_covariances_xyz.value[:,2].T + self.cross_covariances_xyz.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
+        # Plot xyz cross covariance matrix determinant and trace, x-u cross covariance, y-v cross covariance and z-w cross covariance
+        self.plot_indicator(
+            ax, -self.time, cross_covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', colors[0])
+        self.plot_indicator(
+            ax, -self.time, cross_covariances_xyz_matrix_trace, 0, 'Trace${{}}_{{XYZ}}$', '--', colors[1])
+        self.plot_indicator(ax, -self.time, cross_covariances_xyz, 0, '$X$-$U$', '-', colors[2])
+        self.plot_indicator(ax, -self.time, cross_covariances_xyz, 1, '$Y$-$V$', '--', colors[3])
+        self.plot_indicator(ax, -self.time, cross_covariances_xyz, 2, '$Z$-$W$', ':', colors[4])
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
@@ -434,162 +406,45 @@ class Output_Series():
                         round(self.rv_offset.to('km/s').value, 2)))
 
         # Legend and axes formatting
-        ax.legend(loc=1, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Time (Myr)', fontsize=8)
+        ax.set_ylabel('Size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 10.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
         # ax.yaxis.set_major_formatter(format_ticks)
 
         # Save figure
-        save_figure(self.name, f'Cross_covariances_xyz_{self.name}.pdf',
+        save_figure(self.name, f"Cross_covariances_xyz_{self.name}{'_robust' if robust else ''}.pdf",
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_ξηζ_plot(self, title=True, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ-ξ, η-η and ζ-ζ covariances, and determinant and trace. """
-
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
-        ax = fig.add_subplot(111)
-
-        # ξηζ covariance matrix determinant
-        ax.plot(-self.time, self.covariances_ξηζ_matrix_det.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'Det${{}}_{{ξ\prime η\prime ζ\prime}}$ : ({self.covariances_ξηζ_matrix_det.age[0]:.2f}'
-                f' ± {self.covariances_ξηζ_matrix_det.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_matrix_det.value - self.covariances_ξηζ_matrix_det.value_error,
-            self.covariances_ξηζ_matrix_det.value + self.covariances_ξηζ_matrix_det.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
-
-        # ξηζ covariance matrix trace
-        ax.plot(-self.time, self.covariances_ξηζ_matrix_trace.value,
-            linestyle='--', color=colors[1], linewidth=1.5, label=(
-                f'Trace${{}}_{{ξ\prime η\prime ζ\prime}}$ : ({self.covariances_ξηζ_matrix_trace.age[0]:.2f} '
-                f'± {self.covariances_ξηζ_matrix_trace.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_matrix_trace.value - self.covariances_ξηζ_matrix_trace.value_error,
-            self.covariances_ξηζ_matrix_trace.value + self.covariances_ξηζ_matrix_trace.value_error,
-            color=colors[1], alpha=0.3, linewidth=0.)
-
-        # ξ-ξ covariance
-        ax.plot(-self.time, self.covariances_ξηζ.value[:,0],
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'$ξ\prime$-$ξ\prime$ : ({self.covariances_ξηζ.age[0]:.2f} '
-                f'± {self.covariances_ξηζ.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ.value[:,0].T - self.covariances_ξηζ.value_error[:,0].T,
-            self.covariances_ξηζ.value[:,0].T + self.covariances_ξηζ.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # η-η covariance
-        ax.plot(-self.time, self.covariances_ξηζ.value[:,1],
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'$η\prime$-$η\prime$ : ({self.covariances_ξηζ.age[1]:.2f} '
-                f'± {self.covariances_ξηζ.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ.value[:,1].T - self.covariances_ξηζ.value_error[:,1].T,
-            self.covariances_ξηζ.value[:,1].T + self.covariances_ξηζ.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # ζ-ζ covariance
-        ax.plot(-self.time, self.covariances_ξηζ.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'$ζ\prime$-$ζ\prime$ : ({self.covariances_ξηζ.age[2]:.2f} '
-                f'± {self.covariances_ξηζ.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ.value[:,2].T - self.covariances_ξηζ.value_error[:,2].T,
-            self.covariances_ξηζ.value[:,2].T + self.covariances_ξηζ.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
-
-        # Title formatting
-        self.stop(type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(" ξ-ξ, η-η and ζ-ζ covariances of β Pictoris (without outliners) "
-                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
-            elif self.from_model:
-                ax.set_title(" ξ-ξ, η-η and z-z covariances of {} moving group simulations with "
-                    "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia DR2\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)))
-
-        # Legend and axes formatting
-        ax.legend(loc=4, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 30.)
-        # ax.yaxis.set_major_formatter(format_ticks)
-
-        # Save figure
-        save_figure(self.name, f'Covariances_ξηζ_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
-        # plt.show()
-
-    def create_cross_covariances_ξηζ_plot(self, title=True, forced=False, default=False, cancel=False):
+    def create_cross_covariances_ξηζ_plot(self, robust=False, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of ξ-vξ, η-vη and ζ-vζ cross covariances, and determinant and trace. """
 
         # Figure initialization
         self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax = fig.add_subplot(111)
 
-        # ξηζ cross covariance matrix determinant
-        ax.plot(-self.time, self.cross_covariances_ξηζ_matrix_det.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'Det${{}}_{{ξ\prime η\prime ζ\prime}}$ : ({self.cross_covariances_ξηζ_matrix_det.age[0]:.2f} '
-                f'± {self.cross_covariances_ξηζ_matrix_det.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_ξηζ_matrix_det.value - self.cross_covariances_ξηζ_matrix_det.value_error,
-            self.cross_covariances_ξηζ_matrix_det.value + self.cross_covariances_ξηζ_matrix_det.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
+        # Select empirical or robust indicators
+        if robust:
+            cross_covariances_ξηζ_matrix_det = self.cross_covariances_ξηζ_matrix_det_robust
+            cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace_robust
+            cross_covariances_ξηζ = self.cross_covariances_ξηζ_robust
+        else:
+            cross_covariances_ξηζ_matrix_det = self.cross_covariances_ξηζ_matrix_det
+            cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace
+            cross_covariances_ξηζ = self.cross_covariances_ξηζ
 
-        # ξηζ cross covariance matrix trace
-        ax.plot(-self.time, self.cross_covariances_ξηζ_matrix_trace.value,
-            linestyle='--', color=colors[1], linewidth=1.5, label=(
-                f'Trace${{}}_{{ξ\prime η\prime ζ\prime}}$ : ({self.cross_covariances_ξηζ_matrix_trace.age[0]:.2f} '
-                f'± {self.cross_covariances_ξηζ_matrix_trace.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_ξηζ_matrix_trace.value - self.cross_covariances_ξηζ_matrix_trace.value_error,
-            self.cross_covariances_ξηζ_matrix_trace.value + self.cross_covariances_ξηζ_matrix_trace.value_error,
-            color=colors[1], alpha=0.3, linewidth=0.)
-
-        # ξ-vξ cross covariance
-        ax.plot(-self.time, self.cross_covariances_ξηζ.value[:,0],
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                '$ξ\prime$-$\dot{ξ}\prime$:' f' ({self.cross_covariances_ξηζ.age[0]:.2f} '
-                f'± {self.cross_covariances_ξηζ.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_ξηζ.value[:,0].T - self.cross_covariances_ξηζ.value_error[:,0].T,
-            self.cross_covariances_ξηζ.value[:,0].T + self.cross_covariances_ξηζ.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # η-vη cross covariance
-        ax.plot(-self.time, self.cross_covariances_ξηζ.value[:,1],
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                '$η\prime$-$\dot{η}\prime$: ' f'({self.cross_covariances_ξηζ.age[1]:.2f} '
-                f'± {self.cross_covariances_ξηζ.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_ξηζ.value[:,1].T - self.cross_covariances_ξηζ.value_error[:,1].T,
-            self.cross_covariances_ξηζ.value[:,1].T + self.cross_covariances_ξηζ.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # ζ-vζ cross covariance
-        ax.plot(-self.time, self.cross_covariances_ξηζ.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                '$ζ\prime$-$\dot{ζ}\prime$: ' f'({self.cross_covariances_ξηζ.age[2]:.2f} '
-                f'± {self.cross_covariances_ξηζ.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.cross_covariances_ξηζ.value[:,2].T - self.cross_covariances_ξηζ.value_error[:,2].T,
-            self.cross_covariances_ξηζ.value[:,2].T + self.cross_covariances_ξηζ.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
+        # Plot xyz cross covariance matrix determinant and trace, x-u cross covariance, y-v cross covariance and z-w cross covariance
+        self.plot_indicator(
+            ax, -self.time, cross_covariances_ξηζ_matrix_det, 0, 'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '-', colors[0])
+        self.plot_indicator(
+            ax, -self.time, cross_covariances_ξηζ_matrix_trace, 0, 'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '--', colors[1])
+        self.plot_indicator(ax, -self.time, cross_covariances_ξηζ, 0, '$ξ^\prime$-$\dot{ξ}^\prime$', '-', colors[2])
+        self.plot_indicator(ax, -self.time, cross_covariances_ξηζ, 1, '$η^\prime$-$\dot{η}^\prime$', '--', colors[3])
+        self.plot_indicator(ax, -self.time, cross_covariances_ξηζ, 2, '$ζFla\prime$-$\dot{ζ}^\prime$', ':', colors[4])
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
@@ -608,193 +463,20 @@ class Output_Series():
                         round(self.rv_offset.to('km/s').value, 2)))
 
         # Legend and axes formatting
-        ax.legend(loc=1, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Time (Myr)', fontsize=8)
+        ax.set_ylabel('Size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 2.5)
+        ax.set_ylim(0., 10.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
         # ax.yaxis.set_major_formatter(format_ticks)
 
         # Save figure
-        save_figure(self.name, f'Cross_covariances_ξηζ_{self.name}.pdf',
+        save_figure(self.name, f"Cross_covariances_ξηζ_{self.name}{'_robust' if robust else ''}.pdf",
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_ξηζ_robust_plot(self, title=True, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ-ξ, η-η and ζ-ζ robust covariances, and determinant and trace. """
-
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
-        ax = fig.add_subplot(111)
-
-        # ξηζ robust covariance matrix determinant
-        ax.plot(-self.time, self.covariances_ξηζ_matrix_det_robust.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'Det${{}}_{{ξ\prime η\prime ζ\prime}}$ (robust) : ({self.covariances_ξηζ_matrix_det_robust.age[0]:.2f}'
-                f' ± {self.covariances_ξηζ_matrix_det_robust.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_matrix_det_robust.value - self.covariances_ξηζ_matrix_det_robust.value_error,
-            self.covariances_ξηζ_matrix_det_robust.value + self.covariances_ξηζ_matrix_det_robust.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
-
-        # ξηζ robust covariance matrix trace
-        ax.plot(-self.time, self.covariances_ξηζ_matrix_trace_robust.value,
-            linestyle='--', color=colors[1], linewidth=1.5, label=(
-                f'Trace${{}}_{{ξ\prime η\prime ζ\prime}}$ (robust) : ({self.covariances_ξηζ_matrix_trace_robust.age[0]:.2f} '
-                f'± {self.covariances_ξηζ_matrix_trace_robust.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_matrix_trace_robust.value - self.covariances_ξηζ_matrix_trace_robust.value_error,
-            self.covariances_ξηζ_matrix_trace_robust.value + self.covariances_ξηζ_matrix_trace_robust.value_error,
-            color=colors[1], alpha=0.3, linewidth=0.)
-
-        # ξ-ξ robust covariance
-        ax.plot(-self.time, self.covariances_ξηζ_robust.value[:,0],
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'$ξ\prime$-$ξ\prime$ (robust) : ({self.covariances_ξηζ_robust.age[0]:.2f} '
-                f'± {self.covariances_ξηζ_robust.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_robust.value[:,0].T - self.covariances_ξηζ_robust.value_error[:,0].T,
-            self.covariances_ξηζ_robust.value[:,0].T + self.covariances_ξηζ_robust.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # η-η robust covariance
-        ax.plot(-self.time, self.covariances_ξηζ_robust.value[:,1],
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'$η\prime$-$η\prime$ (robust) : ({self.covariances_ξηζ_robust.age[1]:.2f} '
-                f'± {self.covariances_ξηζ_robust.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_robust.value[:,1].T - self.covariances_ξηζ_robust.value_error[:,1].T,
-            self.covariances_ξηζ_robust.value[:,1].T + self.covariances_ξηζ_robust.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # ζ-ζ robust covariance
-        ax.plot(-self.time, self.covariances_ξηζ_robust.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'$ζ\prime$-$ζ\prime$ (robust) : ({self.covariances_ξηζ_robust.age[2]:.2f} '
-                f'± {self.covariances_ξηζ_robust.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_ξηζ_robust.value[:,2].T - self.covariances_ξηζ_robust.value_error[:,2].T,
-            self.covariances_ξηζ_robust.value[:,2].T + self.covariances_ξηζ_robust.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
-
-        # Title formatting
-        self.stop(type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(" ξ-ξ, η-η and ζ-ζ robust covariances of β Pictoris (without outliners) "
-                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
-            elif self.from_model:
-                ax.set_title(" ξ-ξ, η-η and z-z robust covariances of {} moving group simulations "
-                    "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia DR2\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)))
-
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 30.)
-        # ax.yaxis.set_major_formatter(format_ticks)
-
-        # Save figure
-        save_figure(self.name, f'Covariances_ξηζ_robust_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
-        # plt.show()
-
-    def create_covariances_xyz_robust_plot(self, title=True, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ-ξ, η-η and ζ-ζ robust covariances, and determinant and trace. """
-
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(5, 4.2), facecolor='w')
-        ax = fig.add_subplot(111)
-
-        # ξηζ robust covariance matrix determinant
-        ax.plot(-self.time, self.covariances_xyz_matrix_det_robust.value,
-            linestyle='-', color=colors[0], linewidth=1.5, label=(
-                f'Det${{}}_{{xyz}}$ (robust) : ({self.covariances_xyz_matrix_det_robust.age[0]:.2f}'
-                f' ± {self.covariances_xyz_matrix_det_robust.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_matrix_det_robust.value - self.covariances_xyz_matrix_det_robust.value_error,
-            self.covariances_xyz_matrix_det_robust.value + self.covariances_xyz_matrix_det_robust.value_error,
-            color=colors[0], alpha=0.3, linewidth=0.)
-
-        # ξηζ robust covariance matrix trace
-        ax.plot(-self.time, self.covariances_xyz_matrix_trace_robust.value,
-            linestyle='--', color=colors[1], linewidth=1.5, label=(
-                f'Trace${{}}_{{xyz}}$ (robust) : ({self.covariances_xyz_matrix_trace_robust.age[0]:.2f} '
-                f'± {self.covariances_xyz_matrix_trace_robust.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_matrix_trace_robust.value - self.covariances_xyz_matrix_trace_robust.value_error,
-            self.covariances_xyz_matrix_trace_robust.value + self.covariances_xyz_matrix_trace_robust.value_error,
-            color=colors[1], alpha=0.3, linewidth=0.)
-
-        # ξ-ξ robust covariance
-        ax.plot(-self.time, self.covariances_xyz_robust.value[:,0],
-            linestyle='-', color=colors[2], linewidth=1.5, label=(
-                f'$X$-$X$ (robust) : ({self.covariances_xyz_robust.age[0]:.2f} '
-                f'± {self.covariances_xyz_robust.age_error[0]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_robust.value[:,0].T - self.covariances_xyz_robust.value_error[:,0].T,
-            self.covariances_xyz_robust.value[:,0].T + self.covariances_xyz_robust.value_error[:,0].T,
-            color=colors[2], alpha=0.3, linewidth=0.)
-
-        # η-η robust covariance
-        ax.plot(-self.time, self.covariances_xyz_robust.value[:,1],
-            linestyle='--', color=colors[3], linewidth=1.5, label=(
-                f'$Y$-$Y$ (robust) : ({self.covariances_xyz_robust.age[1]:.2f} '
-                f'± {self.covariances_xyz_robust.age_error[1]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_robust.value[:,1].T - self.covariances_xyz_robust.value_error[:,1].T,
-            self.covariances_xyz_robust.value[:,1].T + self.covariances_xyz_robust.value_error[:,1].T,
-            color=colors[3], alpha=0.3, linewidth=0.)
-
-        # ζ-ζ robust covariance
-        ax.plot(-self.time, self.covariances_xyz_robust.value[:,2],
-            linestyle=':', color=colors[4], linewidth=1.5, label=(
-                f'$Z$-$Z$ (robust) : ({self.covariances_xyz_robust.age[2]:.2f} '
-                f'± {self.covariances_xyz_robust.age_error[2]:.2f}) Myr'))
-        ax.fill_between(-self.time,
-            self.covariances_xyz_robust.value[:,2].T - self.covariances_xyz_robust.value_error[:,2].T,
-            self.covariances_xyz_robust.value[:,2].T + self.covariances_xyz_robust.value_error[:,2].T,
-            color=colors[4], alpha=0.3, linewidth=0.)
-
-        # Title formatting
-        self.stop(type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(" ξ-ξ, η-η and ζ-ζ robust covariances of β Pictoris (without outliners) "
-                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)))
-            elif self.from_model:
-                ax.set_title(" ξ-ξ, η-η and z-z robust covariances of {} moving group simulations "
-                    "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia DR2\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)))
-
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=6)
-        ax.set_xlabel('Time (Myr)')
-        ax.set_ylabel('Size (pc)')
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 30.)
-        # ax.yaxis.set_major_formatter(format_ticks)
-
-        # Save figure
-        save_figure(self.name, f'Covariances_xyz_robust_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
-        # plt.show()
-
-    def create_covariances_ξηζ_sklearn_plot(self, title=True, forced=False, default=False, cancel=False):
+    def create_covariances_ξηζ_sklearn_plot(self, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of ξ-ξ, η-η and ζ-ζ sklearn covariances, and determinant and trace. """
 
         # Figure initialization
@@ -881,7 +563,7 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_det_mad_mst_plot(self, secondary=False, title=True, forced=False, default=False, cancel=False):
+    def create_det_mad_mst_plot(self, secondary=False, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of xyz covariance matrix determinant, xyz total median absolute
             deviation, and minimum spanning tree branches length mean and median absolute
             deviation over the entire duration of the data.
@@ -972,8 +654,7 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_det_mad_mst_cross_covariances_plots(
-            self, other, title=True, forced=False, default=False, cancel=False):
+    def create_det_mad_mst_cross_covariances_plots(self, other, title=True, forced=False, default=False, cancel=False):
         """ Creates a plot of xyz covariance matrix determinant, xyz total median absolute
             deviation, and minimum spanning tree branches length mean and median absolute
             deviation over the entire duration of the data.
@@ -1164,17 +845,20 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_histogram(self, title=True, forced=False, default=False, cancel=False):
-        """ Creates an histogram of ages computed in a series. """
+    def create_age_distribution(self, title=True, forced=False, default=False, cancel=False):
+        """ Creates a plot of the distribution of ages computed in a series, including the
+            effects of measurement errors and the jack-knife Monte-Carlo.
+        """
 
         # Figure initialization
         self.check_traceback()
-        fig = plt.figure(figsize=(12, 8), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax = fig.add_subplot(111)
 
-        # Histogram plotting
-        ages = [group.covariances_xyz_matrix_det.age for group in self]
-        ax.hist(ages, bins='auto', color=blues[3]) # bins=np.arange(21.975, 26.025, 0.05)
+        # Plot histogram
+        ages = [group.covariances_xyz_matrix_det.age[0] for group in self]
+        ax.hist(ages, bins=np.linspace(16, 24, 33), density=True, color=blues[3], alpha=0.66, label='Indicator')
+        # bins=np.arange(21.975, 26.025, 0.05)
 
         # Title formatting
         self.stop(type(title) != bool, 'TypeError',
@@ -1182,15 +866,16 @@ class Output_Series():
         if title:
             ax.set_title(
                 f'Distribution of {self.number_of_groups} moving groups age,\n'
-                f'without measurement errors. Average age: ({self.covariances_xyz_matrix_det.age:.2f} '
-                f'± {self.covariances_xyz_matrix_det.age:.2f}) Myr\n')
+                f'Average age: ({self.covariances_xyz_matrix_det.age[0]:.2f} '
+                f'± {self.covariances_xyz_matrix_det.age_error[0]:.2f}) Myr\n')
 
         # Axes formatting
         ax.set_xlabel('Age (Myr)')
-        ax.set_ylabel('Number of groups')
+        ax.set_ylabel('Density')
+        ax.tick_params(direction='in', top=True, right=True)
 
         # Save figure
-        save_figure(self.name, f'Age_Historgram_{self.name}.pdf',
+        save_figure(self.name, f'Age_distribution_{self.name}.pdf',
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
@@ -1242,42 +927,83 @@ class Output_Series():
             create_line(self.indicators[i], valid=False)
         print(f"{'':-<155}")
 
+    def convert_to_LaTeX_table(self, table):
+        """ Converts a table or array to a LaTeX compatible format. """
+
+        for row in table:
+            print(' & '.join([str(i) for i in row], end='\n') + '\\\\')
+
+    def create_table_observations(self):
+        """ Creates a table of observations: ra, dec, pmra, pmdec, parallax and radial velocity. """
+
+        # Name and spectral type
+        for row in self.data:
+            line = [row.name, row.type]
+
+            # Radius and mass
+            # line += [row.radius.get_LaTeX(), row.mass.get_LaTeX()]
+
+            # Position and velocity
+            position = row.position.to(['mas', 'deg', 'deg'])
+            velocity = row.velocity.to(['km/s', 'mas/yr', 'mas/yr'])
+            line += [
+                position[2].convert_deg(True), position[1].convert_deg(False),
+                velocity[2].get_LaTeX(), velocity[1].get_LaTeX(),
+                position[0].get_LaTeX(), velocity[0].get_LaTeX()]
+
+            # line += [i.get_LaTeX() for i in (position[0], position[1], position[2])]
+
+            # Velocity
+
+            # line += [i.get_LaTeX() for i in (velocity[0], velocity[1], velocity[2])]
+
+            print(' & '.join([str(i) for i in line]) + '\\\\')
+
+
 class Output_Group():
     """ Defines output methods from a Group object. """
 
-    def get_age(self, age=None, indicator=None, index=None):
-        """ Computes the index of the age for a given indicator and index. """
+    def get_indicator(self, indicator, index=None):
+        """ Retrieves the proprer Series.indicator instance from a string and index. """
 
-        # Given age
+        # Indicator instance
+        self.series.stop(type(indicator) != str, 'TypeError',
+            "'indicator' must be a string or None ({} given).", type(indicator))
+        self.series.stop(indicator not in [indicator.label for indicator in self.series.indicators],
+            'ValueError', "'indicator' must be a valid indicator key ({} given).", indicator)
+        indicator = vars(self.series)[indicator]
+
+        # indicator index
+        if index is not None:
+            self.series.stop(type(index) != int, 'TypeError',
+                "'index' must be an integer or None ({} given).", type(index))
+            self.series.stop(index > indicator.value.size - 1, 'ValueError',
+                "'index' is too large for this indicator ({} given, {} in size).", index, indicator.value.size)
+        else:
+            self.series.stop(indicator.value.size > 1, 'ValueError',
+                "No 'index' is provided (indicator is {} in size).", indicator.value.size)
+
+        return (indicator, index if indicator.value.size > 1 else 0)
+
+    def get_epoch(self, age=None, indicator=None, index=None):
+        """ Computes the time index of the epoch for a given age or, indicator and dimensional index. """
+
+        # Index from age
         if age is not None:
             self.series.stop(type(age) not in (int, float), 'TypeError',
                 "'age' must be an integer, float or None ({} given).", type(age))
             self.series.stop(age < 0, 'ValueError',
                 "'age' must be greater than or equal to 0.0 ({} given).", type(age))
-            return int(age / self.series.final_time.value * self.series.number_of_steps)
 
-        # Age from indicator
+        # Index from the epoch of minimal of an indicator
         elif indicator is not None:
-            self.series.stop(type(indicator) != str, 'TypeError',
-                "'indicator' must be a string or None ({} given).", type(indicator))
-            self.series.stop(indicator not in [indicator.label for indicator in self.series.indicators],
-                'ValueError', "'indicator' must be a valid indicator key ({} given).", type(indicator))
-            age = vars(self.series)[indicator].age_ajusted
-
-            # indicator index
-            if index is not None:
-                self.series.stop(type(index) != int, 'TypeError',
-                    "'index' must be an integer or None ({} given).", type(index))
-                self.series.stop(index > age.size - 1, 'ValueError',
-                    "'index' is too large for this indicator ({} given, {} in size).", index, age.size)
-                age = age[index]
-            else:
-                self.series.stop(age.size > 1, 'ValueError',
-                    "No 'index' is provided (indicator is {} in size).", age.size)
-            return int(age / self.series.final_time.value * self.series.number_of_steps)
-
+            indicator, index = self.get_indicator(indicator, index)
+            age = indicator.age_ajusted[index]
         else:
-            return None
+            self.series.stop(True, 'ValueError',
+                "Either 'age' or 'indicator' must not be None ({} given).", age, index)
+
+        return int(age / self.series.final_time.value * self.series.number_of_steps)
 
     def trajectory_xyz(
             self, title=True, labels=False, indicator=None, index=None,
@@ -1295,7 +1021,7 @@ class Output_Group():
             "'labels' must be a boolean ({} given).", type(labels))
 
         # Birth epoch
-        birth = self.get_age(indicator=indicator, index=index)
+        birth = self.get_epoch(indicator=indicator, index=index)
 
         # Plot stars trajectories
         for ax, x, y in ((ax1, 1, 0), (ax2, 2, 0), (ax3, 1, 2)):
@@ -1412,17 +1138,20 @@ class Output_Group():
         """ Draws the ξηζ trajectories of stars in the group. """
 
         # Figure initialization
-        fig = plt.figure(figsize=(5, 4.75), facecolor='w')
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
         ax1 = fig.add_axes([0.10, 0.34, 0.61, 0.61])
         ax2 = fig.add_axes([0.72, 0.34, 0.23, 0.61])
         ax3 = fig.add_axes([0.10, 0.10, 0.61, 0.23])
+        # ax1 = fig.add_axes([0.05, 0.25, 0.61, 0.61])
+        # ax2 = fig.add_axes([0.72, 0.25, 0.23, 0.61])
+        # ax3 = fig.add_axes([0.05, 0.05, 0.61, 0.23])
 
         # Check labels
         self.series.stop(type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
 
         # Birth epoch
-        birth = self.get_age(indicator=indicator, index=index)
+        birth = self.get_epoch(indicator=indicator, index=index)
 
         # Plot stars trajectories
         for ax, x, y in ((ax1, 0, 1), (ax2, 2, 1), (ax3, 0, 2)):
@@ -1443,7 +1172,7 @@ class Output_Group():
                     ax.scatter(
                         np.array([star.position_ξηζ[birth,x]]),
                         np.array([star.position_ξηζ[birth,y]]),
-                        s=6, marker='o', color='r' if star.outlier else 'k', zorder=2)
+                        s=6, marker='o', color='r' if star.outlier else 'b', zorder=2)
 
                 # Add stars name
                 if self.series.from_data and labels:
@@ -1492,11 +1221,11 @@ class Output_Group():
 
         # Axes formatting
         ax1.set_xticklabels([])
-        ax1.set_ylabel('$η\prime$ (pc)')
-        ax2.set_xlabel('$ζ\prime$ (pc)')
+        ax1.set_ylabel('$η\prime$ (pc)', fontsize=8)
+        ax2.set_xlabel('$ζ\prime$ (pc)', fontsize=8)
         ax2.set_yticklabels([])
-        ax3.set_xlabel('$ξ\prime$ (pc)')
-        ax3.set_ylabel('$ζ\prime$ (pc)')
+        ax3.set_xlabel('$ξ\prime$ (pc)', fontsize=8)
+        ax3.set_ylabel('$ζ\prime$ (pc)', fontsize=8)
 
         # Axes limits
         ax1.set_xlim(-225, 60)
@@ -1507,9 +1236,9 @@ class Output_Group():
         ax3.set_ylim(-40, 49)
 
         # Axes ticks
-        ax1.tick_params(direction='in')
-        ax2.tick_params(direction='in')
-        ax3.tick_params(direction='in')
+        ax1.tick_params(direction='in', top=True, right=True, labelsize=8)
+        ax2.tick_params(direction='in', top=True, right=True, labelsize=8)
+        ax3.tick_params(direction='in', top=True, right=True, labelsize=8)
 
         # Title formatting
         self.series.stop(type(title) != bool, 'TypeError',
@@ -1535,7 +1264,7 @@ class Output_Group():
         ax4 = fig.add_subplot(221)
 
         # Birth epoch
-        birth = [self.get_age(indicator='covariances_xyz', index=index) for index in range(3)]
+        birth = [self.get_epoch(indicator='covariances_xyz', index=index) for index in range(3)]
 
         # Plot stars xyz trajectories
         for ax, y in ((ax1, 2), (ax2, 1), (ax3, 0)):
@@ -1672,7 +1401,7 @@ class Output_Group():
         ax4 = fig.add_subplot(221)
 
         # Birth epoch
-        birth = [self.get_age(indicator='covariances_ξηζ', index=index) for index in range(3)]
+        birth = [self.get_epoch(indicator='covariances_ξηζ', index=index) for index in range(3)]
 
         # Plot stars ξηζ trajectories
         for ax, y in ((ax1, 2), (ax2, 1), (ax3, 0)):
@@ -1760,7 +1489,7 @@ class Output_Group():
         ax2.set_ylabel('$η\prime - <η\prime>$ (pc)')
         ax3.set_ylabel('$ξ\prime - <ξ\prime>$ (pc)')
         ax4.set_ylabel('$<ξ\prime η\prime ζ\prime>$ (pc)')
-        ax4.legend(loc=2, fontsize=9)
+        ax4.legend(loc=2, fontsize=9, fancybox=False)
 
         # Axes limits
         ax1.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
@@ -2345,6 +2074,104 @@ class Output_Group():
         # Save figure
         save_figure(self.name, f'Covariances_Scatter_{self.name}_'
                 f'{position_keys[i].upper()}-{velocity_keys[j].upper()}.pdf',
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_age_distribution(
+            self, title=True, indicator=None, index=None,
+            forced=False, default=False, cancel=False):
+        """ Creates a plot of the distribution of jack-knife Monte-Carlo ages computed in a group. """
+
+        # Figure initialization
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w')
+        ax = fig.add_subplot(111)
+
+        # Retrieve ages
+        indicator, index = self.get_indicator(indicator, index)
+        indicator_name = indicator.label
+        ages = indicator.ages
+        if ages.ndim == 2:
+            ages = ages[self.number]
+        elif ages.ndim == 3:
+            ages = ages[self.number,:,index]
+
+        # Plot uncorrected histogram and gaussian curve
+        x = np.linspace(8, 36, 1000)
+        μ = indicator.age[index]
+        σ = indicator.age_int_error[index]
+        print(μ, σ)
+        gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
+        i, = (gauss > 0.001).nonzero()
+        ax.plot(x[i], gauss[i], color=blues[3], zorder=0.8, label='$\\xi^\\prime$ variance')
+        ax.hist(
+            ages, bins=np.linspace(12, 32, 81), density=True,
+            color=blues[3], alpha=0.3, zorder=0.8)
+        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=blues[3], linestyle='--', zorder=0.8)
+
+        # Plot corrected histogram and gaussian curve
+        x = np.linspace(8, 36, 1000)
+        μ = indicator.age_ajusted[index]
+        σ = (indicator.age_int_error[index]**2 + 1.56**2)**0.5
+        print(μ, σ)
+        gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
+        i, = (gauss > 0.001).nonzero()
+        ax.plot(x[i], gauss[i], color=blues[2], zorder=0.9, label='Corrected $\\xi^\\prime$ variance')
+        ages = (ages - indicator.age[index]) * (σ / indicator.age_int_error[index]) + μ
+        ax.hist(
+            ages, bins=np.linspace(12, 32, 81), density=True,
+            color=blues[2], alpha=0.3, zorder=0.9)
+        # ax.fill_between(x[i], np.zeros_like(x[i]), gauss[i], color=blues[2], alpha=0.3, linewidth=0., zorder=0.3)
+        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=blues[2], linestyle='--', zorder=0.9)
+
+        # Plot gaussian curve from Miret-Roig et al. (2020)
+        μ = 18.5
+        σ1, σ2 = 2.4, 2.0
+        x1, x2 = np.arange(μ - 10, μ, 0.005), np.arange(μ, μ + 10, 0.001)
+        gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
+        gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
+        x = np.concatenate((x1, x2))
+        gauss = np.concatenate((gauss1, gauss2))
+        i, = (gauss > 0.001).nonzero()
+        ax.plot(x[i], gauss[i], color=greens[3], zorder=0.7, label='Miret-Roig et al. (2020)')
+        ax.fill_between(x[i], np.zeros_like(x[i]), gauss[i], color=greens[1], alpha=0.3, linewidth=0., zorder=0.7)
+        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=greens[1], linestyle='--', zorder=0.7)
+
+        # Plot gaussian curve from Crundall et al. (2019)
+        μ = 18.3
+        σ1, σ2 = 1.2, 1.3
+        x1, x2 = np.arange(μ - 10, μ, 0.005), np.arange(μ, μ + 10, 0.001)
+        gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
+        gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
+        x = np.concatenate((x1, x2))
+        gauss = np.concatenate((gauss1, gauss2))
+        i, = (gauss > 0.001).nonzero()
+        ax.plot(x[i], gauss[i], color=greens[2], zorder=0.6, label='Crundall et al. (2019)')
+        ax.fill_between(x[i], np.zeros_like(x[i]), gauss[i], color=greens[2], alpha=0.3, linewidth=0., zorder=0.6)
+        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=greens[2], linestyle='--', zorder=0.6)
+
+        # Show a shaded area for LDB and isochrone ages
+        LDB_range = np.array([20, 26])
+        ax.fill_between(LDB_range, 0, 1, color='0.5', alpha=0.2,  linewidth=0., transform=ax.get_xaxis_transform(), zorder=0.5)
+
+        # Title formatting
+        self.series.stop(type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            ax.set_title(
+                f'Distribution of {self.series.jackknife_number} jack knife Monte-Carlo,\n'
+                f'Average age: ({indicator.age[0]:.2f} '
+                f'± {indicator.age_int_error[0]:.2f}) Myr\n')
+
+        # Axes formatting
+        ax.set_xlabel('Age (Myr)', fontsize=8)
+        ax.set_ylabel('Density', fontsize=8)
+        ax.set_xlim(13, 29)
+        ax.set_xticks([14., 16., 18., 20., 22., 24., 26., 28.])
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
+        ax.legend(loc=1, fontsize=8, fancybox=False)
+
+        # Save figure
+        save_figure(self.name, f'Age_distribution_Jack_knife_{self.name}_{indicator_name}.pdf',
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 

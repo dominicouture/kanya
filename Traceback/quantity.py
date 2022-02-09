@@ -6,6 +6,7 @@
 """
 
 import numpy as np
+from decimal import Decimal
 from astropy import units as u
 from astropy.constants import c, G, M_sun, R_sun
 from Traceback.tools import squeeze, broadcast, full
@@ -80,6 +81,59 @@ class Quantity:
         else:
             self.parent = None
             self.index = None
+
+    def find_precisions(self):
+        """ Finds the precision of a value, that is, the exponent of its last significant digit.
+            If no error is provided, the last significant digit of the value is used. Otherwise,
+            the first significant digit of the error is used.
+        """
+
+        # Find indexes with and without errors
+        zeros = self.errors == 0.0
+        nonzeros = ~zeros
+
+        # Compute precisions and errors for values without errors
+        self.precisions = np.zeros_like(self.errors, dtype=int)
+        self.precisions[zeros] = -np.vectorize(
+            lambda x: Decimal(str(x)).as_tuple().exponent, otypes=[np.int])(self.values[zeros])
+        self.errors[zeros] = np.float_power(10., -self.precisions[zeros])
+
+        # Compute precisions for values with errors
+        self.precisions[nonzeros] = -np.array(np.floor(np.log10(self.errors[nonzeros])), dtype=int)
+
+    def apply_precision(self):
+        """ Reduces the number of significant numbers based on the precison. """
+
+        # Find precisions, round errors, update precisions and errors, round values
+        self.find_precisions()
+        self.errors = np.vectorize(np.round)(self.errors, self.precisions)
+        self.find_precisions()
+        self.errors = np.vectorize(np.round)(self.errors, self.precisions)
+        self.values = np.vectorize(np.round)(self.values, self.precisions)
+
+        if self.shape == (1,):
+            self.value = float(self.values[0])
+            self.error = float(self.errors[0])
+            self.precision = int(self.precisions[0])
+
+    def get_LaTeX(self):
+        """ Creates a LaTeX compatible string. """
+
+        self.apply_precision()
+
+        return f'${self.value:.{self.precision}f} \\pm {self.error:.{self.precision}f}$'
+
+    def convert_deg(self, ra):
+        """ Converts a right ascension or declination value from degree to HH:MM:SS.SS or
+            DD:MM:SS.SS.
+        """
+
+        hh = int(self.value / (15 if ra else 1))
+        mm = int(self.value * 60 % 60)
+        ss = float(self.value * 3600 % 60)
+
+        return f'{hh:0>2.0f}:{mm:0>2.0f}:{ss:0>5.2f}'
+
 
     def __repr__(self):
         """ Creates a string with the values, errors and units of the Quantity object. """

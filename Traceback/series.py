@@ -425,7 +425,7 @@ class Series(list, Output_Series):
         # Check if parameter.values is convertible to an integer and greater than or equal to 1
         self.stop(parameter.values % 1 != 0, 'ValueError', "'{}' must be convertible "
             "to an integer ({} given).", parameter.label, parameter.values)
-        self.stop(parameter.values < 1, 'ValueError', "'{}' must be "
+        self.stop(parameter.values < 0, 'ValueError', "'{}' must be "
             "greater than or equal to 1 ({} given).", parameter.label, parameter.values)
 
         # Conversion to an integer
@@ -591,11 +591,10 @@ class Series(list, Output_Series):
                         for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.value.shape))
                 self.values = (np.array([vars(group)[self.label].values for group in self.series[1:]])
-                     if self.series.number_of_groups > 1
+                    if self.series.number_of_groups > 1
                         else np.expand_dims(vars(self.series[0])[self.label].values, axis=0))
-                self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
-                self.value_error_quad = np.atleast_1d((
-                    self.value_int_error**2 + self.value_ext_error**2)**0.5)
+                self.value_error = np.std(self.values, axis=(0, 1))
+                self.value_error_quad = (self.value_int_error**2 + self.value_ext_error**2)**0.5
 
                 # Age and errors
                 self.age = vars(self.series[0])[self.label].age
@@ -604,11 +603,10 @@ class Series(list, Output_Series):
                         for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.age.shape))
                 self.ages = (np.array([vars(group)[self.label].ages for group in self.series[1:]])
-                     if self.series.number_of_groups > 1
+                    if self.series.number_of_groups > 1
                         else np.expand_dims(vars(self.series[0])[self.label].ages, axis=0))
-                self.age_error = np.atleast_1d(np.std(self.ages, axis=(0, 1)))
-                self.age_error_quad = np.atleast_1d((
-                    self.age_int_error**2 + self.age_ext_error**2)**0.5)
+                self.age_error = np.std(self.ages, axis=(0, 1))
+                self.age_error_quad = (self.age_int_error**2 + self.age_ext_error**2)**0.5
 
                 # Minimum and errors
                 self.min = vars(self.series[0])[self.label].min
@@ -617,11 +615,10 @@ class Series(list, Output_Series):
                         for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.min.shape))
                 self.minima = (np.array([vars(group)[self.label].minima for group in self.series[1:]])
-                     if self.series.number_of_groups > 1
+                    if self.series.number_of_groups > 1
                         else np.expand_dims(vars(self.series[0])[self.label].minima, axis=0))
-                self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
-                self.min_error_quad = np.atleast_1d((
-                    self.min_int_error**2 + self.min_ext_error**2)**0.5)
+                self.min_error = np.std(self.minima, axis=(0, 1))
+                self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
                 # Age age_offset based on simulation
                 self.age_offset = self.series.age_offset[self.label]
@@ -643,10 +640,8 @@ class Series(list, Output_Series):
                 self.value_ext_error = np.std(
                     [vars(group)[self.label].value for group in self.series], axis=0)
                 self.values = np.array([vars(group)[self.label].values for group in self.series])
-                self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
-                self.value_error = np.atleast_1d(np.std(self.values, axis=(0, 1)))
-                self.value_error_quad = np.atleast_1d((
-                    self.value_int_error**2 + self.value_ext_error**2)**0.5)
+                self.value_error = np.std(self.values, axis=(0, 1))
+                self.value_error_quad = (self.value_int_error**2 + self.value_ext_error**2)**0.5
 
                 # Age and errors
                 self.age = np.mean(
@@ -656,9 +651,8 @@ class Series(list, Output_Series):
                 self.age_ext_error = np.std(
                     [vars(group)[self.label].age for group in self.series], axis=0)
                 self.ages = np.array([vars(group)[self.label].ages for group in self.series])
-                self.age_error = np.atleast_1d(np.std(self.ages, axis=(0, 1)))
-                self.age_error_quad = np.atleast_1d((
-                    self.age_int_error**2 + self.age_ext_error**2)**0.5)
+                self.age_error = np.std(self.ages, axis=(0, 1))
+                self.age_error_quad = (self.age_int_error**2 + self.age_ext_error**2)**0.5
 
                 # Minimum and errors
                 self.min = np.mean(
@@ -668,9 +662,8 @@ class Series(list, Output_Series):
                 self.min_ext_error = np.std(
                     [vars(group)[self.label].min for group in self.series], axis=0)
                 self.minima = np.array([vars(group)[self.label].minima for group in self.series])
-                self.min_error = np.atleast_1d(np.std(self.minima, axis=(0, 1)))
-                self.min_error_quad = np.atleast_1d((
-                    self.min_int_error**2 + self.min_ext_error**2)**0.5)
+                self.min_error = np.std(self.minima, axis=(0, 1))
+                self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
                 # Age age_offset based on simulation
                 self.age_offset = self.series.age.value - self.age
@@ -1111,7 +1104,7 @@ class Series(list, Output_Series):
                 'cross_covariances_xyz': np.array([0.0, 0.0, 0.0]),
                 'cross_covariances_xyz_matrix_det': np.array([0.0]),
                 'cross_covariances_xyz_matrix_trace': np.array([0.0]),
-                'covariances_ξηζ': np.array([0.0, 0.0, 0.0]),
+                'covariances_ξηζ': np.array([3.84, 0.0, 0.0]),
                 'covariances_ξηζ_matrix_det': np.array([0.0]),
                 'covariances_ξηζ_matrix_trace': np.array([0.0]),
                 'cross_covariances_ξηζ': np.array([0.0, 0.0, 0.0]),

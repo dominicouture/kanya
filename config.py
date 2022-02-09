@@ -21,8 +21,8 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Name of series of groups
-# name.value = 'beta_pictoris'
-name.value = 'beta_pictoris_eDR3'
+name.value = 'beta_pictoris'
+# name.value = 'beta_pictoris_eDR3'
 # name.value = 'beta_pictoris_Miret-Roig'
 
 # Path to the file or directory used as input or output relative the base directory (str). If the
@@ -34,8 +34,8 @@ file_path.value = None
 number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-# number_of_steps.value = 250
-number_of_steps.value = 171
+number_of_steps.value = 500
+# number_of_steps.value = 171
 
 # Number of stars in each simulated group of stars (integer, > 0)
 number_of_stars.value = 26
@@ -67,15 +67,14 @@ position_scatter.values = (3.0, 3.0, 3.0)
 # position_scatter.values = (29.3, 14.0, 9.0)
 
 # Average velocity of the simulated sample of stars (tuple)
-# velocity.values = (-10.278, -15.726, -8.759) # new
-velocity.values = (-10.549, -15.889,  -8.711)
+velocity.values = (-10.278, -15.726, -8.759) # new
+# velocity.values = (-10.549, -15.889,  -8.711)
 # velocity.values = (-10.93, -15.79,  -8.94)
 # velocity.values = (-11.344, -11.344, -11.344)
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
 velocity_error.values = (1.0112, 0.30754, 0.26432)
-# velocity_error.values = (0.0, 0.30754, 0.26432)
 # velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
@@ -84,7 +83,6 @@ velocity_error.axis = 'equatorial'
 
 # Average velocity scatter of the simulated sample of stars (tuple)
 velocity_scatter.values = (1.6805, 1.6805, 1.6805)
-# velocity_scatter.values = (0.3, 0.3, 0.3)
 # velocity_scatter.values = (2.21753, 1.36009, 1.57355)
 velocity_scatter.units = 'km/s'
 
@@ -93,7 +91,7 @@ velocity_scatter.units = 'km/s'
 # data.value = '../Data/bpic_Crundall2019.csv'
 # data.value = '../Data/β Pictoris Moving Group - Member Stars (no outliers).csv'
 # data.value = '../Data/β Pictoris Moving Group - Core Sample (eDR3).csv'
-data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3).csv'
+data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 1.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -192,7 +190,7 @@ data_rv_offsets.value = False
 data_errors.value = False
 
 # Number of Jackknife Monte Carlo iterations (integer, ≥ 0)
-jackknife_number.value = 500
+jackknife_number.value = 100
 
 # Fraction of stars included in every Jackkinfe Monte Carlo iteration (0 < float ≤ 1)
 jackknife_fraction.value = 0.5
@@ -209,6 +207,6 @@ sample.value = 'sample'
 sample.value = 'subsample'
 
 # Galactic potential used for orbit integration (str or None)
-potential.value = None
+# potential.value = None
 # potential.value = 'MWPotential2014'
-# potential.value = 'Irrgang13I'
+potential.value = 'Irrgang13I'

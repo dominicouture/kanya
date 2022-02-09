@@ -645,7 +645,7 @@ def uvw_to_μρμθw(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0)
         return values, errors
 
 def μρμθw_to_uvw(ρ, θ, z, μρ, μθ, w, Δρ=0, Δθ=0, Δz=0, Δμρ=0, Δμθ=0, Δw=0):
-    """ Converts a μρμθw, radial velocity (μρ; pc/Myr), angular velocity (μθ; rad/Myr) and W
+    """ Converts a μρμθw, radial velocity (μρ; pc/Myr), angular velocity (μθ; rad/Myr) and w
         velocity (w; pc/Myr), cylindrical coordinate velocity vector (galactocentric) to an UVW
         cartesian coordinate velocity vector (pc/Myr), along with measurement errors.
     """

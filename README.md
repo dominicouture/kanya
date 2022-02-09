@@ -25,4 +25,5 @@ This software uses the following non-standard Python (version 3.6.3) modules:
 - scipy
 - matplotlib
 - astropy
-- galpy (in the future)
+- galpy
+- sklearn
