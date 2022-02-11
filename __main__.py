@@ -40,10 +40,10 @@ for series in collection:
     # Group output
     for group in series:
         if group.number == 0:
-            group.trajectory_xyz(title=False, forced=True, indicator='covariances_xyz', index=0) # Valid
-            group.trajectory_ξηζ(title=False, forced=True, indicator='covariances_xyz', index=0) # Valid
-            group.trajectory_txyz(title=False, forced=True) # Valid
-            group.trajectory_tξηζ(title=False, forced=True) # Valid
+            group.trajectory_xyz(forced=True, indicator='covariances_xyz', index=0) # Valid
+            group.trajectory_ξηζ(forced=True, indicator='covariances_xyz', index=0) # Valid
+            group.trajectory_txyz(forced=True, indicator='covariances_xyz', index=0) # Valid
+            group.trajectory_tξηζ(forced=True, indicator='covariances_xyz', index=0) # Valid
             # group.create_map(title=False, forced=True, labels=False)
             # group.create_2D_and_3D_scatter([0,  5,  10], title=False, forced=True)
             # group.create_2D_and_3D_scatter([15, 20, 25], title=False, forced=True)

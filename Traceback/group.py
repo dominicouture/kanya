@@ -103,7 +103,7 @@ class Group(list, Output_Group):
                     *star.position.errors, *star.velocity.errors)
 
                 # Apply radial velocity offset
-                velocity_rδα += np.array([rv_offset, 0., 0.])
+                velocity_rδα += np.array([star.rv_offset.value, 0., 0.])
 
                 # Compute equatorial xyz position and velocity
                 position_xyz, position_xyz_error = (star.position.values, star.position.errors)
@@ -912,16 +912,3 @@ class Group(list, Output_Group):
             """ Returns a string of name of the star. """
 
             return self.name
-
-        def shift_rv(self):
-            """ Shifts the radial velocity based on the gravitationnal redshift of the star and
-                current value of the radial velocity.
-            """
-
-            # Gravitationnal constant (pc^3 / M_sol / Myr^2)
-            G = 0.004498706056647732
-
-            # Speed of light (pc/Myr)
-            c = 306601.3937879527
-
-            self.velocity_xyz[:,0] = G * (c + self.velocity_xyz[:,0]) - c

@@ -537,7 +537,7 @@ class Data(list):
 
             # Default radial velocity offset otherwise
             else:
-                 self.rv_offset = self.series.rv_offset
+                 self.rv_offset = self.data.series.rv_offset
 
             # Position columns and unit conversion
             self.position = Quantity(

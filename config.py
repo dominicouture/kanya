@@ -147,6 +147,7 @@ data.axis = 'observables'
 
 # data.system = 'cartesian'
 # data.axis = 'equatorial'
+# data.units = ['pc',   'pc',   'pc', 'km/s', 'km/s', 'km/s']
 # data.values = {'beta_pictoris_Miret-Roig': [
 #     [   'X',    'Y',    'Z',    'U',    'V',    'W', 'mass', 'radius'],
 #     [  'pc',   'pc',   'pc', 'km/s', 'km/s', 'km/s',     '',       ''],
@@ -189,7 +190,7 @@ data_rv_offsets.value = False
 # Whether to use actual or simulated measurement errors (boolean)
 data_errors.value = False
 
-# Number of Jackknife Monte Carlo iterations (integer, ≥ 0)
+# Number of Jackknife Monte Carlo iterations (integer, ≥ 1)
 jackknife_number.value = 100
 
 # Fraction of stars included in every Jackkinfe Monte Carlo iteration (0 < float ≤ 1)

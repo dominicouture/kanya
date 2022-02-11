@@ -1006,7 +1006,7 @@ class Output_Group():
         return int(age / self.series.final_time.value * self.series.number_of_steps)
 
     def trajectory_xyz(
-            self, title=True, labels=False, indicator=None, index=None,
+            self, title=False, labels=False, age=None, indicator=None, index=None,
             forced=False, default=False, cancel=False):
         """ Draw the xyz trajectories of stars in the group. """
 
@@ -1021,7 +1021,7 @@ class Output_Group():
             "'labels' must be a boolean ({} given).", type(labels))
 
         # Birth epoch
-        birth = self.get_epoch(indicator=indicator, index=index)
+        birth = self.get_epoch(age=age, indicator=indicator, index=index)
 
         # Plot stars trajectories
         for ax, x, y in ((ax1, 1, 0), (ax2, 2, 0), (ax3, 1, 2)):
@@ -1133,7 +1133,7 @@ class Output_Group():
             forced=forced, default=default, cancel=cancel)
 
     def trajectory_ξηζ(
-            self, title=True, labels=False, indicator=None, index=None,
+            self, title=False, labels=False, age=None, indicator=None, index=None,
             forced=False, default=False, cancel=False):
         """ Draws the ξηζ trajectories of stars in the group. """
 
@@ -1151,7 +1151,7 @@ class Output_Group():
             "'labels' must be a boolean ({} given).", type(labels))
 
         # Birth epoch
-        birth = self.get_epoch(indicator=indicator, index=index)
+        birth = self.get_epoch(age=age, indicator=indicator, index=index)
 
         # Plot stars trajectories
         for ax, x, y in ((ax1, 0, 1), (ax2, 2, 1), (ax3, 0, 2)):
@@ -1252,7 +1252,7 @@ class Output_Group():
         # plt.show()
 
     def trajectory_txyz(
-            self, title=True, indicator=None, index=None,
+            self, title=False, age=None, indicator=None, index=None,
             forced=False, default=False, cancel=False):
         """ Draws the xyz trajectories as a function of time of stars. """
 
@@ -1264,7 +1264,7 @@ class Output_Group():
         ax4 = fig.add_subplot(221)
 
         # Birth epoch
-        birth = [self.get_epoch(indicator='covariances_xyz', index=index) for index in range(3)]
+        birth = [self.get_epoch(age=age, indicator=indicator, index=index) for index in range(3)]
 
         # Plot stars xyz trajectories
         for ax, y in ((ax1, 2), (ax2, 1), (ax3, 0)):
@@ -1390,7 +1390,9 @@ class Output_Group():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def trajectory_tξηζ(self, title=True, forced=False, default=False, cancel=False):
+    def trajectory_tξηζ(
+            self, title=False, age=None, indicator=None, index=None,
+            forced=False, default=False, cancel=False):
         """ Draws the ξηζ trajectories as a function of time of stars. """
 
         # Figure initialization
@@ -1401,7 +1403,7 @@ class Output_Group():
         ax4 = fig.add_subplot(221)
 
         # Birth epoch
-        birth = [self.get_epoch(indicator='covariances_ξηζ', index=index) for index in range(3)]
+        birth = [self.get_epoch(age=age, indicator=indicator, index=index) for index in range(3)]
 
         # Plot stars ξηζ trajectories
         for ax, y in ((ax1, 2), (ax2, 1), (ax3, 0)):
