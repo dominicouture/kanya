@@ -19,153 +19,153 @@ class Config():
         A config object can then be used as the input of a Series object.
     """
 
-    class Indicator():
-        """ Contains the data of a given size indicator. """
+    class Metric():
+        """ Contains the data of a given association size metric. """
 
         def __init__(self, label, name, valid, order):
-            """ Initializes an Indicator object. """
+            """ Initializes a Metric object. """
 
             self.label = label
             self.name = np.atleast_1d(name)
             self.valid = np.atleast_1d(valid)
             self.order = order
 
-    # Size indicators
-    indicators = {indicator.label: indicator for indicator in (
+    # Initializes association size metrics
+    metrics = {metric.label: metric for metric in (
 
-        # xyz median absolution deviation indicators
-        Indicator(
+        # xyz median absolution deviation
+        Metric(
             'mad_xyz',
             np.array(['X MAD', 'Y MAD', 'Z MAD']),
             np.array([False, False, False]), 26),
-        Indicator('mad_xyz_total', 'Total XYZ MAD', False, 27),
-        Indicator(
+        Metric('mad_xyz_total', 'Total XYZ MAD', False, 27),
+        Metric(
             'mad_ξηζ',
             np.array(['ξ MAD', 'η MAD', 'ζ MAD']),
             np.array([False, False, False]), 28),
-        Indicator('mad_ξηζ_total', 'Total ξηζ MAD', False, 29),
+        Metric('mad_ξηζ_total', 'Total ξηζ MAD', False, 29),
 
-        # xyz position covariance matrix, determinant and trace indicators
-        Indicator(
+        # xyz position covariance matrix, determinant and trace
+        Metric(
             'covariances_xyz',
             np.array(['X Variance', 'Y Variance', 'Z Variance']),
             np.array([True, False, False]), 0),
-        Indicator(
+        Metric(
             'covariances_xyz_matrix_det',
             'XYZ Covariance Matrix Determinant', False, 2),
-        Indicator(
+        Metric(
             'covariances_xyz_matrix_trace',
             'XYZ Covariance Matrix Trace', False, 4),
 
-        # ξηζ position covariance matrix, determinant and trace indicators
-        Indicator(
+        # ξηζ position covariance matrix, determinant and trace
+        Metric(
             'covariances_ξηζ',
             np.array(['ξ Variance', 'η Variance', 'ζ Variance']),
             np.array([True, False, False]), 6),
-        Indicator(
+        Metric(
             'covariances_ξηζ_matrix_det',
             'ξηζ Covariance Matrix Determinant', False, 8),
-        Indicator(
+        Metric(
             'covariances_ξηζ_matrix_trace',
             'ξηζ Covariance Matrix Trace', False, 10),
 
-        # xyz position and velocity cross covariance matrix, determinant and trace indicators
-        Indicator(
+        # xyz position and velocity cross covariance matrix, determinant and trace
+        Metric(
             'cross_covariances_xyz',
             np.array(['X-U Cross Covariance', 'Y-V Cross Covariance', 'Z-W Cross Covariance']),
             np.array([False, False, False]), 12),
-        Indicator(
+        Metric(
             'cross_covariances_xyz_matrix_det',
             'XYZ Cross Covariance Matrix Determinant', False, 14),
-        Indicator(
+        Metric(
             'cross_covariances_xyz_matrix_trace',
             'XYZ Cross Covariance Matrix Trace', False, 16),
 
-        # ξηζ position and velocity cross covariance matrix, determinant and trace indicators
-        Indicator(
+        # ξηζ position and velocity cross covariance matrix, determinant and trace
+        Metric(
             'cross_covariances_ξηζ',
             np.array(['ξ-vξ Cross Covariance', 'η-vη Cross Covariance', 'ζ-vζ Cross Covariance']),
             np.array([False, False, False]), 18),
-        Indicator(
+        Metric(
             'cross_covariances_ξηζ_matrix_det',
             'ξηζ Cross Covariance Matrix Determinant', False, 22),
-        Indicator(
+        Metric(
             'cross_covariances_ξηζ_matrix_trace',
             'ξηζ Cross Covariance Matrix Trace', False, 24),
 
-        # xyz position robust covariance matrix, determinant and trace indicators
-        Indicator(
+        # xyz position robust covariance matrix, determinant and trace
+        Metric(
             'covariances_xyz_robust',
             np.array(['X Variance (robust)', 'Y Variance (robust)', 'Z Variance (robust)']),
             np.array([True, False, False]), 1),
-        Indicator(
+        Metric(
             'covariances_xyz_matrix_det_robust',
             'XYZ Covariance Matrix Determinant (robust)', False, 3),
-        Indicator(
+        Metric(
             'covariances_xyz_matrix_trace_robust',
             'XYZ Covariance Matrix Trace (robust)', False, 5),
 
-        # ξηζ position robust covariance matrix, determinant and trace indicators
-        Indicator(
+        # ξηζ position robust covariance matrix, determinant and trace
+        Metric(
             'covariances_ξηζ_robust',
             np.array(['ξ Variance (robust)', 'η Variance (robust)', 'ζ Variance (robust)']),
             np.array([True, False, False]), 7),
-        Indicator(
+        Metric(
             'covariances_ξηζ_matrix_det_robust',
             'ξηζ Covariance Matrix Determinant (robust)', False, 9),
-        Indicator(
+        Metric(
             'covariances_ξηζ_matrix_trace_robust',
             'ξηζ Covariance Matrix Trace (robust)', False, 11),
 
-        # xyz position and velocity robust cross covariance matrix, determinant and trace indicators
-        Indicator(
+        # xyz position and velocity robust cross covariance matrix, determinant and trace
+        Metric(
             'cross_covariances_xyz_robust',
             np.array(['X-U Cross Covariance (robust)', 'Y-V Cross Covariance (robust)',
                 'Z-W Cross Covariance (robust)']),
             np.array([False, False, False]), 13),
-        Indicator(
+        Metric(
             'cross_covariances_xyz_matrix_det_robust',
             'XYZ Cross Covariance Matrix Determinant (robust)', False, 15),
-        Indicator(
+        Metric(
             'cross_covariances_xyz_matrix_trace_robust',
             'XYZ Cross Covariance Matrix Trace (robust)', False, 17),
 
-        # ξηζ position and velocity robust cross covariance matrix, determinant and trace indicators
-        Indicator(
+        # ξηζ position and velocity robust cross covariance matrix, determinant and trace
+        Metric(
             'cross_covariances_ξηζ_robust',
             np.array(['ξ-vξ Cross Covariance (robust)', 'η-vη Cross Covariance (robust)',
                 'ζ-vζ Cross Covariance (robust)']),
             np.array([False, False, False]), 21),
-        Indicator(
+        Metric(
             'cross_covariances_ξηζ_matrix_det_robust',
             'ξηζ Cross Covariance Matrix Determinant (robust)', False, 23),
-        Indicator(
+        Metric(
             'cross_covariances_ξηζ_matrix_trace_robust',
             'ξηζ Cross Covariance Matrix Trace (robust)', False, 25),
 
-        # ξηζ position sklearn covariance matrix, determinant and trace indicators
-        Indicator(
+        # ξηζ position sklearn covariance matrix, determinant and trace
+        Metric(
             'covariances_ξηζ_sklearn',
             np.array(['ξ Variance (sklearn)', 'η Variance (sklearn)', 'ζ Variance (sklearn)']),
             np.array([False, False, False]), 7.5),
-        Indicator(
+        Metric(
             'covariances_ξηζ_matrix_det_sklearn',
             'ξηζ Covariance Matrix Determinant (sklearn)', False, 9.5),
-        Indicator(
+        Metric(
             'covariances_ξηζ_matrix_trace_sklearn',
             'ξηζ Covariance Matrix Trace (sklearn)', False, 11.5),
 
-        # Minimum spanning tree average branch length indicators
-        Indicator('mst_xyz_mean', 'XYZ MST Mean', False, 30),
-        Indicator('mst_ξηζ_mean', 'ξηζ MST Mean', False, 31),
+        # Minimum spanning tree average branch length
+        Metric('mst_xyz_mean', 'XYZ MST Mean', False, 30),
+        Metric('mst_ξηζ_mean', 'ξηζ MST Mean', False, 31),
 
-        # Minimum spanning tree robust average branch length indicators
-        Indicator('mst_xyz_mean_robust', 'XYZ MST Mean (robust)', False, 32),
-        Indicator('mst_ξηζ_mean_robust', 'ξηζ MST Mean (robust)', False, 33),
+        # Minimum spanning tree robust average branch length
+        Metric('mst_xyz_mean_robust', 'XYZ MST Mean (robust)', False, 32),
+        Metric('mst_ξηζ_mean_robust', 'ξηζ MST Mean (robust)', False, 33),
 
-        # Minimum spanning tree branch length median absolute deviation indicators
-        Indicator('mst_xyz_mad', 'XYZ MST MAD', False, 34),
-        Indicator('mst_ξηζ_mad', 'ξηζ MST MAD', False, 35))}
+        # Minimum spanning tree branch length median absolute deviation
+        Metric('mst_xyz_mad', 'XYZ MST MAD', False, 34),
+        Metric('mst_ξηζ_mad', 'ξηζ MST MAD', False, 35))}
 
     class Parameter():
         """ Contains the components of a given configuration parameter. """
@@ -194,8 +194,10 @@ class Config():
                 parameter = vars(parameter)
 
             # Check if the parameter is a dictionary here
-            stop(type(parameter) != dict, 'TypeError', "A parameter must be a Config.Parameter "
-                "object or a dictionary ({} given).", type(parameter))
+            stop(
+                type(parameter) != dict, 'TypeError',
+                "A parameter must be a Config.Parameter object or a dictionary ({} given).",
+                type(parameter))
 
             # Component conversion from singular to plural form
             for component in ('value', 'unit'):
@@ -214,19 +216,22 @@ class Config():
 
             # Parameter update if present in self.default_components
             if type(parameter) == dict:
-                vars(self).update({key: component for key, component in parameter.items() \
+                vars(self).update({
+                    key: component for key, component in parameter.items()
                     if key in self.default_components})
 
         def __repr__(self):
             """ Returns a string with all the components of the parameter. """
 
-            return '({})'.format(', '.join(
-                ['{}: {}'.format(key, value) for key, value in vars(self).items()]))
+            return '({})'.format(
+                ', '.join(['{}: {}'.format(key, value) for key, value in vars(self).items()]))
 
     # Null parameters
-    null_position = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
+    null_position = dict(
+        values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
         units=tuple(variable.unit.label for variable in systems['cartesian'].position))
-    null_velocity = dict(values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
+    null_velocity = dict(
+        values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
         units=tuple(variable.unit.label for variable in systems['cartesian'].velocity))
     null_time = dict(units=System.default_units['time'].label)
 
@@ -252,11 +257,12 @@ class Config():
         Parameter(label='velocity_scatter', name='Average velocity scatter', **null_velocity),
         Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
         Parameter(label='data_errors', name='Data errors', values=False),
-        Parameter(label='rv_offset', name='Radial velocity offset', values=0.0,
+        Parameter(
+            label='rv_offset', name='Radial velocity offset', values=0.0,
             units=System.default_units['speed'].label, system='cartesian'),
         Parameter(label='data_rv_offsets', name='Data radial velocity offset', values=False),
-        Parameter(label='jackknife_number', name='Jackknife number', values=1),
-        Parameter(label='jackknife_fraction', name='Jackknife fraction', values=1.0, units=''),
+        Parameter(label='jackknife_number', name='Jack-knife number', values=1),
+        Parameter(label='jackknife_fraction', name='Jack-knife fraction', values=1.0, units=''),
         Parameter(label='mst_fraction', name='Minimum spanning tree fraction', values=1.0, units=''),
         Parameter(label='cutoff', name='Cutoff', values=None),
         Parameter(label='sample', name='Sample', values=None),
@@ -281,8 +287,9 @@ class Config():
         elif type(parent) == Config:
             self.initialize_from_parameters(deepcopy(vars(parent)))
         else:
-            stop(True, 'TypeError', "'parent' can either be a Config object or None ({} given).",
-                type(parent))
+            stop(
+                True, 'TypeError',
+                "'parent' can either be a Config object or None ({} given).", type(parent))
 
         # Parameters import
         if path is not None:
@@ -299,19 +306,22 @@ class Config():
         """
 
         # Check if config_path is a string
-        stop(type(config_path) != str, 'TypeError',
+        stop(
+            type(config_path) != str, 'TypeError',
             "The path to the configuration file must be a string ('{}' given).", type(config_path))
 
         # Absolute path
         config_path = directory(collection.base_dir, config_path, 'config_path')
 
         # Check if the configuration file exists
-        stop(not path.exists(config_path), 'FileNotFoundError',
+        stop(
+            not path.exists(config_path), 'FileNotFoundError',
             "No configuration file located at '{}'.", config_path)
 
         # Check if the configuration is a Python file
-        stop(path.splitext(config_path)[1] != '.py', 'TypeError', "'{}' is not a Python file. "
-            "(with a .py extension)", path.basename(config_path))
+        stop(
+            path.splitext(config_path)[1] != '.py', 'TypeError',
+            "'{}' is not a Python file. (with a .py extension)", path.basename(config_path))
 
         # Configuration file import
         from importlib.util import spec_from_file_location, module_from_spec
@@ -323,8 +333,9 @@ class Config():
 
         # Check if all names are valid
         except NameError as error:
-            stop(True, 'NameError', "{}, only values in 'default_parameters' are configurable.",
-                error.args[0])
+            stop(
+                True, 'NameError',
+                "{}, only values in 'default_parameters' are configurable.", error.args[0])
 
         # Parameters import
         self.initialize_from_parameters(vars(parameters))
@@ -336,8 +347,9 @@ class Config():
         """
 
         # Check if 'args' is a boolean value
-        stop(type(args) != bool, 'TypeError', "'args' must be a boolean value ({} given).",
-            type(args))
+        stop(
+            type(args) != bool, 'TypeError',
+            "'args' must be a boolean value ({} given).", type(args))
 
         # Arguments parsing
         from argparse import ArgumentParser

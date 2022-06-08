@@ -65,31 +65,37 @@ class Series(list, Output_Series):
 
         # Check if all parameters are present and are Config.Parameter objects
         for parameter in self.config.default_parameters.keys():
-            self.stop(parameter not in vars(self.config), 'NameError',
+            self.stop(
+                parameter not in vars(self.config), 'NameError',
                 "Required parameter '{}' is missing in the configuration.", parameter)
-            self.stop(type(vars(self.config)[parameter]) != self.config.Parameter, 'TypeError',
+            self.stop(
+                type(vars(self.config)[parameter]) != self.config.Parameter, 'TypeError',
                 "'{}' must be a Config.Parameter object ({} given).", parameter,
                 type(vars(self.config)[parameter]))
 
             # Check if all components are present
             for component in self.config.Parameter.default_components.keys():
-                self.stop(component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
+                self.stop(
+                    component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
                     "Required component '{}' is missing from the '{}' parameter "
                     "in the configuration.", component, parameter)
 
         # Check for invalid parameters and components
         for parameter_label, parameter in vars(self.config).items():
-            self.stop(parameter_label not in self.config.default_parameters.keys(), 'NameError',
+            self.stop(
+                parameter_label not in self.config.default_parameters.keys(), 'NameError',
                 "Parameter '{}' in the configuration is invalid.", parameter_label)
             for component_label, component in vars(parameter).items():
-                self.stop(component_label not in self.config.Parameter.default_components.keys(),
+                self.stop(
+                    component_label not in self.config.Parameter.default_components.keys(),
                     'NameError', "Parameter's component '{}' in '{}' is invalid.", component_label,
                      parameter_label)
 
                 # Check whether all components, but parameter.values and parameter.units, are
                 # strings or None
                 if component_label not in ('values', 'units'):
-                    self.stop(component is not None and type(component) not in (
+                    self.stop(
+                        component is not None and type(component) not in (
                             str, System, System.Axis, System.Origin), 'TypeError',
                         "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
                         component_label, parameter_label, type(component))
@@ -107,7 +113,8 @@ class Series(list, Output_Series):
             if type(parameter.system) == System:
                 pass
             elif parameter.system is not None:
-                self.stop(parameter.system.lower() not in systems.keys(), 'ValueError',
+                self.stop(
+                    parameter.system.lower() not in systems.keys(), 'ValueError',
                     "'system' component of '{}' is invalid ({} required, {} given).",
                     parameter.label, list(systems.keys()), parameter.system)
                 parameter.system = systems[parameter.system.lower()]
@@ -118,7 +125,8 @@ class Series(list, Output_Series):
             if type(parameter.axis) == System.Axis:
                 pass
             elif parameter.axis is not None:
-                self.stop(parameter.axis.lower() not in parameter.system.axes.keys(), 'ValueError',
+                self.stop(
+                    parameter.axis.lower() not in parameter.system.axes.keys(), 'ValueError',
                     "'axis' component of '{}' is not a valid ({} required, {} given).",
                     parameter.label, list(parameter.system.axes.keys()), parameter.axis)
                 parameter.axis = parameter.system.axes[parameter.axis.lower()]
@@ -129,8 +137,9 @@ class Series(list, Output_Series):
             if type(parameter.origin) == System.Origin:
                 pass
             elif parameter.origin is not None:
-                self.stop(parameter.origin.lower() not in parameter.system.origins.keys(), 'Value'
-                    'Error', "'origin' component of '{}' is not a valid ({} required, {} given).",
+                self.stop(
+                    parameter.origin.lower() not in parameter.system.origins.keys(), 'ValueError',
+                    "'origin' component of '{}' is not a valid ({} required, {} given).",
                     parameter.label, list(parameter.system.origins.keys()), parameter.origin)
                 parameter.origin = parameter.system.origins[parameter.origin.lower()]
             elif default_parameter.origin is not None:
@@ -140,17 +149,19 @@ class Series(list, Output_Series):
         """ Checks basic series parameters. Checks if self.name is a string and creates a default
             value if needed. Checks the type of the modes provided in the configuration and checks
             if their values are valid. self.to_file is set to False if self.from_file is True.
-            Moreover, self.date is defined and self.indicators configured.
+            Moreover, self.date is defined and self.metrics configured.
         """
 
         # Check if name is a string
         if self.config.name.values is not None:
-            self.stop(type(self.config.name.values) != str, 'TypeError',
+            self.stop(
+                type(self.config.name.values) != str, 'TypeError',
                 "'name' must be a string ('{}' given).", type(self.config.name.values))
 
         # Series name
-        self.name = collection.default_name() if self.config.name.values is None \
-            else self.config.name.values
+        self.name = (
+            collection.default_name() if self.config.name.values is None
+            else self.config.name.values)
 
         # Current date and time
         from time import strftime
@@ -159,9 +170,11 @@ class Series(list, Output_Series):
         # from_data, from_model, from_file and to_file parameters
         for argument in ('from_data', 'from_model', 'from_file', 'to_file'):
             vars(self)[argument] = vars(self.config)[argument].values
-            self.stop(vars(self)[argument] is None, 'NameError',
+            self.stop(
+                vars(self)[argument] is None, 'NameError',
                 "Required parameter '{}' is missing in the configuration.", argument)
-            self.stop(type(vars(self)[argument]) != bool, 'TypeError',
+            self.stop(
+                type(vars(self)[argument]) != bool, 'TypeError',
                 "'{}' must be a boolean ({} given).", argument, type(vars(self)[argument]))
 
         # self.to_file parameter set to False if self.from_file is True
@@ -170,10 +183,10 @@ class Series(list, Output_Series):
                 "The file will not be updated with its own data.", self.name)
             self.to_file = False
 
-        # Indicators configuration
-        self.indicators = []
-        for indicator in self.config.indicators.keys():
-            self.Indicator(self, self.config.indicators[indicator])
+        # Association size metric configuration
+        self.metrics = []
+        for metric in self.config.metrics.keys():
+            self.Metric(self, self.config.metrics[metric])
 
     def configure_mode(self, mode=None):
         """ Checks if selected mode is valid, and if one and no more than one mode has been
@@ -182,8 +195,8 @@ class Series(list, Output_Series):
 
         # Mode import
         if mode is not None:
-            self.stop(type(mode) != str, 'TypeError', "'mode' must be a string ({} given).",
-                type(mode))
+            self.stop(
+                type(mode) != str, 'TypeError', "'mode' must be a string ({} given).", type(mode))
             if mode.lower().replace('_', '').replace('from', '') == 'data':
                 self.from_data = True
                 self.from_model = False
@@ -194,13 +207,15 @@ class Series(list, Output_Series):
                 self.stop(True, 'ValueError', "Could not understand mode '{}'", mode)
 
         # Check if at least one mode has been selected
-        self.stop(self.from_data == False and self.from_model == False, 'ValueError',
+        self.stop(
+            self.from_data == False and self.from_model == False, 'ValueError',
             "Either traceback '{}' from data or a model (None selected).", self.name)
 
         # Check if no more than one mode has been selected
-        self.stop(self.from_data == True and self.from_model == True,
-            'ValueError', "No more than one traceback mode ('from_data' or 'from_model') can be "
-            "selected for '{}'", self.name)
+        self.stop(
+            self.from_data == True and self.from_model == True,
+            'ValueError', "No more than one traceback mode ('from_data' or 'from_model') "
+            "can be selected for '{}'", self.name)
 
     def configure_file(self, file_path=None):
         """ Checks if the file directory and the file itself exist and creates them if needed.
@@ -209,32 +224,35 @@ class Series(list, Output_Series):
         """
 
         # file_path parameter
-        self.file_path = file_path if file_path is not None \
-            else self.config.file_path.values if self.config.file_path.values is not None \
-            else output(check=self.from_file, create=self.to_file) + '/'
+        self.file_path = (
+            file_path if file_path is not None
+            else self.config.file_path.values if self.config.file_path.values is not None
+            else output(check=self.from_file, create=self.to_file) + '/')
 
         # Check if file_path parameter is a string, which must be done before the directory call
-        self.stop(type(self.file_path) != str, 'TypeError', "'file_path' must be a string "
-            "({} given).", type(self.file_path))
+        self.stop(
+            type(self.file_path) != str, 'TypeError',
+            "'file_path' must be a string ({} given).", type(self.file_path))
 
         # self.file_path redefined as the absolute path, default name and directory creation
         self.file_path = path.join(
             directory(collection.base_dir, path.dirname(self.file_path),
                 'file_path', check=self.from_file, create=self.to_file),
-            '{}.series'.format(self.name) if path.basename(self.file_path) == '' \
-                else path.basename(self.file_path))
+            '{}.series'.format(self.name) if path.basename(self.file_path) == ''
+            else path.basename(self.file_path))
 
         # Check if the series file exists, if loading from a file
-        self.stop(self.from_file and not path.exists(self.file_path), 'FileNotFoundError',
+        self.stop(
+            self.from_file and not path.exists(self.file_path), 'FileNotFoundError',
             "No series file located at '{}'.", self.file_path)
 
         # Check if the file is a series file
-        self.stop(path.splitext(self.file_path)[1].lower() != '.series',
-            'TypeError', "'{}' is not a series file (with a .series extension).",
-            path.basename(self.file_path))
+        self.stop(
+            path.splitext(self.file_path)[1].lower() != '.series', 'TypeError',
+            "'{}' is not a series file (with a .series extension).", path.basename(self.file_path))
 
     def configure_traceback(self):
-        """ Checks traceback configuration parameters from data or a model. """
+        """ Checks traceback configuration parameters for 'From data' and 'From model' modes. """
 
         # number_of_groups parameter
         self.number_of_groups = self.configure_integer(self.config.number_of_groups)
@@ -247,7 +265,8 @@ class Series(list, Output_Series):
 
         # final_time parameter
         self.final_time = self.configure_quantity(self.config.final_time)
-        self.stop(not self.final_time > self.initial_time, 'ValueError',
+        self.stop(
+            not self.final_time > self.initial_time, 'ValueError',
             "'final_time' must be greater than initial_time ({} and {} given).",
             self.final_time, self.initial_time)
 
@@ -262,67 +281,80 @@ class Series(list, Output_Series):
 
         # data_errors parameter
         self.data_rv_offsets = self.config.data_rv_offsets.values
-        self.stop(self.data_rv_offsets is None, 'NameError',
+        self.stop(
+            self.data_rv_offsets is None, 'NameError',
             "Required traceback parameter 'data_rv_offsets' is missing in the configuration.")
-        self.stop(type(self.data_rv_offsets) != bool, 'TypeError',
+        self.stop(
+            type(self.data_rv_offsets) != bool, 'TypeError',
             "'data_rv_offsets' must be a boolean ({} given).", type(self.data_rv_offsets))
 
         # data_errors parameter
         self.data_errors = self.config.data_errors.values
-        self.stop(self.data_errors is None, 'NameError',
+        self.stop(
+            self.data_errors is None, 'NameError',
             "Required traceback parameter 'data_errors' is missing in the configuration.")
-        self.stop(type(self.data_errors) != bool, 'TypeError',
+        self.stop(
+            type(self.data_errors) != bool, 'TypeError',
             "'data_errors' must be a boolean ({} given).", type(self.data_errors))
 
-        # jackknife_fraction parameter
+        # jackknife_number parameter
         self.jackknife_number = self.configure_integer(self.config.jackknife_number)
-        self.stop(self.jackknife_number <= 0, 'ValueError',
+        self.stop(
+            self.jackknife_number <= 0, 'ValueError',
             "'jackknife_number' must be greater to 0 ({} given).", self.jackknife_number)
 
         # jackknife_fraction parameter
         self.jackknife_fraction = self.configure_quantity(self.config.jackknife_fraction).value
-        # self.jackknife_fraction = self.config.jackknife_fraction
-        self.stop(self.jackknife_fraction <= 0 or self.jackknife_fraction > 1, 'ValueError',
-            "'jackknife_number' must be between 0 and 1 ({} given).", self.jackknife_number)
+        self.stop(
+            self.jackknife_fraction <= 0 or self.jackknife_fraction > 1, 'ValueError',
+            "'jackknife_fraction' must be between 0 and 1 ({} given).", self.jackknife_fraction)
 
         # mst_fraction parameter
         self.mst_fraction = self.configure_quantity(self.config.mst_fraction).value
         # self.mst_fraction = self.config.mst_fraction
-        self.stop(self.mst_fraction <= 0 or self.mst_fraction > 1, 'ValueError',
+        self.stop(
+            self.mst_fraction <= 0 or self.mst_fraction > 1, 'ValueError',
             "'mst_fraction' must be between 0 and 1 ({} given).", self.mst_fraction)
 
         # cutoff parameter
         if self.config.cutoff.values is not None:
-            self.stop(type(self.config.cutoff.values) not in (int, float),
-                'TypeError', "'{}' must be an integer, float or None ({} given).",
+            self.stop(
+                type(self.config.cutoff.values) not in (int, float), 'TypeError',
+                "'{}' must be an integer, float or None ({} given).",
                 self.config.cutoff.label, type(self.config.cutoff.values))
-            self.stop(self.config.cutoff.values <= 0.0, 'ValueError',
+            self.stop(
+                self.config.cutoff.values <= 0.0, 'ValueError',
                 "'cutoff' must be greater to 0.0 ({} given).", self.config.cutoff.values)
         self.cutoff = self.config.cutoff.values
 
         # sample parameter
         self.sample = self.config.sample.values
-        self.stop(self.sample is None, 'NameError',
+        self.stop(
+            self.sample is None, 'NameError',
             "Required traceback parameter 'sample' is missing in the configuration.")
-        self.stop(type(self.sample) != str, 'TypeError',
+        self.stop(
+            type(self.sample) != str, 'TypeError',
             "'sample' must be a string ({} given).", type(self.sample))
         self.sample = self.sample.lower()
-        self.stop(self.sample not in ('outliers', 'sample', 'subsample'), 'ValueError',
+        self.stop(
+            self.sample not in ('outliers', 'sample', 'subsample'), 'ValueError',
             "'sample' must be outliers, sample or subsample ({} given).", self.sample)
 
         # potential parameter
         self.potential = self.config.potential.values
         if self.potential is not None:
-            self.stop(type(self.potential) != str, 'TypeError',
+            self.stop(
+                type(self.potential) != str, 'TypeError',
                 "'potential' must be a string or None ({} given).", type(self.potential))
 
             # Converts the potential string to a galpy.potential object
             try:
-                exec(f'from galpy.potential.mwpotentials import {self.potential} as potential',
+                exec(
+                    f'from galpy.potential.mwpotentials import {self.potential} as potential',
                     globals())
             except:
-                self.stop(True, 'ValueError',
-                    "'potenial' is invalid ({} given).", self.potential)
+                self.stop(
+                    True, 'ValueError', "'potenial' is invalid ({} given).", self.potential)
             self.potential = potential
 
         # Data configuration
@@ -347,7 +379,8 @@ class Series(list, Output_Series):
         log("Initializing '{}' series from data.", self.name)
 
         # Check if data is present
-        self.stop(self.config.data is None, 'NameError',
+        self.stop(
+            self.config.data is None, 'NameError',
             "Required traceback parameter 'data' is missing in the configuration.")
 
         # Stars creation from data
@@ -359,8 +392,8 @@ class Series(list, Output_Series):
             self.number_of_stars = len(self.data)
 
             # Simulation parameters set to None or False if stars are imported from data
-            for parameter in ('age', *self.config.position_parameters,
-                    *self.config.velocity_parameters):
+            for parameter in (
+                    'age', *self.config.position_parameters, *self.config.velocity_parameters):
                 vars(self)[parameter] = None
 
     def configure_model(self):
@@ -370,9 +403,11 @@ class Series(list, Output_Series):
         log("Initializing '{}' series from a model.", self.name)
 
         # Check if all the necessary parameters are present
-        for parameter in ('number_of_stars', 'age',
+        for parameter in (
+                'number_of_stars', 'age',
                 *self.config.position_parameters, *self.config.velocity_parameters):
-            self.stop(vars(self.config)[parameter].values is None, 'NameError',
+            self.stop(
+                vars(self.config)[parameter].values is None, 'NameError',
                 "Required simulation parameter '{}' is missing in the configuration.", parameter)
 
         # number_of_stars parameter
@@ -380,7 +415,8 @@ class Series(list, Output_Series):
 
         # age parameter
         self.age = self.configure_quantity(self.config.age)
-        self.stop(self.age.value < 0.0, 'ValueError',
+        self.stop(
+            self.age.value < 0.0, 'ValueError',
             "'age' must be greater than or equal to 0.0 Myr ({} given).", self.age)
 
         # position parameter
@@ -406,7 +442,8 @@ class Series(list, Output_Series):
             self.configure_data()
 
             # Check if the data length matches the number of stars
-            self.stop(len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_offset' "
+            self.stop(
+                len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_offset' "
                  "is True, the data length must be greater than 0.")
 
         # Data set to None because measurement errors and rv offsets are simulated
@@ -417,16 +454,23 @@ class Series(list, Output_Series):
         """ Checks if an integer value is valid and converts it if needed. """
 
         # Check the presence and type of parameter.values
-        self.stop(parameter.values is None, 'NameError',
+        self.stop(
+            parameter.values is None, 'NameError',
             "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
-        self.stop(type(parameter.values) not in (int, float), 'TypeError', "'{}' must be "
-            "an integer or a float ({} given).", parameter.label, type(parameter.values))
+        self.stop(
+            type(parameter.values) not in (int, float), 'TypeError',
+            "'{}' must be an integer or a float ({} given).",
+            parameter.label, type(parameter.values))
 
         # Check if parameter.values is convertible to an integer and greater than or equal to 1
-        self.stop(parameter.values % 1 != 0, 'ValueError', "'{}' must be convertible "
-            "to an integer ({} given).", parameter.label, parameter.values)
-        self.stop(parameter.values < 0, 'ValueError', "'{}' must be "
-            "greater than or equal to 1 ({} given).", parameter.label, parameter.values)
+        self.stop(
+            parameter.values % 1 != 0, 'ValueError',
+            "'{}' must be convertible to an integer ({} given).",
+            parameter.label, parameter.values)
+        self.stop(
+            parameter.values < 0, 'ValueError',
+            "'{}' must be greater than or equal to 1 ({} given).",
+            parameter.label, parameter.values)
 
         # Conversion to an integer
         return int(parameter.values)
@@ -435,37 +479,45 @@ class Series(list, Output_Series):
         """ Checks if a value is valid and converts it to default units if needed. """
 
         # Check the presence and type of parameter.values component
-        self.stop(parameter.values is None, 'NameError',
+        self.stop(
+            parameter.values is None, 'NameError',
             "Required traceback parameter '{}' is missing in the configuration.", parameter.label)
-        self.stop(type(parameter.values) not in (int, float), 'TypeError', "'{}' must be "
-            " an integer or a float ({} given).", parameter.label, type(parameter.values))
+        self.stop(
+            type(parameter.values) not in (int, float), 'TypeError',
+            "'{}' must be an integer or a float ({} given).",
+            parameter.label, type(parameter.values))
 
         # Default units component
         if parameter.units is None:
             parameter.units = self.config.default_parameters[parameter.label].units
 
         # Check if parameter.units is a string
-        self.stop(type(parameter.units) != str, 'TypeError', "'units' component of '{}' "
-            "must be a string ({} given).", parameter.label, type(parameter.units))
+        self.stop(
+            type(parameter.units) != str, 'TypeError',
+            "'units' component of '{}' must be a string ({} given).",
+            parameter.label, type(parameter.units))
 
         # Check if parameter.units can be converted to Unit
         try:
             Unit(parameter.units)
         except:
-            self.stop(True, 'ValueError', "'units' component of '{}' must represent a unit.",
-                parameter.label)
+            self.stop(
+                True, 'ValueError',
+                "'units' component of '{}' must represent a unit.", parameter.label)
 
         # Quantity object creation
         try:
             quantity = Quantity(**vars(parameter))
         except:
-            self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.",
-                parameter.label)
+            self.stop(
+                True, 'ValueError',
+                "'{}' could not be converted to a Quantity object.", parameter.label)
 
         # Check if the physical type is valid
         default_physical_type = Unit(
             self.config.default_parameters[parameter.label].units).physical_type
-        self.stop(quantity.physical_types.flatten()[0] != default_physical_type, 'ValueError',
+        self.stop(
+            quantity.physical_types.flatten()[0] != default_physical_type, 'ValueError',
             "Unit of '{}' does not have the correct physical type ('{}' given, '{}' required).",
             parameter.label, quantity.physical_types.flatten()[0], default_physical_type)
 
@@ -487,9 +539,11 @@ class Series(list, Output_Series):
             self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.label)
 
         # Check the presence and type of parameter.values
-        self.stop(parameter.values is None, 'NameError',
+        self.stop(
+            parameter.values is None, 'NameError',
             "Required simulation parameter '{}' is missing in the configuration.", parameter.label)
-        self.stop(type(parameter.values) not in (tuple, list, np.ndarray), 'TypeError',
+        self.stop(
+            type(parameter.values) not in (tuple, list, np.ndarray), 'TypeError',
             "'values' component of '{}' must be a tuple, list or np.ndarray ({} given).'",
                 parameter.label, type(parameter.values))
 
@@ -497,19 +551,23 @@ class Series(list, Output_Series):
         try:
             np.vectorize(float)(parameter.values)
         except:
-            self.stop(True, 'ValueError',
+            self.stop(
+                True, 'ValueError',
                 "'values' component of '{}' contains non-numerical elements.", parameter.label)
 
         # Check the dimensions of parameter.values
         shape = np.array(parameter.values).shape
         ndim = len(shape)
-        self.stop(ndim > 2, 'ValueError', "'{}' must have 1 or 2 dimensions ({} given).",
-            parameter.label, ndim)
-        self.stop(shape[-1] != 3, 'ValueError',
+        self.stop(
+            ndim > 2, 'ValueError',
+            "'{}' must have 1 or 2 dimensions ({} given).", parameter.label, ndim)
+        self.stop(
+            shape[-1] != 3, 'ValueError',
             "'{}' last dimension must have a size of 3 ({} given).", parameter.label, shape[-1])
-        self.stop(ndim == 2 and shape[0] not in (1, self.number_of_stars),
-            'ValueError',  "'{}' first dimension ({} given) must have a size of 1 or equal "
-            "to the number of stars ({} given).", parameter.label, shape[0], self.number_of_stars)
+        self.stop(
+            ndim == 2 and shape[0] not in (1, self.number_of_stars), 'ValueError',
+            "'{}' first dimension ({} given) must have a size of 1 or equal to the "
+            "number of stars ({} given).", parameter.label, shape[0], self.number_of_stars)
 
         # Default parameter.units component
         if parameter.units is None:
@@ -519,16 +577,19 @@ class Series(list, Output_Series):
         if type(parameter.units) == str:
             if parameter.units.lower() in systems.keys():
                 if parameter.label in self.config.position_parameters:
-                    parameter.units = [variable.usual_unit.unit \
+                    parameter.units = [
+                        variable.usual_unit.unit
                         for variable in systems[parameter.units.lower()].position]
                 elif parameter.label in self.config.velocity_parameters:
-                    parameter.units = [variable.usual_unit.unit \
+                    parameter.units = [
+                        variable.usual_unit.unit
                         for variable in systems[parameter.units.lower()].velocity]
             else:
                 parameter.units = (parameter.units,)
 
         # Check the type of parameter.units component
-        self.stop(type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
+        self.stop(
+            type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
             "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
                 parameter.label, type(parameter.values))
 
@@ -536,98 +597,108 @@ class Series(list, Output_Series):
         try:
             Unit(np.array(parameter.units, dtype=object))
         except:
-            self.stop(True, 'ValueError',
+            self.stop(
+                True, 'ValueError',
                 "'units' components of '{}' must all represent units.", parameter.label)
 
         # Quantity object creation
         try:
             quantity = Quantity(**vars(parameter))
         except:
-            self.stop(True, 'ValueError', "'{}' could not be converted to a Quantity object.",
-                parameter.label)
+            self.stop(
+                True, 'ValueError',
+                "'{}' could not be converted to a Quantity object.", parameter.label)
 
         # Check if physical types are valid based on parameter.system
         physical_types = np.array([variable.physical_type for variable in variables])
-        self.stop(not (quantity.physical_types == physical_types).all(), 'ValueError',
+        self.stop(
+            not (quantity.physical_types == physical_types).all(), 'ValueError',
             "Units in '{}' do not have the correct physical type "
-            "({} given, {} required for '{}' system.)", parameter.label,
-             quantity.physical_types.tolist(), physical_types.tolist(), quantity.system)
+            "({} given, {} required for '{}' system.)",
+            parameter.label, quantity.physical_types.tolist(),
+            physical_types.tolist(), quantity.system)
 
         # Units conversion to default units
         return quantity.to()
 
-    class Indicator():
-        """ Age indicator including its average values, age error, age at minimum and minimum. """
+    class Metric():
+        """ Association size metric including its average values, age error, age at minimum and
+            minimum.
+        """
 
-        def __init__(self, series, indicator):
-            """ Initializes an average age indicator. """
+        def __init__(self, series, metric):
+            """ Initializes an average association size metric. """
 
             # Initialization
             self.series = series
-            self.label = deepcopy(indicator.label)
-            self.name = deepcopy(indicator.name)
-            self.valid = deepcopy(indicator.valid)
-            self.order = deepcopy(indicator.order)
+            self.label = deepcopy(metric.label)
+            self.name = deepcopy(metric.name)
+            self.valid = deepcopy(metric.valid)
+            self.order = deepcopy(metric.order)
             self.status = False
 
-            # Add the indicator to the series
+            # Add the association size metric to the series
             vars(self.series)[self.label] = self
-            self.series.indicators.append(self)
+            self.series.metrics.append(self)
 
         def __call__(self):
-            """ Computes the values and errors of an indicator. If the series has been initialized
-                from data, the first group (index 0) is used for values, age and mininum. Other
-                groups are used to compute uncertainty due to measurement errors. If only one group
-                is present, the internal error is used as the total error.
+            """ Computes the values and errors of an association size metric. If the series has
+                been initialized from data, the first group (index 0) is used for values, age and
+                mininum. Other groups are used to compute uncertainty due to measurement errors.
+                If only one group is present, the internal error is used as the total error.
             """
 
-            # Average indicator for stars from data
+            # Average association size metric for stars from data
             if self.status and self.series.from_data:
 
                 # Value and errors
                 self.value = vars(self.series[0])[self.label].value
                 self.value_int_error = vars(self.series[0])[self.label].value_int_error
-                self.value_ext_error = (np.std([vars(group)[self.label].value
-                        for group in self.series[1:]], axis=0)
+                self.value_ext_error = (
+                    np.std([vars(group)[self.label].value for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.value.shape))
-                self.values = (np.array([vars(group)[self.label].values for group in self.series[1:]])
+                self.values = (
+                    np.array([vars(group)[self.label].values for group in self.series[1:]])
                     if self.series.number_of_groups > 1
-                        else np.expand_dims(vars(self.series[0])[self.label].values, axis=0))
+                    else np.expand_dims(vars(self.series[0])[self.label].values, axis=0))
                 self.value_error = np.std(self.values, axis=(0, 1))
                 self.value_error_quad = (self.value_int_error**2 + self.value_ext_error**2)**0.5
 
                 # Age and errors
                 self.age = vars(self.series[0])[self.label].age
                 self.age_int_error = vars(self.series[0])[self.label].age_int_error
-                self.age_ext_error = (np.std([vars(group)[self.label].age
-                        for group in self.series[1:]], axis=0)
+                self.age_ext_error = (
+                    np.std([vars(group)[self.label].age for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.age.shape))
-                self.ages = (np.array([vars(group)[self.label].ages for group in self.series[1:]])
+                self.ages = (
+                    np.array([vars(group)[self.label].ages for group in self.series[1:]])
                     if self.series.number_of_groups > 1
-                        else np.expand_dims(vars(self.series[0])[self.label].ages, axis=0))
+                    else np.expand_dims(vars(self.series[0])[self.label].ages, axis=0))
                 self.age_error = np.std(self.ages, axis=(0, 1))
                 self.age_error_quad = (self.age_int_error**2 + self.age_ext_error**2)**0.5
 
                 # Minimum and errors
                 self.min = vars(self.series[0])[self.label].min
                 self.min_int_error = vars(self.series[0])[self.label].min_int_error
-                self.min_ext_error = (np.std([vars(group)[self.label].min
-                        for group in self.series[1:]], axis=0)
+                self.min_ext_error = (
+                    np.std([vars(group)[self.label].min for group in self.series[1:]], axis=0)
                     if self.series.number_of_groups > 1 else np.zeros(self.min.shape))
-                self.minima = (np.array([vars(group)[self.label].minima for group in self.series[1:]])
+                self.minima = (
+                    np.array([vars(group)[self.label].minima for group in self.series[1:]])
                     if self.series.number_of_groups > 1
-                        else np.expand_dims(vars(self.series[0])[self.label].minima, axis=0))
+                    else np.expand_dims(vars(self.series[0])[self.label].minima, axis=0))
                 self.min_error = np.std(self.minima, axis=(0, 1))
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
-                # Age age_offset based on simulation
+                # Age offset based on simulation
                 self.age_offset = self.series.age_offset[self.label]
+
                 self.age_ajusted = self.age + self.age_offset
 
                 # Minimum change
                 self.min_change = (self.min / self.value[0] - 1.) * 100.
 
-            # Average indicator for stars from a model
+            # Average association size metric for stars from a model
             elif self.status and self.series.from_model:
                 self.values = np.mean(
                     [vars(group)[self.label].values for group in self.series], axis=0)
@@ -672,7 +743,7 @@ class Series(list, Output_Series):
                 # Minimum change
                 self.min_change = (self.min / self.value[0] - 1.) * 100.
 
-            # No average indicator
+            # Null average association size metric
             else:
                 null = np.full(self.valid.shape, np.nan)
 
@@ -710,8 +781,9 @@ class Series(list, Output_Series):
             # Box size (Myr) converted to the corresponding number of steps
             # box_size = 1. # Transform in to parameter
             # box_size = 0.01
-            # box_size = int(box_size * self.series.number_of_steps / (
-            #     self.series.final_time.value - self.series.initial_time.value))
+            # box_size = int(
+            #     box_size * self.series.number_of_steps /
+            #     (self.series.final_time.value - self.series.initial_time.value))
             # if box_size > 1:
             #     box = np.squeeze(np.tile(
             #         np.ones(box_size) / box_size, (1 if self.values.ndim == 1 else 3, 1))).T
@@ -735,13 +807,16 @@ class Series(list, Output_Series):
         # Check if a series already exists
         if self.name in collection.series.keys():
             choice = None
-            self.stop(type(forced) != bool, 'TypeError',
+            self.stop(
+                type(forced) != bool, 'TypeError',
                 "'forced' must be a boolean ({} given).", type(forced))
             if not forced:
-                self.stop(type(default) != bool, 'TypeError',
+                self.stop(
+                    type(default) != bool, 'TypeError',
                     "'default' must be a default ({} given).", type(default))
                 if not default:
-                    self.stop(type(cancel) != bool, 'TypeError',
+                    self.stop(
+                        type(cancel) != bool, 'TypeError',
                         "'cancel' must be a boolean ({} given).", type(cancel))
                     if not cancel:
 
@@ -760,7 +835,8 @@ class Series(list, Output_Series):
                     if cancel or choice in ('n', 'no'):
 
                         # Logging
-                        log("'{}' series was not added to the collection because a series "
+                        log(
+                            "'{}' series was not added to the collection because a series "
                             "with the same name already exists.", self.name, logging=logging)
                         del self
 
@@ -772,7 +848,8 @@ class Series(list, Output_Series):
                     collection.append(self)
 
                     # Logging
-                    log("'{}' series renamed '{}' and added to the collection.",
+                    log(
+                        "'{}' series renamed '{}' and added to the collection.",
                         name, self.name, logging=logging)
 
             # Existing series deletion and addition to the collection
@@ -781,7 +858,8 @@ class Series(list, Output_Series):
                 collection.append(self)
 
                 # Logging
-                log("Existing '{}' series deleted and new series added to the collection.",
+                log(
+                    "Existing '{}' series deleted and new series added to the collection.",
                     self.name, logging=logging)
 
         # Addition to the collection
@@ -798,7 +876,8 @@ class Series(list, Output_Series):
         """ Removes the series from the collection. """
 
         # Check if the series is in the collection
-        self.stop(self.name not in collection.series.keys(), 'NameError',
+        self.stop(
+            self.name not in collection.series.keys(), 'NameError',
             "'{}' is not in the collection", self.name)
 
         # Series deletion from the collection
@@ -843,7 +922,8 @@ class Series(list, Output_Series):
 
         # Initialization
         parent = self.config if parent is None else parent
-        self.stop(type(create) != bool, 'TypeError',
+        self.stop(
+            type(create) != bool, 'TypeError',
             "'create' must be a boolean ({} given).", type(create))
         create = False if len(self) == 0 else create
 
@@ -851,7 +931,8 @@ class Series(list, Output_Series):
         new_config = Config(parent, path, args, **parameters)
 
         # Check what parameters, if any, are modified
-        new_parameters = [parameter for parameter in vars(self.config)
+        new_parameters = [
+            parameter for parameter in vars(self.config)
             if vars(vars(new_config)[parameter]) != vars(vars(self.config)[parameter])]
 
         # No parameters are modified
@@ -865,7 +946,8 @@ class Series(list, Output_Series):
 
             # Check if name is a string
             if new_config.name.values is not None:
-                self.stop(type(new_config.name.values) != str, 'TypeError',
+                self.stop(
+                    type(new_config.name.values) != str, 'TypeError',
                     "'name' must be a string ('{}' given).", type(new_config.name.values))
 
             # Series removal from the collection
@@ -874,8 +956,9 @@ class Series(list, Output_Series):
 
             # Change groups and series names
             name = deepcopy(self.name)
-            self.name = collection.default_name() if new_config.name.values is None \
-                else new_config.name.values
+            self.name = (
+                collection.default_name()
+                if new_config.name.values is None else new_config.name.values)
             self.config.name = new_config.name
             for group in self:
                 group.name = group.name.replace(name, self.name)
@@ -890,7 +973,8 @@ class Series(list, Output_Series):
         else:
 
             # Check if a traceback has already been done
-            self.stop(type(forced) != bool, 'TypeError',
+            self.stop(
+                type(forced) != bool, 'TypeError',
                 "'forced' must be a boolean ({} given).", type(forced))
             if len(self) > 0:
 
@@ -898,10 +982,12 @@ class Series(list, Output_Series):
                 if not forced:
                     forced = None
                     while forced is None:
-                        choice = input("'{}' series has already been traced back. Do you wish "
+                        choice = input(
+                            "'{}' series has already been traced back. Do you wish "
                             "to delete existing groups? (Y/N) ".format(self.name)).lower()
-                        forced = True if choice in ('y', 'yes') \
-                            else False if choice in ('n', 'no') else None
+                        forced = (
+                            True if choice in ('y', 'yes')
+                                else False if choice in ('n', 'no') else None)
                         if forced is None:
                             print("Could not understand '{}'.".format(choice))
 
@@ -909,7 +995,8 @@ class Series(list, Output_Series):
                 if not forced:
 
                     # Logging
-                    log("'{}' series was not updated because it has already been traced back.",
+                    log(
+                        "'{}' series was not updated because it has already been traced back.",
                         self.name, logging=logging)
             else:
                 forced = True
@@ -959,8 +1046,9 @@ class Series(list, Output_Series):
 
         # Clone update, if needed
         if parent is not None or path is not None or args == True or len(parameters) > 0:
-            clone.update(parent=parent, path=path, args=args, logging=False, traceback=traceback,
-                **parameters)
+            clone.update(
+                parent=parent, path=path, args=args, logging=False,
+                traceback=traceback, **parameters)
 
         # Logging
         log("'{}' series copied to '{}'.", self.name, clone.name, logging=logging)
@@ -974,7 +1062,8 @@ class Series(list, Output_Series):
         """
 
         # Check if a traceback has already been done
-        self.stop(type(forced) != bool, 'TypeError',
+        self.stop(
+            type(forced) != bool, 'TypeError',
             "'forced' must be a boolean ({} given).", type(forced))
         if len(self) > 0:
 
@@ -982,10 +1071,12 @@ class Series(list, Output_Series):
             if not forced:
                 forced = None
                 while forced is None:
-                    choice = input("'{}' series has already been traced back. Do you wish "
+                    choice = input(
+                        "'{}' series has already been traced back. Do you wish "
                         "to overwrite existing groups? (Y/N) ".format(self.name)).lower()
-                    forced = True if choice in ('y', 'yes') \
-                        else False if choice in ('n', 'no') else None
+                    forced = (
+                        True if choice in ('y', 'yes')
+                        else False if choice in ('n', 'no') else None)
                     if forced is None:
                         print("Could not understand '{}'.".format(choice))
 
@@ -1000,7 +1091,8 @@ class Series(list, Output_Series):
             else:
 
                 # Logging
-                log("'{}' series was not loaded because it has already been traced back.",
+                log(
+                    "'{}' series was not loaded because it has already been traced back.",
                     self.name, logging=logging)
         else:
             forced = True
@@ -1021,7 +1113,8 @@ class Series(list, Output_Series):
 
             # Parameters deletion and series removal from the collection
             self.remove(logging=False)
-            for parameter in [parameter for parameter in vars(self).keys() \
+            for parameter in [
+                    parameter for parameter in vars(self).keys()
                     if parameter not in ('file_path', 'from_file', 'to_file')]:
                 del vars(self)[parameter]
 
@@ -1040,7 +1133,8 @@ class Series(list, Output_Series):
         """
 
         # Check if a traceback has already been done
-        self.stop(type(forced) != bool, 'TypeError',
+        self.stop(
+            type(forced) != bool, 'TypeError',
             "'forced' must be a boolean ({} given).", type(forced))
         if len(self) > 0:
 
@@ -1048,10 +1142,12 @@ class Series(list, Output_Series):
             if not forced:
                 forced = None
                 while forced is None:
-                    choice = input("'{}' series has already been traced back. Do you wish "
+                    choice = input(
+                        "'{}' series has already been traced back. Do you wish "
                         "to overwrite existing groups? (Y/N) ".format(self.name)).lower()
-                    forced = True if choice in ('y', 'yes') \
-                        else False if choice in ('n', 'no') else None
+                    forced = (
+                        True if choice in ('y', 'yes')
+                        else False if choice in ('n', 'no') else None)
                     if forced is None:
                         print("Could not understand '{}'.".format(choice))
 
@@ -1064,7 +1160,8 @@ class Series(list, Output_Series):
             else:
                 self.from_data = self.config.from_data.values
                 self.from_model = self.config.from_model.values
-                log("'{}' series was not loaded because it has already been traced back.",
+                log(
+                    "'{}' series was not loaded because it has already been traced back.",
                     self.name, logging=logging)
         else:
             forced = True
@@ -1083,8 +1180,10 @@ class Series(list, Output_Series):
                 name = f'{self.name}-{number}'
 
                 # Logging
-                log("Tracing back '{}' group from {}.", name,
-                    'data' if self.from_data else 'a model', display=True, logging=logging)
+                log(
+                    "Tracing back '{}' group from {}.", name,
+                    'data' if self.from_data else 'a model',
+                    display=True, logging=logging)
 
                 # Group traceback
                 self.append(Group(self, number, name))
@@ -1132,9 +1231,9 @@ class Series(list, Output_Series):
                 'mst_xyz_mad': np.array([0.0]),
                 'mst_ξηζ_mad': np.array([0.0])}
 
-            # Update indicators
-            for indicator in self.indicators:
-                indicator()
+            # Compute average association size metrics
+            for metric in self.metrics:
+                metric()
 
     def save(self, file_path=None, forced=False, default=False, cancel=False, logging=True):
         """ Saves a series to a binary file. self.file_path is defined as the actual path to the
@@ -1148,8 +1247,9 @@ class Series(list, Output_Series):
             # Series pickling
             from pickle import dump
             file = open(self.file_path, 'wb')
-            dump(({parameter: vars(self)[parameter] for parameter in vars(self).keys() \
-                    if parameter not in ('file_path', 'to_file', 'from_file')},
+            dump(({
+                parameter: vars(self)[parameter] for parameter in vars(self).keys()
+                if parameter not in ('file_path', 'to_file', 'from_file')},
                 tuple(group for group in self)), file)
             file.close()
 
@@ -1161,13 +1261,16 @@ class Series(list, Output_Series):
         # Check if a file already exists
         if path.exists(self.file_path):
             choice = None
-            self.stop(type(forced) != bool, 'TypeError',
+            self.stop(
+                type(forced) != bool, 'TypeError',
                 "'forced' must be a boolean ({} given).", type(forced))
             if not forced:
-                self.stop(type(default) != bool, 'TypeError',
+                self.stop(
+                    type(default) != bool, 'TypeError',
                     "'default' must be a default ({} given).", type(default))
                 if not default:
-                    self.stop(type(cancel) != bool, 'TypeError',
+                    self.stop(
+                        type(cancel) != bool, 'TypeError',
                         "'cancel' must be a boolean ({} given).", type(cancel))
                     if not cancel:
 
@@ -1188,7 +1291,8 @@ class Series(list, Output_Series):
                         self.to_file = self.config.to_file.values
 
                         # Logging
-                        log("'{}' series was not saved because a file already exists at '{}'",
+                        log(
+                            "'{}' series was not saved because a file already exists at '{}'",
                             self.name, self.file_path, logging=logging)
                         del vars(self)['file_path']
 
@@ -1199,7 +1303,8 @@ class Series(list, Output_Series):
                     save(self)
 
                     # Logging
-                    log("File name changed and series saved at '{}'.", self.file_path,
+                    log(
+                        "File name changed and series saved at '{}'.", self.file_path,
                         logging=logging)
 
             # Existing file deletion and saving
@@ -1209,7 +1314,8 @@ class Series(list, Output_Series):
                 save(self)
 
                 # Logging
-                log("Existing file located at '{}' deleted and replaced.", self.file_path,
+                log(
+                    "Existing file located at '{}' deleted and replaced.", self.file_path,
                     logging=logging)
 
         # Saving
@@ -1244,12 +1350,14 @@ class Series(list, Output_Series):
     def check_traceback(self):
         """ Checks whether a traceback has been computed in the series. """
 
-        self.stop(len(self) < 1, 'ValueError', "'{}' series hasn't been traceback. "
+        self.stop(
+            len(self) < 1, 'ValueError', "'{}' series hasn't been traceback. "
             "Impossible to create an output.", self.name)
 
     def stop(self, condition, error, message, *words, marmalade=False):
         """ Calls the stop function from collection with self.name, if it has been set. """
 
         # Addition of series name to stop function call
-        stop(condition, error, message, *words,
+        stop(
+            condition, error, message, *words,
             name=self.name if 'name' in vars(self) else None, extra=2)

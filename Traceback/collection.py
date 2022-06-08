@@ -47,7 +47,8 @@ class Collection(list):
         """
 
         # Check if output_dir parameter is a string, which must be done before the directory call
-        stop(output_dir is not None and type(output_dir) != str, 'TypeError',
+        stop(
+            output_dir is not None and type(output_dir) != str, 'TypeError',
             "'output_dir' must be a string ({} given).", type(output_dir))
 
         # self.output_dir parameter
@@ -63,22 +64,24 @@ class Collection(list):
         from time import strftime
 
         # self.logs_path parameter
-        self.logs_path = path.join(self.output_dir, 'Logs') + '/' if logs_path is None \
-            else logs_path
+        self.logs_path = (
+            path.join(self.output_dir, 'Logs') + '/' if logs_path is None else logs_path)
 
         # Check if logs_path parameter is a string, which must be done before the directory call
-        stop(type(self.logs_path) != str, 'TypeError', "'logs_path' must be a string ({} given).",
-            type(self.logs_path))
+        stop(
+            type(self.logs_path) != str, 'TypeError',
+            "'logs_path' must be a string ({} given).", type(self.logs_path))
 
         # logs_path redefined as the absolute path
         self.logs_path = path.join(
             directory(self.base_dir, path.dirname(self.logs_path), 'logs_path'),
-            'Traceback_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S')) \
-                if path.basename(self.logs_path) == '' else path.basename(self.logs_path))
+            'Traceback_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
+            if path.basename(self.logs_path) == '' else path.basename(self.logs_path))
         self.logs_configured = False
 
         # Check if the file is a logs file
-        stop(path.splitext(self.logs_path)[1].lower() != '.log', 'TypeError',
+        stop(
+            path.splitext(self.logs_path)[1].lower() != '.log', 'TypeError',
             "'{}' is not a log file (with a .log extension).", path.basename(self.logs_path))
 
     def new(
@@ -100,7 +103,8 @@ class Collection(list):
 
         # Series addition and replacement, if needed
         for series in series:
-            stop(str(type(series)) != "<class 'series.Series'>", 'TypeError',
+            stop(
+                str(type(series)) != "<class 'series.Series'>", 'TypeError',
                 "'series' must be Series object ({} given).", type(series))
             series.add(forced, default, cancel, logging)
 
@@ -189,9 +193,11 @@ class Collection(list):
 
                 # Selected series from a name, check if it exists
                 else:
-                    stop(type(name) != str, 'TypeError', "'series' must be a string ({} given).",
+                    stop(
+                        type(name) != str, 'TypeError', "'series' must be a string ({} given).",
                         type(name))
-                    stop(name not in self.series.keys(), 'NameError',
+                    stop(
+                        name not in self.series.keys(), 'NameError',
                         "Series '{}' is not in the collection.", name)
 
 
@@ -228,10 +234,12 @@ def directory(base, directory, name, check=False, create=False):
 
     # Check the type of name, base and directory
     stop(type(name) != str, 'TypeError', "'name' must be a string ({} given).", type(name))
-    stop(type(base) != str, 'TypeError', "The base of '{}' must be a string ({} given).",
-        name, type(base))
-    stop(type(directory) != str, 'TypeError', "The base '{}' must be a string ({} given).",
-        name, type(directory))
+    stop(
+        type(base) != str, 'TypeError',
+        "The base of '{}' must be a string ({} given).", name, type(base))
+    stop(
+        type(directory) != str, 'TypeError',
+        "The base '{}' must be a string ({} given).", name, type(directory))
 
     # Output directory formatting
     working_dir = getcwd()
@@ -240,13 +248,18 @@ def directory(base, directory, name, check=False, create=False):
     chdir(working_dir)
 
     # Check if the directory exists
-    stop(type(check) != bool, 'TypeError', "'check' must be a boolean ({} given).", type(check))
+    stop(
+        type(check) != bool, 'TypeError',
+        "'check' must be a boolean ({} given).", type(check))
     if check:
-        stop(not path.exists(directory), 'NameError',
+        stop(
+            not path.exists(directory), 'NameError',
             "No existing directory located at '{}'.", directory)
 
     # Directory creation, if needed
-    stop(type(create) != bool, 'TypeError', "'create' must be a boolean ({} given).", type(create))
+    stop(
+        type(create) != bool, 'TypeError',
+        "'create' must be a boolean ({} given).", type(create))
     if create and not path.exists(directory):
         makedirs(directory)
 
@@ -263,8 +276,9 @@ def output(output_dir=None, check=False, create=True):
     output_dir = collection.output_dir if output_dir is None else output_dir
 
     # Check if output_dir is a string
-    stop(type(output_dir) != str, 'TypeError', "'output_dir' must be a string ({} given).",
-        type(output_dir))
+    stop(
+        type(output_dir) != str, 'TypeError',
+        "'output_dir' must be a string ({} given).", type(output_dir))
 
     # Absolute directory, check and creation, if needed
     return directory(collection.base_dir, output_dir, 'output_dir', check=check, create=create)
@@ -281,7 +295,8 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
     from logging import basicConfig, root, info, warning, INFO
 
     # Check if logging is True
-    stop(type(logging) != bool, 'TypeError',
+    stop(
+        type(logging) != bool, 'TypeError',
         "'logging' must be a boolean ({} given).", type(logging))
     if logging:
 
@@ -292,17 +307,19 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
         if not collection.logs_configured or collection.logs_path != logs_path:
 
             # Check if logs_path parameter is a string, which must be done before the directory call
-            stop(type(logs_path) != str, 'TypeError', "'logs_path' must be a string ({} given).",
-                type(logs_path))
+            stop(
+                type(logs_path) != str, 'TypeError',
+                "'logs_path' must be a string ({} given).", type(logs_path))
 
             # logs_path redefined as the absolute path and directory creation
             logs_path = path.join(
                 directory(collection.base_dir, path.dirname(logs_path), 'logs_path', create=True),
-                path.basename(collection.logs_path) if path.basename(logs_path) == '' \
-                    else path.basename(logs_path))
+                path.basename(collection.logs_path) if path.basename(logs_path) == ''
+                else path.basename(logs_path))
 
             # Check if the file is a logs file
-            stop(path.splitext(logs_path)[1].lower() != '.log', 'TypeError',
+            stop(
+                path.splitext(logs_path)[1].lower() != '.log', 'TypeError',
                 "'{}' is not a log file (with a .log extension).", path.basename(logs_path))
 
             # Logs configuration, if logs_path matches collection.logs_path
@@ -311,7 +328,8 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
                     for handler in root.handlers[:]:
                         root.removeHandler(handler)
                     collection.logs_configured = True
-                    basicConfig(filename=collection.logs_path, format='%(asctime)s %(message)s',
+                    basicConfig(
+                        filename=collection.logs_path, format='%(asctime)s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
             # Logs configuration, if logs_path doesn't match collection.logs_path
@@ -320,24 +338,31 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
                     for handler in root.handlers[:]:
                         root.removeHandler(handler)
                     collection.logs_configured = False
-                basicConfig(filename=logs_path, format='%(asctime)s %(message)s',
+                basicConfig(
+                    filename=logs_path, format='%(asctime)s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S -', level=INFO)
 
         # Check if message is a string
-        stop(type(message) != str, 'TypeError', "'message' must be a string ({} given).",
+        stop(
+            type(message) != str, 'TypeError',
+            "'message' must be a string ({} given).",
             type(message), name='marmalade')
 
         # Check if words are strings and message formatting
         if len(words) > 0:
             for word in words:
-                stop(type(word) != str, 'TypeError', "'words' must all be strings ({} given).",
-                    type(word))
+                stop(
+                    type(word) != str, 'TypeError',
+                    "'words' must all be strings ({} given).", type(word))
             message = message.format(*words)
 
         # Check if level is valid
-        stop(type(level) != str, 'TypeError', "'level' must be a string ({} given).", type(level))
+        stop(
+            type(level) != str, 'TypeError',
+            "'level' must be a string ({} given).", type(level))
         level = level.lower()
-        stop(level not in ('info', 'warning'), 'ValueError',
+        stop(
+            level not in ('info', 'warning'), 'ValueError',
             "'level' must either be 'info' or 'warning' ({} given).", level)
 
         # Message logging
@@ -347,8 +372,9 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
             warning(message)
 
         # Message display
-        stop(type(display) != bool, 'TypeError', "'display' must be a boolean ({} given).",
-            type(display))
+        stop(
+            type(display) != bool, 'TypeError',
+            "'display' must be a boolean ({} given).", type(display))
         if display:
             print(message)
 
@@ -373,7 +399,7 @@ def stop(condition, error, message, *words, name=None, extra=1):
             try:
                 exec("raise {}".format(error))
             except:
-                stop(True, error, message, *words, name=name, extra=extra+1)
+                stop(True, error, message, *words, name=name, extra=extra + 1)
 
         # If an exception is being handled, its traceback is formatted and execution is terminated
         else:
@@ -381,8 +407,9 @@ def stop(condition, error, message, *words, name=None, extra=1):
             # Traceback message creation
             if len(words) > 0:
                 message = message.format(*words)
-            tb_message = "{} in '{}': {}".format(error, name, message) if name is not None \
-                else "{}: {}".format(error, message)
+            tb_message = (
+                "{} in '{}': {}".format(error, name, message) if name is not None
+                else "{}: {}".format(error, message))
 
             # Traceback stack formatting
             from traceback import format_stack

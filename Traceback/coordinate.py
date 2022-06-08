@@ -122,22 +122,26 @@ class System():
         Variable('r', 'galactic radius', default_units['length']),
         Variable('μρ', 'galactic radial velocity', default_units['speed']),
         Variable('θ', 'galactic angle', default_units['angle'], usual_units['angle']),
-        Variable('μθ', 'galactic angular velocity', default_units['angular speed'],
-            usual_units['angular speed']),
+        Variable(
+            'μθ', 'galactic angular velocity',
+            default_units['angular speed'], usual_units['angular speed']),
 
         # Spherical coordinate system variables
         Variable('ρ', 'distance', default_units['length']),
         Variable('δ', 'declination', default_units['angle'], usual_units['angle']),
         Variable('α', 'right ascension', default_units['angle'], usual_units['angle']),
         Variable('rv', 'radial velocity', default_units['speed'], usual_units['speed']),
-        Variable('μδ', 'declination proper motion', default_units['angular speed'],
-            usual_units['angular speed']),
-        Variable('μα', 'right ascension proper motion', default_units['angular speed'],
-            usual_units['angular speed']),
+        Variable(
+            'μδ', 'declination proper motion',
+            default_units['angular speed'], usual_units['angular speed']),
+        Variable(
+            'μα', 'right ascension proper motion',
+            default_units['angular speed'], usual_units['angular speed']),
 
         # Observables coordinate system variables
         Variable('π', 'parallax', default_units['angle'], usual_units['small angle']),
-        Variable('μαcosδ', 'right ascension proper motion * cos(declination)',
+        Variable(
+            'μαcosδ', 'right ascension proper motion * cos(declination)',
             default_units['angular speed'], usual_units['angular speed']))}
 
     # Error variables
@@ -252,8 +256,9 @@ class Coordinate:
         if velocity is None:
             velocity = Quantity((0.0, 0.0, 0.0), 'pc/Myr')
         elif type(velocity) != Quantity:
-            raise TypeError("Velocity must be a Quantity of shape (n, 3)) or None, not {}".format(
-                type(velocity)))
+            raise TypeError(
+                "Velocity must be a Quantity of shape (n, 3)) or None, not {}".format(
+                    type(velocity)))
         elif velocity.ndim in (1, 2) and velocity.shape[-1] == 3:
             velocity = velocity.to()
         else:
@@ -280,18 +285,22 @@ class Coordinate:
             self.position_rδα = position
             self.position_xyz = None
         else:
-            raise ValueError("Position physical types ({}) don't fit a coordinate "
+            raise ValueError(
+                "Position physical types ({}) don't fit a coordinate "
                 "in a cartesian of spherical system.".format(position.physical_types))
 
         # Conversion of velocity in cartesian or spherical coordinate system
-        if (velocity.physical_types == np.array(['speed', 'speed', 'speed'])).all():
+        if (velocity.physical_types == np.array([
+                'speed', 'speed', 'speed'])).all():
             self.velocity_uvw = velocity
             self.velocity_rvμδμα = None
-        elif (velocity.physical_types == np.array(['speed', 'angular speed', 'angular speed'])).all():
+        elif (velocity.physical_types == np.array([
+                'speed', 'angular speed', 'angular speed'])).all():
             self.velocity_rvμδμα = velocity
             self.velocity_uvw = None
         else:
-            raise ValueError("Velocity physical types ({}) don't fit a coordinate "
+            raise ValueError(
+                "Velocity physical types ({}) don't fit a coordinate "
                 "in a cartesian of spherical system.".format(velocity.physical_types))
 
         # System and axis
@@ -328,28 +337,32 @@ def heliocentric_galactocentric_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
         origin.
     """
 
-    return translate(x, y, z, Δx, Δy, Δz, Coordinate.galactic_center, Coordinate.galactic_center_error)
+    return translate(
+        x, y, z, Δx, Δy, Δz, Coordinate.galactic_center, Coordinate.galactic_center_error)
 
 def heliocentric_galactocentric_uvw(u, v, w, Δu=0, Δv=0, Δw=0):
     """ Translates a cartesian UVW velocity vector (pc) from a heliocentric to a galactocentric
         reference frame.
     """
 
-    return translate(u, v, w, Δu, Δv, Δw, Coordinate.galactic_velocity, Coordinate.galactic_velocity_error)
+    return translate(
+        u, v, w, Δu, Δv, Δw, Coordinate.galactic_velocity, Coordinate.galactic_velocity_error)
 
 def galactocentric_heliocentric_xyz(x, y, z, Δx=0, Δy=0, Δz=0):
     """ Translates a cartesian XYZ position vector (pc) from a galactocentric to a heliocentric
         origin.
     """
 
-    return translate(x, y, z, Δx, Δy, Δz, -Coordinate.galactic_center, Coordinate.galactic_center_error)
+    return translate(
+        x, y, z, Δx, Δy, Δz, -Coordinate.galactic_center, Coordinate.galactic_center_error)
 
 def galactocentric_heliocentric_uvw(u, v, w, Δu=0, Δv=0, Δw=0):
     """ Translates a cartesian UVW velocity vector (pc) from a heliocentric to a galactocentric
         reference frame.
     """
 
-    return translate(u, v, w, Δu, Δv, Δw, -Coordinate.galactic_velocity, Coordinate.galactic_velocity_error)
+    return translate(
+        u, v, w, Δu, Δv, Δw, -Coordinate.galactic_velocity, Coordinate.galactic_velocity_error)
 
 
 # Vector rotation functions
@@ -427,6 +440,7 @@ def xyz_to_rδα(x, y, z, Δx=0, Δy=0, Δz=0):
 
             # Partial derivatives of α: dα/dx, dα/dy and dα/dz
             (-y / norm_xy_2, x / norm_xy_2, 0.0))
+
         )**2, np.array((Δx, Δy, Δz))**2)**0.5
         return values, errors
 
@@ -456,6 +470,7 @@ def rδα_to_xyz(r, δ, α, Δr=0, Δδ=0, Δα=0):
 
             # Partial derivatives of z: dz/dr, dz/dδ and dz/dα
             (sin_δ, -r * cos_δ, 0.0))
+
         )**2, np.array((Δr, Δδ, Δα))**2)**0.5
         return values, errors
 
@@ -508,6 +523,7 @@ def uvw_to_rvμδμα(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0
             ((v * (y**2 - x**2) + 2 * u * x * y) / norm_xy_2**2,
             (u * (y**2 - x**2) - 2 * v * x * y) / norm_xy_2**2,
             0.0, -y / norm_xy_2, x / norm_xy_2, 0.0))
+
         )**2, np.array((Δx, Δy, Δz, Δu, Δv, Δw))**2)**0.5
         return values, errors
 
@@ -550,6 +566,7 @@ def rvμδμα_to_uvw(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, 
             # Partial derivatives of w:
             # (dw/dr, dw/dδ, dw/dα, dw/d(rv), dw/d(µδ) and dw/d(µα)
             (μδ * cos_δ, rv * cos_δ - μδ * r * sin_δ, 0.0, sin_δ, r * cos_δ, 0.0))
+
         )**2, np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα))**2)**0.5
         return values, errors
 
@@ -579,6 +596,7 @@ def xyz_to_ρθz(x, y, z, Δx=0, Δy=0, Δz=0):
 
             # Partial derivatives of z: dz/dx, dz/dy and dz/dz
             (0., 0., 0.))
+
         )**2, np.array((Δx, Δy, Δz))**2)**0.5
         return values, errors
 
@@ -608,6 +626,7 @@ def ρθz_to_xyz(ρ, θ, z, Δρ=0, Δθ=0, Δz=0):
 
             # Partial derivatives of z: dz/dρ, dz/dθ and dz/dz
             (0., 0., 0.))
+
         )**2, np.array((Δρ, Δθ, Δz))**2)**0.5
         return values, errors
 
@@ -641,6 +660,7 @@ def uvw_to_μρμθw(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu=0, Δv=0, Δw=0)
 
             # Partial derivatives of z: dz/dx, dz/dy, dz/dz, dz/du, dz/dv, dz/dz
             (0., 0., 0., 0., 0., 0.))
+
         )**2, np.array((Δx, Δy, Δz, Δu, Δv, Δw))**2)**0.5
         return values, errors
 
@@ -670,6 +690,7 @@ def μρμθw_to_uvw(ρ, θ, z, μρ, μθ, w, Δρ=0, Δθ=0, Δz=0, Δμρ=0, 
 
             # Partial derivatives of z: dz/dx, dz/dy, dz/dz, dz/du, dz/dv, dz/dz
             (0., 0., 0., 0., 0., 0.))
+
         )**2, np.array((Δρ, Δθ, Δz, Δμρ, Δμθ, Δw))**2)**0.5
         return values, errors
 
@@ -828,12 +849,14 @@ def galactic_uvw_galactocentric_ρθz(x, y, z, u, v, w, Δx=0, Δy=0, Δz=0, Δu
 
     # Position translation, rotation and left-handed system
     position_values, position_errors = heliocentric_galactocentric_xyz(x, y, z, Δx, Δy, Δz)
-    position_values, position_errors = galactic_galactocentric_xyz(*position_values, *position_errors)
+    position_values, position_errors = galactic_galactocentric_xyz(
+        *position_values, *position_errors)
     position_values[0] = -position_values[0]
 
     # Velocity rotation, translation and left-handed system
     velocity_values, velocity_errors = galactic_galactocentric_xyz(u, v, w, Δu, Δw, Δz)
-    velocity_values, velocity_errors = heliocentric_galactocentric_uvw(*velocity_values, *velocity_errors)
+    velocity_values, velocity_errors = heliocentric_galactocentric_uvw(
+        *velocity_values, *velocity_errors)
     velocity_values[0] = -velocity_values[0]
 
     # Cylindrical coordinates system
@@ -873,8 +896,10 @@ def position_obs_rδα(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, 
     if not np.array((Δp, Δδ, Δα, Δrv, Δμδ, Δμα_cos_δ)).any():
         return position, velocity, np.zeros(position.shape), np.zeros(velocity.shape)
     else:
-        return position, velocity, np.array((Δp * Coordinate.k / (p + Coordinate.gaia_bias)**2, Δδ, Δα)), \
-            np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ))
+        return (
+            position, velocity,
+            np.array((Δp * Coordinate.k / (p + Coordinate.gaia_bias)**2, Δδ, Δα)),
+            np.array((Δrv, Δμδ, ((Δμα_cos_δ / μα_cos_δ)**2 + (Δδ / δ)**2)**0.5 * μα_cos_δ / cos_δ)))
 
 def position_rδα_obs(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0, Δμδ=0, Δμα=0):
     """ Converts an equatorial spherical coordinate, distance (r; pc), declination (δ, DEC; rad)
@@ -896,8 +921,10 @@ def position_rδα_obs(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0,
     if not np.array((Δr, Δδ, Δα, Δrv, Δμδ, Δμα)).any():
         return position, velocity, np.zeros(position.shape), np.zeros(velocity.shape)
     else:
-        return position, velocity, np.array((Δr * (Coordinate.k / r**2), Δδ, Δα)), \
-            np.array((Δrv, Δμδ, ((Δμα / μα)**2 + (Δδ / δ)**2)**0.5 * μα * cos_δ))
+        return (
+            position, velocity,
+            np.array((Δr * (Coordinate.k / r**2), Δδ, Δα)),
+            np.array((Δrv, Δμδ, ((Δμα / μα)**2 + (Δδ / δ)**2)**0.5 * μα * cos_δ)))
 
 
 # Curvilinear and cylindrical galactocentric transformation functions
@@ -919,10 +946,11 @@ def position_ξηζ_rθz(ξ, η, ζ, t):
         galactocentric cylindrical coordinate position vector, at a given epoch t (Myr).
     """
 
-    return np.dot(Coordinate.ggrm, np.array([
-        ξ + Coordinate.sun_position[0],
-        η / Coordinate.sun_position[0] + Coordinate.sun_angular_frequency * t,
-        ζ + Coordinate.sun_position[2]])).T
+    return np.dot(
+        Coordinate.ggrm, np.array([
+            ξ + Coordinate.sun_position[0],
+            η / Coordinate.sun_position[0] + Coordinate.sun_angular_frequency * t,
+            ζ + Coordinate.sun_position[2]])).T
 
 def velocity_rθz_ξηζ(vr, vt, vz, t):
     """ Converts a rθz, radial velocity (vr; pc/Myr), tangantial velocity (vt; pc/Myr) and heigth

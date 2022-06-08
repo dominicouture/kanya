@@ -32,7 +32,8 @@ class Quantity:
         if type(values) in (tuple, list, np.ndarray):
             self.values = squeeze(np.array(values, dtype=float))
         else:
-            raise TypeError("{} is not a supported type "
+            raise TypeError(
+                "{} is not a supported type "
                 "('int, float, tuple, list or ndarray') for values.".format(type(values)))
         self.shape = self.values.shape
         self.ndim = self.values.ndim
@@ -49,11 +50,13 @@ class Quantity:
         if type(errors) in (tuple, list, np.ndarray):
             self.errors = np.array(full('Errors', self.shape, squeeze(errors)), dtype=float)
         else:
-            raise TypeError("{} is not a supported type "
+            raise TypeError(
+                "{} is not a supported type "
                 "(int, float, tuple, list or ndarray) for errors.".format(type(errors)))
 
         # Error units import
-        self.error_units = self.units if error_units is None else Unit(error_units, shape=self.shape)
+        self.error_units = (
+            self.units if error_units is None else Unit(error_units, shape=self.shape))
         self.error_physical_types = self.error_units.physical_types
 
         # Conversion of errors into value units
@@ -154,8 +157,9 @@ class Quantity:
             """ Returns the value of single-value 'array' or a list version. """
 
             from json import dumps
-            return array.flatten()[0] if np.equal(np.array(array.shape), 1).all() \
-                else dumps(array.tolist()).replace('"', '').replace(' ', '').replace(',', ', ')
+            return (
+                array.flatten()[0] if np.equal(np.array(array.shape), 1).all()
+                else dumps(array.tolist()).replace('"', '').replace(' ', '').replace(',', ', '))
 
         return '({} ± {}) {}'.format(
             flatten(self.values),
@@ -165,25 +169,27 @@ class Quantity:
 
     def __bool__(self):
         if len(self) == 1:
-            return False if self.values.flatten()[0] == 0.0 and self.errors.flatten()[0] == 0.0 \
-                else True
+            return (
+                False if self.values.flatten()[0] == 0.0 and self.errors.flatten()[0] == 0.0
+                else True)
         else:
-            raise ValueError("The truth value of an Quantity with more than one value "
+            raise ValueError(
+                "The truth value of a Quantity with more than one value "
                 "is ambiguous. Use Quantity.any() or Quantity.all()")
 
     def all(self):
         """ Returns True if all values are non zero, False otherwise. """
 
         return np.vectorize(
-            lambda value, error: True if value or error else False
-        )(self.values, self.errors).all()
+            lambda value, error: True if value or error else False)(
+                self.values, self.errors).all()
 
     def any(self):
         """ Returns True if any value is non zero, False otherwise. """
 
         return np.vectorize(
-            lambda value, error: True if value or error else False
-        )(self.values, self.errors).any()
+            lambda value, error: True if value or error else False)(
+                self.values, self.errors).any()
 
     def __pos__(self):
         """ Computes the positve Quantity. """
@@ -244,8 +250,8 @@ class Quantity:
         shape, factors = self.compare(other)
 
         return np.vectorize(
-            lambda value, error: True if value and error else False
-        )(self.values == other.values * factors, self.errors == other.errors * factors)
+            lambda value, error: True if value and error else False)(
+                self.values == other.values * factors, self.errors == other.errors * factors)
 
     def __ne__(self, other):
         """ Tests whether values in self are not equal to values in 'other' (values and errors). """
@@ -298,8 +304,8 @@ class Quantity:
 
         # Units and errors computation
         return Quantity(
-            values,
-            self.units.units * np.vectorize(lambda self_unit, other_unit: self_unit \
+            values, self.units.units * np.vectorize(
+                lambda self_unit, other_unit: self_unit
                 if self_unit.physical_type == other_unit.physical_type else other_unit)(
                     self.units.units, other.units.units),
             np.vectorize(lambda x, y: np.linalg.norm((x, y)))(
@@ -325,8 +331,8 @@ class Quantity:
 
         # Units and errors computation
         return Quantity(
-            values,
-            self.units.units / np.vectorize(lambda self_unit, other_unit: self_unit \
+            values, self.units.units / np.vectorize(
+                lambda self_unit, other_unit: self_unit
                 if self_unit.physical_type == other_unit.physical_type else other_unit)(
                     self.units.units, other.units.units),
             np.vectorize(lambda x, y: np.linalg.norm((x, y)))(
@@ -370,8 +376,7 @@ class Quantity:
 
         # Units and errors computation
         return Quantity(
-            self.values**other.values,
-            self.units.units**other.values,
+            self.values**other.values, self.units.units**other.values,
             np.vectorize(lambda x, y: np.linalg.norm((x, y)))(
                 self.values**(other.values - 1) * other.values * self.errors,
                 self.values**other.values * np.log(self.values) * other.errors))
@@ -453,8 +458,8 @@ class Quantity:
             self.units.units[index] = item.units
             self.errors[index] = item.errors
         except IndexError:
-            raise IndexError("Index {} is out of range of axis of size {}.".format(
-                index, len(self.values)))
+            raise IndexError(
+                "Index {} is out of range of axis of size {}.".format(index, len(self.values)))
 
         # Set self.parent as self at the specified 'index'
         if self.parent is not None:
@@ -481,7 +486,8 @@ class Quantity:
         # Default units per physical types if 'units' is None.
         if units is None:
             from Traceback.coordinate import System
-            units = Unit(np.vectorize(lambda unit: System.default_units[unit.physical_type].unit \
+            units = Unit(
+                np.vectorize(lambda unit: System.default_units[unit.physical_type].unit
                 if unit.physical_type in System.default_units.keys() else unit)(self.units.units))
 
         # Units import
@@ -497,8 +503,9 @@ class Quantity:
     def new(self, new):
         """ Transferts all optional parameters from the old 'self' and returns a 'new' value. """
 
-        optional = {key: vars(self)[key] for key in filter(
-            lambda key: key not in vars(new), vars(self).keys())}
+        optional = {
+            key: vars(self)[key] for key in filter(
+                lambda key: key not in vars(new), vars(self).keys())}
         vars(new).update(optional)
 
         return new
@@ -516,7 +523,8 @@ class Unit():
         """
 
         # Units import
-        if type(units) in (str, type(None), u.core.PrefixUnit, u.core.CompositeUnit,
+        if type(units) in (
+                str, type(None), u.core.PrefixUnit, u.core.CompositeUnit,
                 u.core.IrreducibleUnit, u.core.NamedUnit, u.core.Unit, np.str_, np.unicode_):
             units = [units]
         if type(units) == Unit:
@@ -524,7 +532,8 @@ class Unit():
         elif type(units) in (tuple, list, np.ndarray):
             self.units = squeeze(np.array(np.vectorize(self.to)(units), dtype=object))
         else:
-            raise TypeError("{} is not a supported type (str, NoneType, astropy units, "
+            raise TypeError(
+                "{} is not a supported type (str, NoneType, astropy units, "
                 "tuple, list, np.ndarray or Unit) for units.".format(type(units)))
 
         # Shape broadcast
@@ -542,8 +551,9 @@ class Unit():
         # Names
         if type(names) == str:
             names = [names]
-        self.names = full('Names', self.shape, squeeze(np.array(names))) if names is not None \
-            else self.labels
+        self.names = (
+            full('Names', self.shape, squeeze(np.array(names))) if names is not None
+            else self.labels)
 
         # Singular values if only one unit is present
         if self.shape == (1,):
@@ -574,16 +584,18 @@ class Unit():
         # Check if physical types of 'self' and 'other' match, if needed
         if types:
             if not (self.physical_types == other.physical_types).all():
-                raise ValueError("Units have incompatible physical types: {} and {}.".format(
-                    self.physical_types, other.physical_types))
+                raise ValueError(
+                    "Units have incompatible physical types: {} and {}.".format(
+                        self.physical_types, other.physical_types))
 
         # Conversion factors from 'self' to 'other' with matching physical types
-            return np.vectorize(lambda self_unit, other_unit: self_unit.to(other_unit))(
-                self.units, other.units)
+            return np.vectorize(
+                lambda self_unit, other_unit: self_unit.to(other_unit))(self.units, other.units)
 
         # Conversion factors from 'self' to 'other' without matching physical types
         else:
-            return np.vectorize(lambda self_unit, other_unit: self_unit.to(other_unit) \
+            return np.vectorize(
+                lambda self_unit, other_unit: self_unit.to(other_unit)
                 if self_unit.physical_type == other_unit.physical_type else 1.0)(
                     self.units, other.units)
 

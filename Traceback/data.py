@@ -41,8 +41,10 @@ class Data(list):
 
         # Non-valid 'data.values' types
         else:
-            self.series.stop(True, 'TypeError', "'data.values' component must be a string, "
-                "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.values))
+            self.series.stop(
+                True, 'TypeError',
+                "'data.values' component must be a string, dictionary, "
+                "list, tuple or np.ndarray. ({} given).", type(self.data.values))
 
         # Data configuration
         self.configure_data()
@@ -65,11 +67,13 @@ class Data(list):
         self.data_path = directory(collection.base_dir, self.data.values, 'data_path')
 
         # Check if the data file exists
-        self.series.stop(not path.exists(self.data_path), 'FileNotFoundError',
+        self.series.stop(
+            not path.exists(self.data_path), 'FileNotFoundError',
             "No data file located at '{}'.", self.data_path)
 
         # Check if the path links to a CSV file.
-        self.series.stop(path.splitext(self.data_path)[1].lower() != '.csv', 'TypeError',
+        self.series.stop(
+            path.splitext(self.data_path)[1].lower() != '.csv', 'TypeError',
             "'{}' is not a CSV data file (with a .csv extension).", path.basename(self.data_path))
 
         # Reading of CSV file
@@ -78,12 +82,13 @@ class Data(list):
         data_csv.seek(0)
 
         # Data import into a table and CSV file closing
-        self.table = np.array(
-            [row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))], dtype=object)
+        self.table = np.array([
+            row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))], dtype=object)
         data_csv.close()
 
         # Check if self.table is a 2D array
-        self.series.stop(self.table.ndim != 2, 'ValueError',
+        self.series.stop(
+            self.table.ndim != 2, 'ValueError',
             "'data' parameter must represent a 2D array ({} dimensions in the given CSV). "
             "Make sure all lines have an equal number of columns in the CSV file.", self.table.ndim)
 
@@ -105,12 +110,15 @@ class Data(list):
                 if type(self.data.values[self.series.name]) in (list, tuple, np.ndarray):
                     self.table = np.array(self.data.values[self.series.name], dtype=object)
                 else:
-                    self.series.stop(True, 'TypeError', "Data '{}' in the Python dictionary "
+                    self.series.stop(
+                        True, 'TypeError',
+                        "Data '{}' in the Python dictionary "
                         "must be a list, tuple or np.ndarray. ('{}' given).",
                         self.series.name, type(self.data.values[self.series.name]))
             else:
-                self.series.stop(True, 'ValueError', "Group '{}' is not in the data dictionary.",
-                    self.series.name)
+                self.series.stop(
+                    True, 'ValueError',
+                    "Group '{}' is not in the data dictionary.", self.series.name)
 
         # Data import of a list, tuple or np.ndarray
         if type(self.data.values) in (list, tuple, np.ndarray):
@@ -135,10 +143,10 @@ class Data(list):
         """
 
         # Value variables
-        self.position_variables = {variable.label:
-            variable for variable in self.data.system.position}
-        self.velocity_variables = {variable.label:
-            variable for variable in self.data.system.velocity}
+        self.position_variables = {
+            variable.label: variable for variable in self.data.system.position}
+        self.velocity_variables = {
+            variable.label: variable for variable in self.data.system.velocity}
         self.value_variables = {**self.position_variables, **self.velocity_variables}
 
         # Error variables
@@ -155,7 +163,8 @@ class Data(list):
         self.header = np.vectorize(
             lambda label: label.replace('.', '').replace(',', '').isdigit())(self.table[0]).any()
         if self.from_CSV:
-            self.series.stop(self.header, 'ValueError',
+            self.series.stop(
+                self.header, 'ValueError',
                 "The CSV data file located at '{}' doesn't have a header.", self.data_path)
         elif self.from_data:
             self.series.stop(self.header, 'ValueError', "The data doesn't have a header.")
@@ -171,16 +180,17 @@ class Data(list):
 
         # Units from a string representing a coordinate system to create a dictionary
         elif type(self.data.units) == str:
-            self.series.stop(self.data.units.lower() not in systems.keys(), 'ValueError',
+            self.series.stop(
+                self.data.units.lower() not in systems.keys(), 'ValueError',
                 "'{}' is not a valid coordinates system (use {} instead).",
                 self.data.units, list(systems.keys()))
 
             # Usual units of system retrieval
             # !!! Should also include stellar mass and radius units !!!
             self.data.units = {
-                **{variable.label: variable.usual_unit.label \
+                **{variable.label: variable.usual_unit.label
                     for variable in systems[self.data.units.lower()].position},
-                **{variable.label: variable.usual_unit.label \
+                **{variable.label: variable.usual_unit.label
                     for variable in systems[self.data.units.lower()].velocity}}
 
         # Units from a dictionary
@@ -188,39 +198,45 @@ class Data(list):
 
             # Check if all labels can be matched to a data.system variable
             # !!! The match should also include stellar mass and radius units !!!
-            self.data.units = {self.Column.identify(self.Column, self, label):
-                self.data.units[label] for label in self.data.units.keys()}
-            self.series.stop(not np.vectorize(lambda label: label in self.variables.keys()) \
-                (tuple(self.data.units.keys())).all(), 'ValueError',
+            self.data.units = {
+                self.Column.identify(self.Column, self, label):
+                    self.data.units[label] for label in self.data.units.keys()}
+            self.series.stop(
+                not np.vectorize(lambda label: label in self.variables.keys())(
+                    tuple(self.data.units.keys())).all(), 'ValueError',
                 "All labels in 'data.units' couldn't be matched to a variable of '{}' system.",
                 self.data.system.name)
 
             # Check if all values in self.data.units are strings
-            self.series.stop(not np.vectorize(
-                    lambda label: type(self.data.units[label]) == str)(tuple(
-                        self.data.units.keys())).all(),
-                'TypeError', "All elements in 'data.units' component must be strings.")
+            self.series.stop(
+                not np.vectorize(lambda label: type(self.data.units[label]) == str)(
+                    tuple(self.data.units.keys())).all(), 'TypeError',
+                "All elements in 'data.units' component must be strings.")
 
         # Units from an array mimicking a unit header
         elif type(self.data.units) in (tuple, list, np.ndarray):
             self.data.units = np.squeeze(np.array(self.data.units, dtype=object))
 
             # Check if all values in self.data.units array are strings
-            self.series.stop(not np.vectorize(lambda unit: type(unit) == str) \
-                (self.data.units).all(), 'TypeError',
-                "All elements in 'data.units' component must be strings.")
+            self.series.stop(
+                not np.vectorize(lambda unit: type(unit) == str)(self.data.units).all(),
+                'TypeError', "All elements in 'data.units' component must be strings.")
 
             # Check if self.data.units array has valid dimensions
-            self.series.stop(self.data.units.ndim != 1, 'ValueError', "'data.units' component "
-                "must have 1 dimension ({} given).", self.data.units.ndim)
-            self.series.stop(len(self.data.units) != self.table.shape[1], 'ValueError',
+            self.series.stop(
+                self.data.units.ndim != 1, 'ValueError',
+                "'data.units' component must have 1 dimension ({} given).", self.data.units.ndim)
+            self.series.stop(
+                len(self.data.units) != self.table.shape[1], 'ValueError',
                 "'data.units' component must be as long as the number of columns in "
-                    "'data.values' component. ({} required, {} given).",
-                self.table[1], len(self.data.units))
+                "'data.values' component. ({} required, {} given).",
+                len(self.table[1]), len(self.data.units))
 
         # Non-valid 'data.units' types
         else:
-            self.series.stop(True, 'TypeError', "'data.units' component must be a string, "
+            self.series.stop(
+                True, 'TypeError',
+                "'data.units' component must be a string, "
                 "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units))
 
     def create_columns(self):
@@ -236,10 +252,12 @@ class Data(list):
         # Check if all required columns are present
         for label in self.value_variables.keys():
             if label not in self.columns.keys():
-                self.series.stop(self.from_CSV, 'NameError',
+                self.series.stop(
+                    self.from_CSV, 'NameError',
                     "The column '{}' ('{}') is missing from the CSV data file located at '{}'.",
                     self.value_variables[label].name, label, self.data_path)
-                self.series.stop(self.from_data, 'NameError',
+                self.series.stop(
+                    self.from_data, 'NameError',
                     "The column '{}' ('{}') is missing from the data.",
                     self.value_variables[label].name, label)
 
@@ -298,13 +316,15 @@ class Data(list):
                     try:
                         self.unit = Unit(self.unit)
                     except ValueError:
-                        self.series.stop(True, 'ValueError', "Unit '{}' used for column '{}' "
+                        self.series.stop(
+                            True, 'ValueError', "Unit '{}' used for column '{}' "
                             "is not valid.", self.unit, self.data_label)
 
                     # Check unit physical type
-                    self.data.series.stop(self.unit.physical_type != self.variable.physical_type,
+                    self.data.series.stop(
+                        self.unit.physical_type != self.variable.physical_type,
                         'ValueError', "The unit used for '{}' ('{}') in column ('{}'), '{}', has "
-                            "an incorrect physical type ('{}' required, '{}' given)",
+                        "an incorrect physical type ('{}' required, '{}' given)",
                         self.variable.name, self.label, self.data_label, self.unit.label,
                         self.variable.physical_type, self.unit.physical_type)
 
@@ -361,9 +381,15 @@ class Data(list):
             'err': 'Δ'}
 
         # Label matches
-        # Add mass and radius error
-        matches = {'n': 'name', 'g': 'group', 't': 'type', 'm': 'mass', 'r': 'radius',
-            'drv': 'rv_offset', 'Δdrv': 'rv_offset_error'}
+        # !!! Add mass and radius error !!!
+        matches = {
+            'n': 'name',
+            'g': 'group',
+            't': 'type',
+            'm': 'mass',
+            'r': 'radius',
+            'drv': 'rv_offset',
+            'Δdrv': 'rv_offset_error'}
 
         def identify(self, data, label, missing=False):
             """ Identifies a 'label' and returns a matching wanted label or, including coordinates
@@ -378,8 +404,17 @@ class Data(list):
             old_label = label
 
             # Wanted labels
-            wanted = ('name', 'group', 'id', 'type', 'mass', 'radius', 'rv_offset', 'rv_offset_error',
-                *data.value_variables.keys(), *data.error_variables.keys())
+            wanted = (
+                'name',
+                'group',
+                'id',
+                'type',
+                'mass',
+                'radius',
+                'rv_offset',
+                'rv_offset_error',
+                *data.value_variables.keys(),
+                *data.error_variables.keys())
 
             # Advanced permutations to match a wanted label
             for old, new in self.advanced_permutations.items():
@@ -420,9 +455,11 @@ class Data(list):
 
         # Check if there is at least one row
         if len(self.rows) < 1:
-            self.series.stop(self.from_CSV, 'ValueError',
+            self.series.stop(
+                self.from_CSV, 'ValueError',
                 "No entry in the CSV data file located at '{}'.", self.data_path)
-            self.series.stop(self.from_data, 'ValueError',
+            self.series.stop(
+                self.from_data, 'ValueError',
                 "No entry for the group in the data.")
 
         # Group filtering
@@ -433,10 +470,12 @@ class Data(list):
 
             # Check if there is at least one row remaining
             if len(self.rows) < 1:
-                self.series.stop(self.from_CSV, 'ValueError',
+                self.series.stop(
+                    self.from_CSV, 'ValueError',
                     "No entry for the group '{}' in the CSV data file located at '{}'.",
                     self.series.name, self.data_path)
-                self.series.stop(self.from_data, 'ValueError',
+                self.series.stop(
+                    self.from_data, 'ValueError',
                     "No entry for the group '{}' in the data.", self.series.name)
 
         # Rows creation
@@ -472,8 +511,9 @@ class Data(list):
 
             # Float conversion
             for label in list(self.data.variables.keys()) + [
-                label for label in ('mass', 'radius', 'rv_offset', 'rv_offset_error') if label in self.data.columns]:
-                    # ['mass'] if 'mass' in self.data.columns else []]:
+                label for label in ('mass', 'radius', 'rv_offset', 'rv_offset_error')
+                if label in self.data.columns]:
+                    # !!! ['mass'] if 'mass' in self.data.columns else []]: !!!
 
                 # Empty '' values
                 if self.values[label] in ('', '...'):
@@ -484,30 +524,37 @@ class Data(list):
                     try:
                         self.values[label] = float(self.values[label].replace(',', '.').strip())
                     except ValueError:
-                        self.data.series.stop(True, 'ValueError',
+                        self.data.series.stop(
+                            True, 'ValueError',
                             "'{}' value could not be converted to float in '{}' column.",
                             self.values[label], label)
 
             # Name column
-            self.name = self.values['name'].strip() if 'name' in self.data.columns \
-                and self.values['name'].strip()  != '' else 'Star_{}'.format(
-                    str(self.row - 1) if self.data.unit_header else str(self.row))
+            self.name = (
+                self.values['name'].strip()
+                if 'name' in self.data.columns and self.values['name'].strip() != ''
+                else 'Star_{}'.format(
+                    str(self.row - 1) if self.data.unit_header else str(self.row)))
 
             # Spectral type column
-            self.type = self.values['type'].strip() if 'type' in self.data.columns \
-                and self.values['type'].strip() != '' else None
+            self.type = (
+                self.values['type'].strip()
+                if 'type' in self.data.columns and self.values['type'].strip() != '' else None)
 
             # ID column
-            self.id = self.values['id'].strip() if 'id' in self.data.columns \
-                and self.values['id'].strip() != '' else str(self.row)
+            self.id = (
+                self.values['id'].strip()
+                if 'id' in self.data.columns and self.values['id'].strip() != '' else str(self.row))
 
             # Mass column
-            self.mass = Quantity(self.values['mass'], self.data.columns['mass'].unit) \
-                if 'mass' in self.data.columns and self.values['mass'] != 0. else None
+            self.mass = (
+                Quantity(self.values['mass'], self.data.columns['mass'].unit)
+                if 'mass' in self.data.columns and self.values['mass'] != 0. else None)
 
             # Radius column
-            self.radius = Quantity(self.values['radius'], self.data.columns['radius'].unit) \
-                if 'radius' in self.data.columns and self.values['radius'] != 0. else None
+            self.radius = (
+                Quantity(self.values['radius'], self.data.columns['radius'].unit)
+                if 'radius' in self.data.columns and self.values['radius'] != 0. else None)
 
             # Radial velocity offset from a column
             if 'rv_offset' in self.data.columns:

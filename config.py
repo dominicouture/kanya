@@ -8,21 +8,21 @@
     convertible to a Astropy.Unit object. The default units are:
 
         -   Time: Myr
-        -   Length: pc
-        -   Speed: pc/Myr
+        -   Distance: pc
+        -   Velocity: pc/Myr
         -   Angle: rad
         -   Angular speed: rad/Myr
 
-    'value' or 'values' can a string, integer, float or tuple, list or dictionary based on the
-    parameter.
+    'value' or 'values' can a string, integer, float or tuple, list or dictionary, depending on the
+    given parameter.
 """
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Name of series of groups
-name.value = 'beta_pictoris'
-# name.value = 'beta_pictoris_eDR3'
+# name.value = 'beta_pictoris'
+name.value = 'beta_pictoris_eDR3'
 # name.value = 'beta_pictoris_Miret-Roig'
 
 # Path to the file or directory used as input or output relative the base directory (str). If the
@@ -34,8 +34,9 @@ file_path.value = None
 number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-number_of_steps.value = 500
-# number_of_steps.value = 171
+# number_of_steps.value = 500
+# number_of_steps.value = 250
+number_of_steps.value = 171
 
 # Number of stars in each simulated group of stars (integer, > 0)
 number_of_stars.value = 26
@@ -44,8 +45,8 @@ number_of_stars.value = 26
 initial_time.value = 0.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
-# final_time.value = 50.0
-final_time.value = 50.1951006
+final_time.value = 50.0
+# final_time.value = 50.1951006
 
 # Age of simulated groups of stars (float, ≥ 0.0)
 age.value = 24.0
@@ -86,11 +87,9 @@ velocity_scatter.values = (1.6805, 1.6805, 1.6805)
 # velocity_scatter.values = (2.21753, 1.36009, 1.57355)
 velocity_scatter.units = 'km/s'
 
-# Path to CSV data file (str) or Python dictionary with the data (dict)
-# data.value = '../Data/bpic_updated.csv'
+# Path to CSV data file (str) or Python dictionary with the data (dictionary)
 # data.value = '../Data/bpic_Crundall2019.csv'
-# data.value = '../Data/β Pictoris Moving Group - Member Stars (no outliers).csv'
-# data.value = '../Data/β Pictoris Moving Group - Core Sample (eDR3).csv'
+# data.value = '../Data/β Pictoris Moving Group - Core Sample (New dRV).csv'
 data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 1.csv'
 data.units = 'observables'
 data.system = 'observables'
@@ -184,16 +183,16 @@ data.axis = 'observables'
 rv_offset.value = 0.0
 rv_offset.unit = 'km/s'
 
-# Whether to use actual of simulated rv offsets (boolean)
+# Whether to use actual or simulated rv offsets (boolean)
 data_rv_offsets.value = False
 
 # Whether to use actual or simulated measurement errors (boolean)
 data_errors.value = False
 
-# Number of Jackknife Monte Carlo iterations (integer, ≥ 1)
-jackknife_number.value = 100
+# Number of jack-knife Monte-Carlo iterations (integer, ≥ 1)
+jackknife_number.value = 500
 
-# Fraction of stars included in every Jackkinfe Monte Carlo iteration (0 < float ≤ 1)
+# Fraction of stars included in every jack-knife Monte-Carlo iteration (0 < float ≤ 1)
 jackknife_fraction.value = 0.5
 
 # Fraction of step for which a new MST is computed (0 < float ≤ 1)
