@@ -70,7 +70,7 @@ class Quantity:
             self.value = float(self.values[0])
             self.unit = self.units.units[0]
             self.physical_type = str(self.physical_types[0])
-            self.error = float(self.values[0])
+            self.error = float(self.errors[0])
             self.error_unit = self.unit
             self.error_physical_type = self.physical_type
 

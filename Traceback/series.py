@@ -276,17 +276,17 @@ class Series(list, Output_Series):
         self.time = np.linspace(
             self.initial_time.value, self.final_time.value, self.number_of_steps)
 
-        # rv_offset paramater
-        self.rv_offset = self.configure_quantity(self.config.rv_offset)
+        # rv_shift paramater
+        self.rv_shift = self.configure_quantity(self.config.rv_shift)
 
         # data_errors parameter
-        self.data_rv_offsets = self.config.data_rv_offsets.values
+        self.data_rv_shifts = self.config.data_rv_shifts.values
         self.stop(
-            self.data_rv_offsets is None, 'NameError',
-            "Required traceback parameter 'data_rv_offsets' is missing in the configuration.")
+            self.data_rv_shifts is None, 'NameError',
+            "Required traceback parameter 'data_rv_shifts' is missing in the configuration.")
         self.stop(
-            type(self.data_rv_offsets) != bool, 'TypeError',
-            "'data_rv_offsets' must be a boolean ({} given).", type(self.data_rv_offsets))
+            type(self.data_rv_shifts) != bool, 'TypeError',
+            "'data_rv_shifts' must be a boolean ({} given).", type(self.data_rv_shifts))
 
         # data_errors parameter
         self.data_errors = self.config.data_errors.values
@@ -437,16 +437,16 @@ class Series(list, Output_Series):
         # velocity_scatter parameter
         self.velocity_scatter = self.configure_coordinate(self.config.velocity_scatter)
 
-        # Data configured to use actual error measurements or rv offset
-        if self.data_errors or self.data_rv_offsets:
+        # Data configured to use actual error measurements or radial velocity shift
+        if self.data_errors or self.data_rv_shifts:
             self.configure_data()
 
             # Check if the data length matches the number of stars
             self.stop(
-                len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_offset' "
+                len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_shift' "
                  "is True, the data length must be greater than 0.")
 
-        # Data set to None because measurement errors and rv offsets are simulated
+        # Data set to None since measurement errors and radial velocity shifts are simulated
         else:
             self.data = None
 
@@ -633,6 +633,7 @@ class Series(list, Output_Series):
             self.series = series
             self.label = deepcopy(metric.label)
             self.name = deepcopy(metric.name)
+            self.latex_name = deepcopy(metric.latex_name)
             self.valid = deepcopy(metric.valid)
             self.order = deepcopy(metric.order)
             self.status = False
@@ -660,7 +661,7 @@ class Series(list, Output_Series):
                 self.values = (
                     np.array([vars(group)[self.label].values for group in self.series[1:]])
                     if self.series.number_of_groups > 1
-                    else np.expand_dims(vars(self.series[0])[self.label].values, axis=0))
+                    else vars(self.series[0])[self.label].values[None])
                 self.value_error = np.std(self.values, axis=(0, 1))
                 self.value_error_quad = (self.value_int_error**2 + self.value_ext_error**2)**0.5
 
@@ -673,7 +674,7 @@ class Series(list, Output_Series):
                 self.ages = (
                     np.array([vars(group)[self.label].ages for group in self.series[1:]])
                     if self.series.number_of_groups > 1
-                    else np.expand_dims(vars(self.series[0])[self.label].ages, axis=0))
+                    else vars(self.series[0])[self.label].ages[None])
                 self.age_error = np.std(self.ages, axis=(0, 1))
                 self.age_error_quad = (self.age_int_error**2 + self.age_ext_error**2)**0.5
 
@@ -686,14 +687,14 @@ class Series(list, Output_Series):
                 self.minima = (
                     np.array([vars(group)[self.label].minima for group in self.series[1:]])
                     if self.series.number_of_groups > 1
-                    else np.expand_dims(vars(self.series[0])[self.label].minima, axis=0))
+                    else vars(self.series[0])[self.label].minima[None])
                 self.min_error = np.std(self.minima, axis=(0, 1))
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
-                # Age offset based on simulation
-                self.age_offset = self.series.age_offset[self.label]
+                # Age shift based on simulation
+                self.age_shift = self.series.age_shift[self.label]
 
-                self.age_ajusted = self.age + self.age_offset
+                self.age_ajusted = self.age + self.age_shift
 
                 # Minimum change
                 self.min_change = (self.min / self.value[0] - 1.) * 100.
@@ -736,8 +737,8 @@ class Series(list, Output_Series):
                 self.min_error = np.std(self.minima, axis=(0, 1))
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
-                # Age age_offset based on simulation
-                self.age_offset = self.series.age.value - self.age
+                # Age shift based on simulation
+                self.age_shift = self.series.age.value - self.age
                 self.age_ajusted = self.age
 
                 # Minimum change
@@ -771,8 +772,8 @@ class Series(list, Output_Series):
                 self.min_error = null
                 self.min_error_quad = null
 
-                # Age age_offset based on simulation
-                self.age_offset = null
+                # Age shift based on simulation
+                self.age_shift = null
                 self.age_ajusted = null
 
                 # Minimum change
@@ -1191,8 +1192,8 @@ class Series(list, Output_Series):
             # Logging
             log("'{}' series succesfully traced back.", self.name, logging=logging)
 
-            # Temporary age offset dictionary
-            self.age_offset = {
+            # !!! Temporary age shift dictionary, move to the configuration file !!!
+            self.age_shift = {
                 'mad_xyz': np.array([0.0, 0.0, 0.0]),
                 'mad_xyz_total': np.array([0.0]),
                 'mad_ξηζ': np.array([0.0, 0.0, 0.0]),
@@ -1221,6 +1222,9 @@ class Series(list, Output_Series):
                 'cross_covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
                 'cross_covariances_ξηζ_matrix_det_robust': np.array([0.0]),
                 'cross_covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
+                'covariances_xyz_sklearn': np.array([0.0, 0.0, 0.0]),
+                'covariances_xyz_matrix_det_sklearn': np.array([0.0]),
+                'covariances_xyz_matrix_trace_sklearn': np.array([0.0]),
                 'covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
                 'covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
                 'covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),

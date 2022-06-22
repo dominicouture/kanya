@@ -45,8 +45,8 @@ number_of_stars.value = 26
 initial_time.value = 0.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
-final_time.value = 50.0
-# final_time.value = 50.1951006
+# final_time.value = 70.0
+final_time.value = 50.1951006
 
 # Age of simulated groups of stars (float, ≥ 0.0)
 age.value = 24.0
@@ -57,9 +57,10 @@ position.values = (18.726, -4.500, -18.938) # new
 # position.values = (0.0, 0.0, 0.0)
 
 # Average position error of the simulated sample of stars (tuple)
-position_error.values = (0.19846, 0.0, 0.0)
+# position_error.values = (0.19846,   0.0,    0.0)
+position_error.values = (0.0218, 0.0136, 0.0165)
 # position_error.values = (0.0, 0.0, 0.0)
-position_error.units = 'mas'
+position_error.units = 'observables'
 position_error.system = 'observables'
 position_error.axis = 'equatorial'
 
@@ -75,7 +76,8 @@ velocity.values = (-10.278, -15.726, -8.759) # new
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-velocity_error.values = (1.0112, 0.30754, 0.26432)
+# velocity_error.values = (1.0112, 0.30754, 0.26432)
+velocity_error.values = (0.2634,  0.0196, 0.0231)
 # velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
@@ -90,7 +92,7 @@ velocity_scatter.units = 'km/s'
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
 # data.value = '../Data/bpic_Crundall2019.csv'
 # data.value = '../Data/β Pictoris Moving Group - Core Sample (New dRV).csv'
-data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 1.csv'
+data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 2.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -177,17 +179,16 @@ data.axis = 'observables'
 #     [ 21.87,  12.25, -20.26,  -9.91, -15.17,  -9.78,   0.36,     0.57],
 #     [ 19.57, -18.94, -24.54, -10.25, -15.84,  -7.98,   0.73,     0.83]]}
 
-# Radial velocity offset bias (model) or correction (data) applied to all stars (float)
-# rv_offset.value = -0.5
-# rv_offset.value = 0.5
-rv_offset.value = 0.0
-rv_offset.unit = 'km/s'
+# Radial velocity shift added (from model) or substracted (from data) to all stars (float)
+# rv_shift.value = 0.5
+rv_shift.value = 0.0
+rv_shift.unit = 'km/s'
 
-# Whether to use actual or simulated rv offsets (boolean)
-data_rv_offsets.value = False
+# Whether to use actual or simulated rv shifts (boolean)
+data_rv_shifts.value = False
 
 # Whether to use actual or simulated measurement errors (boolean)
-data_errors.value = False
+data_errors.value = True
 
 # Number of jack-knife Monte-Carlo iterations (integer, ≥ 1)
 jackknife_number.value = 500

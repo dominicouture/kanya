@@ -12,6 +12,7 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
 from csv import reader, writer, Sniffer
+import re
 from Traceback.collection import *
 from Traceback.coordinate import *
 
@@ -48,6 +49,7 @@ class Data(list):
 
         # Data configuration
         self.configure_data()
+        self.get_rv_shift_sequences()
 
         # Columns and rows creation
         self.create_columns()
@@ -78,7 +80,7 @@ class Data(list):
 
         # Reading of CSV file
         data_csv = open(self.data_path, 'r', encoding='utf-8')
-        data_csv_reader = data_csv.read(2048)
+        data_csv_reader = data_csv.read()
         data_csv.seek(0)
 
         # Data import into a table and CSV file closing
@@ -172,7 +174,8 @@ class Data(list):
         # Checks for the presence of a unit header in self.table
         self.unit_header = not np.vectorize(
             lambda unit: unit.replace('.', '').replace(',', '').isdigit())(self.table[1]).any()
-        # !!! Autre vérification pour voir si toutes les valeurs non nulles peuvent être transformée en unit !!!
+        # !!! Autre vérification pour voir si toutes les valeurs
+        # non nulles peuvent être transformée en unit !!!
 
         # Units from a unit header, if present
         if self.data.units is None:
@@ -239,6 +242,115 @@ class Data(list):
                 "'data.units' component must be a string, "
                 "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units))
 
+    def get_rv_shift_sequences(self):
+        """ Import radial velocity shift sequences based on spectral type, including the effects
+            of both gravitational redshift and convective blueshift.
+        """
+
+        # Total radial velocity shift sequences data
+        total_rv_shift_sequences_file = '../Radial velocity shift/total_redshift_sequences.csv'
+        data = np.loadtxt(total_rv_shift_sequences_file, dtype='object', skiprows=1, delimiter=',')
+
+        # Convert to float and delete spectral types with NaN
+        data[:,1:] = np.array(data[:,1:], dtype=float)
+        rows_with_NaN = [
+            row for row in range(data.shape[0])
+            if np.isnan(np.array(data[row,1:], dtype=float)).any()]
+        data = np.delete(data, np.array(rows_with_NaN, dtype=int), axis=0).T
+
+        # Spectral types
+        self.spectral_types_str = data[0]
+        self.spectral_types_num = np.array([
+            self.convert_spt(spt) for spt in self.spectral_types_str], dtype=float)
+        data = np.array(data[1:], dtype=float)
+
+        # Gravitational radial velocity shift
+        self.grav_shift_ms = data[12]
+        self.grav_shift_ms_error = data[13]
+        self.grav_shift_prems = data[14]
+        self.grav_shift_prems_error = data[15]
+
+        # Convective radial velocity shift
+        self.conv_shift = data[10]
+        self.conv_shift_error = data[11]
+
+        # Total radial velocity shift
+        self.total_shift_ms = data[16]
+        self.total_shift_ms_error = data[17]
+        self.total_shift_prems = data[18]
+        self.total_shift_prems_error = data[19]
+
+    def convert_spt(self, spt):
+        """ Converts spectral type letter into a number. """
+
+        # Permutation dictionary
+        permutations = {
+            'Y': 90., 'T': 80., 'L': 70., 'M': 60., 'K': 50.,
+            'G': 40., 'F': 30., 'A': 20., 'B': 10., 'O':  0.}
+
+        # Match spectral type components
+        new_spt = spt.replace(' ', '').replace('(', '').replace(')', '')
+        try:
+            letter, number, spt_class = re.split('(\d+\.?\d*)', new_spt)
+        except ValueError as e:
+            raise ValueError(f"{spt} is an invalid spectral type.") from e
+
+        # Uppercase letter and match
+        letter = letter.upper()
+        if letter not in permutations.keys():
+            raise ValueError(f"{spt} is an invalid spectral type.")
+        letter = permutations[letter]
+
+        # Number conversion
+        try:
+            number = float(number)
+        except ValueError as e:
+            raise ValueError(f"{spt} is an invalid spectral type.") from e
+        if number < 0. or number >= 10.:
+            raise ValueError(f"{spt} is an invalid spectral type.")
+
+        # New spectral type
+        return letter + number
+
+    def convert_sptn(self, sptn):
+        """ Converts spectral type number into a letter form. """
+
+        # Permutation dictionary
+        permutations = {
+            90.: 'Y', 80.: 'T', 70.: 'L', 60.: 'M', 50.: 'K',
+            40.: 'G', 30.: 'F', 20.: 'A', 10.: 'B',  0.: 'O'}
+
+        # Check if 'sptn' is a valid number
+        try:
+            sptn = float(sptn)
+        except ValueError as e:
+            raise ValueError(f'{sptn} must be a number ({type(sptn)} given).') from e
+        if sptn < 0. or sptn >= 100.:
+            raise ValueError(f'{sptn} is an invalid spectral type number.')
+
+        letter = permutations[float((sptn // 10) * 10)]
+        number = sptn % 10
+
+        return f'{letter}{number:.1f}'
+
+    def find_rv_shift(self, spt):
+        """ Finds the closest total radial velocity shift based on spectral type or spectral type
+            number.
+        """
+
+        # Convert a spectral type into a number if needed
+        if np.char.isnumeric(spt):
+            sptn = float(spt) + 60.
+        else:
+            sptn = self.convert_spt(spt)
+
+        # Find matching spectral type and total radial velocity shift
+        index = (np.abs(self.spectral_types_num - sptn)).argmin()
+        spectral_type = self.spectral_types_str[index]
+        total_rv_shift = self.total_shift_ms[index]
+
+        return spectral_type, total_rv_shift
+
     def create_columns(self):
         """ Creates a self.columns dictionary along with self.Column objects for every column
             in self.table. Also checks for the presence of every required columns based on
@@ -289,8 +401,9 @@ class Data(list):
 
             # Variables and units identification
             # !!! S'arranger pour éviter d'avoir à gérer un dictionnaire et une liste ici !!!
-            # Préconvertir les dictionnaires en liste en mettant à jour le unit header ou header par défaut.
-            # Les permutations des labels de colonnes se feraient avant et ça permettrait d'avoir des dictionaires
+            # Préconvertir les dictionnaires en liste en mettant à jour le unit header ou header
+            # par défaut. Les permutations des labels de colonnes se feraient avant et ça
+            # permettrait d'avoir des dictionaires !!!
             if self.label in self.data.variables.keys():
                 self.variable = self.data.variables[self.label]
                 self.units = self.data.data.units
@@ -350,12 +463,13 @@ class Data(list):
             'movinggroup': 'g',
             'kinematicgroup': 'g',
             'association': 'g',
+            'sptn': 't',
             'spt': 't',
             'spectraltype': 't',
             'mass': 'm',
             'radius': 'r',
             'dvr': 'drv',
-            'rvoffset': 'drv',
+            'rvshift': 'drv',
             'star': '',
             'stellar': '',
             'distance': 'ρ',
@@ -381,21 +495,25 @@ class Data(list):
             'err': 'Δ'}
 
         # Label matches
-        # !!! Add mass and radius error !!!
+        # !!! Add mass, radius and spectral type error !!!
         matches = {
             'n': 'name',
             'g': 'group',
             't': 'type',
             'm': 'mass',
             'r': 'radius',
-            'drv': 'rv_offset',
-            'Δdrv': 'rv_offset_error'}
+            'drv': 'rv_shift',
+            'Δdrv': 'rv_shift_error'}
 
         def identify(self, data, label, missing=False):
             """ Identifies a 'label' and returns a matching wanted label or, including coordinates
                 from 'data.system' or a reformatted label, if no match is found. If 'missing' is
                 True, an 'Δ' character is added.
             """
+
+            # Check for blank labels
+            if len(label) == 0:
+                return ''
 
             # Basic label permutation and strip
             for old, new in self.basic_permutations.items():
@@ -411,8 +529,8 @@ class Data(list):
                 'type',
                 'mass',
                 'radius',
-                'rv_offset',
-                'rv_offset_error',
+                'rv_shift',
+                'rv_shift_error',
                 *data.value_variables.keys(),
                 *data.error_variables.keys())
 
@@ -511,7 +629,7 @@ class Data(list):
 
             # Float conversion
             for label in list(self.data.variables.keys()) + [
-                label for label in ('mass', 'radius', 'rv_offset', 'rv_offset_error')
+                label for label in ('mass', 'radius', 'rv_shift', 'rv_shift_error')
                 if label in self.data.columns]:
                     # !!! ['mass'] if 'mass' in self.data.columns else []]: !!!
 
@@ -556,35 +674,42 @@ class Data(list):
                 Quantity(self.values['radius'], self.data.columns['radius'].unit)
                 if 'radius' in self.data.columns and self.values['radius'] != 0. else None)
 
-            # Radial velocity offset from a column
-            if 'rv_offset' in self.data.columns:
+            # Radial velocity shift from a column
+            if 'rv_shift' in self.data.columns:
                 default_unit = Unit('km/s')
-                unit = self.data.columns['rv_offset'].unit
+                unit = self.data.columns['rv_shift'].unit
 
-                # Radial velocity offset error
-                if 'rv_offset_error' in self.data.columns:
-                    error = self.values['rv_offset_error']
-                    error_unit = self.data.columns['rv_offset_error'].unit
+                # Radial velocity shift error
+                if 'rv_shift_error' in self.data.columns:
+                    error = self.values['rv_shift_error']
+                    error_unit = self.data.columns['rv_shift_error'].unit
                 else:
                     error = None
                     error_unit = None
 
                 # Unit conversion
-                self.rv_offset = Quantity(
-                    -1.0 * self.values['rv_offset'],
+                self.rv_shift = Quantity(
+                    self.values['rv_shift'],
                     default_unit if unit is None else unit,
                     0.0 if error is None else error,
                     default_unit if error_unit is None else error_unit).to()
 
-            # Radial velocity offset from mass and radius columns
+            # Radial velocity shift from mass and radius columns
             elif self.mass is not None and self.radius is not None:
-                rv_offset = c.value * ((1 - 2 * G.value * self.mass.value * M_sun.value / (
-                    c.value**2 * self.radius.value * R_sun.value))**0.5 - 1) / 1000
-                self.rv_offset = Quantity(rv_offset, Unit('km/s'), 0.0)
+                rv_shift = (
+                    c.value * ((1 - 2 * G.value * self.mass.value * M_sun.value / (
+                    c.value**2 * self.radius.value * R_sun.value))**0.5 - 1) / 1000)
+                self.rv_shift = Quantity(rv_shift, Unit('km/s'), 0.0)
 
-            # Default radial velocity offset otherwise
+            # Radial velocity shift based on spectral type number
+            elif self.type is not None:
+                self.rv_shift = self.data.series.rv_shift
+                self.type, rv_shift_value = self.data.find_rv_shift_sptn(self.type)
+                self.rv_shift = Quantity(-1.0 * rv_shift_value, 'km/s', 0.0).to()
+
+            # Default radial velocity shift otherwise
             else:
-                 self.rv_offset = self.data.series.rv_offset
+                 self.rv_shift = self.data.series.rv_shift
 
             # Position columns and unit conversion
             self.position = Quantity(

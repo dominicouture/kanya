@@ -34,21 +34,22 @@ for series in collection:
     series.create_cross_covariances_xyz_plot(robust=True, forced=True)
     series.create_cross_covariances_ξηζ_plot(forced=True) # Valid
     series.create_cross_covariances_ξηζ_plot(robust=True, forced=True)
-    # series.create_covariances_ξηζ_sklearn_plot(forced=True)
-    # series.create_det_mad_mst_plot(forced=True)
-    # series.create_age_distribution(forced=True)
+    series.create_covariances_xyz_sklearn_plot(forced=True)
+    series.create_covariances_ξηζ_sklearn_plot(forced=True)
+    series.create_det_mad_mst_plot(forced=True)
+    series.create_age_distribution(forced=True)
 
     # Group output
     for group in series:
         if group.number == 0:
             group.trajectory_xyz(forced=True, metric='covariances_xyz', index=0) # Valid
             group.trajectory_ξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
-            group.trajectory_txyz(forced=True, metric='covariances_xyz', index=0) # Valid
-            group.trajectory_tξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
-            # group.create_map(forced=True, labels=False)
-            # group.create_2D_and_3D_scatter([0,  5,  10], forced=True)
-            # group.create_2D_and_3D_scatter([15, 20, 25], forced=True)
-            # group.create_cross_covariances_scatter('x', 'u', age=10, errors=True, forced=True)
-            # group.create_age_distribution(forced=True, metric='covariances_ξηζ', index=0)
-            # for metric in ('covariances_ξηζ_matrix_det', 'covariances_ξηζ', 'mad_ξηζ', 'mst_ξηζ_mean'):
-            #     group.create_age_distribution(forced=True, metric=metric, index=0)
+            group.trajectory_txyz(forced=True, metric='covariances_xyz') # Valid
+            group.trajectory_tξηζ(forced=True, metric='covariances_ξηζ') # Valid
+            group.create_map(forced=True, labels=False)
+            group.create_2D_and_3D_scatter([0,  5,  10], forced=True)
+            group.create_2D_and_3D_scatter([15, 20, 25], forced=True)
+            group.create_cross_covariances_scatter('x', 'u', age=10, errors=True, forced=True)
+            group.create_age_distribution(forced=True, metric='covariances_ξηζ', index=0)
+            for metric in ('covariances_ξηζ_matrix_det', 'covariances_ξηζ', 'mad_ξηζ', 'mst_ξηζ_mean'):
+                group.create_age_distribution(forced=True, metric=metric, index=0)

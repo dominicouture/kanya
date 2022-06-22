@@ -15,7 +15,7 @@ def squeeze(array):
 
     array = np.squeeze(array)
 
-    return array if array.ndim > 0 else np.expand_dims(array, 0)
+    return array if array.ndim > 0 else array[None]
 
 def broadcast(name, array1, array2):
     """ Returns the resulting of two arrays that can be broacast together or raises an error. """

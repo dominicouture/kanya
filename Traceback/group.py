@@ -46,29 +46,38 @@ class Group(list, Output_Group):
         elif self.series.from_model:
             self.stars_from_model()
 
-        # Association size metrics
+        # Set association size metrics
         self.set_metrics()
 
-        # Median absolute deviation
-        self.get_median_absolute_deviation()
+        # Compute empirical covariances metrics
+        if True:
+            self.get_covariances()
 
-        # Covariances
-        self.get_covariances()
-        self.get_covariances_robust()
-        # self.get_covariances_sklearn()
+        # Compute robust covariances metrics
+        if True:
+            self.get_covariances_robust()
 
-        # Minimum spanning tree
-        self.get_minimum_spanning_tree()
+        # Compute sklearn covariances metrics
+        if True:
+            self.get_covariances_sklearn()
+
+        # Compute median absolute deviation metrics
+        if True:
+            self.get_median_absolute_deviation()
+
+        # Compute minimum spanning tree metrics
+        if True:
+            self.get_minimum_spanning_tree()
 
     def stars_from_data(self):
         """ Creates a list of Star objects from a Python dictionary or CSV files containing the
             parameters including the name of the stars, their xyz positions and uvw velocities,
-            and their respective measurement errors. Radial velocity offset is also added. If
+            and their respective measurement errors. Radial velocity shift is also added. If
             only one group is created in the series, actual values are used. If multiple groups
             are created, positions and velocities are scrambled based on measurement errors.
         """
 
-        # Radial velocity offset due to gravitational redshift
+        # Radial velocity shift due to gravitational redshift and convective blueshift
         for star in self.series.data:
 
             # Observables conversion into equatorial spherical coordinates
@@ -82,9 +91,9 @@ class Group(list, Output_Group):
                         np.random.normal(star.velocity.values, star.velocity.errors)),
                     *star.position.errors, *star.velocity.errors)
 
-                # Apply radial velocity offset and error
-                velocity_rδα += np.array([star.rv_offset.value, 0., 0.])
-                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_offset.error**2)**0.5
+                # Apply radial velocity shift and its error
+                velocity_rδα -= np.array([star.rv_shift.value, 0., 0.])
+                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
                 # Compute equatorial xyz position and velocity
                 position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
@@ -102,8 +111,9 @@ class Group(list, Output_Group):
                     *star.position.values, *star.velocity.values,
                     *star.position.errors, *star.velocity.errors)
 
-                # Apply radial velocity offset
-                velocity_rδα += np.array([star.rv_offset.value, 0., 0.])
+                # Apply radial velocity shift and its error
+                velocity_rδα -= np.array([star.rv_shift.value, 0., 0.])
+                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
                 # Compute equatorial xyz position and velocity
                 position_xyz, position_xyz_error = (star.position.values, star.position.errors)
@@ -126,7 +136,7 @@ class Group(list, Output_Group):
         """ Creates an artificial model of star for a given number of stars and age based on
             the intial average xyz position and uvw velocity, and their respective errors
             and scatters. The sample is then moved forward in time for the given age and radial
-            velocity offset is also added.
+            velocity shift is also added.
         """
 
         # Model backward orbit integration from current to star formation epoch
@@ -160,11 +170,14 @@ class Group(list, Output_Group):
                 position_xyz_error=np.zeros(3))
             self.model_stars.append(model_star)
 
-            # Velocity and possition conversion to equatorial spherical coordinates
+            # Velocity and position conversion to equatorial spherical coordinates
+            position_rδα = galactic_xyz_equatorial_rδα(*model_star.position_xyz[-1])[0]
             velocity_rδα = galactic_uvw_equatorial_rvμδμα(
                 *model_star.position_xyz[-1], *model_star.velocity_xyz[-1])[0]
-            velocity_rδα += np.array([self.series.rv_offset.value, 0.0, 0.0])
-            position_rδα = galactic_xyz_equatorial_rδα(*model_star.position_xyz[-1])[0]
+
+            # Apply radial velocity shift and its error
+            velocity_rδα += np.array([star.rv_shift.value, 0., 0.])
+            # velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
             # Velocity and position conversion to observables
             position_obs, velocity_obs = position_rδα_obs(*position_rδα, *velocity_rδα)[:2]
@@ -173,6 +186,11 @@ class Group(list, Output_Group):
             # Velocity and position scrambling based on actual measurement errors
             if self.series.data_errors:
                 star_errors = star - (star // len(self.series.data)) * len(self.series.data)
+                # np.set_printoptions(precision=3)
+                # if self.number == 0:
+                #     print(
+                #         self.series.data[star_errors].position.errors, '    ',
+                #         self.series.data[star_errors].velocity.errors)
                 position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
                     *np.random.normal(position_obs, self.series.data[star_errors].position.errors),
                     *np.random.normal(velocity_obs, self.series.data[star_errors].velocity.errors),
@@ -181,6 +199,8 @@ class Group(list, Output_Group):
 
             # Velocity and position scrambling based on average measurement errors
             else:
+                # if self.number == 0:
+                #     print(position_error, '    ', velocity_error)
                 position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
                     *np.random.normal(position_obs, position_error),
                     *np.random.normal(velocity_obs, velocity_error),
@@ -248,7 +268,7 @@ class Group(list, Output_Group):
 
     def filter_outliers(self):
         """ Filters outliers from the sample based on ξηζ position and velocity scatter over
-            time. A core sample is created based on a robust covariance matrix estimator using
+            time. A core sample is created based on a robust covariances matrix estimator using
             the scikit-learn (sklearn) Python package, leaving other stars as part of the extended
             sample.
         """
@@ -263,9 +283,11 @@ class Group(list, Output_Group):
                 # Remove stars beyond the σ cutoff of the average position or velocity
                 outliers = False
                 for star in self.sample:
-                    position_outlier = (np.abs(star.relative_position_ξηζ)
+                    position_outlier = (
+                        np.abs(star.relative_position_ξηζ)
                         > (self.scatter_position_ξηζ * self.series.cutoff)).any()
-                    velocity_outlier = (np.abs(star.relative_velocity_ξηζ)
+                    velocity_outlier = (
+                        np.abs(star.relative_velocity_ξηζ)
                         > (self.scatter_velocity_ξηζ * self.series.cutoff)).any()
                     if position_outlier or velocity_outlier:
                         star.set_outlier(position_outlier, velocity_outlier)
@@ -284,30 +306,33 @@ class Group(list, Output_Group):
                     outlier_type = (
                         'Position' if star.position_outlier else
                         'Velocity' if star.velocity_outlier else '')
-                    outlier_sigma = np.max(
-                        np.abs(star.relative_position_ξηζ) / self.scatter_position_ξηζ)
+                    if outlier_type == 'Position':
+                        outlier_sigma = np.max(
+                            np.abs(star.relative_position_ξηζ) / self.scatter_position_ξηζ)
+                    if outlier_type == 'Velocity':
+                        outlier_sigma = np.max(
+                            np.abs(star.relative_velocity_ξηζ) / self.scatter_velocity_ξηζ)
                     print(f'{star.name}: {outlier_type} > {outlier_sigma:.1f}σ')
 
             # Display message if no outliers are found
             elif self.series.cutoff is not None:
                 print(f'No outliers found in {self.series.name}.')
 
-            # Robust covariance matrix and support fraction
+            # Robust covariances matrix and support fraction
             if False:
-                a = np.array([star.position_ξηζ for star in self.sample])
-                a = np.swapaxes(a, 0, 1)
-                robust_covariance_matrix = []
+                a = np.swapaxes(np.array([star.position_ξηζ for star in self.sample]), 0, 1)
+                robust_covariances_matrix = []
                 support_fraction = []
 
                 # Iteration over time
-                for i in range(a.shape[0]):
-                    b = MinCovDet(assume_centered=False).fit(a[i])
-                    # print(i, b[i].shape, b.support_.size, b.support_.nonzero()[0].size, b.dist_.size)
-                    robust_covariance_matrix.append(b.covariance_)
-                    support_fraction.append(b.support_)
+                for step in range(self.series.number_of_steps):
+                    MCD = MinCovDet(assume_centered=False).fit(a[step])
+                    robust_covariances_matrix.append(MCD.covariance_)
+                    support_fraction.append(MCD.support_)
+                    # print(step, MCD.support_.size, MCD.support_.nonzero()[0].size, MCD.dist_.size)
 
                 # Array conversion
-                robust_covariance_matrix = np.array(robust_covariance_matrix)
+                robust_covariances_matrix = np.array(robust_covariances_matrix)
                 support_fraction = np.array(support_fraction)
                 support_fraction_all = (
                     np.sum(support_fraction, axis=0) / self.series.number_of_steps > 0.7)
@@ -333,33 +358,36 @@ class Group(list, Output_Group):
                 # Compute stars coordinates
                 self.get_stars_coordinates()
 
-        # Rotation matrix from covariance matrix
-        # a = np.array([star.position_xyz for star in self.sample]) - self.position_xyz
-        # a = np.tile(a.T, (a.shape[-1], 1, 1, 1))
-        # b = np.swapaxes(a, 0, 1)
-        # covariance_matrix = np.mean(a * b, axis=3).T
-        # eigen_values, eigen_vectors = np.linalg.eig(covariance_matrix)
-        # R = np.linalg.inv(eigen_vectors)
+        # Principal component analysis
+        if False:
+            a = np.array([star.position_xyz for star in self.sample]) - self.position_xyz
+            a = np.tile(a.T, (a.shape[-1], 1, 1, 1))
+            b = np.swapaxes(a, 0, 1)
+            covariances_matrix = np.mean(a * b, axis=3).T
+            eigen_values, eigen_vectors = np.linalg.eig(covariances_matrix)
+            rotation_matrix = np.linalg.inv(eigen_vectors)
 
-        # Rotate star positions
-        # for star in self:
-        #     np.squeeze(np.matmul(np.swapaxes(R, 1, 2), np.expand_dims(star.position_xyz, axis=2)))
-        #     star.position_xyz = np.squeeze(np.matmul(np.expand_dims(star.position_xyz, axis=1), R))
+            # Rotate star positions
+            for star in self:
+                star.position_xyz = np.squeeze(np.matmul(
+                    star.position_xyz[:,None], rotation_matrix))
+                star.position_xyz_other = np.squeeze(np.matmul(
+                    np.swapaxes(rotation_matrix, 1, 2), star.position_xyz[:,:,None]))
 
-        # Compute eigen values association size metric
-        # self.Metric(self, 'eigen_values', np.repeat(
-        #     np.expand_dims(np.sum(eigen_values**2, axis=1)**0.5, axis=0),
-        #     self.series.jackknife_number, axis=0), valid=True)
+            # Compute eigen values association size metric
+            self.Metric(
+                self, 'eigen_values', np.repeat(
+                    (np.sum(eigen_values**2, axis=1)**0.5)[None],
+                    self.series.jackknife_number, axis=0))
 
     def set_metrics(self):
         """ Sets the parameters to compute association size metrics, including weights based on
-            Mahalanobis distances computed using the empirical covariance matrix, using jack-knife
+            Mahalanobis distances computed with empirical covariances matrices, and jack-knife
             Monte-Carlo itrations.
         """
 
         # Compute Mahalanobis distance
-        self.positions_xyz = np.expand_dims(np.array([
-            star.position_xyz for star in self.sample]), axis=1)
+        self.positions_xyz = np.array([star.position_xyz for star in self.sample])[:,None]
         self.sample_size_jackknife = 1
         self.Mahalanobis_xyz = self.get_Mahalanobis_distance('positions_xyz')
 
@@ -387,28 +415,35 @@ class Group(list, Output_Group):
 
         # Create selected stars xyz and ξηζ positions and velocities arrays
         self.positions_xyz = np.array([
-            star.position_xyz for star in self.sample])[self.stars_monte_carlo,:,:]
+            star.position_xyz for star in self.sample])[self.stars_monte_carlo]
         self.positions_ξηζ = np.array([
-            star.position_ξηζ for star in self.sample])[self.stars_monte_carlo,:,:]
+            star.position_ξηζ for star in self.sample])[self.stars_monte_carlo]
         self.velocities_xyz = np.array([
-            star.velocity_xyz for star in self.sample])[self.stars_monte_carlo,:,:]
+            star.velocity_xyz for star in self.sample])[self.stars_monte_carlo]
         self.velocities_ξηζ = np.array([
-            star.velocity_ξηζ for star in self.sample])[self.stars_monte_carlo,:,:]
+            star.velocity_ξηζ for star in self.sample])[self.stars_monte_carlo]
 
-        # def cov_matrix(positions, velocities):
-        #     a = positions - np.mean(positions, axis=0)
-        #     a = np.tile(a.T, (a.shape[-1], 1, 1, 1, 1))
-        #     b = np.swapaxes(a, 0, 1)
-        #     covariance_matrix = np.mean(a * b, axis=4).T
-        #     eigen_values, eigen_vectors = np.linalg.eig(covariance_matrix)
-        #     R = np.linalg.inv(eigen_vectors)
-        #
-        #     return (
-        #         np.squeeze(np.matmul(np.expand_dims(positions, axis=3), np.expand_dims(R, axis=0))),
-        #         np.squeeze(np.matmul(np.expand_dims(velocities, axis=3), np.expand_dims(R, axis=0))))
-        #
-        # self.positions_xyz, self.velocities_xyz = cov_matrix(self.positions_xyz, self.velocities_xyz)
-        # self.positions_ξηζ, self.velocities_ξηζ = cov_matrix(self.positions_ξηζ, self.velocities_ξηζ)
+        # Principal component analysis
+        if False:
+            def rotate(positions, velocities):
+                """ Rotate positions and velocities along the main components of the positions. """
+
+                a = positions - np.mean(positions, axis=0)
+                a = np.tile(a.T, (a.shape[-1], 1, 1, 1, 1))
+                b = np.swapaxes(a, 0, 1)
+                covariances_matrix = np.mean(a * b, axis=4).T
+                eigen_values, eigen_vectors = np.linalg.eig(covariances_matrix)
+                rotation_matrix = np.linalg.inv(eigen_vectors)[None]
+
+                return (
+                    np.squeeze(np.matmul(positions[:,:,:,None], rotation_matrix)),
+                    np.squeeze(np.matmul(velocities[:,:,:,None], rotation_matrix)))
+
+            # Rotate along principal components
+            self.positions_xyz, self.velocities_xyz = rotate(
+                self.positions_xyz, self.velocities_xyz)
+            self.positions_ξηζ, self.velocities_ξηζ = rotate(
+                self.positions_ξηζ, self.velocities_ξηζ)
 
     class Metric():
         """ Association size metric including its values, age at minimum and minimum. Computes
@@ -447,6 +482,200 @@ class Group(list, Output_Group):
             # Set status
             self.metric.status = True
 
+    def get_covariances(self):
+        """ Computes the empirical xyz and ξηζ position covariances matrices, and xyz and ξηζ
+            position and velocity cross covariances matrices. The age of the group is then
+            estimated by finding the epoch when the covariances, determinant or trace of the
+            covariances matrices are minimal.
+        """
+
+        # xyz position covariances matrix, determinant and trace ages
+        self.covariances_xyz_matrix = self.get_covariances_matrix('positions_xyz')
+        self.get_covariances_metrics(
+            self.covariances_xyz_matrix, self.covariances_xyz,
+            self.covariances_xyz_matrix_det, self.covariances_xyz_matrix_trace)
+
+        # xyz position and velocity cross covariances matrix, determinant and trace ages
+        self.cross_covariances_xyz_matrix = self.get_covariances_matrix(
+            'positions_xyz', 'velocities_xyz')
+        self.get_covariances_metrics(
+            self.cross_covariances_xyz_matrix, self.cross_covariances_xyz,
+            self.cross_covariances_xyz_matrix_det, self.cross_covariances_xyz_matrix_trace)
+
+        # ξηζ position covariances matrix, determinant and trace ages
+        self.covariances_ξηζ_matrix = self.get_covariances_matrix('positions_ξηζ')
+        self.get_covariances_metrics(
+            self.covariances_ξηζ_matrix, self.covariances_ξηζ,
+            self.covariances_ξηζ_matrix_det, self.covariances_ξηζ_matrix_trace)
+
+        # ξηζ position and velocity cross covariances matrix, determinant and trace ages
+        self.cross_covariances_ξηζ_matrix = self.get_covariances_matrix(
+            'positions_ξηζ', 'velocities_ξηζ')
+        self.get_covariances_metrics(
+            self.cross_covariances_ξηζ_matrix, self.cross_covariances_ξηζ,
+            self.cross_covariances_ξηζ_matrix_det, self.cross_covariances_ξηζ_matrix_trace)
+
+    def get_covariances_robust(self):
+        """ Computes the robust xyz and ξηζ position covariances matrices, and xyz and ξηζ position
+            and velocity cross covariances matrices by giving each star a different weight based
+            on the Mahalanobis distance computed from the covariance and cross covariances matrices.
+            The age of the group is then estimated by finding the epoch when the variances,
+            determinant or trace of the covariances matrices are minimal.
+        """
+
+        # xyz position robust covariances matrix and determinant ages
+        self.Mahalanobis_xyz = self.get_Mahalanobis_distance(
+            'positions_xyz', covariances_matrix=self.covariances_xyz_matrix)
+        self.covariances_xyz_matrix_robust = self.get_covariances_matrix(
+            'positions_xyz', robust=True, Mahalanobis_distance=self.Mahalanobis_xyz)
+        self.get_covariances_metrics(
+            self.covariances_xyz_matrix_robust, self.covariances_xyz_robust,
+            self.covariances_xyz_matrix_det_robust, self.covariances_xyz_matrix_trace_robust)
+
+        # xyz position and velocity robust cross covariances matrix and determinant ages
+        self.Mahalanobis_cross_xyz = self.get_Mahalanobis_distance(
+            'positions_xyz', 'velocities_xyz',
+            covariances_matrix=self.cross_covariances_xyz_matrix)
+        self.cross_covariances_xyz_matrix_robust = self.get_covariances_matrix(
+            'positions_xyz', 'velocities_xyz',
+            robust=True, Mahalanobis_distance=self.Mahalanobis_xyz)
+        self.get_covariances_metrics(
+            self.cross_covariances_xyz_matrix_robust,
+            self.cross_covariances_xyz_robust,
+            self.cross_covariances_xyz_matrix_det_robust,
+            self.cross_covariances_xyz_matrix_trace_robust)
+
+        # ξηζ position robust covariances matrix, determinant and trace ages
+        self.Mahalanobis_ξηζ = self.get_Mahalanobis_distance(
+            'positions_ξηζ', covariances_matrix=self.covariances_ξηζ_matrix)
+        self.covariances_ξηζ_matrix_robust = self.get_covariances_matrix(
+            'positions_ξηζ', robust=True, Mahalanobis_distance=self.Mahalanobis_ξηζ)
+        self.get_covariances_metrics(
+            self.covariances_ξηζ_matrix_robust, self.covariances_ξηζ_robust,
+            self.covariances_ξηζ_matrix_det_robust, self.covariances_ξηζ_matrix_trace_robust)
+
+        # ξηζ position and velocity robust cross covariances matrix and determinant ages
+        self.Mahalanobis_cross_ξηζ = self.get_Mahalanobis_distance(
+            'positions_ξηζ', 'velocities_ξηζ',
+            covariances_matrix=self.cross_covariances_ξηζ_matrix)
+        self.cross_covariances_ξηζ_matrix_robust = self.get_covariances_matrix(
+            'positions_ξηζ', 'velocities_ξηζ',
+            robust=True, Mahalanobis_distance=self.Mahalanobis_ξηζ)
+        self.get_covariances_metrics(
+            self.cross_covariances_ξηζ_matrix_robust,
+            self.cross_covariances_ξηζ_robust,
+            self.cross_covariances_ξηζ_matrix_det_robust,
+            self.cross_covariances_ξηζ_matrix_trace_robust)
+
+    def get_covariances_sklearn(self):
+        """ Computes the xyz and ξηζ position covariances matrix using the sklearn package. The
+            age of the group is then estimated by finding the epoch when the variances, determinant
+            or trace of the matrix are minimal.
+        """
+
+        # xyz position sklearn covariances matrix, determinant and trace ages
+        self.covariances_xyz_matrix_sklearn = self.get_covariances_matrix(
+            'position_xyz', sklearn=True)
+        self.get_covariances_metrics(
+            self.covariances_xyz_matrix_sklearn, self.covariances_xyz_sklearn,
+            self.covariances_xyz_matrix_det_sklearn, self.covariances_xyz_matrix_trace_sklearn)
+
+        # ξηζ position sklearn covariances matrix, determinant and trace ages
+        self.covariances_ξηζ_matrix_sklearn = self.get_covariances_matrix(
+            'position_ξηζ', sklearn=True)
+        self.get_covariances_metrics(
+            self.covariances_ξηζ_matrix_sklearn, self.covariances_ξηζ_sklearn,
+            self.covariances_ξηζ_matrix_det_sklearn, self.covariances_ξηζ_matrix_trace_sklearn)
+
+    def get_covariances_matrix(
+            self, a, b=None, robust=False, sklearn=False, Mahalanobis_distance=None):
+        """ Computes the covariances matrix with variable weights of a Star parameter, 'a', along
+            all physical dimensions for all timestep. If another Star parameter, 'b', is given, the
+            cross covariances matrix is computed instead. If 'robust' is True, a robust estimator
+            is computed using weights from the Mahalanobis distance. If 'sklearn' is True, a robust
+            covariance estimator with sklearn's minimum covariance determinant (MCD).
+        """
+
+        # Sklearn covariance estimator
+        if sklearn:
+            a = np.swapaxes(np.array([vars(star)[a] for star in self.sample]), 0, 1)
+            covariances_matrix = []
+            support_fraction = []
+            for step in range(self.series.number_of_steps):
+                MCD = MinCovDet(assume_centered=False).fit(a[step])
+                covariances_matrix.append(MCD.covariance_)
+                support_fraction.append(MCD.support_)
+
+            return np.repeat(
+                np.array(covariances_matrix)[None],
+                self.series.jackknife_number, axis=0)
+
+        # Weights from the Mahalanobis distance
+        else:
+            if robust:
+                if Mahalanobis_distance is None:
+                    Mahalanobis_distance = self.get_Mahalanobis_distance(a, b)
+                Mahalanobis_distance = np.repeat(Mahalanobis_distance[:,:,:,None], 3, axis=3)
+
+                # Weights based on the Mahalanobis distance
+                weights = np.exp(-2 * Mahalanobis_distance)
+                weights = np.tile(weights.T, (weights.shape[-1], 1, 1, 1, 1))
+
+            # Covariances matrix
+            a = vars(self)[a] - np.mean(vars(self)[a], axis=0)
+            # a_weights = np.exp(-2. * (a / np.std(a, axis=0))**2)
+            a = np.tile(a.T, (a.shape[-1], 1, 1, 1, 1))
+            if b is None:
+                b = np.swapaxes(a, 0, 1)
+
+            # Cross covariances matrix
+            else:
+                b = vars(self)[b] - np.mean(vars(self)[b], axis=0)
+                # b_weights = np.exp(-2. * (b / np.std(b, axis=0))**2)
+                b = np.swapaxes(np.tile(b.T, (b.shape[-1], 1, 1, 1, 1)), 0, 1)
+
+            return (
+                np.average(a * b, weights=weights, axis=4).T if robust
+                else np.mean(a * b, axis=4).T)
+
+    def get_Mahalanobis_distance(self, a, b=None, covariances_matrix=None):
+        """ Computes the Mahalanobis distances using the covariances matrix of a of all stars in
+            the group for all jack-knife iterations.
+        """
+
+        # Compute the covariances matrix and inverse covariances matrix
+        if covariances_matrix is None:
+            covariances_matrix = self.get_covariances_matrix(a, b)
+        covariances_matrix_invert = np.repeat(
+            np.linalg.inv(covariances_matrix)[None], self.sample_size_jackknife, axis=0)
+
+        # Compute Mahalanobis distances
+        if b is None:
+            b = a
+        c = (vars(self)[a] - np.mean(vars(self)[a], axis=0))[:,:,:,:,None]
+        # d = (vars(self)[b] - np.mean(vars(self)[b], axis=0))[:,:,:,:,None]
+        # d = c
+        # c = ((
+        #     (vars(self)[a] - np.mean(vars(self)[a], axis=0)) +
+        #     (vars(self)[b] - np.mean(vars(self)[b], axis=0))) / 2)[:,:,:,:,None]
+
+        return np.sqrt(np.abs(np.squeeze(
+            np.matmul(np.swapaxes(c, 3, 4), np.matmul(covariances_matrix_invert, c)), axis=(3, 4))))
+
+    def get_covariances_metrics(
+            self, covariances_matrix, covariances,
+            covariances_matrix_det, covariances_matrix_trace):
+        """ Computes the covariances, and the determinant and trace of the covariances matrix. """
+
+        # Covariances
+        covariances(np.abs(covariances_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
+
+        # Covariances matrix determinant
+        covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 6))
+
+        # Covariances matrix trace
+        covariances_matrix_trace(np.abs(np.trace(covariances_matrix, axis1=2, axis2=3) / 3)**0.5)
+
     def get_median_absolute_deviation(self):
         """ Computes the xyz and ξηζ, partial and total median absolute deviations (MAD) of a group
             and their respective errors for all timesteps. The age of the group is then estimated
@@ -462,180 +691,6 @@ class Group(list, Output_Group):
         self.mad_ξηζ(
             np.median(np.abs(self.positions_ξηζ - np.median(self.positions_ξηζ, axis=0)), axis=0))
         self.mad_ξηζ_total(np.sum(self.mad_ξηζ.values**2, axis=2)**0.5)
-
-    def get_covariances(self):
-        """ Computes the xyz and ξηζ position covariance matrices, and xyz and ξηζ position and
-            velocity cross covariance matrices. The age of the group is then estimated by finding
-            the epoch when the covariances, determinant or trace of the matrices are minimal.
-        """
-
-        # xyz position covariance matrix, determinant and trace ages
-        self.covariances_xyz_matrix = self.get_covariance_matrix('positions_xyz')
-        self.get_covariance_metrics(self.covariances_xyz_matrix, 'covariances_xyz')
-
-        # xyz position and velocity cross covariance matrix, determinant and trace ages
-        self.cross_covariances_xyz_matrix = self.get_covariance_matrix(
-            'positions_xyz', 'velocities_xyz')
-        self.get_covariance_metrics(self.cross_covariances_xyz_matrix, 'cross_covariances_xyz')
-
-        # ξηζ position covariance matrix, determinant and trace ages
-        self.covariances_ξηζ_matrix = self.get_covariance_matrix('positions_ξηζ')
-        self.get_covariance_metrics(self.covariances_ξηζ_matrix, 'covariances_ξηζ')
-
-        # ξηζ position and velocity cross covariance matrix, determinant and trace ages
-        self.cross_covariances_ξηζ_matrix = self.get_covariance_matrix(
-            'positions_ξηζ', 'velocities_ξηζ')
-        self.get_covariance_metrics(self.cross_covariances_ξηζ_matrix, 'cross_covariances_ξηζ')
-
-    def get_covariances_robust(self):
-        """ Computes the xyz and ξηζ position robust covariance matrices, and xyz and ξηζ position
-            and velocity robust cross covariance matrices by giving each star a different weight
-            based on the Mahalanobis distance computed from the covariance and cross covariance
-            matrices. The age of the group is then estimated by finding the epoch when the
-            variances, determinant or trace of the matrices are minimal.
-        """
-
-        # xyz position robust covariance matrix and determinant ages
-        self.Mahalanobis_xyz = self.get_Mahalanobis_distance(
-            'positions_xyz', covariance_matrix=self.covariances_xyz_matrix)
-        self.covariances_xyz_robust_matrix = self.get_covariance_matrix(
-            'positions_xyz', robust=True, Mahalanobis_distance=self.Mahalanobis_xyz)
-        self.get_covariance_metrics(
-            self.covariances_xyz_robust_matrix, 'covariances_xyz_robust')
-
-        # xyz position and velocity robust cross covariance matrix and determinant ages
-        self.Mahalanobis_cross_xyz = self.get_Mahalanobis_distance(
-            'positions_xyz', 'velocities_xyz', covariance_matrix=self.cross_covariances_xyz_matrix)
-        self.cross_covariances_xyz_robust_matrix = self.get_covariance_matrix(
-            'positions_xyz', 'velocities_xyz', robust=True,
-            Mahalanobis_distance=self.Mahalanobis_xyz)
-        self.get_covariance_metrics(
-            self.cross_covariances_xyz_robust_matrix, 'cross_covariances_xyz_robust')
-
-        # ξηζ position robust covariance matrix, determinant and trace ages
-        self.Mahalanobis_ξηζ = self.get_Mahalanobis_distance(
-            'positions_ξηζ', covariance_matrix=self.covariances_ξηζ_matrix)
-        self.covariances_ξηζ_robust_matrix = self.get_covariance_matrix(
-            'positions_ξηζ', robust=True, Mahalanobis_distance=self.Mahalanobis_ξηζ)
-        self.get_covariance_metrics(
-            self.covariances_ξηζ_robust_matrix, 'covariances_ξηζ_robust')
-
-        # ξηζ position and velocity robust cross covariance matrix and determinant ages
-        self.Mahalanobis_cross_ξηζ = self.get_Mahalanobis_distance(
-            'positions_ξηζ', 'velocities_ξηζ', covariance_matrix=self.cross_covariances_ξηζ_matrix)
-        self.cross_covariances_ξηζ_robust_matrix = self.get_covariance_matrix(
-            'positions_ξηζ', 'velocities_ξηζ', robust=True,
-            Mahalanobis_distance=self.Mahalanobis_ξηζ)
-        self.get_covariance_metrics(
-            self.cross_covariances_ξηζ_robust_matrix, 'cross_covariances_ξηζ_robust')
-
-    def get_covariances_sklearn(self):
-        """ Computes the ξηζ position covariance matrix using the sklearn package. The age of the
-            group is then estimated by finding the epoch when the variances, determinant or
-            trace of the matrix are minimal.
-        """
-
-        def get_covariance_sklearn_matrix(a):
-            """ Computes a robust covariance determinant with sklearn (slow). """
-
-            # Initialization
-            from sklearn.covariance import MinCovDet
-            a = np.array([vars(star)[a] for star in self.sample])
-            a = np.swapaxes(a, 0, 1)
-
-            # sklearn covariance matrix
-            sklearn_covariance_matrix = []
-            for i in range(a.shape[0]):
-                b = MinCovDet(assume_centered=False).fit(a[i])
-                sklearn_covariance_matrix.append(b.covariance_)
-
-            return np.array(sklearn_covariance_matrix)
-
-        # ξηζ position sklearn covariance matrix, determinant and trace ages
-        self.covariances_ξηζ_sklearn_matrix = get_covariance_sklearn_matrix('position_ξηζ')
-        self.covariances_ξηζ_sklearn(np.repeat(np.expand_dims(np.abs(
-            self.covariances_ξηζ_sklearn_matrix[:, (0, 1, 2), (0, 1, 2)])**0.5, axis=0),
-                self.series.jackknife_number, axis=0))
-        self.covariances_ξηζ_matrix_det_sklearn(np.repeat(np.expand_dims(np.abs(
-            np.linalg.det(self.covariances_ξηζ_sklearn_matrix))**(1 / 6), axis=0),
-                self.series.jackknife_number, axis=0))
-        self.covariances_ξηζ_matrix_trace_sklearn(np.repeat(np.expand_dims(np.abs(
-            np.trace(self.covariances_ξηζ_sklearn_matrix, axis1=1, axis2=2) / 3)**0.5, axis=0),
-                self.series.jackknife_number, axis=0))
-
-    def get_covariance_matrix(self, a, b=None, robust=False, Mahalanobis_distance=None):
-        """ Computes the robust covariance matrix with variable weights of a Star parameter, 'a',
-            along all physical for all timestep. If another Star parameter, 'b', is given, the
-            cross covariance matrix is computed instead. Weights are computed from the Mahalanobis
-            distance
-        """
-
-        # Mahalanobis distance
-        if robust:
-            if Mahalanobis_distance is None:
-                Mahalanobis_distance = self.get_Mahalanobis_distance(a, b)
-            Mahalanobis_distance = np.repeat(np.expand_dims(
-                Mahalanobis_distance, axis=3), 3, axis=3)
-
-            # Compute weights
-            weights = np.exp(-2 * Mahalanobis_distance)
-            weights = np.tile(weights.T, (weights.shape[-1], 1, 1, 1, 1))
-
-        # Covariance matrix
-        a = vars(self)[a] - np.mean(vars(self)[a], axis=0)
-        # a_weights = np.exp(-2. * (a / np.std(a, axis=0))**2)
-        a = np.tile(a.T, (a.shape[-1], 1, 1, 1, 1))
-        if b is None:
-            b = np.swapaxes(a, 0, 1)
-
-        # Cross covariance matrix
-        else:
-            b = vars(self)[b] - np.mean(vars(self)[b], axis=0)
-            # b_weights = np.exp(-2. * (b / np.std(b, axis=0))**2)
-            b = np.swapaxes(np.tile(b.T, (b.shape[-1], 1, 1, 1, 1)), 0, 1)
-
-        return np.average(a * b, weights=weights, axis=4).T if robust else np.mean(a * b, axis=4).T
-
-    def get_Mahalanobis_distance(self, a, b=None, covariance_matrix=None):
-        """ Computes the Mahalanobis distances using the covariance matrix of a of all stars in
-            the group for all jack-knife iterations.
-        """
-
-        # Compute the covariance matrix and inverse covariance matrix
-        if covariance_matrix is None:
-            covariance_matrix = self.get_covariance_matrix(a, b)
-        covariances_matrix_invert = np.repeat(
-            np.expand_dims(np.linalg.inv(covariance_matrix), axis=0),
-            self.sample_size_jackknife, axis=0)
-
-        # Compute Mahalanobis distances
-        if b is None:
-            b = a
-        c = np.expand_dims(vars(self)[a] - np.mean(vars(self)[a], axis=0), axis=4)
-        # d = np.expand_dims(vars(self)[b] - np.mean(vars(self)[b], axis=0), axis=4)
-        # d = c
-        # c = (np.expand_dims(vars(self)[a] - np.mean(vars(self)[a], axis=0), axis=4) +
-        #     np.expand_dims(vars(self)[b] - np.mean(vars(self)[b], axis=0), axis=4)) / 2
-
-        return np.sqrt(np.abs(np.squeeze(
-            np.matmul(np.swapaxes(c, 3, 4), np.matmul(covariances_matrix_invert, c)), axis=(3, 4))))
-
-    def get_covariance_metrics(self, covariance_matrix, metric):
-        """ Computes the covariances, and the determinant and trace of the covariance matrix for
-            a given covariance matrix and association size metric.
-        """
-
-        # Covariances
-        vars(self)[metric](np.abs(covariance_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
-
-        # Covariance matrix determinant
-        metric, robust = (metric[:-7], '_robust') if metric[-7:] == '_robust' else (metric, '')
-        vars(self)[f'{metric}_matrix_det{robust}'](
-            np.abs(np.linalg.det(covariance_matrix))**(1/6))
-
-        # Covariance matrix trace
-        vars(self)[f'{metric}_matrix_trace{robust}'](
-            np.abs(np.trace(covariance_matrix, axis1=2, axis2=3) / 3)**0.5)
 
     def get_minimum_spanning_tree(self):
         """ Builds the minimum spanning tree (MST) of a group for all timesteps using a Kruskal
@@ -795,15 +850,14 @@ class Group(list, Output_Group):
         def get_linear(self):
             """ Computes a star's backward or forward linear trajectory. """
 
-            # Linear xyz positions and velocities
-            self.position_xyz = self.position_xyz + (self.velocity_xyz
-                + Coordinate.galactic_velocity) * np.expand_dims(self.time, axis=0).T
+            # Compute linear xyz positions and velocities
+            self.position_xyz = self.position_xyz + (
+                self.velocity_xyz + Coordinate.galactic_velocity) * self.time[:,None]
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
-            self.velocity_xyz = np.repeat(
-                np.expand_dims(self.velocity_xyz, axis=0), self.time.size, axis=0)
+            self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-            # Linear rθz positions and velocities
+            # Compute linear rθz positions and velocities
             position_rθz = np.array(coords.XYZ_to_galcencyl(
                 *self.position_xyz.T,
                 Xsun=Coordinate.sun_position[0],
@@ -870,7 +924,7 @@ class Group(list, Output_Group):
 
             # Somehow, adding  * np.array([-1, 1, 1]) to vsun above makes this work
             # if self.name == 'Star_30':
-            #     print(self.velocity_rθz_other - self.velocity_rθz)
+            #     covariances_self.velocity_rθz_other - self.velocity_rθz)
 
             # Conversion to natural units
             time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]

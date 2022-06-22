@@ -123,16 +123,16 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
 class Output_Series():
     """ Output methods for a series of groups. """
 
-    def plot_metric(self, ax, metric, index, label, linestyle, color):
+    def plot_metric(self, ax, metric, index, linestyle, color):
         """ Draws the association size metric's value over time on a given axis along with an
             enveloppe to display the uncertainty. The display is further customized with the
-            'label', 'linestyle' and 'color' parameters.
+            'linestyle' and 'color' parameters.
         """
 
         ax.plot(
             -self.time, metric.value.T[index],
             linestyle=linestyle, color=color, linewidth=1.5, label=(
-                f'{label} : ({metric.age[index]:.2f}'
+                f'{metric.latex_name[index]} : ({metric.age[index]:.2f}'
                 f' ± {metric.age_error[index]:.2f}) Myr'))
         ax.fill_between(
             -self.time,
@@ -141,8 +141,8 @@ class Output_Series():
             color=color, alpha=0.3, linewidth=0.)
 
     def create_mad_xyz_plot(self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of the xyz median absolute deviation over the entire duration of
-            the data.
+        """ Creates a plot of the total xyz median absolute deviation (MAD) and x, y and z
+            components of the MAD.
         """
 
         # Figure initialization
@@ -151,20 +151,21 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Plot total xyz MAD, x MAD, y and z MAD
-        self.plot_metric(ax, self.mad_xyz_total, 0, 'MAD${{}}_{{XYZ}}$', '-', colors[0])
-        self.plot_metric(ax, self.mad_xyz, 0, 'MAD${{}}_{{X}}$', '-', colors[2])
-        self.plot_metric(ax, self.mad_xyz, 1, 'MAD${{}}_{{Y}}$', '--', colors[3])
-        self.plot_metric(ax, self.mad_xyz, 2, 'MAD${{}}_{{Z}}$', ':', colors[4])
+        self.plot_metric(ax, self.mad_xyz_total, 0, '-', colors[0])
+        self.plot_metric(ax, self.mad_xyz, 0, '-', colors[2])
+        self.plot_metric(ax, self.mad_xyz, 1, '--', colors[3])
+        self.plot_metric(ax, self.mad_xyz, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
                     "XYZ MAD of β Pictoris (without outliners) over {} Myr\n with "
                     "{} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -172,13 +173,13 @@ class Output_Series():
                     "similar to β Pictoris\n over {} Myr with {} km/s redshift "
                     "correction and actual measurement errors of Gaia EDR3\n".format(
                         self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -190,8 +191,8 @@ class Output_Series():
         # plt.show()
 
     def create_mad_ξηζ_plot(self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of the ξηζ median absolute deviation over the entire duration of
-            the data.
+        """ Creates a plot of the total ξηζ median absolute deviation and ξ', η' and ζ'
+            components of the MAD.
         """
 
         # Figure initialization
@@ -200,22 +201,21 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Plot total ξηζ MAD, ξ MAD, η MAD and ζ MAD
-        self.plot_metric(
-            ax, self.mad_ξηζ_total, 0,
-            'MAD${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '-', colors[0])
-        self.plot_metric(ax, self.mad_ξηζ, 0, 'MAD${{}}_{{ξ^\prime}}$', '-', colors[2])
-        self.plot_metric(ax, self.mad_ξηζ, 1, 'MAD${{}}_{{η^\prime}}$', '--', colors[3])
-        self.plot_metric(ax, self.mad_ξηζ, 2, 'MAD${{}}_{{ζ^\prime}}$', ':', colors[4])
+        self.plot_metric(ax, self.mad_ξηζ_total, 0, '-', colors[0])
+        self.plot_metric(ax, self.mad_ξηζ, 0, '-', colors[2])
+        self.plot_metric(ax, self.mad_ξηζ, 1, '--', colors[3])
+        self.plot_metric(ax, self.mad_ξηζ, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
                     "ξηζ MAD of β Pictoris (without outliners) over {} Myr\n with {} "
                     "km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -223,13 +223,13 @@ class Output_Series():
                     "similar to β Pictoris\n over {} Myr with {} km/s redshift "
                     "correction and actual measurement errors of Gaia EDR3\n".format(
                         self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -242,7 +242,9 @@ class Output_Series():
 
     def create_covariances_xyz_plot(
             self, robust=False, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of X-X, Y-Y and Z-Z covariances, and determinant and trace. """
+        """ Creates a plot of x-x, y-y and z-z covariances, and the determinant and the trace of
+            the covariances matrix.
+        """
 
         # Figure initialization
         self.check_traceback()
@@ -250,6 +252,9 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Select empirical or robust association size metrics
+        self.stop(
+            type(robust) != bool, 'TypeError',
+            "'robust' must be a boolean ({} given).", type(robust))
         if robust:
             covariances_xyz_matrix_det = self.covariances_xyz_matrix_det_robust
             covariances_xyz_matrix_trace = self.covariances_xyz_matrix_trace_robust
@@ -259,16 +264,17 @@ class Output_Series():
             covariances_xyz_matrix_trace = self.covariances_xyz_matrix_trace
             covariances_xyz = self.covariances_xyz
 
-        # Plot xyz covariance matrix determinant and trace, and x-x, y-y and z-z covariances
-        self.plot_metric(ax, covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', colors[0])
-        self.plot_metric(ax, covariances_xyz_matrix_trace, 0, 'Trace${{}}_{{XYZ}}$', '--', colors[1])
-        self.plot_metric(ax, covariances_xyz, 0, '$X-X$', '-', colors[2])
-        self.plot_metric(ax, covariances_xyz, 1, '$Y-Y$', '--', colors[3])
-        self.plot_metric(ax, covariances_xyz, 2, '$Z-Z$', ':', colors[4])
+        # Plot xyz covariances matrix determinant and trace, and x-x, y-y and z-z covariances
+        self.plot_metric(ax, covariances_xyz_matrix_det, 0, '-', colors[0])
+        self.plot_metric(ax, covariances_xyz_matrix_trace, 0, '--', colors[1])
+        self.plot_metric(ax, covariances_xyz, 0, '-', colors[2])
+        self.plot_metric(ax, covariances_xyz, 1, '--', colors[3])
+        self.plot_metric(ax, covariances_xyz, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
@@ -276,7 +282,7 @@ class Output_Series():
                     "over {} Myr\nwith {} km/s redshift correction and actual measurement "
                     "errors\n".format(
                         ' robust' if robust else '', self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -284,13 +290,13 @@ class Output_Series():
                     "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
                     "correction and actual measurement errors of Gaia EDR3\n".format(
                         ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -304,7 +310,9 @@ class Output_Series():
 
     def create_covariances_ξηζ_plot(
             self, robust=False, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ-ξ, η-η and ζ-ζ covariances, and determinant and trace. """
+        """ Creates a plot of ξ'-ξ', η'-η' and ζ'-ζ' covariances, and the determinant and the trace
+            of the covariances matrix.
+        """
 
         # Figure initialization
         self.check_traceback()
@@ -312,6 +320,9 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Select empirical or robust associations size metrics
+        self.stop(
+            type(robust) != bool, 'TypeError',
+            "'robust' must be a boolean ({} given).", type(robust))
         if robust:
             covariances_ξηζ_matrix_det = self.covariances_ξηζ_matrix_det_robust
             covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace_robust
@@ -321,20 +332,17 @@ class Output_Series():
             covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace
             covariances_ξηζ = self.covariances_ξηζ
 
-        # Plot total ξηζ covariance matrix determinant and trace, and ξ-ξ, η-η and ζ-ζ covariances
-        self.plot_metric(
-            ax, covariances_ξηζ_matrix_det, 0,
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '-', colors[0])
-        self.plot_metric(
-            ax, covariances_ξηζ_matrix_trace, 0,
-            'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '--', colors[1])
-        self.plot_metric(ax, covariances_ξηζ, 0, '$ξ^\prime-ξ^\prime$', '-', colors[2])
-        self.plot_metric(ax, covariances_ξηζ, 1, '$η^\prime-η^\prime$', '--', colors[3])
-        self.plot_metric(ax, covariances_ξηζ, 2, '$ζ^\prime-ζ^\prime$', ':', colors[4])
+        # Plot total ξηζ covariances matrix determinant and trace, and ξ-ξ, η-η and ζ-ζ covariances
+        self.plot_metric(ax, covariances_ξηζ_matrix_det, 0, '-', colors[0])
+        self.plot_metric(ax, covariances_ξηζ_matrix_trace, 0, '--', colors[1])
+        self.plot_metric(ax, covariances_ξηζ, 0, '-', colors[2])
+        self.plot_metric(ax, covariances_ξηζ, 1, '--', colors[3])
+        self.plot_metric(ax, covariances_ξηζ, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
@@ -342,7 +350,7 @@ class Output_Series():
                     "covariances of β Pictoris (without outliners) over {} Myr\nwith {} km/s "
                     "redshift correction and actual measurement errors\n".format(
                         ' robust' if robust else '', self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -351,13 +359,13 @@ class Output_Series():
                     "β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
                     "measurement errors of Gaia EDR3\n".format(
                         ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -371,7 +379,9 @@ class Output_Series():
 
     def create_cross_covariances_xyz_plot(
             self, robust=False, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of x-u, y-v and z-w cross covariances, and determinant and trace. """
+        """ Creates a plot of x-u, y-v and z-w cross covariances, and the determinant and the trace
+            of the cross covariances matrix between positions and velocities.
+        """
 
         # Figure initialization
         self.check_traceback()
@@ -379,6 +389,9 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Select empirical or robust association size metrics
+        self.stop(
+            type(robust) != bool, 'TypeError',
+            "'robust' must be a boolean ({} given).", type(robust))
         if robust:
             cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det_robust
             cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace_robust
@@ -388,19 +401,18 @@ class Output_Series():
             cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace
             cross_covariances_xyz = self.cross_covariances_xyz
 
-        # Plot total xyz cross covariance matrix determinant and trace,
+        # Plot total xyz cross covariances matrix determinant and trace,
         # and x-u, y-v and z-w cross covariances
-        self.plot_metric(
-            ax, cross_covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', colors[0])
-        self.plot_metric(
-            ax, cross_covariances_xyz_matrix_trace, 0, 'Trace${{}}_{{XYZ}}$', '--', colors[1])
-        self.plot_metric(ax, cross_covariances_xyz, 0, '$X-U$', '-', colors[2])
-        self.plot_metric(ax, cross_covariances_xyz, 1, '$Y-V$', '--', colors[3])
-        self.plot_metric(ax, cross_covariances_xyz, 2, '$Z-W$', ':', colors[4])
+        self.plot_metric(ax, cross_covariances_xyz_matrix_det, 0, '-', colors[0])
+        self.plot_metric(ax, cross_covariances_xyz_matrix_trace, 0, '--', colors[1])
+        self.plot_metric(ax, cross_covariances_xyz, 0, '-', colors[2])
+        self.plot_metric(ax, cross_covariances_xyz, 1, '--', colors[3])
+        self.plot_metric(ax, cross_covariances_xyz, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
@@ -408,7 +420,7 @@ class Output_Series():
                     "over {} Myr\nwith {} km/s redshift correction and actual measurement "
                     "errors\n".format(
                         ' robust' if robust else '', self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -416,13 +428,13 @@ class Output_Series():
                     "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
                     "correction and actual measurement errors of Gaia EDR3\n".format(
                         ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -436,7 +448,9 @@ class Output_Series():
 
     def create_cross_covariances_ξηζ_plot(
             self, robust=False, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ-vξ, η-vη and ζ-vζ cross covariances, and determinant and trace. """
+        """ Creates a plot of ξ'-vξ', η'-vη' and ζ'-vζ' cross covariances, and the determinant and
+            the trace of the cross covariances matrix between position and velocities.
+        """
 
         # Figure initialization
         self.check_traceback()
@@ -444,6 +458,9 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Select empirical or robust association size metrics
+        self.stop(
+            type(robust) != bool, 'TypeError',
+            "'robust' must be a boolean ({} given).", type(robust))
         if robust:
             cross_covariances_ξηζ_matrix_det = self.cross_covariances_ξηζ_matrix_det_robust
             cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace_robust
@@ -453,24 +470,18 @@ class Output_Series():
             cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace
             cross_covariances_ξηζ = self.cross_covariances_ξηζ
 
-        # Plot total ξηζ cross covariance matrix determinant and trace,
+        # Plot total ξηζ cross covariances matrix determinant and trace,
         # and ξ-vξ, η-vη and ζ-vζ cross covariances
-        self.plot_metric(
-            ax, cross_covariances_ξηζ_matrix_det, 0,
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '-', colors[0])
-        self.plot_metric(
-            ax, cross_covariances_ξηζ_matrix_trace, 0,
-            'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', '--', colors[1])
-        self.plot_metric(
-            ax, cross_covariances_ξηζ, 0, '$ξ^\prime-\dot{ξ}^\prime$', '-', colors[2])
-        self.plot_metric(
-            ax, cross_covariances_ξηζ, 1, '$η^\prime-\dot{η}^\prime$', '--', colors[3])
-        self.plot_metric(
-            ax, cross_covariances_ξηζ, 2, '$ζ^\prime-\dot{ζ}^\prime$', ':', colors[4])
+        self.plot_metric(ax, cross_covariances_ξηζ_matrix_det, 0, '-', colors[0])
+        self.plot_metric(ax, cross_covariances_ξηζ_matrix_trace, 0, '--', colors[1])
+        self.plot_metric(ax, cross_covariances_ξηζ, 0, '-', colors[2])
+        self.plot_metric(ax, cross_covariances_ξηζ, 1, '--', colors[3])
+        self.plot_metric(ax, cross_covariances_ξηζ, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
@@ -479,7 +490,7 @@ class Output_Series():
                     "outliners) over {} Myr\nwith {} km/s redshift correction and actual "
                     "measurement errors\n".format(
                         ' robust' if robust else '', self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -488,13 +499,13 @@ class Output_Series():
                     "with kinematics similar to β Pictoris \n over {} Myr with {} km/s "
                     "redshift correction and actual measurement errors of Gaia EDR3\n".format(
                         ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -506,43 +517,91 @@ class Output_Series():
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_ξηζ_sklearn_plot(
+    def create_covariances_xyz_sklearn_plot(
             self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ-ξ, η-η and ζ-ζ sklearn covariances, and determinant and trace. """
+        """ Creates a plot of x-x, y-y and z-z sklearn covariances, and the determinant and
+            the trace of the sklearn covariances matrix.
+        """
 
         # Figure initialization
         self.check_traceback()
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
         ax = fig.add_subplot(111)
 
-        # Plot sklearn total ξηζ covariance matrix determinant and trace,
-        # and ξ-ξ, η-η and ζ-ζ covariances
-        self.plot_metric(
-            ax, self.covariances_ξηζ_matrix_det_sklearn, 0,
-            f'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', '-', colors[0])
-        self.plot_metric(
-            ax, self.covariances_ξηζ_matrix_trace_sklearn, 0,
-            f'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', '--', colors[1])
-        self.plot_metric(
-            ax, self.covariances_ξηζ_sklearn, 0,
-            f'$ξ^\prime-ξ^\prime$ (sklearn)', '-', colors[2])
-        self.plot_metric(
-            ax, self.covariances_ξηζ_sklearn, 1,
-            f'$η^\prime-η^\prime$ (sklearn)', '--', colors[3])
-        self.plot_metric(
-            ax, self.covariances_ξηζ_sklearn, 2,
-            f'$ζ^\prime-ζ^\prime$ (sklearn)', ':', colors[4])
+        # Plot sklearn total ξηζ covariances matrix determinant and trace,
+        # and x-x, y-y and z-z covariances
+        self.plot_metric(ax, self.covariances_xyz_matrix_det_sklearn, 0, '-', colors[0])
+        self.plot_metric(ax, self.covariances_xyz_matrix_trace_sklearn, 0, '--', colors[1])
+        self.plot_metric(ax, self.covariances_xyz_sklearn, 0, '-', colors[2])
+        self.plot_metric(ax, self.covariances_xyz_sklearn, 1, '--', colors[3])
+        self.plot_metric(ax, self.covariances_xyz_sklearn, 2, ':', colors[4])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            if self.from_data:
+                ax.set_title(
+                    "$X-X$, $Y-Y$ and $Z-Z$ sklearn covariances of β Pictoris (without outliners) "
+                    "over {} Myr\n with {} km/s redshift correction and actual measurement "
+                    "errors\n".format(
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
+                    fontsize=8)
+            elif self.from_model:
+                ax.set_title(
+                    "$X-X$, $Y-Y$ and $Z-Z$ sklearn covariances of {} simulated associations with "
+                    "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
+                    "correction and actual measurement errors of Gaia EDR3\n".format(
+                        self.number_of_groups, self.duration.value,
+                        round(self.rv_shift.to('km/s').value, 2)),
+                    fontsize=8)
+
+        # Legend and axes formatting
+        ax.legend(loc=2, fontsize=7, fancybox=False)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
+        ax.set_xlim(-self.final_time.value + 20., 0.)
+        ax.set_ylim(0., 40.)
+        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
+        # ax.yaxis.set_major_formatter(format_ticks)
+
+        # Save figure
+        save_figure(
+            self.name, f'Covariances_xyz_sklearn_{self.name}.pdf',
+            forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_covariances_ξηζ_sklearn_plot(
+            self, title=False, forced=False, default=False, cancel=False):
+        """ Creates a plot of ξ'-ξ', η'-η' and ζ'-ζ' sklearn covariances, and the determinant and
+            the trace of the sklearn covariances matrix.
+        """
+
+        # Figure initialization
+        self.check_traceback()
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        ax = fig.add_subplot(111)
+
+        # Plot sklearn total ξηζ covariances matrix determinant and trace,
+        # and ξ-ξ, η-η and ζ-ζ covariances
+        self.plot_metric(ax, self.covariances_ξηζ_matrix_det_sklearn, 0, '-', colors[0])
+        self.plot_metric(ax, self.covariances_ξηζ_matrix_trace_sklearn, 0, '--', colors[1])
+        self.plot_metric(ax, self.covariances_ξηζ_sklearn, 0, '-', colors[2])
+        self.plot_metric(ax, self.covariances_ξηζ_sklearn, 1, '--', colors[3])
+        self.plot_metric(ax, self.covariances_ξηζ_sklearn, 2, ':', colors[4])
+
+        # Title formatting
+        self.stop(
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
                     "$ξ^\prime-ξ^\prime$, $η^\prime-η^\prime$ and $ζ^\prime-ζ^\prime$ sklearn "
                     "covariances of β Pictoris (without outliners) over {} Myr\n"
                     "with {} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -551,13 +610,13 @@ class Output_Series():
                     "β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
                     "measurement errors of Gaia EDR3\n".format(
                         self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -571,7 +630,7 @@ class Output_Series():
 
     def create_det_mad_mst_plot(
             self, secondary=False, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of xyz covariance matrix determinant, xyz total median absolute
+        """ Creates a plot of xyz covariances matrix determinant, xyz total median absolute
             deviation, and minimum spanning tree branches length mean and median absolute
             deviation over the entire duration of the data.
         """
@@ -582,10 +641,10 @@ class Output_Series():
         ax = fig.add_subplot(111)
 
         # Plot association size metrics
-        self.plot_metric(ax, self.covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', colors[0])
-        self.plot_metric(ax, self.mad_xyz_total, 0, 'MAD${{}}_{{XYZ}}$', '--', colors[1])
-        self.plot_metric(ax, self.mst_xyz_mean, 0, 'Mean MST${{}}_{{XYZ}}$', '-', colors[2])
-        self.plot_metric(ax, self.mst_xyz_mad, 0, 'MAD MST${{}}_{{XYZ}}$', '--', colors[3])
+        self.plot_metric(ax, self.covariances_xyz_matrix_det, 0, '-', colors[0])
+        self.plot_metric(ax, self.mad_xyz_total, 0, '--', colors[1])
+        self.plot_metric(ax, self.mst_xyz_mean, 0, '-', colors[2])
+        self.plot_metric(ax, self.mst_xyz_mad, 0, '--', colors[3])
 
         # Secondary lines
         self.stop(
@@ -602,13 +661,14 @@ class Output_Series():
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
                     "Size of β Pictoris (without outliners) over {} Myr\n with "
                     "{} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
@@ -616,13 +676,13 @@ class Output_Series():
                     "β Pictoris\n over {} Myr with {} km/s redshift correction and actual "
                     "measurement errors of Gaia EDR3\n".format(
                         self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Time (Myr)', fontsize=8)
-        ax.set_ylabel('Size (pc)', fontsize=8)
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel('Association size (pc)', fontsize=8)
         ax.set_xlim(-self.final_time.value + 20., 0.)
         ax.set_ylim(0., 40.)
         ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -636,7 +696,7 @@ class Output_Series():
 
     def create_det_mad_mst_cross_covariances_plots(
             self, other, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of xyz covariance matrix determinant, xyz total median absolute
+        """ Creates a plot of xyz covariances matrix determinant, xyz total median absolute
             deviation, and minimum spanning tree branches length mean and median absolute
             deviation over the entire duration of the data.
         """
@@ -652,34 +712,33 @@ class Output_Series():
             ncols=2, constrained_layout=True, figsize=(6.66, 3.33), facecolor='w', dpi=300)
 
         # Plot association size metrics (self)
-        self.plot_metric(
-            ax0, self.covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', blues[1])
-        self.plot_metric(ax0, self.mad_xyz_total, 0, 'MAD${{}}_{{XYZ}}$', '--', blues[2])
-        self.plot_metric(ax0, self.mst_xyz_mean, 0, 'Mean MST${{}}_{{XYZ}}$', '-.', blues[3])
-        self.plot_metric(ax0, self.mst_xyz_mad, 0, 'MAD MST${{}}_{{XYZ}}$', ':', blues[4])
-        self.plot_metric(ax1, self.cross_covariances_xyz, 0, '$X-U$', '-', blues[1])
-        self.plot_metric(ax1, self.cross_covariances_xyz, 1, '$Y-V$', '--', blues[2])
-        self.plot_metric(ax1, self.cross_covariances_xyz, 2, '$Z-W$', ':', blues[3])
+        self.plot_metric(ax0, self.covariances_xyz_matrix_det, 0, '-', blues[1])
+        self.plot_metric(ax0, self.mad_xyz_total, 0, '--', blues[2])
+        self.plot_metric(ax0, self.mst_xyz_mean, 0, '-.', blues[3])
+        self.plot_metric(ax0, self.mst_xyz_mad, 0, ':', blues[4])
+        self.plot_metric(ax1, self.cross_covariances_xyz, 0, '-', blues[1])
+        self.plot_metric(ax1, self.cross_covariances_xyz, 1, '--', blues[2])
+        self.plot_metric(ax1, self.cross_covariances_xyz, 2, ':', blues[3])
 
         # Plot association size metrics (other)
-        other.plot_metric(
-            ax0, other.covariances_xyz_matrix_det, 0, 'Det${{}}_{{XYZ}}$', '-', greens[1])
-        other.plot_metric(ax0, other.mad_xyz_total, 0, 'MAD${{}}_{{XYZ}}$', '--', greens[2])
-        other.plot_metric(ax0, other.mst_xyz_mean, 0, 'Mean MST${{}}_{{XYZ}}$', '-.', greens[3])
-        other.plot_metric(ax0, other.mst_xyz_mad, 0, 'MAD MST${{}}_{{XYZ}}$', ':', greens[4])
-        other.plot_metric(ax1, other.cross_covariances_xyz, 0, '$X-U$', '-', greens[1])
-        other.plot_metric(ax1, other.cross_covariances_xyz, 1, '$Y-V$', '--', greens[2])
-        other.plot_metric(ax1, other.cross_covariances_xyz, 2, '$Z-W$', ':', greens[3])
+        other.plot_metric(ax0, other.covariances_xyz_matrix_det, 0, '-', greens[1])
+        other.plot_metric(ax0, other.mad_xyz_total, 0, '--', greens[2])
+        other.plot_metric(ax0, other.mst_xyz_mean, 0, '-.', greens[3])
+        other.plot_metric(ax0, other.mst_xyz_mad, 0, ':', greens[4])
+        other.plot_metric(ax1, other.cross_covariances_xyz, 0, '-', greens[1])
+        other.plot_metric(ax1, other.cross_covariances_xyz, 1, '--', greens[2])
+        other.plot_metric(ax1, other.cross_covariances_xyz, 2, ':', greens[3])
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 fig.suptitle(
                     "XYZ cross covariances of β Pictoris (without outliners) over {} Myr\n with "
                     "{} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_offset.to('km/s').value, 2)),
+                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
             elif self.from_model:
                 fig.suptitle(
@@ -687,14 +746,14 @@ class Output_Series():
                     "kinematics similar to β Pictoris\n over {} Myr with {} km/s redshift "
                     "correction and actual measurement errors of Gaia EDR3\n".format(
                         self.number_of_groups, self.duration.value,
-                        round(self.rv_offset.to('km/s').value, 2)),
+                        round(self.rv_shift.to('km/s').value, 2)),
                     fontsize=8)
 
         # Legend and axes formatting
         for ax in (ax0, ax1):
             ax.legend(loc=2, fontsize=7, fancybox=False)
-            ax.set_xlabel('Time (Myr)', fontsize=8)
-            ax.set_ylabel("Size (pc)", fontsize=8 )
+            ax.set_xlabel('Epoch (Myr)', fontsize=8)
+            ax.set_ylabel("Association size (pc)", fontsize=8 )
             ax.set_xlim(-self.final_time.value + 20., 0.)
             ax.set_ylim(0., 40.)
             ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -726,7 +785,8 @@ class Output_Series():
 
         # Title formatting
         self.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(
                 f'Distribution of {self.number_of_groups} moving groups age,\n'
@@ -759,13 +819,13 @@ class Output_Series():
 
             for i in filter(lambda i: valid[i], np.arange(valid.size)):
                 print(
-                    f"{metric.name[i]:<50}"
-                    f"{convert(metric.age[i]):>15}"
-                    f"{convert(metric.age_int_error[i]):>20}"
-                    f"{convert(metric.age_ext_error[i]):>20}"
-                    f"{convert(metric.age_error[i]):>15}"
-                    f"{convert(metric.min_change[i]):>20}"
-                    f"{convert(metric.age_offset[i]):>15}")
+                    f'{metric.name[i]:<50}'
+                    f'{convert(metric.age[i]):>15}'
+                    f'{convert(metric.age_int_error[i]):>20}'
+                    f'{convert(metric.age_ext_error[i]):>20}'
+                    f'{convert(metric.age_error[i]):>15}'
+                    f'{convert(metric.min_change[i]):>20}'
+                    f'{convert(metric.age_shift[i]):>15}')
 
         # Set precision and order
         np.set_printoptions(precision=2)
@@ -832,6 +892,35 @@ class Output_Series():
 class Output_Group():
     """ Output methods for a group of stars. """
 
+    def get_epoch(self, age=None, metric=None, index=None):
+        """ Computes the time index of the epoch for a given association age or, association size
+            metric and dimensional index.
+        """
+
+        # Index from age
+        if age is not None:
+            self.series.stop(
+                type(age) not in (int, float), 'TypeError',
+                "'age' must be an integer, float or None ({} given).", type(age))
+            self.series.stop(
+                age < 0, 'ValueError',
+                "'age' must be greater than or equal to 0.0 ({} given).", age)
+            self.series.stop(
+                age > self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({} Myr, {} Myr given).",
+                self.series.final_time.value, age)
+
+        # Index from the epoch of minimum of an association size metric
+        elif metric is not None:
+            metric, index = self.get_metric(metric, index)
+            age = metric.age_ajusted[index]
+        else:
+            self.series.stop(
+                True, 'ValueError',
+                "Either 'age' or 'metric' must not be None ({} and {} given).", age, index)
+
+        return int(age / self.series.final_time.value * self.series.number_of_steps)
+
     def get_metric(self, metric, index=None):
         """ Retrieves the proprer Series.Metric instance from a string and index. """
 
@@ -859,31 +948,6 @@ class Output_Group():
                 "No 'index' is provided (metric is {} in size).", metric.value.size)
 
         return (metric, index if metric.value.size > 1 else 0)
-
-    def get_epoch(self, age=None, metric=None, index=None):
-        """ Computes the time index of the epoch for a given association age or, association size
-            metric and dimensional index.
-        """
-
-        # Index from age
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer, float or None ({} given).", type(age))
-            self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
-
-        # Index from the epoch of minimum of an association size metric
-        elif metric is not None:
-            metric, index = self.get_metric(metric, index)
-            age = metric.age_ajusted[index]
-        else:
-            self.series.stop(
-                True, 'ValueError',
-                "Either 'age' or 'metric' must not be None ({} given).", age, index)
-
-        return int(age / self.series.final_time.value * self.series.number_of_steps)
 
     def trajectory_xyz(
             self, title=False, labels=False, age=None, metric=None, index=None,
@@ -1006,7 +1070,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             fig.suptitle(f"XYZ trajectories of stars in {self.name}", fontsize=8)
 
@@ -1126,7 +1191,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             fig.suptitle(f"ξηζ trajectories of stars in {self.name}", fontsize=8)
 
@@ -1137,7 +1203,7 @@ class Output_Group():
         # plt.show()
 
     def trajectory_txyz(
-            self, title=False, age=None, metric=None, index=None,
+            self, title=False, age=None, metric=None,
             forced=False, default=False, cancel=False):
         """ Draws the xyz trajectories as a function of time of stars. """
 
@@ -1157,7 +1223,7 @@ class Output_Group():
                 color = '#ff0000' if star.outlier else greys[0]
                 ax.plot(
                     self.series.time, (star.position_xyz - self.position_xyz)[:,y],
-                    color=color, linewidth=0.4, zorder=1)
+                    color=color, linewidth=0.4, zorder=1, alpha=0.6)
 
             # Show vectical dashed line
             ax.axvline(x=self.series.time[birth[y]], color='0.5', linewidth=1.0, linestyle='--')
@@ -1234,8 +1300,8 @@ class Output_Group():
                         s=6, marker=m, color=blues[y + 2], zorder=2)
 
         # Legend and axes formatting
-        ax1.set_xlabel('Time (Myr)', fontsize=8)
-        ax2.set_xlabel('Time (Myr)', fontsize=8)
+        ax1.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax2.set_xlabel('Epoch (Myr)', fontsize=8)
         ax3.set_xticklabels([])
         ax4.set_xticklabels([])
         ax1.set_ylabel('$Z - <Z>$ (pc)', fontsize=8)
@@ -1267,7 +1333,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(f'XYZ trajectories of stars in {self.name}', fontsize=8)
 
@@ -1278,7 +1345,7 @@ class Output_Group():
         # plt.show()
 
     def trajectory_tξηζ(
-            self, title=False, age=None, metric=None, index=None,
+            self, title=False, age=None, metric=None,
             forced=False, default=False, cancel=False):
         """ Draws the ξηζ trajectories as a function of time of stars. """
 
@@ -1298,7 +1365,7 @@ class Output_Group():
                 color = '#ff0000' if star.outlier else greys[0]
                 ax.plot(
                     self.series.time, (star.position_ξηζ - self.position_ξηζ)[:,y],
-                    color=color, linewidth=0.4, zorder=1)
+                    color=color, linewidth=0.4, zorder=1, alpha=0.6)
 
             # Show vectical dashed line
             ax.axvline(x=self.series.time[birth[y]], color='0.5', linewidth=1.0, linestyle='--')
@@ -1372,8 +1439,8 @@ class Output_Group():
                         s=6, marker=m, color=blues[y + 2], zorder=2)
 
         # Legend and axes formatting
-        ax1.set_xlabel('Time (Myr)', fontsize=8)
-        ax2.set_xlabel('Time (Myr)', fontsize=8)
+        ax1.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax2.set_xlabel('Epoch (Myr)', fontsize=8)
         ax3.set_xticklabels([])
         ax4.set_xticklabels([])
         ax1.set_ylabel('$ζ^\prime - <ζ^\prime>$ (pc)', fontsize=8)
@@ -1405,7 +1472,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(f'ξηζ trajectories of stars in {self.name}', fontsize=8)
 
@@ -1473,7 +1541,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title('Mollweide projection of tracebacks', fontsize=8)
 
@@ -1496,15 +1565,17 @@ class Output_Group():
         axis = {'x': 0, 'y': 1, 'z': 2}
         keys = tuple(axis.keys())
 
-        # X axis
-        self.series.stop(type(i) != str, "X axis 'i' must be a string ({} given).", type(i))
+        # Check if X and Y axes are valid, and initialization
+        self.series.stop(
+            type(i) != str, 'TypeError',
+            "X axis 'i' must be a string ({} given).", type(i))
         self.series.stop(
             i.lower() not in keys, 'ValueError',
             "X axis 'i' must be an axis key ('x', 'y' or 'z', {} given).", i)
         i = axis[i.lower()]
-
-        # Y axis
-        self.series.stop(type(j) != str, "Y axis 'j' must be a string ({} given).", type(j))
+        self.series.stop(
+            type(j) != str, 'TypeError',
+            "Y axis 'j' must be a string ({} given).", type(j))
         self.series.stop(
             j.lower() not in keys, 'ValueError',
             "Y axis 'j' must be an axis key ('x', 'y' or 'z', {} given).", j)
@@ -1518,13 +1589,24 @@ class Output_Group():
             self.series.stop(
                 step % 1 != 0, 'ValueError',
                 "'step' must be convertible to an integer ({} given).", step)
+            self.series.stop(
+                step < 0, 'ValueError',
+                "'step' must be greater than or equal to 0.0 ({} given).", step)
+            self.series.stop(
+                step >= self.series.number_of_steps, 'ValueError',
+                "'step' must be lower than the number of steps ({}, {} given).",
+                self.series.number_of_steps, step)
         if age is not None:
             self.series.stop(
                 type(age) not in (int, float), 'TypeError',
                 "'age' must be an integer or float ({} given).", type(age))
             self.series.stop(
                 age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
+                "'age' must be greater than or equal to 0.0 ({} given).", age)
+            self.series.stop(
+                age > self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({} Myr, {} Myr given).",
+                self.series.final_time.value, age)
 
         # Step or age calculation
         if age is not None:
@@ -1572,7 +1654,8 @@ class Output_Group():
 
         # Branches creation
         self.series.stop(
-            type(mst) != bool, 'TypeError', "'mst' must be a boolean ({} given).", type(mst))
+            type(mst) != bool, 'TypeError',
+            "'mst' must be a boolean ({} given).", type(mst))
         if mst:
             for branch in self.mst[step]:
                 ax.plot(
@@ -1581,7 +1664,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(
                 "{} and {} positions of stars in β Pictoris at {} Myr "
@@ -1615,13 +1699,24 @@ class Output_Group():
             self.series.stop(
                 step % 1 != 0, 'ValueError',
                 "'step' must be convertible to an integer ({} given).", step)
+            self.series.stop(
+                step < 0, 'ValueError',
+                "'step' must be greater than or equal to 0.0 ({} given).", step)
+            self.series.stop(
+                step >= self.series.number_of_steps, 'ValueError',
+                "'step' must be lower than the number of steps ({}, {} given).",
+                self.series.number_of_steps, step)
         if age is not None:
             self.series.stop(
                 type(age) not in (int, float), 'TypeError',
                 "'age' must be an integer or float ({} given).", type(age))
             self.series.stop(
                 age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
+                "'age' must be greater than or equal to 0.0 ({} given).", age)
+            self.series.stop(
+                age > self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({} Myr, {} Myr given).",
+                self.series.final_time.value, age)
 
         # Step or age calculation
         if age is not None:
@@ -1679,7 +1774,8 @@ class Output_Group():
 
         # Branches creation
         self.series.stop(
-            type(mst) != bool, 'TypeError', "'mst' must be a boolean ({} given).", type(mst))
+            type(mst) != bool, 'TypeError',
+            "'mst' must be a boolean ({} given).", type(mst))
         if mst:
             for branch in self.mst[step]:
                 ax.plot((
@@ -1692,7 +1788,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(
                 f'Minimum spanning tree of stars in β Pictoris at {age:.1f} Myr\n', fontsize=8)
@@ -1747,7 +1844,8 @@ class Output_Group():
 
         # Title formatting
         self.series.stop(
-            type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(
                 '$X-Y$, $X-Z$, $Y-Z$ and 3D scatters at '
@@ -1766,15 +1864,17 @@ class Output_Group():
         axis = {'x': 0, 'y': 1, 'z': 2}
         keys = tuple(axis.keys())
 
-        # X axis
-        self.series.stop(type(i) != str, "X axis 'i' must be a string ({} given).", type(i))
+        # Check if X and Y axes are valid, and initialization
+        self.series.stop(
+            type(i) != str, 'TypeError',
+            "X axis 'i' must be a string ({} given).", type(i))
         self.series.stop(
             i.lower() not in keys, 'ValueError',
             "X axis 'i' must be an axis key ('x', 'y' or 'z', {} given).", i)
         i = axis[i.lower()]
-
-        # Y axis
-        self.series.stop(type(j) != str, "Y axis 'j' must be a string ({} given).", type(j))
+        self.series.stop(
+            type(j) != str, 'TypeError',
+            "Y axis 'j' must be a string ({} given).", type(j))
         self.series.stop(
             j.lower() not in keys, 'ValueError',
             "Y axis 'j' must be an axis key ('x', 'y' or 'z', {} given).", j)
@@ -1788,13 +1888,24 @@ class Output_Group():
             self.series.stop(
                 step % 1 != 0, 'ValueError',
                 "'step' must be convertible to an integer ({} given).", step)
+            self.series.stop(
+                step < 0, 'ValueError',
+                "'step' must be greater than or equal to 0.0 ({} given).", step)
+            self.series.stop(
+                step >= self.series.number_of_steps, 'ValueError',
+                "'step' must be lower than the number of steps ({}, {} given).",
+                self.series.number_of_steps, step)
         if age is not None:
             self.series.stop(
                 type(age) not in (int, float), 'TypeError',
                 "'age' must be an integer or float ({} given).", type(age))
             self.series.stop(
                 age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
+                "'age' must be greater than or equal to 0.0 ({} given).", age)
+            self.series.stop(
+                age > self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({} Myr, {} Myr given).",
+                self.series.final_time.value, age)
 
         # Step or age calculation
         if age is not None:
@@ -1853,13 +1964,24 @@ class Output_Group():
             self.series.stop(
                 step % 1 != 0, 'ValueError',
                 "'step' must be convertible to an integer ({} given).", step)
+            self.series.stop(
+                step < 0, 'ValueError',
+                "'step' must be greater than or equal to 0.0 ({} given).", step)
+            self.series.stop(
+                step >= self.series.number_of_steps, 'ValueError',
+                "'step' must be lower than the number of steps ({}, {} given).",
+                self.series.number_of_steps, step)
         if age is not None:
             self.series.stop(
                 type(age) not in (int, float), 'TypeError',
                 "'age' must be an integer or float ({} given).", type(age))
             self.series.stop(
                 age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
+                "'age' must be greater than or equal to 0.0 ({} given).", age)
+            self.series.stop(
+                age > self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({} Myr, {} Myr given).",
+                self.series.final_time.value, age)
 
         # Step or age calculation
         if age is not None:
@@ -1923,15 +2045,17 @@ class Output_Group():
         position_keys = tuple(position_axis.keys())
         velocity_keys = tuple(velocity_axis.keys())
 
-        # Position axis
-        self.series.stop(type(i) != str, "Position axis 'i' must be a string ({} given).", type(i))
+        # Check if position and velocity axes are valid, and initialization
+        self.series.stop(
+            type(i) != str, 'TypeError',
+            "Position axis 'i' must be a string ({} given).", type(i))
         self.series.stop(
             i.lower() not in position_keys, 'ValueError',
             "Position axis 'i' must be an postion axis key ('x', 'y' or 'z', {} given).", i)
         i = position_axis[i.lower()]
-
-        # Velocity axis
-        self.series.stop(type(j) != str, "Velocity axis 'j' must be a string ({} given).", type(j))
+        self.series.stop(
+            type(j) != str, 'TypeError',
+            "Velocity axis 'j' must be a string ({} given).", type(j))
         self.series.stop(
             j.lower() not in velocity_keys, 'ValueError',
             "Velocity axis 'j' must be an postion axis key ('u', 'v' or 'w', {} given).", j)
@@ -1945,13 +2069,24 @@ class Output_Group():
             self.series.stop(
                 step % 1 != 0, 'ValueError',
                 "'step' must be convertible to an integer ({} given).", step)
+            self.series.stop(
+                step < 0, 'ValueError',
+                "'step' must be greater than or equal to 0.0 ({} given).", step)
+            self.series.stop(
+                step >= self.series.number_of_steps, 'ValueError',
+                "'step' must be lower than the number of steps ({}, {} given).",
+                self.series.number_of_steps, step)
         if age is not None:
             self.series.stop(
                 type(age) not in (int, float), 'TypeError',
                 "'age' must be an integer or float ({} given).", type(age))
             self.series.stop(
                 age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", type(age))
+                "'age' must be greater than or equal to 0.0 ({} given).", age)
+            self.series.stop(
+                age > self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({} Myr, {} Myr given).",
+                self.series.final_time.value, age)
 
         # Step or age calculation
         if age is not None:
@@ -2025,7 +2160,9 @@ class Output_Group():
     def create_age_distribution(
             self, title=False, metric=None, index=None,
             forced=False, default=False, cancel=False):
-        """ Creates a plot of the distribution of jack-knife Monte-Carlo ages computed in a group. """
+        """ Creates a plot of the distribution of jack-knife Monte-Carlo ages computed in a
+            group.
+        """
 
         # Figure initialization
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
@@ -2141,7 +2278,7 @@ def create_histogram(
 
     # Check if ages are valid
     stop(
-        type(ages) not in (tuple, list),
+        type(ages) not in (tuple, list), 'TypeError',
         "'ages' must either must be a tuple or list ({} given)", type(ages))
     for age in ages:
         stop(
@@ -2195,7 +2332,8 @@ def create_histogram(
 
     # Title formatting
     stop(
-        type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+        type(title) != bool, 'TypeError',
+        "'title' must be a boolean ({} given).", type(title))
     if title:
         ax.set_title(
             "Distribution of ages ({} groups, {} Myr, {} stars,\ninitial scatter = "
@@ -2299,7 +2437,8 @@ def create_color_mesh(
 
     # Title formatting
     stop(
-        type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+        type(title) != bool, 'TypeError',
+        "'title' must be a boolean ({} given).", type(title))
     if title:
         ax.set_title(
             'Scatter on age (Myr) over the initial scatter (pc)\n'
@@ -2319,7 +2458,7 @@ def create_color_mesh(
 
 def plot_age_error(title=False, forced=False, default=False, cancel=False):
     """ Creates a plot of ages obtained for diffrent measurement errors on radial velocity
-        and offset due to gravitationnal redshift.
+        and radial velocity shifts due to gravitationnal redshift.
     """
 
     # Figure initialization
@@ -2376,7 +2515,8 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
 
     # Title formatting
     stop(
-        type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+        type(title) != bool, 'TypeError',
+        "'title' must be a boolean ({} given).", type(title))
     if title:
         ax.set_title(
             "Measured age of a simulation of 1000 24 Myr-old groups\n"
@@ -2396,7 +2536,7 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
 
     # Save figure
     save_figure(
-        self.name, f'Errors_RV_offset_plot_{self.name}.pdf',
+        self.name, f'Errors_rv_shift_plot_{self.name}.pdf',
         forced=forced, default=default, cancel=cancel)
     # plt.show()
 
@@ -2421,7 +2561,8 @@ def create_minimum_error_plots(title=False, forced=False, default=False, cancel=
 
     # Title formatting
     stop(
-        type(title) != bool, 'TypeError', "'title' must be a boolean ({} given).", type(title))
+        type(title) != bool, 'TypeError',
+        "'title' must be a boolean ({} given).", type(title))
     if title:
         ax.set_title('Impact of UVW velocity on the age of minimal scatter.', fontsize=8)
 
