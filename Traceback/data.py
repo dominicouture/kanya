@@ -301,7 +301,7 @@ class Data(list):
             raise ValueError(f"{spt} is an invalid spectral type.")
         letter = permutations[letter]
 
-        # Number conversion
+        # Convert letter
         try:
             number = float(number)
         except ValueError as e:
@@ -328,14 +328,16 @@ class Data(list):
         if sptn < 0. or sptn >= 100.:
             raise ValueError(f'{sptn} is an invalid spectral type number.')
 
+        # Convert number
         letter = permutations[float((sptn // 10) * 10)]
         number = sptn % 10
 
         return f'{letter}{number:.1f}'
 
     def find_rv_shift(self, spt):
-        """ Finds the closest total radial velocity shift based on spectral type or spectral type
-            number.
+        """ Finds the closest total radial velocity shift, including the effects of gravitational
+            redshift and convective blueshift, based on the spectral type or spectral type number
+            of a star or brown dwarf.
         """
 
         # Convert a spectral type into a number if needed

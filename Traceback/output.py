@@ -20,7 +20,7 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)))
 
 # Set pyplot rc parameters
-plt.rc('font', serif='Latin Modern Math', family='serif', size='12')
+plt.rc('font', serif='Latin Modern Math', family='serif', size='8')
 plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Math:roman')
 plt.rc('lines', markersize=4)
 plt.rc('pdf', fonttype=42)
@@ -33,14 +33,25 @@ oranges = ('#000000', '#562b00', '#a05000', '#ff8000', 'ffa040')
 magentas = ('#000000', '#560056', '#a000a0', '#df00df', '#f056f0')
 colors = (greens[1], greens[2], blues[2], blues[3], blues[4])
 
-def save_figure(name, file_path=None, forced=False, default=False, cancel=False):
+def save_figure(name, file_path=None, tight=True, forced=False, default=False, cancel=False):
     """ Checks whether a path already exists and asks for user input if it does. The base path
         is assumed to be the output directory. Also, if the path does not have an extension, a
         '.pdf' extension is added.
     """
 
-    # Padding
-    padding = 0.01
+    def save(file_path, tight):
+        """ Saves figure with or without tight layout and some padding. """
+
+        # Check 'tight' argument
+        stop(
+            type(forced) != bool, 'TypeError',
+            "'forced' must be a boolean ({} given).", type(forced))
+
+        # Save figure
+        if tight:
+            plt.savefig(file_path, bbox_inches='tight', pad_inches=0.01)
+        else:
+            plt.savefig(file_path)
 
     # file_path parameter
     file_path = file_path if file_path is not None else output(create=True) + '/'
@@ -98,7 +109,7 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
             if default or choice in ('k', 'keep'):
                 from Traceback.tools import default_name
                 file_path = default_name(file_path)
-                plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
+                save(file_path, tight)
 
                 # Logging
                 log("'{}': file name changed and file saved at '{}'.", name, file_path)
@@ -107,15 +118,14 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
         if forced or choice in ('y', 'yes'):
             from os import remove
             remove(file_path)
-            plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
+            save(file_path, tight)
 
             # Logging
             log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
 
     # Save figure
     else:
-        plt.savefig(file_path, bbox_inches='tight', pad_inches=padding)
-        # plt.savefig(file_path)
+        save(file_path, tight)
 
         # Logging
         log("'{}': file saved at '{}'.", name, file_path)
@@ -123,139 +133,139 @@ def save_figure(name, file_path=None, forced=False, default=False, cancel=False)
 class Output_Series():
     """ Output methods for a series of groups. """
 
-    def plot_metric(self, ax, metric, index, linestyle, color):
-        """ Draws the association size metric's value over time on a given axis along with an
-            enveloppe to display the uncertainty. The display is further customized with the
-            'linestyle' and 'color' parameters.
+    def initialize_figure_metric(self):
+        """ Initializes a figure and an axis to plot association size metrics. """
+
+        # Initialize figure
+        self.check_traceback()
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        ax = fig.add_axes([0.127, 0.103, 0.871, 0.895])
+
+        return fig, ax
+
+    def check_robust_sklearn_metric(self, robust, sklearn):
+        """ Checks if 'robust' and 'sklearn' arguments are valid to select to proper association
+            size metrics.
         """
 
+        # Check 'robust' and 'sklearn' arguments
+        self.stop(
+            type(robust) != bool, 'TypeError',
+            "'robust' must be a boolean ({} given).", type(robust))
+        self.stop(
+            type(sklearn) != bool, 'TypeError',
+            "'sklearn' must be a boolean ({} given).", type(sklearn))
+        self.stop(
+            robust and sklearn, 'ValueError',
+            "'robust' and 'sklearn' cannot both be True.")
+
+    def plot_metric(self, ax, metric, index, linestyle, color, zorder=0.5, secondary=False):
+        """ Plots the association size metric's value over time on a given axis along with an
+            enveloppe to display the uncertainty. The display is further customized with the
+            'linestyle' and 'color' parameters. If 'secondary' is True, secondary lines are
+            displayed as well.
+        """
+
+        # Plot the value of the metric over time
         ax.plot(
             -self.time, metric.value.T[index],
-            linestyle=linestyle, color=color, linewidth=1.5, label=(
-                f'{metric.latex_name[index]} : ({metric.age[index]:.2f}'
-                f' ± {metric.age_error[index]:.2f}) Myr'))
+            linewidth=1.0, linestyle=linestyle, color=color, zorder=zorder, label=(
+                f'{metric.latex_name[index]} : ({metric.age[index]:.1f}'
+                f' ± {metric.age_error[index]:.1f}) Myr'))
+
+        # Plot an enveloppe to display the uncertainty
         ax.fill_between(
             -self.time,
             metric.value.T[index] - metric.value_error.T[index],
             metric.value.T[index] + metric.value_error.T[index],
-            color=color, alpha=0.3, linewidth=0.)
+            color=color, alpha=0.3, linewidth=0., zorder=zorder - 0.5)
 
-    def create_mad_xyz_plot(self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of the total xyz median absolute deviation (MAD) and x, y and z
-            components of the MAD.
-        """
+        # Plot secondary lines
+        self.stop(
+            type(secondary) != bool, 'TypeError',
+            "'secondary' must be a boolean ({} given).", type(secondary))
+        if secondary:
+            values = metric.values.reshape((
+                metric.values.shape[0] * metric.values.shape[1],
+                metric.values.shape[2], metric.values.shape[3]))
+            for i in np.unique(np.round(
+                    np.linspace(0, self.number_of_groups * self.jackknife_number - 1, 20))):
+                ax.plot(
+                    -self.time, values[int(i),:,index],
+                    linestyle=linestyle, color=color, alpha=0.4,
+                    linewidth=0.5, zorder=zorder - 0.25)
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+    def set_title_metric(self, ax, title, metric):
+        """ Sets a title for association size metrics plots if 'title' is True. """
 
-        # Plot total xyz MAD, x MAD, y and z MAD
-        self.plot_metric(ax, self.mad_xyz_total, 0, '-', colors[0])
-        self.plot_metric(ax, self.mad_xyz, 0, '-', colors[2])
-        self.plot_metric(ax, self.mad_xyz, 1, '--', colors[3])
-        self.plot_metric(ax, self.mad_xyz, 2, ':', colors[4])
-
-        # Title formatting
         self.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 ax.set_title(
-                    "XYZ MAD of β Pictoris (without outliners) over {} Myr\n with "
-                    "{} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
+                    "{} of {}\n over {:.1f} Myr with a {:.1f} km/s radial "
+                    "velocity correction\n".format(
+                        metric, self.name, self.duration.value,
+                        self.rv_shift.to('km/s').value),
                     fontsize=8)
             elif self.from_model:
                 ax.set_title(
-                    "Average XYZ MAD of {} simulated associations with kinematics "
-                    "similar to β Pictoris\n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia EDR3\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
+                    "Average {} of {} simulated associations over {:.1f} Myr\n"
+                    "with kinematics similar to {} and a {:.1f} km/s radial velocity "
+                    "bias\n".format(
+                        metric, self.number_of_groups, self.duration.value,
+                        self.name, self.rv_shift.to('km/s').value),
                     fontsize=8)
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
+    def set_axis_metric(self, ax):
+        """ Sets the parameters of an axis and its figure to plot association size metrics. """
+
+        # Set legend
+        legend = ax.legend(loc=2, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
+        legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+        legend.get_frame().set_linewidth(0.5)
+
+        # Set labels
         ax.set_xlabel('Epoch (Myr)', fontsize=8)
         ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
+
+        # Set limits
+        ax.set_xlim(-self.final_time.value + 14, -self.initial_time.value)
+        ax.set_ylim(-1., 39.)
+
+        # Set ticks
+        ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35.])
+        ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
+        ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
         # ax.yaxis.set_major_formatter(format_ticks)
 
-        # Save figure
-        save_figure(
-            self.name, f'MAD_xyz_{self.name}.pdf', forced=forced, default=default, cancel=cancel)
-        # plt.show()
-
-    def create_mad_ξηζ_plot(self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of the total ξηζ median absolute deviation and ξ', η' and ζ'
-            components of the MAD.
-        """
-
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
-
-        # Plot total ξηζ MAD, ξ MAD, η MAD and ζ MAD
-        self.plot_metric(ax, self.mad_ξηζ_total, 0, '-', colors[0])
-        self.plot_metric(ax, self.mad_ξηζ, 0, '-', colors[2])
-        self.plot_metric(ax, self.mad_ξηζ, 1, '--', colors[3])
-        self.plot_metric(ax, self.mad_ξηζ, 2, ':', colors[4])
-
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "ξηζ MAD of β Pictoris (without outliners) over {} Myr\n with {} "
-                    "km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "Average ξηζ MAD of {} simulated associations with kinematics "
-                    "similar to β Pictoris\n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia EDR3\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
-
-        # Save figure
-        save_figure(
-            self.name, f'MAD_ξηζ_{self.name}.pdf', forced=forced, default=default, cancel=cancel)
-        # plt.show()
+        # Set spines
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.5)
 
     def create_covariances_xyz_plot(
-            self, robust=False, title=False, forced=False, default=False, cancel=False):
+            self, robust=False, sklearn=False, title=False,
+            forced=False, default=False, cancel=False):
         """ Creates a plot of x-x, y-y and z-z covariances, and the determinant and the trace of
-            the covariances matrix.
+            the covariances matrix. If either 'robust' or 'sklearn' is True, the robust or sklearn
+            covariances matrix is used. Otherwise, the empirical covariances matrix is used.
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
-        # Select empirical or robust association size metrics
-        self.stop(
-            type(robust) != bool, 'TypeError',
-            "'robust' must be a boolean ({} given).", type(robust))
-        if robust:
+        # Check 'robust' and 'sklearn' arguments
+        self.check_robust_sklearn_metric(robust, sklearn)
+
+        # Select empirical, robust or sklearn association size metrics
+        if sklearn:
+            covariances_xyz_matrix_det = self.covariances_xyz_matrix_det_sklearn
+            covariances_xyz_matrix_trace = self.covariances_xyz_matrix_trace_sklearn
+            covariances_xyz = self.covariances_xyz_sklearn
+        elif robust:
             covariances_xyz_matrix_det = self.covariances_xyz_matrix_det_robust
             covariances_xyz_matrix_trace = self.covariances_xyz_matrix_trace_robust
             covariances_xyz = self.covariances_xyz_robust
@@ -265,65 +275,47 @@ class Output_Series():
             covariances_xyz = self.covariances_xyz
 
         # Plot xyz covariances matrix determinant and trace, and x-x, y-y and z-z covariances
-        self.plot_metric(ax, covariances_xyz_matrix_det, 0, '-', colors[0])
-        self.plot_metric(ax, covariances_xyz_matrix_trace, 0, '--', colors[1])
-        self.plot_metric(ax, covariances_xyz, 0, '-', colors[2])
-        self.plot_metric(ax, covariances_xyz, 1, '--', colors[3])
-        self.plot_metric(ax, covariances_xyz, 2, ':', colors[4])
+        self.plot_metric(ax, covariances_xyz_matrix_det, 0, '-', colors[0], 0.8)
+        self.plot_metric(ax, covariances_xyz_matrix_trace, 0, '--', colors[1], 0.6)
+        self.plot_metric(ax, covariances_xyz, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, covariances_xyz, 1, '--', colors[3], 0.7)
+        self.plot_metric(ax, covariances_xyz, 2, ':', colors[4], 0.5)
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "$X-X$, $Y-Y$ and $Z-Z${} covariances of β Pictoris (without outliners) "
-                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        ' robust' if robust else '', self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "$X-X$, $Y-Y$ and $Z-Z${} covariances of {} simulated associations with "
-                    "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia EDR3\n".format(
-                        ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
+        # Set title
+        self.set_title_metric(
+            ax, title, '$XYZ$'
+            f"{' robust' if robust else ' sklearn' if sklearn else ''} covariances")
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f"Covariances_xyz_{self.name}{'_robust' if robust else ''}.pdf",
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'Covariances_xyz_{self.name}'
+            f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def create_covariances_ξηζ_plot(
-            self, robust=False, title=False, forced=False, default=False, cancel=False):
+            self, robust=False, sklearn=False, title=False,
+            forced=False, default=False, cancel=False):
         """ Creates a plot of ξ'-ξ', η'-η' and ζ'-ζ' covariances, and the determinant and the trace
-            of the covariances matrix.
+            of the covariances matrix. If either 'robust' or 'sklearn' is True, the robust or
+            sklearn covariances matrix is used. Otherwise, the empirical covariances matrix is used.
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
-        # Select empirical or robust associations size metrics
-        self.stop(
-            type(robust) != bool, 'TypeError',
-            "'robust' must be a boolean ({} given).", type(robust))
-        if robust:
+        # Check 'robust' and 'sklearn' arguments
+        self.check_robust_sklearn_metric(robust, sklearn)
+
+        # Select empirical, robust or sklearn association size metrics
+        if sklearn:
+            covariances_ξηζ_matrix_det = self.covariances_ξηζ_matrix_det_sklearn
+            covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace_sklearn
+            covariances_ξηζ = self.covariances_ξηζ_sklearn
+        elif robust:
             covariances_ξηζ_matrix_det = self.covariances_ξηζ_matrix_det_robust
             covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace_robust
             covariances_ξηζ = self.covariances_ξηζ_robust
@@ -332,66 +324,47 @@ class Output_Series():
             covariances_ξηζ_matrix_trace = self.covariances_ξηζ_matrix_trace
             covariances_ξηζ = self.covariances_ξηζ
 
-        # Plot total ξηζ covariances matrix determinant and trace, and ξ-ξ, η-η and ζ-ζ covariances
-        self.plot_metric(ax, covariances_ξηζ_matrix_det, 0, '-', colors[0])
-        self.plot_metric(ax, covariances_ξηζ_matrix_trace, 0, '--', colors[1])
-        self.plot_metric(ax, covariances_ξηζ, 0, '-', colors[2])
-        self.plot_metric(ax, covariances_ξηζ, 1, '--', colors[3])
-        self.plot_metric(ax, covariances_ξηζ, 2, ':', colors[4])
+        # Plot total ξ'η'ζ' covariances matrix determinant and trace,
+        # and ξ'-ξ', η'-η' and ζ'-ζ' covariances
+        self.plot_metric(ax, covariances_ξηζ_matrix_det, 0, '-', colors[0], 0.8)
+        self.plot_metric(ax, covariances_ξηζ_matrix_trace, 0, '--', colors[1], 0.6)
+        self.plot_metric(ax, covariances_ξηζ, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, covariances_ξηζ, 1, '--', colors[3], 0.7)
+        self.plot_metric(ax, covariances_ξηζ, 2, ':', colors[4], 0.5)
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "$ξ^\prime-ξ^\prime$, $η^\prime-η^\prime$ and $ζ^\prime-ζ^\prime${} "
-                    "covariances of β Pictoris (without outliners) over {} Myr\nwith {} km/s "
-                    "redshift correction and actual measurement errors\n".format(
-                        ' robust' if robust else '', self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "$ξ^\prime-ξ^\prime$, $η^\prime-η^\prime$ and $ζ^\prime-ζ^\prime${} "
-                    "covariances of {} simulated associations with kinematics similar to "
-                    "β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
-                    "measurement errors of Gaia EDR3\n".format(
-                        ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
+        # Set title
+        self.set_title_metric(
+            ax, title, '$ξ^\prime η^\prime ζ^\prime$'
+            f"{' robust' if robust else ' sklearn' if sklearn else ''} covariances")
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f"Covariances_ξηζ_{self.name}{'_robust' if robust else ''}.pdf",
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'Covariances_ξηζ_{self.name}'
+            f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def create_cross_covariances_xyz_plot(
-            self, robust=False, title=False, forced=False, default=False, cancel=False):
+            self, robust=False, sklearn=False, title=False,
+            forced=False, default=False, cancel=False):
         """ Creates a plot of x-u, y-v and z-w cross covariances, and the determinant and the trace
             of the cross covariances matrix between positions and velocities.
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
-        # Select empirical or robust association size metrics
-        self.stop(
-            type(robust) != bool, 'TypeError',
-            "'robust' must be a boolean ({} given).", type(robust))
+        # Check 'robust' and 'sklearn' arguments
+        self.check_robust_sklearn_metric(robust, sklearn)
+
+        # Select empirical, robust or sklearn association size metrics
+        if sklearn:
+            cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det
+            cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace
+            cross_covariances_xyz = self.cross_covariances_xyz
         if robust:
             cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det_robust
             cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace_robust
@@ -403,65 +376,46 @@ class Output_Series():
 
         # Plot total xyz cross covariances matrix determinant and trace,
         # and x-u, y-v and z-w cross covariances
-        self.plot_metric(ax, cross_covariances_xyz_matrix_det, 0, '-', colors[0])
-        self.plot_metric(ax, cross_covariances_xyz_matrix_trace, 0, '--', colors[1])
-        self.plot_metric(ax, cross_covariances_xyz, 0, '-', colors[2])
-        self.plot_metric(ax, cross_covariances_xyz, 1, '--', colors[3])
-        self.plot_metric(ax, cross_covariances_xyz, 2, ':', colors[4])
+        self.plot_metric(ax, cross_covariances_xyz_matrix_det, 0, '-', colors[0], 0.8)
+        self.plot_metric(ax, cross_covariances_xyz_matrix_trace, 0, '--', colors[1], 0.6)
+        self.plot_metric(ax, cross_covariances_xyz, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, cross_covariances_xyz, 1, '--', colors[3], 0.7)
+        self.plot_metric(ax, cross_covariances_xyz, 2, ':', colors[4], 0.5)
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "$X-U$, $Y-V$ and $Z-W${} cross covariances of β Pictoris (without outliners) "
-                    "over {} Myr\nwith {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        ' robust' if robust else '', self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "$X-U$, $Y-V$ and $Z-W${} cross covariances of {} simulated associations "
-                    "with kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia EDR3\n".format(
-                        ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
+        # Set title
+        self.set_title_metric(
+            ax, title, '$X-U$, $Y-V$ and $Z-W$'
+            f"{' robust' if robust else ' sklearn' if sklearn else ''} cross covariances")
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f"Cross_covariances_xyz_{self.name}{'_robust' if robust else ''}.pdf",
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'Cross_covariances_xyz_{self.name}'
+            f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def create_cross_covariances_ξηζ_plot(
-            self, robust=False, title=False, forced=False, default=False, cancel=False):
+            self, robust=False, sklearn=False, title=False,
+            forced=False, default=False, cancel=False):
         """ Creates a plot of ξ'-vξ', η'-vη' and ζ'-vζ' cross covariances, and the determinant and
             the trace of the cross covariances matrix between position and velocities.
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
-        # Select empirical or robust association size metrics
-        self.stop(
-            type(robust) != bool, 'TypeError',
-            "'robust' must be a boolean ({} given).", type(robust))
-        if robust:
+        # Check 'robust' and 'sklearn' arguments
+        self.check_robust_sklearn_metric(robust, sklearn)
+
+        # Select empirical, robust or sklearn association size metrics
+        if sklearn:
+            cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det
+            cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace
+            cross_covariances_xyz = self.cross_covariances_xyz
+        elif robust:
             cross_covariances_ξηζ_matrix_det = self.cross_covariances_ξηζ_matrix_det_robust
             cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace_robust
             cross_covariances_ξηζ = self.cross_covariances_ξηζ_robust
@@ -471,234 +425,136 @@ class Output_Series():
             cross_covariances_ξηζ = self.cross_covariances_ξηζ
 
         # Plot total ξηζ cross covariances matrix determinant and trace,
-        # and ξ-vξ, η-vη and ζ-vζ cross covariances
-        self.plot_metric(ax, cross_covariances_ξηζ_matrix_det, 0, '-', colors[0])
-        self.plot_metric(ax, cross_covariances_ξηζ_matrix_trace, 0, '--', colors[1])
-        self.plot_metric(ax, cross_covariances_ξηζ, 0, '-', colors[2])
-        self.plot_metric(ax, cross_covariances_ξηζ, 1, '--', colors[3])
-        self.plot_metric(ax, cross_covariances_ξηζ, 2, ':', colors[4])
+        # and ξ'-vξ', η'-vη' and ζ'-vζ' cross covariances
+        self.plot_metric(ax, cross_covariances_ξηζ_matrix_det, 0, '-', colors[0], 0.8)
+        self.plot_metric(ax, cross_covariances_ξηζ_matrix_trace, 0, '--', colors[1], 0.6)
+        self.plot_metric(ax, cross_covariances_ξηζ, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, cross_covariances_ξηζ, 1, '--', colors[3], 0.7)
+        self.plot_metric(ax, cross_covariances_ξηζ, 2, ':', colors[4], 0.5)
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "$ξ^\prime-\dot{ξ}^\prime$, $η^\prime-\dot{η}^\prime$ and "
-                    "$ζ^\prime-\dot{ζ}^\prime${} cross covariances of β Pictoris (without "
-                    "outliners) over {} Myr\nwith {} km/s redshift correction and actual "
-                    "measurement errors\n".format(
-                        ' robust' if robust else '', self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "$ξ^\prime-\dot{ξ}^\prime$, $η^\prime-\dot{η}^\prime$ and "
-                    "$ζ^\prime-\dot{ζ}^\prime${} cross covariances of {} simulated associations "
-                    "with kinematics similar to β Pictoris \n over {} Myr with {} km/s "
-                    "redshift correction and actual measurement errors of Gaia EDR3\n".format(
-                        ' robust' if robust else '', self.number_of_groups,
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
+        # Set title
+        self.set_title_metric(
+            ax, title, '$ξ^\prime-\dot{ξ}^\prime$, '
+            '$η^\prime-\dot{η}^\prime$ and $ζ^\prime-\dot{ζ}^\prime$'
+            f"{' robust' if robust else ' sklearn' if sklearn else ''} cross covariances")
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f"Cross_covariances_ξηζ_{self.name}{'_robust' if robust else ''}.pdf",
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'Cross_covariances_ξηζ_{self.name}'
+            f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_xyz_sklearn_plot(
-            self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of x-x, y-y and z-z sklearn covariances, and the determinant and
-            the trace of the sklearn covariances matrix.
+    def create_mad_xyz_plot(self, title=False, forced=False, default=False, cancel=False):
+        """ Creates a plot of the total xyz median absolute deviation (MAD), and x, y and z
+            components of the MAD.
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
-        # Plot sklearn total ξηζ covariances matrix determinant and trace,
-        # and x-x, y-y and z-z covariances
-        self.plot_metric(ax, self.covariances_xyz_matrix_det_sklearn, 0, '-', colors[0])
-        self.plot_metric(ax, self.covariances_xyz_matrix_trace_sklearn, 0, '--', colors[1])
-        self.plot_metric(ax, self.covariances_xyz_sklearn, 0, '-', colors[2])
-        self.plot_metric(ax, self.covariances_xyz_sklearn, 1, '--', colors[3])
-        self.plot_metric(ax, self.covariances_xyz_sklearn, 2, ':', colors[4])
+        # Plot total xyz MAD, x MAD, y and z MAD
+        self.plot_metric(ax, self.mad_xyz_total, 0, '-', colors[0], 0.8)
+        self.plot_metric(ax, self.mad_xyz, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, self.mad_xyz, 1, '--', colors[3], 0.7)
+        self.plot_metric(ax, self.mad_xyz, 2, ':', colors[4], 0.5)
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "$X-X$, $Y-Y$ and $Z-Z$ sklearn covariances of β Pictoris (without outliners) "
-                    "over {} Myr\n with {} km/s redshift correction and actual measurement "
-                    "errors\n".format(
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "$X-X$, $Y-Y$ and $Z-Z$ sklearn covariances of {} simulated associations with "
-                    "kinematics similar to β Pictoris \n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia EDR3\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
+        # Set title
+        self.set_title_metric(ax, title, '$XYZ$ MAD')
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f'Covariances_xyz_sklearn_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'MAD_xyz_{self.name}.pdf',
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_covariances_ξηζ_sklearn_plot(
-            self, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of ξ'-ξ', η'-η' and ζ'-ζ' sklearn covariances, and the determinant and
-            the trace of the sklearn covariances matrix.
+    def create_mad_ξηζ_plot(self, title=False, forced=False, default=False, cancel=False):
+        """ Creates a plot of the total ξηζ median absolute deviation (MAD), and ξ', η' and ζ'
+            components of the MAD.
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
-        # Plot sklearn total ξηζ covariances matrix determinant and trace,
-        # and ξ-ξ, η-η and ζ-ζ covariances
-        self.plot_metric(ax, self.covariances_ξηζ_matrix_det_sklearn, 0, '-', colors[0])
-        self.plot_metric(ax, self.covariances_ξηζ_matrix_trace_sklearn, 0, '--', colors[1])
-        self.plot_metric(ax, self.covariances_ξηζ_sklearn, 0, '-', colors[2])
-        self.plot_metric(ax, self.covariances_ξηζ_sklearn, 1, '--', colors[3])
-        self.plot_metric(ax, self.covariances_ξηζ_sklearn, 2, ':', colors[4])
+        # Plot total ξ'η'ζ' MAD, ξ' MAD, η' MAD and ζ' MAD
+        self.plot_metric(ax, self.mad_ξηζ_total, 0, '-', colors[0], 0.8)
+        self.plot_metric(ax, self.mad_ξηζ, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, self.mad_ξηζ, 1, '--', colors[3], 0.7)
+        self.plot_metric(ax, self.mad_ξηζ, 2, ':', colors[4], 0.5)
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "$ξ^\prime-ξ^\prime$, $η^\prime-η^\prime$ and $ζ^\prime-ζ^\prime$ sklearn "
-                    "covariances of β Pictoris (without outliners) over {} Myr\n"
-                    "with {} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "$ξ^\prime-ξ^\prime$, $η^\prime-η^\prime$ and $ζ^\prime-ζ^\prime$ sklearn"
-                    "covariances of {} simulated associations with kinematics similar to "
-                    "β Pictoris \n over {} Myr with {} km/s redshift correction and actual "
-                    "measurement errors of Gaia EDR3\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
+        # Set title
+        self.set_title_metric(ax, title, '$ξ^\prime η^\prime ζ^\prime$ MAD')
 
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f'Covariances_ξηζ_sklearn_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'MAD_ξηζ_{self.name}.pdf',
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_det_mad_mst_plot(
-            self, secondary=False, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of xyz covariances matrix determinant, xyz total median absolute
-            deviation, and minimum spanning tree branches length mean and median absolute
-            deviation over the entire duration of the data.
+    def create_xyz_mst_plot(self, title=False, forced=False, default=False, cancel=False):
+        """ Creates a plot of the mean branch length (both empirical and robust) and median
+            absolute deviation of the xyz minimum spanning tree (MST).
         """
 
-        # Figure initialization
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
 
         # Plot association size metrics
-        self.plot_metric(ax, self.covariances_xyz_matrix_det, 0, '-', colors[0])
-        self.plot_metric(ax, self.mad_xyz_total, 0, '--', colors[1])
-        self.plot_metric(ax, self.mst_xyz_mean, 0, '-', colors[2])
-        self.plot_metric(ax, self.mst_xyz_mad, 0, '--', colors[3])
+        self.plot_metric(ax, self.mst_xyz_mean, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, self.mst_xyz_mean_robust, 0, '--', colors[3], 0.7)
+        self.plot_metric(ax, self.mst_xyz_mad, 0, ':', colors[4], 0.5)
 
-        # Secondary lines
-        self.stop(
-            type(secondary) != bool, 'TypeError',
-            "'secondary' must be a boolean ({} given).", type(secondary))
-        if secondary:
-            i = 0
-            plot_i = np.arange(0, len(self), 20)
-            for group in self:
-                if i in plot_i:
-                    ax.plot(-self.time, group.covariances_xyz_matrix_det.value.T[0],
-                        linestyle='-', color=colors[0], alpha=0.5, linewidth=0.5)
-                i += 1
+        # Set title
+        self.set_title_metric(ax, title, '$XYZ$ MST')
 
-        # Title formatting
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "Size of β Pictoris (without outliners) over {} Myr\n with "
-                    "{} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-            elif self.from_model:
-                ax.set_title(
-                    "Average size of {} simulated associations with kinematics similar to "
-                    "β Pictoris\n over {} Myr with {} km/s redshift correction and actual "
-                    "measurement errors of Gaia EDR3\n".format(
-                        self.number_of_groups, self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
-                    fontsize=8)
-
-        # Legend and axes formatting
-        ax.legend(loc=2, fontsize=7, fancybox=False)
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-        ax.set_xlim(-self.final_time.value + 20., 0.)
-        ax.set_ylim(0., 40.)
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        # ax.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
 
         # Save figure
         save_figure(
-            self.name, f'Size_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
+            self.name, f'MST_xyz_{self.name}.pdf',
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def create_det_mad_mst_cross_covariances_plots(
+    def create_ξηζ_mst_plot(self, title=False, forced=False, default=False, cancel=False):
+        """ Creates a plot of the mean branch length (both empirical and robust) and median
+            absolute deviation of the ξηζ minimum spanning tree (MST).
+        """
+
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
+
+        # Plot association size metrics
+        self.plot_metric(ax, self.mst_ξηζ_mean, 0, '-', colors[2], 0.9)
+        self.plot_metric(ax, self.mst_ξηζ_mean_robust, 0, '--', colors[3], 0.7)
+        self.plot_metric(ax, self.mst_ξηζ_mad, 0, ':', colors[4], 0.5)
+
+        # Set title
+        self.set_title_metric(ax, title, '$ξ^\prime η^\prime ζ^\prime$ MST')
+
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
+
+        # Save figure
+        save_figure(
+            self.name, f'MST_ξηζ_{self.name}.pdf',
+            tight=False, forced=forced, default=default, cancel=cancel)
+        # plt.show()
+
+    def create_xyz_det_mad_mst_cross_covariances_plots(
             self, other, title=False, forced=False, default=False, cancel=False):
-        """ Creates a plot of xyz covariances matrix determinant, xyz total median absolute
-            deviation, and minimum spanning tree branches length mean and median absolute
-            deviation over the entire duration of the data.
+        """ Creates a plot of xyz determinant of the covariances matrix, xyz total median absolute
+            deviation, mean branch length of the xyz minimum spanning tree, and x-u, y-v and z-w
+            cross covariances.
         """
 
         # Check if 'other' is valid
@@ -706,8 +562,9 @@ class Output_Series():
             type(other) != type(self), 'TypeError',
             "'other' must be a Series object ({} given).", type(other))
 
-        # Figure initialization
+        # Initialize figure
         self.check_traceback()
+        other.check_traceback()
         fig, (ax0, ax1) = plt.subplots(
             ncols=2, constrained_layout=True, figsize=(6.66, 3.33), facecolor='w', dpi=300)
 
@@ -729,61 +586,56 @@ class Output_Series():
         other.plot_metric(ax1, other.cross_covariances_xyz, 1, '--', greens[2])
         other.plot_metric(ax1, other.cross_covariances_xyz, 2, ':', greens[3])
 
-        # Title formatting
+        # Set title
         self.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             if self.from_data:
                 fig.suptitle(
-                    "XYZ cross covariances of β Pictoris (without outliners) over {} Myr\n with "
-                    "{} km/s redshift correction and actual measurement errors\n".format(
-                        self.duration.value, round(self.rv_shift.to('km/s').value, 2)),
+                    '$XYZ$ covariances, MAD, MST and cross covariances of {}\n and {} over '
+                    '{:.1f} Myr with a {:.1f} km/s radial velocity correction\n'.format(
+                        self.name, other.name, self.duration.value,
+                        self.rv_shift.to('km/s').value),
                     fontsize=8)
             elif self.from_model:
                 fig.suptitle(
-                    "Average XYZ cross covariances of {} moving group simulations with "
-                    "kinematics similar to β Pictoris\n over {} Myr with {} km/s redshift "
-                    "correction and actual measurement errors of Gaia EDR3\n".format(
+                    'Average $XYZ$ covariances, MAD, MST and cross covariances of {}'
+                    'simulated associations over {:.1f} Myr\n with kinematics similar to'
+                    "{} and {}, and a {:.1f} km/s radial velocity bias\n".format(
                         self.number_of_groups, self.duration.value,
-                        round(self.rv_shift.to('km/s').value, 2)),
+                        self.name, other.name, self.rv_shift.to('km/s').value),
                     fontsize=8)
 
-        # Legend and axes formatting
-        for ax in (ax0, ax1):
-            ax.legend(loc=2, fontsize=7, fancybox=False)
-            ax.set_xlabel('Epoch (Myr)', fontsize=8)
-            ax.set_ylabel("Association size (pc)", fontsize=8 )
-            ax.set_xlim(-self.final_time.value + 20., 0.)
-            ax.set_ylim(0., 40.)
-            ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-            # ax0.yaxis.set_major_formatter(format_ticks)
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax0)
+        self.set_axis_metric(ax1)
 
         # Save figure
         save_figure(
-            self.name, f'Size_{self.name}_{other.name}.pdf',
+            self.name, f'Covariances_MAD_MST_Cross_covariannces_xyz_{self.name}_{other.name}.pdf',
             forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def create_age_distribution(
             self, title=False, forced=False, default=False, cancel=False):
         """ Creates a plot of the distribution of ages computed in a series, including the
-            effects of measurement errors and the jack-knife Monte-Carlo.
+            effects of measurement errors and the jack-knife Monte Carlo.
         """
 
-        # Figure initialization
+        # Initialize figure
         self.check_traceback()
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot(111, frame_on=True)
 
         # Plot histogram
         ages = [group.covariances_xyz_matrix_det.age[0] for group in self]
         ax.hist(
             ages, bins=np.linspace(16, 24, 33), density=True,
-            color=blues[3], alpha=0.66, label='metric')
+            color=blues[3], alpha=0.7, label='metric')
         # bins=np.arange(21.975, 26.025, 0.05)
 
-        # Title formatting
+        # Set title
         self.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
@@ -793,10 +645,16 @@ class Output_Series():
                 f'Average age: ({self.covariances_xyz_matrix_det.age[0]:.2f} '
                 f'± {self.covariances_xyz_matrix_det.age_error[0]:.2f}) Myr\n', fontsize=8)
 
-        # Axes formatting
-        ax.set_xlabel('Age (Myr)')
-        ax.set_ylabel('Density')
-        ax.tick_params(direction='in', top=True, right=True)
+        # Set labels
+        ax.set_xlabel('Age (Myr)', fontsize=8)
+        ax.set_ylabel('Density', fontsize=8)
+
+        # Set ticks
+        ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
+
+        # Set spines
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.5)
 
         # Save figure
         save_figure(
@@ -881,9 +739,6 @@ class Output_Series():
                 position[0].get_LaTeX(), velocity[0].get_LaTeX()]
 
             # line += [i.get_LaTeX() for i in (position[0], position[1], position[2])]
-
-            # Velocity
-
             # line += [i.get_LaTeX() for i in (velocity[0], velocity[1], velocity[2])]
 
             print(' & '.join([str(i) for i in line]) + '\\\\')
@@ -954,7 +809,7 @@ class Output_Group():
             forced=False, default=False, cancel=False):
         """ Draw the xyz trajectories of stars in the group. """
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
         ax1 = fig.add_axes([0.10, 0.34, 0.61, 0.61])
         ax2 = fig.add_axes([0.72, 0.34, 0.23, 0.61])
@@ -974,80 +829,88 @@ class Output_Group():
                 ax.plot(
                     star.position_xyz.T[x] / 1000,
                     star.position_xyz.T[y] / 1000,
-                    color='r' if star.outlier else 'k', linewidth=0.4, zorder=1)
+                    color='#ff0000' if star.outlier else '#000000',
+                    linewidth=0.5, alpha=0.6, zorder=1)
 
                 # Plot stars current positions
                 ax.scatter(
                     np.array([star.position_xyz[0,x]]) / 1000,
                     np.array([star.position_xyz[0,y]]) / 1000,
-                    s=6, marker='s', color='k', zorder=2)
+                    s=6, marker='s', color='#000000', zorder=2)
 
                 # Plot stars birth positions
                 if birth is not None:
                     ax.scatter(
                         np.array([star.position_xyz[birth,x]]) / 1000,
                         np.array([star.position_xyz[birth,y]]) / 1000,
-                        s=6, marker='o', color='r' if star.outlier else 'b', zorder=2)
+                        color='#ff0000' if star.outlier else '#0000ff',
+                        s=6, marker='o', zorder=2)
 
                 # Add stars name
                 if self.series.from_data and labels:
                     ax.text(
                         np.array(star.position_xyz.T[0,x]) / 1000,
                         np.array(star.position_xyz.T[0,y]) / 1000,
-                        star.name, horizontalalignment='left', fontsize=7)
+                        star.name, horizontalalignment='left', fontsize=6)
 
             # Plot average model star trajectory
             if self.series.from_model:
                 ax.plot(
                     self.average_model_star.position_xyz.T[x] / 1000,
                     self.average_model_star.position_xyz.T[y] / 1000,
-                    color='g', linewidth=1.0, zorder=3)
+                    color='#00ff00', linewidth=1.0, zorder=3)
 
                 # Plot average model star birth position
                 ax.scatter(
                     np.array([self.average_model_star.position_xyz[-1,x]]) / 1000,
                     np.array([self.average_model_star.position_xyz[-1,y]]) / 1000,
-                    s=6, marker='*', color='g', zorder=3)
+                    s=6, marker='*', color='#00ff00', zorder=3)
 
                 # Plot average model star current position
                 ax.scatter(
                     np.array([self.average_model_star.position_xyz[0,x]]) / 1000,
                     np.array([self.average_model_star.position_xyz[0,y]]) / 1000,
-                    s=6, marker='s', color='g', zorder=3)
+                    s=6, marker='s', color='#00ff00', zorder=3)
 
                 # Plot model stars trajectories
                 for star in self.model_stars:
                     ax.plot(
                         star.position_xyz.T[x] / 1000,
                         star.position_xyz.T[y] / 1000,
-                        color='b', linewidth=0.4, zorder=2)
+                        color='#0000ff', alpha=0.6, linewidth=0.5, zorder=2)
 
                     # Plot model stars birth positions
                     ax.scatter(
                         np.array([star.position_xyz[0,x]]) / 1000,
                         np.array([star.position_xyz[0,y]]) / 1000,
-                        s=6, marker='*', color='b', zorder=2)
+                        s=6, marker='*', color='#0000ff', zorder=2)
 
                     # Plot model stars current positions
                     ax.scatter(
                         np.array([star.position_xyz[-1,x]]) / 1000,
                         np.array([star.position_xyz[-1,y]]) / 1000,
-                        s=6, marker='s', color='b', zorder=2)
+                        s=6, marker='s', color='#0000ff', zorder=2)
 
             # Draw vertical and horizontal lines through the Sun's position at the current epoch
-            ax.axhline(0., color='0.4', linestyle=':', zorder=0)
-            ax.axvline(0., color='0.4', linestyle=':', zorder=0)
+            ax.axhline(0., color='#000000', linewidth=0.5, linestyle=':', alpha=0.8, zorder=0)
+            ax.axvline(0., color='#000000', linewidth=0.5, linestyle=':', alpha=0.8, zorder=0)
 
-        # Draw circles around the galactic center
-        for r in range(1, 16):
+        # Draw circles around the galactic center located at 8.122 kpc from the Sun
+        for radius in range(1, 16):
             ax1.add_artist(plt.Circle(
-                (0, 8.122), r, color='0.8', fill=False, linestyle=':', zorder=0))
+                (0, 8.122), radius, color='#000000', fill=False,
+                linewidth=0.5, linestyle=':', alpha=0.2, zorder=0))
 
-        # Axes labels
-        ax1.set_xticklabels([])
+        # Set title
+        self.series.stop(
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            fig.suptitle(f"$XYZ$ trajectories of stars in {self.name}", fontsize=8)
+
+        # Set labels
         ax1.set_ylabel('$X$ (kpc)', fontsize=8)
         ax2.set_xlabel('$Z$ (kpc)', fontsize=8)
-        ax2.set_yticklabels([])
         ax3.set_xlabel('$Y$ (kpc)', fontsize=8)
         ax3.set_ylabel('$Z$ (kpc)', fontsize=8)
 
@@ -1055,7 +918,7 @@ class Output_Group():
         ax1.invert_xaxis()
         ax3.invert_xaxis()
 
-        # Axes limits
+        # Set limits
         ax1.set_xlim(1, -13)
         ax1.set_ylim(-1, 13)
         ax2.set_xlim(-0.3, 0.3)
@@ -1063,17 +926,17 @@ class Output_Group():
         ax3.set_xlim(1, -13)
         ax3.set_ylim(-0.3, 0.3)
 
-        # Axes ticks
-        ax1.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax2.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax3.tick_params(direction='in', top=True, right=True, labelsize=8)
+        # Set ticks
+        ax1.set_xticklabels([])
+        ax2.set_yticklabels([])
+        for ax in [ax1, ax2, ax3]:
+            ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
+        # ax.yaxis.set_major_formatter(format_ticks)
 
-        # Title formatting
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            fig.suptitle(f"XYZ trajectories of stars in {self.name}", fontsize=8)
+        # Set spines
+        for ax in [ax1, ax2, ax3]:
+            for spine in ax.spines.values():
+                spine.set_linewidth(0.5)
 
         # Save figure
         save_figure(
@@ -1085,14 +948,11 @@ class Output_Group():
             forced=False, default=False, cancel=False):
         """ Draws the ξηζ trajectories of stars in the group. """
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
         ax1 = fig.add_axes([0.10, 0.34, 0.61, 0.61])
         ax2 = fig.add_axes([0.72, 0.34, 0.23, 0.61])
         ax3 = fig.add_axes([0.10, 0.10, 0.61, 0.23])
-        # ax1 = fig.add_axes([0.05, 0.25, 0.61, 0.61])
-        # ax2 = fig.add_axes([0.72, 0.25, 0.23, 0.61])
-        # ax3 = fig.add_axes([0.05, 0.05, 0.61, 0.23])
 
         # Check labels
         self.series.stop(
@@ -1106,77 +966,84 @@ class Output_Group():
         for ax, x, y in ((ax1, 0, 1), (ax2, 2, 1), (ax3, 0, 2)):
             for star in self:
                 ax.plot(
-                    star.position_ξηζ.T[x],
-                    star.position_ξηζ.T[y],
-                    color='r' if star.outlier else 'k', linewidth=0.4, zorder=1)
+                    star.position_ξηζ.T[x], star.position_ξηζ.T[y],
+                    color='#ff0000' if star.outlier else '#000000',
+                    linewidth=0.5, alpha=0.6, zorder=1)
 
                 # Plot stars current positions
                 ax.scatter(
                     np.array([star.position_ξηζ[0,x]]),
                     np.array([star.position_ξηζ[0,y]]),
-                    s=6, marker='s', color='k', zorder=2)
+                    s=6, marker='s', color='#000000', zorder=2)
 
                 # Plot stars birth positions
                 if birth is not None:
                     ax.scatter(
                         np.array([star.position_ξηζ[birth,x]]),
                         np.array([star.position_ξηζ[birth,y]]),
-                        s=6, marker='o', color='r' if star.outlier else 'b', zorder=2)
+                        color='#ff0000' if star.outlier else '#0000ff',
+                        s=6, marker='o', zorder=2)
 
                 # Add stars name
                 if self.series.from_data and labels:
                     ax.text(
                         np.array(star.position_ξηζ.T[0,x]),
                         np.array(star.position_ξηζ.T[0,y]),
-                        star.name, horizontalalignment='left', fontsize=7)
+                        star.name, horizontalalignment='left', fontsize=6)
 
             # Plot average model star trajectory
             if self.series.from_model:
                 ax.plot(
                     self.average_model_star.position_ξηζ.T[x],
                     self.average_model_star.position_ξηζ.T[y],
-                    color='g', linewidth=1.0, zorder=3)
+                    color='#00ff00', linewidth=1.0, zorder=3)
 
                 # Plot average model star birth position
                 ax.scatter(
                     np.array([self.average_model_star.position_ξηζ[-1,x]]),
                     np.array([self.average_model_star.position_ξηζ[-1,y]]),
-                    s=6, marker='*', color='g', zorder=3)
+                    s=6, marker='*', color='#00ff00', zorder=3)
 
                 # Plot average model star current position
                 ax.scatter(
                     np.array([self.average_model_star.position_ξηζ[0,x]]),
                     np.array([self.average_model_star.position_ξηζ[0,y]]),
-                    s=6, marker='s', color='g', zorder=3)
+                    s=6, marker='s', color='#00ff00', zorder=3)
 
                 # Model stars
                 for star in self.model_stars:
                     ax.plot(
                         star.position_ξηζ.T[x],
                         star.position_ξηζ.T[y],
-                        color='b', linewidth=0.4, zorder=2)
+                        color='#0000ff', linewidth=0.5, alpha=0.6, zorder=2)
 
                     # Plot model stars birth positions
                     ax.scatter(
                         np.array([star.position_ξηζ[0,x]]),
                         np.array([star.position_ξηζ[0,y]]),
-                        s=6, marker='*', color='b', zorder=2)
+                        s=6, marker='*', color='#0000ff', zorder=2)
 
                     # Plot model stars current positions
                     ax.scatter(
                         np.array([star.position_ξηζ[-1,x]]),
                         np.array([star.position_ξηζ[-1,y]]),
-                        s=6, marker='s', color='b', zorder=2)
+                        s=6, marker='s', color='#0000ff', zorder=2)
 
-        # Axes labels
-        ax1.set_xticklabels([])
+        # Set title
+        self.series.stop(
+            type(title) != bool, 'TypeError',
+            "'title' must be a boolean ({} given).", type(title))
+        if title:
+            fig.suptitle(
+                f"$ξ^\prime η^\prime ζ^\prime$ trajectories of stars in {self.name}", fontsize=8)
+
+        # Set labels
         ax1.set_ylabel('$η^\prime$ (pc)', fontsize=8)
         ax2.set_xlabel('$ζ^\prime$ (pc)', fontsize=8)
-        ax2.set_yticklabels([])
         ax3.set_xlabel('$ξ^\prime$ (pc)', fontsize=8)
         ax3.set_ylabel('$ζ^\prime$ (pc)', fontsize=8)
 
-        # Axes limits
+        # Set limits
         ax1.set_xlim(-225, 60)
         ax1.set_ylim(-45, 110)
         ax2.set_xlim(-40, 49)
@@ -1184,17 +1051,17 @@ class Output_Group():
         ax3.set_xlim(-225, 60)
         ax3.set_ylim(-40, 49)
 
-        # Axes ticks
-        ax1.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax2.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax3.tick_params(direction='in', top=True, right=True, labelsize=8)
+        # Set ticks
+        ax1.set_xticklabels([])
+        ax2.set_yticklabels([])
+        for ax in [ax1, ax2, ax3]:
+            ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
+        # ax.yaxis.set_major_formatter(format_ticks)
 
-        # Title formatting
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title))
-        if title:
-            fig.suptitle(f"ξηζ trajectories of stars in {self.name}", fontsize=8)
+        # Set spines
+        for ax in [ax1, ax2, ax3]:
+            for spine in ax.spines.values():
+                spine.set_linewidth(0.5)
 
         # Save figure
         save_figure(
@@ -1207,12 +1074,12 @@ class Output_Group():
             forced=False, default=False, cancel=False):
         """ Draws the xyz trajectories as a function of time of stars. """
 
-        # Figure initialization
-        fig = plt.figure(figsize=(7.08, 6.00), facecolor='w', dpi=300)
-        ax1 = fig.add_subplot(224)
-        ax2 = fig.add_subplot(223)
-        ax3 = fig.add_subplot(222)
-        ax4 = fig.add_subplot(221)
+        # Initialize figure
+        fig = plt.figure(facecolor='w', figsize=(7.08, 5.65), dpi=300)
+        ax1 = fig.add_axes([0.506, 0.064, 0.365, 0.4595])
+        ax2 = fig.add_axes([0.129, 0.064, 0.365, 0.4595])
+        ax3 = fig.add_axes([0.506, 0.539, 0.365, 0.4595])
+        ax4 = fig.add_axes([0.129, 0.539, 0.365, 0.4595])
 
         # Birth epoch
         birth = [self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
@@ -1220,13 +1087,15 @@ class Output_Group():
         # Plot stars xyz trajectories
         for ax, y in ((ax1, 2), (ax2, 1), (ax3, 0)):
             for star in self:
-                color = '#ff0000' if star.outlier else greys[0]
+                color = '#ff0000' if star.outlier else '#000000'
                 ax.plot(
                     self.series.time, (star.position_xyz - self.position_xyz)[:,y],
-                    color=color, linewidth=0.4, zorder=1, alpha=0.6)
+                    color=color, linewidth=0.5, zorder=1, alpha=0.6)
 
             # Show vectical dashed line
-            ax.axvline(x=self.series.time[birth[y]], color='0.5', linewidth=1.0, linestyle='--')
+            ax.axvline(
+                x=self.series.time[birth[y]], color='#000000',
+                linewidth=0.5, linestyle='--', zorder=0.5)
 
             # Average model star
             if self.series.from_model:
@@ -1239,14 +1108,14 @@ class Output_Group():
                 ax.plot(
                     -self.average_model_star.time,
                     average_model_star_position_xyz,
-                    color='g', linewidth=1.0, zorder=3)
+                    color='#00ff00', linewidth=1.0, zorder=3)
 
                 # Plot average model star birth and current positions
                 for t, x, m in ((-1, -1, '*'), (0, 0, 's')):
                     ax.scatter(
                         -np.array([self.average_model_star.time[t]]),
                         np.array([average_model_star_position_xyz[x]]),
-                        s=6, marker=m, color='g', zorder=4)
+                        s=6, marker=m, color='#00ff00', zorder=4)
 
                 # Model stars
                 for star in self.model_stars:
@@ -1255,20 +1124,20 @@ class Output_Group():
                     # Plot model stars trajectories
                     ax.plot(
                         star.time[::-1], model_star_position_xyz,
-                        color='b', linewidth=0.4, zorder=2)
+                        color='#0000ff', linewidth=0.5, zorder=2, alpha=0.6)
 
                     # Plot model stars birth and current positions
                     for t, x, m in ((-1, 0, '*'), (0, -1, 's')):
                         ax.scatter(
                             np.array([star.time[t]]),
                             np.array([model_star_position_xyz[x]]),
-                            s=6, marker=m, color='b', zorder=2)
+                            s=6, marker=m, color='#0000ff', zorder=2)
 
         # Plot average xyz trajectories
-        for y, ls, label in ((0, '-', '$<X>$'), (1, '--', '$<Y>$'), (2, '-.', '$<Z>$')):
+        for y, label in ((0, '$<X>$'), (1, '$<Y>$'), (2, '$<Z>$')):
             ax4.plot(
-                self.series.time, self.position_xyz[:,y] / 1000, color=greys[y * 2],
-                linewidth=1.5, linestyle=ls, label=label, zorder=1)
+                self.series.time, self.position_xyz[:,y] / 1000,
+                color=blues[2 * y], linewidth=1.0, label=label, zorder=1)
 
             # Plot average model star trajectory
             if self.series.from_model:
@@ -1276,7 +1145,7 @@ class Output_Group():
                 ax4.plot(
                     -self.average_model_star.time,
                     average_model_star_position_xyz,
-                    color=greens[y + 2], linewidth=1.5, linestyle=ls, zorder=3)
+                    color=greens[y + 2], linewidth=1.0, zorder=3)
 
                 # Plot average model star birth and current positions
                 for t, x, m in ((-1, -1, '*'), (0, 0, 's')):
@@ -1290,7 +1159,7 @@ class Output_Group():
                     [star.position_xyz[:,y] for star in self.model_stars], axis=0) / 1000
                 ax4.plot(
                     self.model_stars[0].time[::-1], model_star_position_xyz,
-                    color=blues[y + 2], linewidth=1.5, linestyle=ls, zorder=2)
+                    color=blues[y + 2], linewidth=1.0, zorder=2)
 
                 # Plot model stars birth and current positions
                 for t, x, m in ((-1, 0, '*'), (0, -1, 's')):
@@ -1299,49 +1168,51 @@ class Output_Group():
                         np.array([model_star_position_xyz[x]]),
                         s=6, marker=m, color=blues[y + 2], zorder=2)
 
-        # Legend and axes formatting
-        ax1.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax2.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax3.set_xticklabels([])
-        ax4.set_xticklabels([])
-        ax1.set_ylabel('$Z - <Z>$ (pc)', fontsize=8)
-        ax2.set_ylabel('$Y - <Y>$ (pc)', fontsize=8)
-        ax3.set_ylabel('$X - <X>$ (pc)', fontsize=8)
-        ax4.set_ylabel('$<XYZ>$ (kpc)', fontsize=8)
-        ax4.legend(loc=2, fontsize=7, fancybox=False)
-
-        # Axes limits
-        ax1.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-        ax2.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-        ax3.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-        ax4.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-
-        # Axes ticks
-        ax1.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax2.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax3.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax4.tick_params(direction='in', top=True, right=True, labelsize=8)
-
-        # Set axes location
-        ax1.yaxis.set_label_position('right')
-        ax3.yaxis.set_label_position('right')
-        ax1.yaxis.tick_right()
-        ax3.yaxis.tick_right()
-
-        # Tight layout
-        fig.tight_layout(h_pad=0.5, w_pad=1.0)
-
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(f'XYZ trajectories of stars in {self.name}', fontsize=8)
 
+        # Set legend
+        legend = ax4.legend(loc=3, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
+        legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+        legend.get_frame().set_linewidth(0.5)
+
+        # Set labels
+        ax1.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax2.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax1.set_ylabel('$Z - <Z>$ (pc)', fontsize=8)
+        ax2.set_ylabel('$Y - <Y>$ (pc)', fontsize=8)
+        ax3.set_ylabel('$X - <X>$ (pc)', fontsize=8)
+        ax4.set_ylabel('$<XYZ>$ (kpc)', fontsize=8)
+        ax1.yaxis.set_label_position('right')
+        ax3.yaxis.set_label_position('right')
+
+        # Set limits
+        for ax in (ax1, ax2, ax3, ax4):
+            ax.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time) + 1)
+
+        # Set ticks
+        ax1.yaxis.tick_right()
+        ax3.yaxis.tick_right()
+        ax3.set_xticklabels([])
+        ax4.set_xticklabels([])
+        for ax in (ax1, ax2, ax3, ax4):
+            ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
+
+        # Set spines
+        for ax in (ax1, ax2, ax3, ax4):
+            for spine in ax.spines.values():
+                spine.set_linewidth(0.5)
+
         # Save figure
         save_figure(
             self.name, f"Trajectory_txyz_{self.name}.pdf",
-            forced=forced, default=default, cancel=cancel)
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def trajectory_tξηζ(
@@ -1349,12 +1220,12 @@ class Output_Group():
             forced=False, default=False, cancel=False):
         """ Draws the ξηζ trajectories as a function of time of stars. """
 
-        # Figure initialization
-        fig = plt.figure(figsize=(7.08, 6.00), facecolor='w', dpi=300)
-        ax1 = fig.add_subplot(224)
-        ax2 = fig.add_subplot(223)
-        ax3 = fig.add_subplot(222)
-        ax4 = fig.add_subplot(221)
+        # Initialize figure
+        fig = plt.figure(facecolor='w', figsize=(7.08, 5.65), dpi=300)
+        ax1 = fig.add_axes([0.506, 0.064, 0.365, 0.4595])
+        ax2 = fig.add_axes([0.129, 0.064, 0.365, 0.4595])
+        ax3 = fig.add_axes([0.506, 0.539, 0.365, 0.4595])
+        ax4 = fig.add_axes([0.129, 0.539, 0.365, 0.4595])
 
         # Birth epoch
         birth = [self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
@@ -1362,13 +1233,15 @@ class Output_Group():
         # Plot stars ξηζ trajectories
         for ax, y in ((ax1, 2), (ax2, 1), (ax3, 0)):
             for star in self:
-                color = '#ff0000' if star.outlier else greys[0]
+                color = '#ff0000' if star.outlier else '#000000'
                 ax.plot(
                     self.series.time, (star.position_ξηζ - self.position_ξηζ)[:,y],
-                    color=color, linewidth=0.4, zorder=1, alpha=0.6)
+                    color=color, linewidth=0.5, zorder=1, alpha=0.6)
 
             # Show vectical dashed line
-            ax.axvline(x=self.series.time[birth[y]], color='0.5', linewidth=1.0, linestyle='--')
+            ax.axvline(
+                x=self.series.time[birth[y]], color='#000000',
+                linewidth=0.5, linestyle='--', zorder=0.5)
 
             # Plot average model star trajectory
             if self.series.from_model:
@@ -1379,35 +1252,34 @@ class Output_Group():
                 ax.plot(
                     -self.average_model_star.time,
                     average_model_star_position_ξηζ,
-                    color='g', linewidth=1.0, zorder=3)
+                    color='#00ff00', linewidth=1.0, zorder=3)
 
                 # Plot average model star birth and current positions
                 for t, x, m in ((-1, -1, '*'), (0, 0, 's')):
                     ax.scatter(
                         -np.array([self.average_model_star.time[t]]),
                         np.array([average_model_star_position_ξηζ[x]]),
-                        s=6, marker=m, color='g', zorder=4)
+                        s=6, marker=m, color='#00ff00', zorder=4)
 
                 # Plot model stars trajectories
                 for star in self.model_stars:
                     model_star_position_ξηζ = star.position_ξηζ[:,y] - position_ξηζ
                     ax.plot(
                         star.time[::-1], model_star_position_ξηζ,
-                        color='b', linewidth=0.4, zorder=2)
+                        color='#0000ff', linewidth=0.5, zorder=2, alpha=0.6)
 
                     # Plot model stars birth and current positions
                     for t, x, m in ((-1, 0, '*'), (0, -1, 's')):
                         ax.scatter(
                             np.array([star.time[t]]),
                             np.array([model_star_position_ξηζ[x]]),
-                            s=6, marker=m, color='b', zorder=2)
+                            s=6, marker=m, color='#0000ff', zorder=2)
 
         # Plot average ξηζ trajectories
-        for y, ls, label in (
-                (0, '-', '$<ξ^\prime>$'), (1, '--', '$<η^\prime>$'), (2, '-.', '$<ζ^\prime>$')):
+        for y, label in ((0, '$<ξ^\prime>$'), (1, '$<η^\prime>$'), (2, '$<ζ^\prime>$')):
             ax4.plot(
-                self.series.time, self.position_ξηζ[:,y], color=greys[y * 2],
-                linewidth=1.5, linestyle=ls, label=label, zorder=1)
+                self.series.time, self.position_ξηζ[:,y],
+                color=blues[2 * y], linewidth=1.0, label=label, zorder=1)
 
             # Plot average model star trajectory
             if self.series.from_model:
@@ -1415,7 +1287,7 @@ class Output_Group():
                 ax4.plot(
                     -self.average_model_star.time,
                     average_model_star_position_ξηζ,
-                    color=greens[y + 2], linewidth=1.5, linestyle=ls, zorder=3)
+                    color=greens[y + 2], linewidth=1.0, zorder=3)
 
                 # Plot average model star birth and current positions
                 for t, x, m in ((-1, -1, '*'), (0, 0, 's')):
@@ -1429,7 +1301,7 @@ class Output_Group():
                     [star.position_ξηζ[:,y] for star in self.model_stars], axis=0)
                 ax4.plot(
                     self.model_stars[0].time[::-1], model_star_position_ξηζ,
-                    color=blues[y + 2], linewidth=1.5, linestyle=ls, zorder=2)
+                    color=blues[y + 2], linewidth=1.0, zorder=2)
 
                 # Plot model stars birth and current positions
                 for t, x, m in ((-1, 0, '*'), (0, -1, 's')):
@@ -1438,49 +1310,51 @@ class Output_Group():
                         np.array([model_star_position_ξηζ[x]]),
                         s=6, marker=m, color=blues[y + 2], zorder=2)
 
-        # Legend and axes formatting
-        ax1.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax2.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax3.set_xticklabels([])
-        ax4.set_xticklabels([])
-        ax1.set_ylabel('$ζ^\prime - <ζ^\prime>$ (pc)', fontsize=8)
-        ax2.set_ylabel('$η^\prime - <η^\prime>$ (pc)', fontsize=8)
-        ax3.set_ylabel('$ξ^\prime - <ξ^\prime>$ (pc)', fontsize=8)
-        ax4.set_ylabel('$<ξ^\prime η^\prime ζ^\prime>$ (pc)', fontsize=8)
-        ax4.legend(loc=2, fontsize=7, fancybox=False)
-
-        # Axes limits
-        ax1.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-        ax2.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-        ax3.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-        ax4.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time))
-
-        # Axes ticks
-        ax1.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax2.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax3.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax4.tick_params(direction='in', top=True, right=True, labelsize=8)
-
-        # Set axes location
-        ax1.yaxis.set_label_position('right')
-        ax3.yaxis.set_label_position('right')
-        ax1.yaxis.tick_right()
-        ax3.yaxis.tick_right()
-
-        # Tight layout
-        fig.tight_layout(h_pad=0.5, w_pad=1.0)
-
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(f'ξηζ trajectories of stars in {self.name}', fontsize=8)
 
+        # Set legend
+        legend = ax4.legend(loc=3, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
+        legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+        legend.get_frame().set_linewidth(0.5)
+
+        # Set labels
+        ax1.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax2.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax1.set_ylabel('$ζ^\prime - <ζ^\prime>$ (pc)', fontsize=8)
+        ax2.set_ylabel('$η^\prime - <η^\prime>$ (pc)', fontsize=8)
+        ax3.set_ylabel('$ξ^\prime - <ξ^\prime>$ (pc)', fontsize=8)
+        ax4.set_ylabel('$<ξ^\prime η^\prime ζ^\prime>$ (pc)', fontsize=8)
+        ax1.yaxis.set_label_position('right')
+        ax3.yaxis.set_label_position('right')
+
+        # Set limits
+        for ax in (ax1, ax2, ax3, ax4):
+            ax.set_xlim(np.min(self.series.time) - 1, np.max(self.series.time) + 1)
+
+        # Set ticks
+        ax1.yaxis.tick_right()
+        ax3.yaxis.tick_right()
+        ax3.set_xticklabels([])
+        ax4.set_xticklabels([])
+        for ax in (ax1, ax2, ax3, ax4):
+            ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
+
+        # Set spines
+        for ax in (ax1, ax2, ax3, ax4):
+            for spine in ax.spines.values():
+                spine.set_linewidth(0.5)
+
         # Save figure
         save_figure(
             self.name, f'Trajectory_tξηζ_{self.name}.pdf',
-            forced=forced, default=default, cancel=cancel)
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
     def create_map(self, labels=False, title=False, forced=False, default=False, cancel=False):
@@ -1488,11 +1362,11 @@ class Output_Group():
             velocities must not compensated for the sun velocity and computing xyz positions.
         """
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(6.66, 3.33), facecolor='w', dpi=300)
         ax = fig.add_subplot(111, projection="mollweide")
 
-        # Coordinates computation
+        # Compute coordinates
         from Traceback.coordinate import galactic_xyz_equatorial_rδα
         positions = np.array([[
             galactic_xyz_equatorial_rδα(*star.position_xyz[step])[0]
@@ -1500,7 +1374,7 @@ class Output_Group():
         alphas = np.vectorize(lambda α: α - (2 * np.pi if α > np.pi else 0.0))(positions[:,:,2])
         deltas = positions[:,:,1]
 
-        # Trajectories
+        # Plot trajectories
         for star in range(len(self)):
             color = '#2635ff' if not self[star].outlier else '#ff2634'
 
@@ -1524,27 +1398,27 @@ class Output_Group():
             if labels:
                 ax.text(
                     alphas[star, 0] + 0.1, deltas[star, 0] + 0.1, star + 1,
-                    horizontalalignment='left', fontsize=7, zorder=2)
+                    horizontalalignment='left', fontsize=6, zorder=2)
 
-        # Scatter
-        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color='k', zorder=3)
+        # Plot current-day positions
+        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color='#000000', zorder=3)
 
-        # Proper motion arrows
+        # Show proper motion arrows
         for star in self.series.data:
             ax.arrow(
                 star.position.values[2] - (2 * np.pi if star.position.values[2] > np.pi else 0.0),
                 star.position.values[1], -star.velocity.values[2]/4, -star.velocity.values[1]/4,
-                head_width=0.03, head_length=0.03, color='k', zorder=4)
+                head_width=0.03, head_length=0.03, color='#000000', zorder=4)
 
-        # Axes formatting
-        ax.grid(zorder=1)
-
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title('Mollweide projection of tracebacks', fontsize=8)
+
+        # Format axis
+        ax.grid(zorder=1)
 
         # Save figure
         save_figure(
@@ -1561,11 +1435,11 @@ class Output_Group():
             spanning tree branches.
         """
 
-        # Axis initialization
+        # Initialize axis
         axis = {'x': 0, 'y': 1, 'z': 2}
         keys = tuple(axis.keys())
 
-        # Check if X and Y axes are valid, and initialization
+        # Check if X and Y axes are valid, and initialize axis
         self.series.stop(
             type(i) != str, 'TypeError',
             "X axis 'i' must be a string ({} given).", type(i))
@@ -1608,23 +1482,23 @@ class Output_Group():
                 "'age' must be younger than the final time ({} Myr, {} Myr given).",
                 self.series.final_time.value, age)
 
-        # Step or age calculation
+        # Compute step or age
         if age is not None:
             step = int(round(age / self.series.timestep.value))
             age = round(self.series.time[step], 2)
         else:
             age = round(step * self.series.timestep, 2)
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
         ax = fig.add_subplot(111)
 
-        # Scatter
+        # Plot xyz positions
         ax.scatter(
             [star.position_xyz[step, i] for star in self.sample],
             [star.position_xyz[step, j] for star in self.sample], marker='o', color='0.0')
 
-        # Error bars
+        # Plot error bars
         self.series.stop(
             type(errors) != bool, 'TypeError',
             "'error' must be a boolean ({} given).", type(errors))
@@ -1643,16 +1517,16 @@ class Output_Group():
                     (position[i], position[i]),
                     (position[j] - error[j], position[j] + error[j]), color='0.1', linewidth=0.7)
 
-        # Star labels
+        # Show star labels
         self.series.stop(
             type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
         if labels:
             for star in self.sample:
                 ax.text(star.position_xyz[step, i] + 1, star.position_xyz[step, j] + 1, star.name,
-                horizontalalignment='left', fontsize=7)
+                horizontalalignment='left', fontsize=6)
 
-        # Branches creation
+        # Create branches
         self.series.stop(
             type(mst) != bool, 'TypeError',
             "'mst' must be a boolean ({} given).", type(mst))
@@ -1660,9 +1534,9 @@ class Output_Group():
             for branch in self.mst[step]:
                 ax.plot(
                     (branch.start.position[step, i], branch.end.position[step, i]),
-                    (branch.start.position[step, j], branch.end.position[step, j]), color='b')
+                    (branch.start.position[step, j], branch.end.position[step, j]), color='#0000ff')
 
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
@@ -1671,7 +1545,7 @@ class Output_Group():
                 "{} and {} positions of stars in β Pictoris at {} Myr "
                 "wihtout outliers.\n".format(keys[i].upper(), keys[j].upper(), age), fontsize=8)
 
-        # Axes formatting
+        # Set labels
         ax.set_xlabel(f'${keys[i].lower()}$ (pc)')
         ax.set_ylabel(f'${keys[j].lower()}$ (pc)')
 
@@ -1718,7 +1592,7 @@ class Output_Group():
                 "'age' must be younger than the final time ({} Myr, {} Myr given).",
                 self.series.final_time.value, age)
 
-        # Step or age calculation
+        # Compute step or age
         if age is not None:
             step = int(round(age / self.series.timestep.value))
             age = round(self.series.time[step], 2)
@@ -1726,17 +1600,18 @@ class Output_Group():
             step = int(step)
             age = round(step * self.series.timestep.value, 2)
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
         ax = fig.add_subplot(111, projection='3d')
 
-        # Scatter
+        # Plot xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, 0] for star in self.sample],
             [star.relative_position_xyz[step, 1] for star in self.sample],
-            [star.relative_position_xyz[step, 2] for star in self.sample], marker='o', color='0.0')
+            [star.relative_position_xyz[step, 2] for star in self.sample],
+            marker='o', color='0.0')
 
-        # Error bars
+        # Plot error bars
         self.series.stop(
             type(errors) != bool, 'TypeError',
             "'error' must be a boolean ({} given).", type(errors))
@@ -1761,7 +1636,7 @@ class Output_Group():
                     (position[0], position[0]), (position[1], position[1]),
                     (position[2] - error[2], position[2] + error[2]), color='0.1', linewidth=0.7)
 
-        # Star labels
+        # Show star labels
         self.series.stop(
             type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
@@ -1770,9 +1645,9 @@ class Output_Group():
                 ax.text(
                     star.position_xyz[step, 0] + 2, star.position_xyz[step, 1] + 2,
                     star.position_xyz[step, 2] + 2, star.name,
-                    horizontalalignment='left', fontsize=7)
+                    horizontalalignment='left', fontsize=6)
 
-        # Branches creation
+        # Create branches
         self.series.stop(
             type(mst) != bool, 'TypeError',
             "'mst' must be a boolean ({} given).", type(mst))
@@ -1784,9 +1659,9 @@ class Output_Group():
                     branch.start.relative_position_xyz[step, 1],
                     branch.end.relative_position_xyz[step, 1]), (
                     branch.start.relative_position_xyz[step, 2],
-                    branch.end.relative_position_xyz[step, 2]), color='b')
+                    branch.end.relative_position_xyz[step, 2]), color='#0000ff')
 
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
@@ -1794,7 +1669,7 @@ class Output_Group():
             ax.set_title(
                 f'Minimum spanning tree of stars in β Pictoris at {age:.1f} Myr\n', fontsize=8)
 
-        # Axes formatting
+        # Set labels
         ax.set_xlabel('\n $x$ (pc)')
         ax.set_ylabel('\n $y$ (pc)')
         ax.set_zlabel('\n $z$ (pc)')
@@ -1818,10 +1693,10 @@ class Output_Group():
         self.series.stop(
             len(ages) != 3, 'ValueError', "'ages' must be have a length of 3 ({} given).", ages)
 
-        # Figure initialization
+        # Initialize figure
         self.fig = plt.figure(figsize=(9, 11.15), facecolor='w', dpi=300)
 
-        # Axes creation
+        # Create axes
         row1 = 0.795
         row2 = 0.545
         row3 = 0.295
@@ -1842,7 +1717,7 @@ class Output_Group():
         self.create_3D_axis(age=ages[1], index=11, left=0.381, bottom=row4)
         self.create_3D_axis(age=ages[2], index=12, left=0.712, bottom=row4)
 
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
@@ -1860,11 +1735,11 @@ class Output_Group():
     def create_2D_axis(self, i, j, step=None, age=None, index=1, left=0, bottom=0):
         """ Creates a 2D axis. """
 
-        # Axis initialization
+        # Initialize axis
         axis = {'x': 0, 'y': 1, 'z': 2}
         keys = tuple(axis.keys())
 
-        # Check if X and Y axes are valid, and initialization
+        # Check if X and Y axes are valid, and initialize axis
         self.series.stop(
             type(i) != str, 'TypeError',
             "X axis 'i' must be a string ({} given).", type(i))
@@ -1907,23 +1782,23 @@ class Output_Group():
                 "'age' must be younger than the final time ({} Myr, {} Myr given).",
                 self.series.final_time.value, age)
 
-        # Step or age calculation
+        # Compute step or age
         if age is not None:
             step = int(round(age / self.series.timestep.value))
             age = round(self.series.time[step], 2)
         else:
             age = round(step * self.series.timestep, 2)
 
-        # Axis initialization
+        # Initialize axis
         ax = self.fig.add_subplot(4, 3, index, position=[left, bottom, 0.255, 0.20])
 
-        # Star scatter
+        # Plot stars' xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, i] for star in self.sample],
             [star.relative_position_xyz[step, j] for star in self.sample],
-            marker='o', s=8, color='k')
+            marker='o', s=8, color='#000000')
 
-        # Outliers scatter
+        # Plot outliers' xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, i] for star in self.outliers],
             [star.relative_position_xyz[step, j] for star in self.outliers],
@@ -1945,11 +1820,11 @@ class Output_Group():
                 (position[i], position[i]),
                 (position[j] - error[j], position[j] + error[j]), color=color, linewidth=0.7)
 
-        # Axes formatting
+        # Set labels
         ax.set_xlabel(f'${keys[i].upper()}$ (pc)')
         ax.set_ylabel(f'${keys[j].upper()}$ (pc)', labelpad=-12.)
 
-        # Limits
+        # Set limits
         ax.set_xlim(-100, 100)
         ax.set_ylim(-100, 100)
 
@@ -1983,7 +1858,7 @@ class Output_Group():
                 "'age' must be younger than the final time ({} Myr, {} Myr given).",
                 self.series.final_time.value, age)
 
-        # Step or age calculation
+        # Compute step or age
         if age is not None:
             step = int(round(age / self.series.timestep.value))
             age = round(self.series.time[step], 2)
@@ -1991,25 +1866,25 @@ class Output_Group():
             step = int(step)
             age = round(step * self.series.timestep.value, 2)
 
-        # Figure initialization
+        # Initialize figure
         ax = self.fig.add_subplot(
             4, 3, index, projection='3d', position=[left, bottom, 0.29, 0.215])
 
-        # Star scatter
+        # Plot stars' xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, 0] for star in self.sample],
             [star.relative_position_xyz[step, 1] for star in self.sample],
             [star.relative_position_xyz[step, 2] for star in self.sample],
             marker='o', color='0.0')
 
-        # Outlier scatter
+        # Plot outliers' xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, 0] for star in self.outliers],
             [star.relative_position_xyz[step, 1] for star in self.outliers],
             [star.relative_position_xyz[step, 2] for star in self.outliers],
             marker='o', color='#ff2634')
 
-        # Branches creation
+        # Create branches
         for branch in self.mst[step]:
             ax.plot((
                 branch.start.relative_position_xyz[step, 0],
@@ -2019,16 +1894,18 @@ class Output_Group():
                 branch.start.relative_position_xyz[step, 2],
                 branch.end.relative_position_xyz[step, 2]), color='#2635ff')
 
-        # Axes formatting
-        ax.view_init(azim=45)
+        # Set labels
         ax.set_xlabel('$X$ (pc)')
         ax.set_ylabel('$Y$ (pc)')
         ax.set_zlabel('$Z$ (pc)')
 
-        # Axes limits
+        # Set limits
         ax.set_xlim(-100, 100)
         ax.set_ylim(-100, 100)
         ax.set_zlim(-100, 100)
+
+        # Set view
+        ax.view_init(azim=45)
 
     def create_cross_covariances_scatter(
             self, i, j, step=None, age=None, errors=False, labels=False,
@@ -2039,7 +1916,7 @@ class Output_Group():
             and 'mst' adds the minimum spanning tree branches.
         """
 
-        # Axes initialization
+        # Initialize axis
         position_axis = {'x': 0, 'y': 1, 'z': 2}
         velocity_axis = {'u': 0, 'v': 1, 'w': 2}
         position_keys = tuple(position_axis.keys())
@@ -2088,23 +1965,23 @@ class Output_Group():
                 "'age' must be younger than the final time ({} Myr, {} Myr given).",
                 self.series.final_time.value, age)
 
-        # Step or age calculation
+        # Compute step or age
         if age is not None:
             step = int(round(age / self.series.timestep.value))
             age = round(self.series.time[step], 2)
         else:
             age = round(step * self.series.timestep, 2)
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
         ax = fig.add_subplot(111)
 
-        # Scatter
+        # Plot xyz positions
         ax.scatter(
             [star.position_xyz[step, i] for star in self.sample],
             [star.velocity_xyz[step, j] for star in self.sample], marker='o', color='0.0')
 
-        # Error bars
+        # Plot error bars
         self.series.stop(
             type(errors) != bool, 'TypeError',
             "'error' must be a boolean ({} given).", type(errors))
@@ -2127,16 +2004,16 @@ class Output_Group():
                     (velocity[j] - velocity_error[j], velocity[j] + velocity_error[j]),
                     color='0.1', linewidth=0.7)
 
-        # Star labels
+        # Show star labels
         self.series.stop(
             type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
         if labels:
             for star in self.sample:
                 ax.text(star.position_xyz[step, i] + 1, star.velocity_xyz[step, j] + 1, star.name,
-                horizontalalignment='left', fontsize=7)
+                horizontalalignment='left', fontsize=6)
 
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
@@ -2146,7 +2023,7 @@ class Output_Group():
                 "outliers.\n".format(position_keys[i].upper(), velocity_keys[j].upper(), age),
                 fontsize=8)
 
-        # Axes formatting
+        # Set labels
         ax.set_xlabel(f'{position_keys[i].upper()} (pc)')
         ax.set_ylabel(f'{velocity_keys[j].upper()} (pc/Myr)')
 
@@ -2160,13 +2037,13 @@ class Output_Group():
     def create_age_distribution(
             self, title=False, metric=None, index=None,
             forced=False, default=False, cancel=False):
-        """ Creates a plot of the distribution of jack-knife Monte-Carlo ages computed in a
+        """ Creates a plot of the distribution of jack-knife Monte Carlo ages computed in a
             group.
         """
 
-        # Figure initialization
+        # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
-        ax = fig.add_subplot(111)
+        ax = fig.add_axes([0.127, 0.103, 0.871, 0.895])
 
         # Retrieve ages
         metric, index = self.get_metric(metric, index)
@@ -2181,27 +2058,27 @@ class Output_Group():
         x = np.linspace(8, 36, 1000)
         μ = metric.age[index]
         σ = metric.age_int_error[index]
-        print(μ, σ)
         gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
         i, = (gauss > 0.001).nonzero()
         ax.plot(
             x[i], gauss[i], color=blues[3], zorder=0.8,
-            label='$\\xi^\\prime$ variance')
+            label='$\\xi^\\prime$ variance', linewidth=1.0)
         ax.hist(
             ages, bins=np.linspace(12, 32, 81), density=True,
             color=blues[3], alpha=0.3, zorder=0.8)
-        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=blues[3], linestyle='--', zorder=0.8)
+        ax.vlines(
+            μ, ymin=0.0, ymax=np.max(gauss), color=blues[3],
+            linestyle='--', zorder=0.8, linewidth=1.0)
 
         # Plot corrected histogram and gaussian curve
         x = np.linspace(8, 36, 1000)
         μ = metric.age_ajusted[index]
         σ = (metric.age_int_error[index]**2 + 1.56**2)**0.5
-        print(μ, σ)
         gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
         i, = (gauss > 0.001).nonzero()
         ax.plot(
             x[i], gauss[i], color=blues[2], zorder=0.9,
-            label='Corrected $\\xi^\\prime$ variance')
+            label='Corrected $\\xi^\\prime$ variance', linewidth=1.0)
         ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
         ax.hist(
             ages, bins=np.linspace(12, 32, 81), density=True,
@@ -2209,37 +2086,47 @@ class Output_Group():
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=blues[2],
             alpha=0.3, linewidth=0., zorder=0.3)
-        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=blues[2], linestyle='--', zorder=0.9)
+        ax.vlines(
+            μ, ymin=0.0, ymax=np.max(gauss), color=blues[2],
+            linestyle='--', zorder=0.9, linewidth=1.0)
 
         # Plot gaussian curve from Miret-Roig et al. (2020)
         μ = 18.5
         σ1, σ2 = 2.4, 2.0
-        x1, x2 = np.arange(μ - 10, μ, 0.005), np.arange(μ, μ + 10, 0.001)
+        x1, x2 = np.arange(μ - 10, μ, 0.01), np.arange(μ, μ + 10, 0.01)
         gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
         gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
         x = np.concatenate((x1, x2))
         gauss = np.concatenate((gauss1, gauss2))
         i, = (gauss > 0.001).nonzero()
-        ax.plot(x[i], gauss[i], color=greens[3], zorder=0.7, label='Miret-Roig et al. (2020)')
+        ax.plot(
+            x[i], gauss[i], color=greens[3], zorder=0.75,
+            label='Miret-Roig et al. (2020)', linewidth=1.0)
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=greens[1],
             alpha=0.3, linewidth=0., zorder=0.7)
-        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=greens[1], linestyle='--', zorder=0.7)
+        ax.vlines(
+            μ, ymin=0.0, ymax=np.max(gauss), color=greens[1],
+            linestyle='--', zorder=0.75, linewidth=1.0)
 
         # Plot gaussian curve from Crundall et al. (2019)
         μ = 18.3
         σ1, σ2 = 1.2, 1.3
-        x1, x2 = np.arange(μ - 10, μ, 0.005), np.arange(μ, μ + 10, 0.001)
+        x1, x2 = np.arange(μ - 10, μ, 0.01), np.arange(μ, μ + 10, 0.01)
         gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
         gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
         x = np.concatenate((x1, x2))
         gauss = np.concatenate((gauss1, gauss2))
         i, = (gauss > 0.001).nonzero()
-        ax.plot(x[i], gauss[i], color=greens[2], zorder=0.6, label='Crundall et al. (2019)')
+        ax.plot(
+            x[i], gauss[i], color=greens[2], zorder=0.6,
+            label='Crundall et al. (2019)', linewidth=1.0)
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=greens[2],
             alpha=0.3, linewidth=0., zorder=0.6)
-        ax.vlines(μ, ymin=0.0, ymax=np.max(gauss), color=greens[2], linestyle='--', zorder=0.6)
+        ax.vlines(
+            μ, ymin=0.0, ymax=np.max(gauss), color=greens[2],
+            linestyle='--', zorder=0.6, linewidth=1.0)
 
         # Show a shaded area for LDB and isochrone ages
         LDB_range = np.array([20, 26])
@@ -2247,28 +2134,42 @@ class Output_Group():
             LDB_range, 0, 1, color='0.5', alpha=0.2,  linewidth=0.,
             transform=ax.get_xaxis_transform(), zorder=0.5)
 
-        # Title formatting
+        # Set title
         self.series.stop(
             type(title) != bool, 'TypeError',
             "'title' must be a boolean ({} given).", type(title))
         if title:
             ax.set_title(
-                f'Distribution of {self.series.jackknife_number} jack-knife Monte-Carlo,\n'
-                f'Average age: ({metric.age[0]:.2f} '
-                f'± {metric.age_int_error[0]:.2f}) Myr\n', fontsize=8)
+                f'Distribution of {self.series.jackknife_number} jack-knife Monte Carlo,\n'
+                f'Average age: ({metric.age[0]:.1f} '
+                f'± {metric.age_int_error[0]:.1F}) Myr\n', fontsize=8)
 
-        # Axes formatting
+        # Set legend
+        legend = ax.legend(loc=1, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
+        legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+        legend.get_frame().set_linewidth(0.5)
+
+        # Set labels
         ax.set_xlabel('Age (Myr)', fontsize=8)
         ax.set_ylabel('Density', fontsize=8)
+
+        # Set limits
         ax.set_xlim(13, 29)
+
+        # Set ticks
         ax.set_xticks([14., 16., 18., 20., 22., 24., 26., 28.])
-        ax.tick_params(direction='in', top=True, right=True, labelsize=8)
-        ax.legend(loc=1, fontsize=8, fancybox=False)
+        ax.tick_params(width=0.5, direction='in', top=True, right=True, labelsize=8)
+
+        # Set spines
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.5)
 
         # Save figure
         save_figure(
             self.name, f'Age_distribution_jackknife_{self.name}_{metric_name}.pdf',
-            forced=forced, default=default, cancel=cancel)
+            tight=False, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
 def create_histogram(
@@ -2322,15 +2223,15 @@ def create_histogram(
         age < 0, 'ValueError',
         "'age' must be greater than or equal to 0.0 ({} given).",type(age))
 
-    # Figure initialization
+    # Initialize figure
     fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
     ax = fig.add_subplot(111)
 
-    # Histogram plotting
+    # Plot histogram
     hist, bin_edges = np.histogram(ages, density=True)
     ax.hist(ages, bins='auto', density=True) # bins=np.arange(21.975, 26.025, 0.05)
 
-    # Title formatting
+    # Set title
     stop(
         type(title) != bool, 'TypeError',
         "'title' must be a boolean ({} given).", type(title))
@@ -2342,7 +2243,7 @@ def create_histogram(
                     np.round(np.average(ages), 3), np.round(np.std(ages), 3))),
             fontsize=8)
 
-    # Axes formatting
+    # Set labels
     ax.set_xlabel('Age (Myr)')
     ax.set_ylabel('Number of groups')
 
@@ -2420,11 +2321,11 @@ def create_color_mesh(
     # Check if method is valid
     stop(type(method) != str, 'TypeError', "'method' must a string ({} given).", type(method))
 
-    # Figure initialization
+    # Initialize figure
     fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
     ax = fig.add_subplot(111)
 
-    # Mesh plotting
+    # Plot mesh
     x, y = np.meshgrid(initial_scatter, number_of_stars)
     grid_x, grid_y = np.mgrid[0:20:81j, 20:100:81j]
     grid_z = griddata(
@@ -2435,7 +2336,7 @@ def create_color_mesh(
         mappable=plt.cm.ScalarMappable(norm=plt.Normalize(0.0, 6.0), cmap=plt.cm.PuBu_r),
         ax=ax, ticks=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], format='%0.1f')
 
-    # Title formatting
+    # Set title
     stop(
         type(title) != bool, 'TypeError',
         "'title' must be a boolean ({} given).", type(title))
@@ -2444,9 +2345,11 @@ def create_color_mesh(
             'Scatter on age (Myr) over the initial scatter (pc)\n'
             f'and the number of stars ({number_of_groups} groups, {age:.1f}Myr)', fontsize=8)
 
-    # Axes formatting
+    # Set labels
     ax.set_xlabel('Initial scatter (pc)')
     ax.set_ylabel('Number of stars')
+
+    # Set ticks
     ax.set_xticks([0., 5., 10., 15., 20.])
     ax.set_yticks([20., 40., 60., 80., 100.])
 
@@ -2461,11 +2364,11 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         and radial velocity shifts due to gravitationnal redshift.
     """
 
-    # Figure initialization
+    # Initialize figure
     fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
     ax = fig.add_subplot(111)
 
-    # + 0.0 km/s points
+    # Plot + 0.0 km/s points
     ax.errorbar(
         np.array([
             0.0, 0.25, 0.50, 0.75, 1.0, 1.25,
@@ -2479,7 +2382,7 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         fmt='o', color='0.0', ms=6.0, elinewidth=1.0,
         label='$\\Delta v_{r,grav}$ = 0,0 km/s')
 
-    # + 0.5 km/s points
+    # Plot + 0.5 km/s points
     ax.errorbar(
         np.array([
             0.0, 0.25, 0.50, 0.75, 1.0, 1.25,
@@ -2493,7 +2396,7 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         fmt='D', color='0.33', ms=6.0, elinewidth=1.0,
         label='$\\Delta v_{r,grav}$ = 0,5 km/s')
 
-    # + 1.0 km/s points
+    # Plot + 1.0 km/s points
     ax.errorbar(
         np.array([
             0.0, 0.25, 0.50, 0.75, 1.0, 1.25,
@@ -2507,13 +2410,13 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         fmt='^', color='0.67', ms=6.0, elinewidth=1.0,
         label='$\\Delta v_{r,grav}$ = 1,0 km/s')
 
-    # β Pictoris typical error line
-    ax.axvline(x=1.0105, ymin=0.0, ymax = 25, linewidth=1, color='k', ls='dashed')
+    # Plot β Pictoris typical error line
+    ax.axvline(x=1.0105, ymin=0.0, ymax = 25, linewidth=1, color='#000000', ls='dashed')
     ax.text(
         1.15, 6.95, 'Erreur de mesure\nsur $v_r$ typique des\nmembres de $\\beta\\,$PMG',
         horizontalalignment='left', fontsize=14)
 
-    # Title formatting
+    # Set title
     stop(
         type(title) != bool, 'TypeError',
         "'title' must be a boolean ({} given).", type(title))
@@ -2522,12 +2425,18 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
             "Measured age of a simulation of 1000 24 Myr-old groups\n"
             "over the measurement error on RV (other errors typical of Gaia EDR3)\n", fontsize=8)
 
-    # Legend and axes formatting
-    ax.legend(loc=1, fontsize=7)
+    # Set legend
+    ax.legend(loc=1, fontsize=8)
+
+    # Set labels
     ax.set_xlabel('Error on radial velocity (km/s)', fontsize=8)
     ax.set_ylabel('Age (Myr)', fontsize=8)
+
+    # Set limits
     ax.set_xlim(-0.1, 3.1)
     ax.set_ylim(6, 24.5)
+
+    # Set ticks
     ax.set_xticks([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
     ax.set_yticks([6.0, 9.0, 12.0, 15.0, 18.0, 21.0, 24.0])
     ax.tick_params(direction='in', top=True, right=True, labelsize=8)
@@ -2545,11 +2454,11 @@ def create_minimum_error_plots(title=False, forced=False, default=False, cancel=
         on the uvw velocity.
     """
 
-    # Figure initialization
+    # Initialize figure
     fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
     ax = fig.add_subplot(111)
 
-    # Plotting
+    # Plot ages as a function of errors
     errors = np.array([
         0.0, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1., 1.5, 2., 2.5, 3.,
         3.5, 4., 4.5, 5., 6., 7., 8., 9., 10., 12., 14., 16., 18., 20.])
@@ -2559,16 +2468,18 @@ def create_minimum_error_plots(title=False, forced=False, default=False, cancel=
         0.9330, 0.7350, 0.5800, 0.488, 0.3460, 0.2620, 0.1920, 0.1600, 0.1340])
     ax.plot(errors, ages, '.-', color='0.0', linewidth=1.0)
 
-    # Title formatting
+    # Set title
     stop(
         type(title) != bool, 'TypeError',
         "'title' must be a boolean ({} given).", type(title))
     if title:
         ax.set_title('Impact of UVW velocity on the age of minimal scatter.', fontsize=8)
 
-    # Axes formatting
+    # Set labels
     ax.set_xlabel('Error on UVW velocity (km/s)', fontsize=8)
     ax.set_ylabel('Age at minimal XYZ scatter (Myr)', fontsize=8)
+
+    # Set ticks
     ax.tick_params(direction='in', top=True, right=True, labelsize=8)
 
     # Save figure

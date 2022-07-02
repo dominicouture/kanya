@@ -23,21 +23,22 @@ collection.create()
 
 # Output creation
 for series in collection:
-    series.show_metrics() # Valid
+    series.create_covariances_xyz_plot(forced=True)
+    series.create_covariances_ξηζ_plot(forced=True) # Valid
+    series.create_covariances_xyz_plot(robust=True, forced=True)
+    series.create_covariances_ξηζ_plot(robust=True, forced=True)
+    series.create_covariances_xyz_plot(sklearn=True, forced=True)
+    series.create_covariances_ξηζ_plot(sklearn=True, forced=True)
+    series.create_cross_covariances_xyz_plot(forced=True)
+    series.create_cross_covariances_ξηζ_plot(forced=True) # Valid
+    series.create_cross_covariances_xyz_plot(robust=True, forced=True)
+    series.create_cross_covariances_ξηζ_plot(robust=True, forced=True)
     series.create_mad_xyz_plot(forced=True)
     series.create_mad_ξηζ_plot(forced=True) # Valid
-    series.create_covariances_xyz_plot(forced=True)
-    series.create_covariances_xyz_plot(robust=True, forced=True)
-    series.create_covariances_ξηζ_plot(forced=True) # Valid
-    series.create_covariances_ξηζ_plot(robust=True, forced=True)
-    series.create_cross_covariances_xyz_plot(forced=True)
-    series.create_cross_covariances_xyz_plot(robust=True, forced=True)
-    series.create_cross_covariances_ξηζ_plot(forced=True) # Valid
-    series.create_cross_covariances_ξηζ_plot(robust=True, forced=True)
-    series.create_covariances_xyz_sklearn_plot(forced=True)
-    series.create_covariances_ξηζ_sklearn_plot(forced=True)
-    series.create_det_mad_mst_plot(forced=True)
+    series.create_xyz_mst_plot(forced=True)
+    series.create_ξηζ_mst_plot(forced=True)
     series.create_age_distribution(forced=True)
+    series.show_metrics() # Valid
 
     # Group output
     for group in series:

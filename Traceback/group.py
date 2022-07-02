@@ -176,7 +176,7 @@ class Group(list, Output_Group):
                 *model_star.position_xyz[-1], *model_star.velocity_xyz[-1])[0]
 
             # Apply radial velocity shift and its error
-            velocity_rδα += np.array([star.rv_shift.value, 0., 0.])
+            # velocity_rδα += np.array([star.rv_shift.value, 0., 0.])
             # velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
             # Velocity and position conversion to observables
@@ -383,7 +383,7 @@ class Group(list, Output_Group):
     def set_metrics(self):
         """ Sets the parameters to compute association size metrics, including weights based on
             Mahalanobis distances computed with empirical covariances matrices, and jack-knife
-            Monte-Carlo itrations.
+            Monte Carlo itrations.
         """
 
         # Compute Mahalanobis distance
@@ -401,14 +401,14 @@ class Group(list, Output_Group):
         for metric in self.series.metrics:
             self.Metric(self, metric)
 
-        # For the first group, randomly select stars for the jack-knife Monte-Carlo
+        # For the first group, randomly select stars for the jack-knife Monte Carlo
         if self.number == 0:
             self.sample_size_jackknife = int(self.sample_size * self.series.jackknife_fraction)
             self.stars_monte_carlo = np.array([
                 np.random.choice(self.sample_size, self.sample_size_jackknife, replace=False)
                     for i in range(self.series.jackknife_number)]).T
 
-        # For other groups, use the same stars for the jack-knife Monte-Carlo as the first group
+        # For other groups, use the same stars for the jack-knife Monte Carlo as the first group
         else:
             self.sample_size_jackknife = self.series[0].sample_size_jackknife
             self.stars_monte_carlo = self.series[0].stars_monte_carlo
@@ -447,7 +447,7 @@ class Group(list, Output_Group):
 
     class Metric():
         """ Association size metric including its values, age at minimum and minimum. Computes
-            errors on values, age and minium using a jack-knife Monte-Carlo method.
+            errors on values, age and minium using a jack-knife Monte Carlo method.
         """
 
         def __init__(self, group, metric):
@@ -462,7 +462,7 @@ class Group(list, Output_Group):
             self.group.metrics.append(self)
 
         def __call__(self, values):
-            """ Computes errors on values, age and minium using a jack-knife Monte-Carlo method. """
+            """ Computes errors on values, age and minium using a jack-knife Monte Carlo method. """
 
             # Average values and errors
             self.values = np.atleast_3d(values)
@@ -682,12 +682,12 @@ class Group(list, Output_Group):
             by finding the epoch when the median absolute deviation is minimal.
         """
 
-        # xyz median absolute deviation age
+        # xyz median absolute deviation ages
         self.mad_xyz(
             np.median(np.abs(self.positions_xyz - np.median(self.positions_xyz, axis=0)), axis=0))
         self.mad_xyz_total(np.sum(self.mad_xyz.values**2, axis=2)**0.5)
 
-        # ξηζ median absolute deviation age
+        # ξηζ median absolute deviation ages
         self.mad_ξηζ(
             np.median(np.abs(self.positions_ξηζ - np.median(self.positions_ξηζ, axis=0)), axis=0))
         self.mad_ξηζ_total(np.sum(self.mad_ξηζ.values**2, axis=2)**0.5)
@@ -710,7 +710,7 @@ class Group(list, Output_Group):
         self.mst_xyz, self.mst_xyz_lengths, self.mst_xyz_weights = self.get_branches('length_xyz')
         self.mst_ξηζ, self.mst_ξηζ_lengths, self.mst_ξηζ_weights = self.get_branches('length_ξηζ')
 
-        # Jack-knife Monte-Carlo branch lengths
+        # Jack-knife Monte Carlo branch lengths
         sample_size_jackknife = int(self.number_of_branches * self.series.jackknife_fraction)
         branches_monte_carlo = np.array([
             np.random.choice(self.number_of_branches, sample_size_jackknife, replace=False)
@@ -720,17 +720,15 @@ class Group(list, Output_Group):
         mst_ξηζ_lengths = self.mst_ξηζ_lengths.T[branches_monte_carlo].swapaxes(0, 1)
         mst_ξηζ_weights = self.mst_ξηζ_weights.T[branches_monte_carlo].swapaxes(0, 1)
 
-        # Minimum spanning tree average branch length ages
+        # xyz minimum spanning tree average branch length and median absolute deviation ages
         self.mst_xyz_mean(np.mean(mst_xyz_lengths, axis=0))
-        self.mst_ξηζ_mean(np.mean(mst_ξηζ_lengths, axis=0))
-
-        # Minimum spanning tree robust average branch length ages
         self.mst_xyz_mean_robust(np.average(mst_xyz_lengths, weights=mst_xyz_weights, axis=0))
-        self.mst_ξηζ_mean_robust(np.average(mst_ξηζ_lengths, weights=mst_ξηζ_weights, axis=0))
-
-        # Minimum spanning tree branch length median absolute deviation ages
         self.mst_xyz_mad(
             np.median(np.abs(mst_xyz_lengths - np.median(mst_xyz_lengths, axis=0)), axis=0))
+
+        # ξηζ minimum spanning tree average branch length and median absolute deviation ages
+        self.mst_ξηζ_mean(np.mean(mst_ξηζ_lengths, axis=0))
+        self.mst_ξηζ_mean_robust(np.average(mst_ξηζ_lengths, weights=mst_ξηζ_weights, axis=0))
         self.mst_ξηζ_mad(
             np.median(np.abs(mst_ξηζ_lengths - np.median(mst_ξηζ_lengths, axis=0)), axis=0))
 

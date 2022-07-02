@@ -53,7 +53,7 @@ class Collection(list):
 
         # self.output_dir parameter
         self.output_dir = directory(
-            self.base_dir, 'Output' if output_dir is None else output_dir, 'output_dir')
+            self.base_dir, '../Output' if output_dir is None else output_dir, 'output_dir')
 
     def set_logs(self, logs_path=None):
         """ Sets the global log path. The log file and directory are only created if a message
@@ -226,8 +226,8 @@ class Collection(list):
 
 def directory(base, directory, name, check=False, create=False):
     """ Checks for type errors, checks if 'directory' already exists, creates it if needed and
-        returns the absolute directory path. The directory can either be relative path to the
-        'base' or an absolute path.
+        returns the absolute directory path. The directory can either be relative path to 'base'
+        or an absolute path.
     """
 
     from os import makedirs, getcwd, chdir

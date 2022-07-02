@@ -44,7 +44,7 @@ class Config():
         Metric(
             'covariances_xyz_matrix_det',
             'XYZ Covariance Matrix Determinant',
-            'Det${{}}_{{XYZ}}$', False, 2),
+            'Det.${{}}_{{XYZ}}$', False, 2),
         Metric(
             'covariances_xyz_matrix_trace',
             'XYZ Covariance Matrix Trace',
@@ -62,50 +62,11 @@ class Config():
         Metric(
             'covariances_ξηζ_matrix_det',
             'ξηζ Covariance Matrix Determinant',
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 8),
+            'Det.${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 8),
         Metric(
             'covariances_ξηζ_matrix_trace',
             'ξηζ Covariance Matrix Trace',
             'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 10),
-
-        # xyz position and velocity cross covariances matrix, determinant and trace
-        Metric(
-            'cross_covariances_xyz',
-            np.array([
-                'X-U Cross Covariance',
-                'Y-V Cross Covariance',
-                'Z-W Cross Covariance']),
-            np.array(['$X-U$', '$Y-V$', '$Z-W$']),
-            np.array([False, False, False]), 12),
-        Metric(
-            'cross_covariances_xyz_matrix_det',
-            'XYZ Cross Covariance Matrix Determinant',
-            'Det${{}}_{{XYZ}}$', False, 14),
-        Metric(
-            'cross_covariances_xyz_matrix_trace',
-            'XYZ Cross Covariance Matrix Trace',
-            'Trace${{}}_{{XYZ}}$', False, 16),
-
-        # ξηζ position and velocity cross covariances matrix, determinant and trace
-        Metric(
-            'cross_covariances_ξηζ',
-            np.array([
-                'ξ-vξ Cross Covariance',
-                'η-vη Cross Covariance',
-                'ζ-vζ Cross Covariance']),
-            np.array([
-                '$ξ^\prime-\dot{ξ}^\prime$',
-                '$η^\prime-\dot{η}^\prime$',
-                '$ζ^\prime-\dot{ζ}^\prime$']),
-            np.array([False, False, False]), 18),
-        Metric(
-            'cross_covariances_ξηζ_matrix_det',
-            'ξηζ Cross Covariance Matrix Determinant',
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 22),
-        Metric(
-            'cross_covariances_ξηζ_matrix_trace',
-            'ξηζ Cross Covariance Matrix Trace',
-            'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 24),
 
         # xyz position robust covariances matrix, determinant and trace
         Metric(
@@ -122,7 +83,7 @@ class Config():
         Metric(
             'covariances_xyz_matrix_det_robust',
             'XYZ Covariance Matrix Determinant (robust)',
-            'Det${{}}_{{XYZ}}$ (robust)', False, 3),
+            'Det.${{}}_{{XYZ}}$ (robust)', False, 3),
         Metric(
             'covariances_xyz_matrix_trace_robust',
             'XYZ Covariance Matrix Trace (robust)',
@@ -143,53 +104,11 @@ class Config():
         Metric(
             'covariances_ξηζ_matrix_det_robust',
             'ξηζ Covariance Matrix Determinant (robust)',
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 9),
+            'Det.${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 9),
         Metric(
             'covariances_ξηζ_matrix_trace_robust',
             'ξηζ Covariance Matrix Trace (robust)',
             'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 11),
-
-        # xyz position and velocity robust cross covariances matrix, determinant and trace
-        Metric(
-            'cross_covariances_xyz_robust',
-            np.array([
-                'X-U Cross Covariance (robust)',
-                'Y-V Cross Covariance (robust)',
-                'Z-W Cross Covariance (robust)']),
-            np.array([
-                '$X-U$ (robust)',
-                '$Y-V$ (robust)',
-                '$Z-W$ (robust)']),
-            np.array([False, False, False]), 13),
-        Metric(
-            'cross_covariances_xyz_matrix_det_robust',
-            'XYZ Cross Covariance Matrix Determinant (robust)',
-            'Det${{}}_{{XYZ}}$ (robust)', False, 15),
-        Metric(
-            'cross_covariances_xyz_matrix_trace_robust',
-            'XYZ Cross Covariance Matrix Trace (robust)',
-            'Trace${{}}_{{XYZ}}$ (robust)', False, 17),
-
-        # ξηζ position and velocity robust cross covariances matrix, determinant and trace
-        Metric(
-            'cross_covariances_ξηζ_robust',
-            np.array([
-                'ξ-vξ Cross Covariance (robust)',
-                'η-vη Cross Covariance (robust)',
-                'ζ-vζ Cross Covariance (robust)']),
-            np.array([
-                '$ξ^\prime-\dot{ξ}^\prime$ (robust)',
-                '$η^\prime-\dot{η}^\prime$ (robust)',
-                '$ζ^\prime-\dot{ζ}^\prime$ (robust)']),
-            np.array([False, False, False]), 21),
-        Metric(
-            'cross_covariances_ξηζ_matrix_det_robust',
-            'ξηζ Cross Covariance Matrix Determinant (robust)',
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 23),
-        Metric(
-            'cross_covariances_ξηζ_matrix_trace_robust',
-            'ξηζ Cross Covariance Matrix Trace (robust)',
-            'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 25),
 
         # xyz position sklearn covariances matrix, determinant and trace
         Metric(
@@ -206,7 +125,7 @@ class Config():
         Metric(
             'covariances_xyz_matrix_det_sklearn',
             'XYZ Covariance Matrix Determinant (sklearn)',
-            'Det${{}}_{{XYZ}}$ (sklearn)', False, 3.5),
+            'Det.${{}}_{{XYZ}}$ (sklearn)', False, 3.5),
         Metric(
             'covariances_xyz_matrix_trace_sklearn',
             'XYZ Covariance Matrix Trace (sklearn)',
@@ -227,11 +146,92 @@ class Config():
         Metric(
             'covariances_ξηζ_matrix_det_sklearn',
             'ξηζ Covariance Matrix Determinant (sklearn)',
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', False, 9.5),
+            'Det.${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', False, 9.5),
         Metric(
             'covariances_ξηζ_matrix_trace_sklearn',
             'ξηζ Covariance Matrix Trace (sklearn)',
             'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', False, 11.5),
+
+        # xyz position and velocity cross covariances matrix, determinant and trace
+        Metric(
+            'cross_covariances_xyz',
+            np.array([
+                'X-U Cross Covariance',
+                'Y-V Cross Covariance',
+                'Z-W Cross Covariance']),
+            np.array(['$X-U$', '$Y-V$', '$Z-W$']),
+            np.array([False, False, False]), 12),
+        Metric(
+            'cross_covariances_xyz_matrix_det',
+            'XYZ Cross Covariance Matrix Determinant',
+            'Det.${{}}_{{XYZ}}$', False, 14),
+        Metric(
+            'cross_covariances_xyz_matrix_trace',
+            'XYZ Cross Covariance Matrix Trace',
+            'Trace${{}}_{{XYZ}}$', False, 16),
+
+        # ξηζ position and velocity cross covariances matrix, determinant and trace
+        Metric(
+            'cross_covariances_ξηζ',
+            np.array([
+                'ξ-vξ Cross Covariance',
+                'η-vη Cross Covariance',
+                'ζ-vζ Cross Covariance']),
+            np.array([
+                '$ξ^\prime-\dot{ξ}^\prime$',
+                '$η^\prime-\dot{η}^\prime$',
+                '$ζ^\prime-\dot{ζ}^\prime$']),
+            np.array([False, False, False]), 18),
+        Metric(
+            'cross_covariances_ξηζ_matrix_det',
+            'ξηζ Cross Covariance Matrix Determinant',
+            'Det.${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 22),
+        Metric(
+            'cross_covariances_ξηζ_matrix_trace',
+            'ξηζ Cross Covariance Matrix Trace',
+            'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 24),
+
+        # xyz position and velocity robust cross covariances matrix, determinant and trace
+        Metric(
+            'cross_covariances_xyz_robust',
+            np.array([
+                'X-U Cross Covariance (robust)',
+                'Y-V Cross Covariance (robust)',
+                'Z-W Cross Covariance (robust)']),
+            np.array([
+                '$X-U$ (robust)',
+                '$Y-V$ (robust)',
+                '$Z-W$ (robust)']),
+            np.array([False, False, False]), 13),
+        Metric(
+            'cross_covariances_xyz_matrix_det_robust',
+            'XYZ Cross Covariance Matrix Determinant (robust)',
+            'Det.${{}}_{{XYZ}}$ (robust)', False, 15),
+        Metric(
+            'cross_covariances_xyz_matrix_trace_robust',
+            'XYZ Cross Covariance Matrix Trace (robust)',
+            'Trace${{}}_{{XYZ}}$ (robust)', False, 17),
+
+        # ξηζ position and velocity robust cross covariances matrix, determinant and trace
+        Metric(
+            'cross_covariances_ξηζ_robust',
+            np.array([
+                'ξ-vξ Cross Covariance (robust)',
+                'η-vη Cross Covariance (robust)',
+                'ζ-vζ Cross Covariance (robust)']),
+            np.array([
+                '$ξ^\prime-\dot{ξ}^\prime$ (robust)',
+                '$η^\prime-\dot{η}^\prime$ (robust)',
+                '$ζ^\prime-\dot{ζ}^\prime$ (robust)']),
+            np.array([False, False, False]), 21),
+        Metric(
+            'cross_covariances_ξηζ_matrix_det_robust',
+            'ξηζ Cross Covariance Matrix Determinant (robust)',
+            'Det.${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 23),
+        Metric(
+            'cross_covariances_ξηζ_matrix_trace_robust',
+            'ξηζ Cross Covariance Matrix Trace (robust)',
+            'Trace${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (robust)', False, 25),
 
         # xyz position and velocity sklearn cross covariances matrix, determinant and trace
         Metric(
@@ -248,7 +248,7 @@ class Config():
         Metric(
             'cross_covariances_xyz_matrix_det_sklearn',
             'XYZ Cross Covariance Matrix Determinant (sklearn)',
-            'Det${{}}_{{XYZ}}$ (sklearn)', False, 15.5),
+            'Det.${{}}_{{XYZ}}$ (sklearn)', False, 15.5),
         Metric(
             'cross_covariances_xyz_matrix_trace_sklearn',
             'XYZ Cross Covariance Matrix Trace (sklearn)',
@@ -269,7 +269,7 @@ class Config():
         Metric(
             'cross_covariances_ξηζ_matrix_det_sklearn',
             'ξηζ Cross Covariance Matrix Determinant (sklearn)',
-            'Det${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', False, 23.5),
+            'Det.${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ (sklearn)', False, 23.5),
         Metric(
             'cross_covariances_ξηζ_matrix_trace_sklearn',
             'ξηζ Cross Covariance Matrix Trace (sklearn)',
@@ -301,26 +301,24 @@ class Config():
             'mad_ξηζ_total', 'Total ξηζ MAD',
             'MAD${{}}_{{ξ^\prime η^\prime ζ^\prime}}$', False, 29),
 
-        # Minimum spanning tree average branch length
+        # xyz minimum spanning tree average branch length and median absolute deviation
         Metric(
             'mst_xyz_mean', 'XYZ MST Mean',
             'MST${{}}_{{XYZ}}$ Mean', False, 30),
         Metric(
-            'mst_ξηζ_mean', 'ξηζ MST Mean',
-            'MST${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ Mean', False, 31),
-
-        # Minimum spanning tree robust average branch length
-        Metric(
             'mst_xyz_mean_robust', 'XYZ MST Mean (robust)',
-            'MST${{}}_{{XYZ}}$ Mean (robust)', False, 32),
-        Metric(
-            'mst_ξηζ_mean_robust', 'ξηζ MST Mean (robust)',
-            'MST${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ Mean (robust)', False, 33),
-
-        # Minimum spanning tree branch length median absolute deviation
+            'MST${{}}_{{XYZ}}$ Mean (robust)', False, 31),
         Metric(
             'mst_xyz_mad', 'XYZ MST MAD',
-            'MST${{}}_{{XYZ}}$ MAD', False, 34),
+            'MST${{}}_{{XYZ}}$ MAD', False, 32),
+
+        # ξηζ minimum spanning tree average branch length and median absolute deviation
+        Metric(
+            'mst_ξηζ_mean', 'ξηζ MST Mean',
+            'MST${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ Mean', False, 33),
+        Metric(
+            'mst_ξηζ_mean_robust', 'ξηζ MST Mean (robust)',
+            'MST${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ Mean (robust)', False, 34),
         Metric(
             'mst_ξηζ_mad', 'ξηζ MST MAD',
             'MST${{}}_{{ξ^\prime η^\prime ζ^\prime}}$ MAD', False, 35))}

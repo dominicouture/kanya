@@ -693,7 +693,6 @@ class Series(list, Output_Series):
 
                 # Age shift based on simulation
                 self.age_shift = self.series.age_shift[self.label]
-
                 self.age_ajusted = self.age + self.age_shift
 
                 # Minimum change
@@ -1194,10 +1193,6 @@ class Series(list, Output_Series):
 
             # !!! Temporary age shift dictionary, move to the configuration file !!!
             self.age_shift = {
-                'mad_xyz': np.array([0.0, 0.0, 0.0]),
-                'mad_xyz_total': np.array([0.0]),
-                'mad_ξηζ': np.array([0.0, 0.0, 0.0]),
-                'mad_ξηζ_total': np.array([0.0]),
                 'covariances_xyz': np.array([0.0, 0.0, 0.0]),
                 'covariances_xyz_matrix_det': np.array([0.0]),
                 'covariances_xyz_matrix_trace': np.array([0.0]),
@@ -1228,11 +1223,15 @@ class Series(list, Output_Series):
                 'covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
                 'covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
                 'covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),
+                'mad_xyz': np.array([0.0, 0.0, 0.0]),
+                'mad_xyz_total': np.array([0.0]),
+                'mad_ξηζ': np.array([0.0, 0.0, 0.0]),
+                'mad_ξηζ_total': np.array([0.0]),
                 'mst_xyz_mean': np.array([0.0]),
-                'mst_ξηζ_mean': np.array([0.0]),
                 'mst_xyz_mean_robust': np.array([0.0]),
-                'mst_ξηζ_mean_robust': np.array([0.0]),
                 'mst_xyz_mad': np.array([0.0]),
+                'mst_ξηζ_mean': np.array([0.0]),
+                'mst_ξηζ_mean_robust': np.array([0.0]),
                 'mst_ξηζ_mad': np.array([0.0])}
 
             # Compute average association size metrics

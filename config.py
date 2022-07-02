@@ -35,18 +35,19 @@ number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 500
-# number_of_steps.value = 250
-number_of_steps.value = 171
+number_of_steps.value = 250
+# number_of_steps.value = 172
 
 # Number of stars in each simulated group of stars (integer, > 0)
 number_of_stars.value = 26
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
+# initial_time.value = -1.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
-# final_time.value = 70.0
-final_time.value = 50.1951006
+# final_time.value = 50.1951006
+final_time.value = 51.0
 
 # Age of simulated groups of stars (float, ≥ 0.0)
 age.value = 24.0
@@ -185,15 +186,15 @@ rv_shift.value = 0.0
 rv_shift.unit = 'km/s'
 
 # Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = False
+data_rv_shifts.value = True
 
 # Whether to use actual or simulated measurement errors (boolean)
 data_errors.value = True
 
-# Number of jack-knife Monte-Carlo iterations (integer, ≥ 1)
+# Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
 jackknife_number.value = 500
 
-# Fraction of stars included in every jack-knife Monte-Carlo iteration (0 < float ≤ 1)
+# Fraction of stars included in every jack-knife Monte Carlo iteration (0 < float ≤ 1)
 jackknife_fraction.value = 0.5
 
 # Fraction of step for which a new MST is computed (0 < float ≤ 1)
