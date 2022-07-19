@@ -8,6 +8,7 @@
     2 - Groups creation: traceback members' positions from data or a model, and age computation
         by minimizing association size metrics.
     3 - Output creation: series and groups output.
+
 """
 
 from Traceback import *
@@ -37,16 +38,19 @@ for series in collection:
     series.create_mad_ξηζ_plot(forced=True) # Valid
     series.create_xyz_mst_plot(forced=True)
     series.create_ξηζ_mst_plot(forced=True)
+    series.create_covariances_mad_ξηζ_plot(forced=True)
     series.create_age_distribution(forced=True)
     series.show_metrics() # Valid
 
     # Group output
     for group in series:
         if group.number == 0:
-            group.trajectory_xyz(forced=True, metric='covariances_xyz', index=0) # Valid
+            group.trajectory_xyz(forced=True, metric='covariances_xyz', index=0)
             group.trajectory_ξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
-            group.trajectory_txyz(forced=True, metric='covariances_xyz') # Valid
-            group.trajectory_tξηζ(forced=True, metric='covariances_ξηζ') # Valid
+            group.trajectory_time_xyz('2x2', forced=True, metric='covariances_xyz')
+            group.trajectory_time_xyz('1x3', forced=True, metric='covariances_xyz')
+            group.trajectory_time_ξηζ('2x2', forced=True, metric='covariances_ξηζ')
+            group.trajectory_time_ξηζ('1x3', forced=True, metric='covariances_ξηζ') # Valid
             group.create_map(forced=True, labels=False)
             group.create_2D_and_3D_scatter([0,  5,  10], forced=True)
             group.create_2D_and_3D_scatter([15, 20, 25], forced=True)
