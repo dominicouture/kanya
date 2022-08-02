@@ -35,7 +35,7 @@ for series in collection:
     series.create_cross_covariances_xyz_plot(robust=True, forced=True)
     series.create_cross_covariances_ξηζ_plot(robust=True, forced=True)
     series.create_mad_xyz_plot(forced=True)
-    series.create_mad_ξηζ_plot(forced=True) # Valid
+    series.create_mad_ξηζ_plot( forced=True) # Valid
     series.create_xyz_mst_plot(forced=True)
     series.create_ξηζ_mst_plot(forced=True)
     series.create_covariances_mad_ξηζ_plot(forced=True)

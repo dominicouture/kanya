@@ -161,6 +161,12 @@ class Data(list):
         # All variables
         self.variables = {**self.value_variables, **self.error_variables}
 
+        # Valid labels (strings, numerial, all)
+        self.valid_labels_str = ('name', 'group', 'id', 'spectral_type')
+        self.valid_labels_num = tuple(self.variables.keys()) + (
+            'mass', 'radius', 'rv_shift', 'rv_shift_error')
+        self.valid_labels = self.valid_labels_str + self.valid_labels_num
+
         # Checks for the presence of a header in self.table
         self.header = np.vectorize(
             lambda label: label.replace('.', '').replace(',', '').isdigit())(self.table[0]).any()
@@ -248,7 +254,7 @@ class Data(list):
         """
 
         # Total radial velocity shift sequences data
-        total_rv_shift_sequences_file = '../Radial velocity shift/total_redshift_sequences.csv'
+        total_rv_shift_sequences_file = '../Radial velocity shift/total_rv_shift_sequences.csv'
         data = np.loadtxt(total_rv_shift_sequences_file, dtype='object', skiprows=1, delimiter=',')
 
         # Convert to float and delete spectral types with NaN
@@ -285,8 +291,8 @@ class Data(list):
 
         # Permutation dictionary
         permutations = {
-            'Y': 90., 'T': 80., 'L': 70., 'M': 60., 'K': 50.,
-            'G': 40., 'F': 30., 'A': 20., 'B': 10., 'O':  0.}
+            'Y': 90.0, 'T': 80.0, 'L': 70.0, 'M': 60.0, 'K': 50.0,
+            'G': 40.0, 'F': 30.0, 'A': 20.0, 'B': 10.0, 'O':  0.0}
 
         # Match spectral type components
         new_spt = spt.replace(' ', '').replace('(', '').replace(')', '')
@@ -317,15 +323,15 @@ class Data(list):
 
         # Permutation dictionary
         permutations = {
-            90.: 'Y', 80.: 'T', 70.: 'L', 60.: 'M', 50.: 'K',
-            40.: 'G', 30.: 'F', 20.: 'A', 10.: 'B',  0.: 'O'}
+            90.0: 'Y', 80.0: 'T', 70.0: 'L', 60.0: 'M', 50.0: 'K',
+            40.0: 'G', 30.0: 'F', 20.0: 'A', 10.0: 'B',  0.0: 'O'}
 
         # Check if 'sptn' is a valid number
         try:
             sptn = float(sptn)
         except ValueError as e:
             raise ValueError(f'{sptn} must be a number ({type(sptn)} given).') from e
-        if sptn < 0. or sptn >= 100.:
+        if sptn < 0.0 or sptn >= 100.0:
             raise ValueError(f'{sptn} is an invalid spectral type number.')
 
         # Convert number
@@ -342,16 +348,16 @@ class Data(list):
 
         # Convert a spectral type into a number if needed
         if np.char.isnumeric(spt):
-            sptn = float(spt) + 60.
+            sptn = float(spt) + 60.0
         else:
             sptn = self.convert_spt(spt)
 
         # Find matching spectral type and total radial velocity shift
         index = (np.abs(self.spectral_types_num - sptn)).argmin()
         spectral_type = self.spectral_types_str[index]
-        total_rv_shift = self.total_shift_ms[index]
+        rv_shift = self.total_shift_ms[index]
 
-        return spectral_type, total_rv_shift
+        return spectral_type, rv_shift
 
     def create_columns(self):
         """ Creates a self.columns dictionary along with self.Column objects for every column
@@ -459,6 +465,7 @@ class Data(list):
             '(s)': '',
             'none': '',
             'fixed': '',
+            'source': '',
             'new': '',
             'name': 'n',
             'series': 'g',
@@ -470,8 +477,6 @@ class Data(list):
             'spectraltype': 't',
             'mass': 'm',
             'radius': 'r',
-            'dvr': 'drv',
-            'rvshift': 'drv',
             'star': '',
             'stellar': '',
             'distance': 'ρ',
@@ -479,6 +484,8 @@ class Data(list):
             'parallax': 'π',
             'plx': 'π',
             'radialvelocity': 'rv',
+            'dvr': 'drv',
+            'rvshift': 'drv',
             'declination': 'δ',
             'dec': 'δ',
             'delta': 'δ',
@@ -501,7 +508,7 @@ class Data(list):
         matches = {
             'n': 'name',
             'g': 'group',
-            't': 'type',
+            't': 'spectral_type',
             'm': 'mass',
             'r': 'radius',
             'drv': 'rv_shift',
@@ -522,19 +529,6 @@ class Data(list):
                 label = label.replace(old, new)
             label = label.strip()
             old_label = label
-
-            # Wanted labels
-            wanted = (
-                'name',
-                'group',
-                'id',
-                'type',
-                'mass',
-                'radius',
-                'rv_shift',
-                'rv_shift_error',
-                *data.value_variables.keys(),
-                *data.error_variables.keys())
 
             # Advanced permutations to match a wanted label
             for old, new in self.advanced_permutations.items():
@@ -562,8 +556,8 @@ class Data(list):
             if label in self.matches.keys():
                 label = self.matches[label]
 
-            # Return old label if label is not a wanted label
-            return label if label in wanted else old_label
+            # Return old label if label is not a valid label
+            return label if label in self.data.valid_labels else old_label
 
     def create_rows(self):
         """ Filters what rows in self.table are part of the selected group definied by
@@ -602,6 +596,10 @@ class Data(list):
         for row in self.rows:
             self.append(self.Row(self, row))
 
+        # Create valid and invalid lists
+        self.valid = list(filter(lambda row: row.valid, self))
+        self.invalid = list(filter(lambda row: not row.valid, self))
+
     class Row:
         """ Contains the data for an individual row (star), including name, type, id, position
             and velocity.
@@ -629,25 +627,27 @@ class Data(list):
                 else:
                     self.values[label] = ''
 
-            # Float conversion
-            for label in list(self.data.variables.keys()) + [
-                label for label in ('mass', 'radius', 'rv_shift', 'rv_shift_error')
-                if label in self.data.columns]:
+            # Convert numerical values
+            for label in self.data.valid_labels_num:
+                if label in self.data.columns:
                     # !!! ['mass'] if 'mass' in self.data.columns else []]: !!!
 
-                # Empty '' values
-                if self.values[label] in ('', '...'):
-                    self.values[label] = 0.
+                    # Convert empty '' errors to 0.0 and others to None
+                    if self.values[label] in ('', '...'):
+                        if label in self.data.error_variables.keys():
+                            self.values[label] = 0.0
+                        else:
+                            self.values[label] = None
 
-                # Numerical values
-                else:
-                    try:
-                        self.values[label] = float(self.values[label].replace(',', '.').strip())
-                    except ValueError:
-                        self.data.series.stop(
-                            True, 'ValueError',
-                            "'{}' value could not be converted to float in '{}' column.",
-                            self.values[label], label)
+                    # Convert numerical values to float
+                    else:
+                        try:
+                            self.values[label] = float(self.values[label].replace(',', '.').strip())
+                        except ValueError:
+                            self.data.series.stop(
+                                True, 'ValueError',
+                                "'{}' value could not be converted to float in '{}' column.",
+                                self.values[label], label)
 
             # Name column
             self.name = (
@@ -657,9 +657,10 @@ class Data(list):
                     str(self.row - 1) if self.data.unit_header else str(self.row)))
 
             # Spectral type column
-            self.type = (
-                self.values['type'].strip()
-                if 'type' in self.data.columns and self.values['type'].strip() != '' else None)
+            self.spectral_type = (
+                self.values['spectral_type'].strip()
+                if 'spectral_type' in self.data.columns and
+                self.values['spectral_type'].strip() != '' else None)
 
             # ID column
             self.id = (
@@ -669,12 +670,12 @@ class Data(list):
             # Mass column
             self.mass = (
                 Quantity(self.values['mass'], self.data.columns['mass'].unit)
-                if 'mass' in self.data.columns and self.values['mass'] != 0. else None)
+                if 'mass' in self.data.columns and self.values['mass'] != 0.0 else None)
 
             # Radius column
             self.radius = (
                 Quantity(self.values['radius'], self.data.columns['radius'].unit)
-                if 'radius' in self.data.columns and self.values['radius'] != 0. else None)
+                if 'radius' in self.data.columns and self.values['radius'] != 0.0 else None)
 
             # Radial velocity shift from a column
             if 'rv_shift' in self.data.columns:
@@ -703,13 +704,12 @@ class Data(list):
                     c.value**2 * self.radius.value * R_sun.value))**0.5 - 1) / 1000)
                 self.rv_shift = Quantity(rv_shift, Unit('km/s'), 0.0)
 
-            # Radial velocity shift based on spectral type number
-            elif self.type is not None:
-                self.rv_shift = self.data.series.rv_shift
-                self.type, rv_shift_value = self.data.find_rv_shift_sptn(self.type)
-                self.rv_shift = Quantity(-1.0 * rv_shift_value, 'km/s', 0.0).to()
+            # Radial velocity shift based on spectral type
+            elif self.spectral_type is not None:
+                self.spectral_type, rv_shift = self.data.find_rv_shift(self.spectral_type)
+                self.rv_shift = Quantity(rv_shift, 'km/s', 0.0).to()
 
-            # Default radial velocity shift otherwise
+            # Uniform radial velocity shift otherwise
             else:
                  self.rv_shift = self.data.series.rv_shift
 
@@ -728,3 +728,6 @@ class Data(list):
                 [self.values[label] for label in self.data.velocity_error_variables.keys()],
                 [self.data.columns[label].unit
                     for label in self.data.velocity_error_variables.keys()]).to()
+
+            # Check for non numerical values in position and velocity
+            self.valid = (~np.isnan(self.position.values) & ~np.isnan(self.velocity.values)).all()

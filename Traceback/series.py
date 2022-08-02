@@ -279,7 +279,7 @@ class Series(list, Output_Series):
         # rv_shift paramater
         self.rv_shift = self.configure_quantity(self.config.rv_shift)
 
-        # data_errors parameter
+        # data_rv_shifts parameter
         self.data_rv_shifts = self.config.data_rv_shifts.values
         self.stop(
             self.data_rv_shifts is None, 'NameError',

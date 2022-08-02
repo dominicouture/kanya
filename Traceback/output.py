@@ -9,6 +9,7 @@ import numpy as np
 from os import path
 from matplotlib import pyplot as plt, lines, ticker as tkr
 from mpl_toolkits.mplot3d import Axes3D
+from colorsys import hls_to_rgb
 from scipy.interpolate import griddata
 from scipy.stats import linregress
 from Traceback.collection import *
@@ -16,24 +17,39 @@ from Traceback.collection import *
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
-# Format ticks label with commas instead of dots for French language publications
-# ax.xaxis.set_major_formatter(format_ticks)
-# ax.yaxis.set_major_formatter(format_ticks)
-format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)))
-
 # Set pyplot rc parameters
 plt.rc('font', serif='Latin Modern Math', family='serif', size='8')
 plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Math:roman')
 plt.rc('lines', markersize=4)
 plt.rc('pdf', fonttype=42)
 
+# Set ticks label with commas instead of dots for French language publications
+# ax.xaxis.set_major_formatter(format_ticks)
+# ax.yaxis.set_major_formatter(format_ticks)
+format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)))
+
 # Set colors
-greys = ('#000000', '#333333', '#666666', '#999999', '#cccccc')
-greens = ('#000000', '#005600', '#00a000', '#00df00', '#56f056')
-blues = ('#000000', '#002b56', '#0050a0', '#0080ff', '#40a0ff')
-oranges = ('#000000', '#562b00', '#a05000', '#ff8000', '#ffa040')
-magentas = ('#000000', '#560056', '#a000a0', '#df00df', '#f056f0')
-colors = (greens[1], greens[2], blues[2], blues[3], blues[4])
+class colors():
+    """ Defines a set of RGB color and grey tones. """
+
+    # RGB color tones
+    vars().update({name: color for name, color in zip(
+        (
+            'red',   'orange', 'yellow',  'chartreuse',
+            'green', 'lime',   'cyan',    'azure',
+            'blue',  'indigo', 'magenta', 'pink'),
+        tuple(tuple(tuple(
+            np.round(hls_to_rgb(hue / 360, luma, 1.0), 3))
+                for luma in np.arange(0.05, 1.0, 0.05))
+                    for hue in np.arange(0, 360, 30)))})
+
+    # Grey tones
+    black = (0.0, 0.0, 0.0)
+    grey = tuple((luma, luma, luma) for luma in np.arange(0.05, 1.0, 0.05))
+    white = (1.0, 1.0, 1.0)
+
+    # Metric colors
+    metric = (green[3], green[6], green[9], green[12], azure[3], azure[6], azure[9], azure[12])
 
 def save_figure(name, file_path=None, tight=True, forced=False, default=False, cancel=False):
     """ Checks whether a path already exists and asks for user input if it does. The base path
@@ -140,7 +156,7 @@ class Output_Series():
 
         # Initialize figure
         self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_axes([0.103, 0.103, 0.895, 0.895])
 
         return fig, ax
@@ -161,7 +177,7 @@ class Output_Series():
             robust and sklearn, 'ValueError',
             "'robust' and 'sklearn' cannot both be True.")
 
-    def plot_metric(self, ax, metric, index, linestyle, color, zorder=0.5, secondary=False):
+    def plot_metric(self, ax, metric, index, color, linestyle, zorder=0.5, secondary=False):
         """ Plots the association size metric's value over time on a given axis along with an
             enveloppe to display the uncertainty. The display is further customized with the
             'linestyle' and 'color' parameters. If 'secondary' is True, secondary lines are
@@ -170,17 +186,18 @@ class Output_Series():
 
         # Plot the value of the metric over time
         ax.plot(
-            -self.time, metric.value.T[index],
-            linewidth=1.0, linestyle=linestyle, color=color, zorder=zorder, label=(
+            -self.time, metric.value.T[index], label=(
                 f'{metric.latex_name[index]} : ({metric.age[index]:.1f}'
-                f' ± {metric.age_error[index]:.1f}) Myr'))
+                f' ± {metric.age_error[index]:.1f}) Myr'),
+            color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
+            solid_capstyle='round', dash_capstyle='round', zorder=zorder)
 
         # Plot an enveloppe to display the uncertainty
         ax.fill_between(
             -self.time,
             metric.value.T[index] - metric.value_error.T[index],
             metric.value.T[index] + metric.value_error.T[index],
-            color=color, alpha=0.3, linewidth=0., zorder=zorder - 0.5)
+            color=color, alpha=0.2, linewidth=0.0, zorder=zorder - 0.5)
 
         # Plot secondary lines
         self.stop(
@@ -194,8 +211,8 @@ class Output_Series():
                     np.linspace(0, self.number_of_groups * self.jackknife_number - 1, 20))):
                 ax.plot(
                     -self.time, values[int(i),:,index],
-                    linestyle=linestyle, color=color, alpha=0.4,
-                    linewidth=0.5, zorder=zorder - 0.25)
+                    color=color, alpha=0.6, linewidth=0.5,
+                    linestyle=linestyle, zorder=zorder - 0.25)
 
     def set_title_metric(self, ax, title, metric):
         """ Sets a title for association size metrics plots if 'title' is True. """
@@ -226,8 +243,8 @@ class Output_Series():
         # Set legend
         legend = ax.legend(loc=2, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
         legend.get_frame().set_alpha(None)
-        legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
-        legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+        legend.get_frame().set_facecolor(colors.white + (0.8,))
+        legend.get_frame().set_edgecolor(colors.black)
         legend.get_frame().set_linewidth(0.5)
 
         # Set labels
@@ -235,7 +252,7 @@ class Output_Series():
         ax.set_ylabel('Association size (pc)', fontsize=8)
 
         # Set limits
-        ax.set_xlim(-self.final_time.value + 14, -self.initial_time.value)
+        ax.set_xlim(-self.final_time.value + 14, -self.initial_time.value + 1)
         ax.set_ylim(-1., 39.)
 
         # Set ticks
@@ -284,11 +301,11 @@ class Output_Series():
             covariances_xyz = self.covariances_xyz
 
         # Plot xyz covariances matrix determinant and trace, and x-x, y-y and z-z covariances
-        self.plot_metric(ax, covariances_xyz_matrix_det, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax, covariances_xyz_matrix_trace, 0, '--', colors[1], 0.6)
-        self.plot_metric(ax, covariances_xyz, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, covariances_xyz, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax, covariances_xyz, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax, covariances_xyz_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, covariances_xyz_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax, covariances_xyz, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, covariances_xyz, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, covariances_xyz, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(
@@ -335,11 +352,11 @@ class Output_Series():
 
         # Plot total ξ'η'ζ' covariances matrix determinant and trace,
         # and ξ'-ξ', η'-η' and ζ'-ζ' covariances
-        self.plot_metric(ax, covariances_ξηζ_matrix_det, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax, covariances_ξηζ_matrix_trace, 0, '--', colors[1], 0.6)
-        self.plot_metric(ax, covariances_ξηζ, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, covariances_ξηζ, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax, covariances_ξηζ, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax, covariances_ξηζ_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, covariances_ξηζ_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax, covariances_ξηζ, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, covariances_ξηζ, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, covariances_ξηζ, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(
@@ -385,11 +402,11 @@ class Output_Series():
 
         # Plot total xyz cross covariances matrix determinant and trace,
         # and x-u, y-v and z-w cross covariances
-        self.plot_metric(ax, cross_covariances_xyz_matrix_det, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax, cross_covariances_xyz_matrix_trace, 0, '--', colors[1], 0.6)
-        self.plot_metric(ax, cross_covariances_xyz, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, cross_covariances_xyz, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax, cross_covariances_xyz, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax, cross_covariances_xyz_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, cross_covariances_xyz_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax, cross_covariances_xyz, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, cross_covariances_xyz, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, cross_covariances_xyz, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(
@@ -435,11 +452,11 @@ class Output_Series():
 
         # Plot total ξηζ cross covariances matrix determinant and trace,
         # and ξ'-vξ', η'-vη' and ζ'-vζ' cross covariances
-        self.plot_metric(ax, cross_covariances_ξηζ_matrix_det, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax, cross_covariances_ξηζ_matrix_trace, 0, '--', colors[1], 0.6)
-        self.plot_metric(ax, cross_covariances_ξηζ, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, cross_covariances_ξηζ, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax, cross_covariances_ξηζ, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax, cross_covariances_ξηζ_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, cross_covariances_ξηζ_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax, cross_covariances_ξηζ, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, cross_covariances_ξηζ, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, cross_covariances_ξηζ, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(
@@ -466,10 +483,10 @@ class Output_Series():
         fig, ax = self.initialize_figure_metric()
 
         # Plot total xyz MAD, x MAD, y and z MAD
-        self.plot_metric(ax, self.mad_xyz_total, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax, self.mad_xyz, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, self.mad_xyz, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax, self.mad_xyz, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax, self.mad_xyz_total, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, self.mad_xyz, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, self.mad_xyz, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, self.mad_xyz, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(ax, title, '$XYZ$ MAD')
@@ -492,10 +509,10 @@ class Output_Series():
         fig, ax = self.initialize_figure_metric()
 
         # Plot total ξ'η'ζ' MAD, ξ' MAD, η' MAD and ζ' MAD
-        self.plot_metric(ax, self.mad_ξηζ_total, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax, self.mad_ξηζ, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, self.mad_ξηζ, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax, self.mad_ξηζ, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax, self.mad_ξηζ_total, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, self.mad_ξηζ, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, self.mad_ξηζ, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, self.mad_ξηζ, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(ax, title, '$ξ^\prime η^\prime ζ^\prime$ MAD')
@@ -518,9 +535,9 @@ class Output_Series():
         fig, ax = self.initialize_figure_metric()
 
         # Plot association size metrics
-        self.plot_metric(ax, self.mst_xyz_mean, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, self.mst_xyz_mean_robust, 0, '--', colors[3], 0.7)
-        self.plot_metric(ax, self.mst_xyz_mad, 0, ':', colors[4], 0.5)
+        self.plot_metric(ax, self.mst_xyz_mean, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, self.mst_xyz_mean_robust, 0, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, self.mst_xyz_mad, 0, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(ax, title, '$XYZ$ MST')
@@ -543,9 +560,9 @@ class Output_Series():
         fig, ax = self.initialize_figure_metric()
 
         # Plot association size metrics
-        self.plot_metric(ax, self.mst_ξηζ_mean, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax, self.mst_ξηζ_mean_robust, 0, '--', colors[3], 0.7)
-        self.plot_metric(ax, self.mst_ξηζ_mad, 0, ':', colors[4], 0.5)
+        self.plot_metric(ax, self.mst_ξηζ_mean, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, self.mst_ξηζ_mean_robust, 0, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, self.mst_ξηζ_mad, 0, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(ax, title, '$ξ^\prime η^\prime ζ^\prime$ MST')
@@ -568,23 +585,23 @@ class Output_Series():
 
         # Initialize figure
         self.check_traceback()
-        fig = plt.figure(figsize=(3.345, 6.520), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.345, 6.520), facecolor=colors.white, dpi=300)
         ax1 = fig.add_axes([0.100, 0.526, 0.899, 0.461])
         ax2 = fig.add_axes([0.100, 0.050, 0.899, 0.461])
 
         # Plot total ξ'η'ζ' covariances matrix determinant and trace,
         # and ξ'-ξ', η'-η' and ζ'-ζ' covariances
-        self.plot_metric(ax1, self.covariances_ξηζ_matrix_det, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax1, self.covariances_ξηζ_matrix_trace, 0, '--', colors[1], 0.6)
-        self.plot_metric(ax1, self.covariances_ξηζ, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax1, self.covariances_ξηζ, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax1, self.covariances_ξηζ, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax1, self.covariances_ξηζ_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax1, self.covariances_ξηζ_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax1, self.covariances_ξηζ, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax1, self.covariances_ξηζ, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax1, self.covariances_ξηζ, 2, colors.metric[7], ':', 0.5)
 
         # Plot total ξ'η'ζ' MAD, ξ' MAD, η' MAD and ζ' MAD
-        self.plot_metric(ax2, self.mad_ξηζ_total, 0, '-', colors[0], 0.8)
-        self.plot_metric(ax2, self.mad_ξηζ, 0, '-', colors[2], 0.9)
-        self.plot_metric(ax2, self.mad_ξηζ, 1, '--', colors[3], 0.7)
-        self.plot_metric(ax2, self.mad_ξηζ, 2, ':', colors[4], 0.5)
+        self.plot_metric(ax2, self.mad_ξηζ_total, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax2, self.mad_ξηζ, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax2, self.mad_ξηζ, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax2, self.mad_ξηζ, 2, colors.metric[7], ':', 0.5)
 
         # Set title
         self.set_title_metric(ax1, title, '$ξ^\prime η^\prime ζ^\prime$ covariances and MAD')
@@ -615,25 +632,25 @@ class Output_Series():
         self.check_traceback()
         other.check_traceback()
         fig, (ax0, ax1) = plt.subplots(
-            ncols=2, constrained_layout=True, figsize=(6.66, 3.33), facecolor='w', dpi=300)
+            ncols=2, constrained_layout=True, figsize=(6.66, 3.33), facecolor=colors.white, dpi=300)
 
         # Plot association size metrics (self)
-        self.plot_metric(ax0, self.covariances_xyz_matrix_det, 0, '-', blues[1])
-        self.plot_metric(ax0, self.mad_xyz_total, 0, '--', blues[2])
-        self.plot_metric(ax0, self.mst_xyz_mean, 0, '-.', blues[3])
-        self.plot_metric(ax0, self.mst_xyz_mad, 0, ':', blues[4])
-        self.plot_metric(ax1, self.cross_covariances_xyz, 0, '-', blues[1])
-        self.plot_metric(ax1, self.cross_covariances_xyz, 1, '--', blues[2])
-        self.plot_metric(ax1, self.cross_covariances_xyz, 2, ':', blues[3])
+        self.plot_metric(ax0, self.covariances_xyz_matrix_det, 0, colors.metric[4], '-', 0.8)
+        self.plot_metric(ax0, self.mad_xyz_total, 0, colors.metric[5], '--', 0.7)
+        self.plot_metric(ax0, self.mst_xyz_mean, 0, colors.metric[6], '-.', 0.6)
+        self.plot_metric(ax0, self.mst_xyz_mad, 0, colors.metric[7], ':', 0.5)
+        self.plot_metric(ax1, self.cross_covariances_xyz, 0, colors.metric[4], '-', 0.8)
+        self.plot_metric(ax1, self.cross_covariances_xyz, 1, colors.metric[5], '--', 0.7)
+        self.plot_metric(ax1, self.cross_covariances_xyz, 2, colors.metric[6], ':', 0.6)
 
         # Plot association size metrics (other)
-        other.plot_metric(ax0, other.covariances_xyz_matrix_det, 0, '-', greens[1])
-        other.plot_metric(ax0, other.mad_xyz_total, 0, '--', greens[2])
-        other.plot_metric(ax0, other.mst_xyz_mean, 0, '-.', greens[3])
-        other.plot_metric(ax0, other.mst_xyz_mad, 0, ':', greens[4])
-        other.plot_metric(ax1, other.cross_covariances_xyz, 0, '-', greens[1])
-        other.plot_metric(ax1, other.cross_covariances_xyz, 1, '--', greens[2])
-        other.plot_metric(ax1, other.cross_covariances_xyz, 2, ':', greens[3])
+        other.plot_metric(ax0, other.covariances_xyz_matrix_det, 0, colors.metric[0], '-', 0.8)
+        other.plot_metric(ax0, other.mad_xyz_total, 0, colors.metric[1], '--', 0.7)
+        other.plot_metric(ax0, other.mst_xyz_mean, 0, colors.metric[2], '-.', 0.6)
+        other.plot_metric(ax0, other.mst_xyz_mad, 0, colors.metric[3], ':', 0.5)
+        other.plot_metric(ax1, other.cross_covariances_xyz, 0, colors.metric[0], '-', 0.8)
+        other.plot_metric(ax1, other.cross_covariances_xyz, 1, colors.metric[1], '--', 0.7)
+        other.plot_metric(ax1, other.cross_covariances_xyz, 2, colors.metric[2], ':', 0.6)
 
         # Set title
         self.stop(
@@ -674,14 +691,14 @@ class Output_Series():
 
         # Initialize figure
         self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111, frame_on=True)
 
         # Plot histogram
         ages = [group.covariances_xyz_matrix_det.age[0] for group in self]
         ax.hist(
             ages, bins=np.linspace(16, 24, 33), density=True,
-            color=blues[3], alpha=0.7, label='metric')
+            color=colors.azure[8], alpha=0.7, label='metric')
         # bins=np.arange(21.975, 26.025, 0.05)
 
         # Set title
@@ -798,7 +815,7 @@ class Output_Group():
 
     def get_epoch(self, age=None, metric=None, index=None):
         """ Computes the time index of the epoch for a given association age or, association size
-            metric and dimensional index.
+            metric and dimensional index. Return the birth index, age and age error.
         """
 
         # Index from age
@@ -813,17 +830,19 @@ class Output_Group():
                 age > self.series.final_time.value, 'ValueError',
                 "'age' must be younger than the final time ({} Myr, {} Myr given).",
                 self.series.final_time.value, age)
+            return (
+                int(age / self.series.final_time.value * self.series.number_of_steps), age, None)
 
         # Index from the epoch of minimum of an association size metric
         elif metric is not None:
             metric, index = self.get_metric(metric, index)
-            age = metric.age[index]
-        else:
-            self.series.stop(
-                True, 'ValueError',
-                "Either 'age' or 'metric' must not be None ({} and {} given).", age, index)
+            return (
+                int(metric.age[index] / self.series.final_time.value * self.series.number_of_steps),
+                metric.age[index], metric.age_error[index])
 
-        return int(age / self.series.final_time.value * self.series.number_of_steps)
+        # No birth index, age or age error
+        else:
+            return (None, None, None)
 
     def get_metric(self, metric, index=None):
         """ Retrieves the proprer Series.Metric instance from a string and index. """
@@ -851,7 +870,7 @@ class Output_Group():
                 metric.value.size > 1, 'ValueError',
                 "No 'index' is provided (metric is {} in size).", metric.value.size)
 
-        return (metric, index if metric.value.size > 1 else 0)
+        return metric, index if metric.value.size > 1 else 0
 
     def trajectory_xyz(
             self, title=False, labels=False, age=None, metric=None, index=None,
@@ -859,7 +878,7 @@ class Output_Group():
         """ Draw the xyz trajectories of stars in the group. """
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.345, 3.315), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.345, 3.315), facecolor=colors.white, dpi=300)
         left, bottom = (0.133, 0.102)
         short1, short2  = (0.236, 0.2381)
         long1, long2 = (0.618, 0.6236)
@@ -873,17 +892,17 @@ class Output_Group():
             type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
 
-        # Birth epoch
-        birth = self.get_epoch(age=age, metric=metric, index=index)
+        # Birth index, age and age error
+        birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
 
         # Select conversion factors from pc to kpc
         for ax, x, y in ((ax1, 1, 0), (ax2, 2, 0), (ax3, 1, 2)):
-            factor_x = 1.0 if x == 2 else 1000
-            factor_y = 1.0 if y == 2 else 1000
+            factor_x = 1.0 if x == 2 else 1000.0
+            factor_y = 1.0 if y == 2 else 1000.0
 
             # Plot stars' trajectories
             for star in self:
-                color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 0.0)
+                color = colors.red[6] if star.outlier else colors.black
                 ax.plot(
                     star.position_xyz.T[x] / factor_x,
                     star.position_xyz.T[y] / factor_y,
@@ -895,17 +914,17 @@ class Output_Group():
                     ax.scatter(
                         np.array([star.position_xyz[0,x]]) / factor_x,
                         np.array([star.position_xyz[0,y]]) / factor_y,
-                        color=(0.0, 0.0, 0.0, 0.8), edgecolors=(0.0, 0.0, 0.0, 1.0),
-                        alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                        color=colors.black + (0.4,), edgecolors=colors.black,
+                        alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Plot stars' birth positions
-                    if birth is not None:
-                        color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 1.0)
+                    if birth_index is not None:
+                        color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            np.array([star.position_xyz[birth,x]]) / factor_x,
-                            np.array([star.position_xyz[birth,y]]) / factor_y,
-                            color=color + (0.8,), edgecolors=color + (1.0,),
-                            alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                            np.array([star.position_xyz[birth_index,x]]) / factor_x,
+                            np.array([star.position_xyz[birth_index,y]]) / factor_y,
+                            color=color + (0.4,), edgecolors=color + (1.0,),
+                            alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Show stars' names
                     if labels:
@@ -914,28 +933,28 @@ class Output_Group():
                             np.array(star.position_xyz.T[0,y]) / factor_y,
                             star.name, horizontalalignment='left', fontsize=6)
 
-            # Plot average model star's trajectory
+            # Plot the average model star's trajectory
             if self.series.from_model:
                 ax.plot(
                     self.average_model_star.position_xyz.T[x] / factor_x,
                     self.average_model_star.position_xyz.T[y] / factor_y,
-                    color=(0.0, 1.0, 0.0), alpha=0.8,
+                    color=colors.green[6], alpha=0.8,
                     linewidth=0.5, solid_capstyle='round', zorder=0.3)
 
-                # Plot average model star's birth and current positions
+                # Plot the average model star's birth and current positions
                 for t, size, marker in ((-1, 12, '*'), (0, 6, 'o')):
                     ax.scatter(
                         np.array([self.average_model_star.position_xyz[t,x]]) / factor_x,
                         np.array([self.average_model_star.position_xyz[t,y]]) / factor_y,
-                        color=(0.0, 1.0, 0.0, 0.8), edgecolors=(0.0, 1.0, 0.0, 1.0),
-                        alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.3)
+                        color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
+                        alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3)
 
                 # Plot model stars' trajectories
                 for star in self.model_stars:
                     ax.plot(
                         star.position_xyz.T[x] / factor_x,
                         star.position_xyz.T[y] / factor_y,
-                        color=(0.0, 0.0, 1.0), alpha=0.6,
+                        color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2)
 
                     # Plot model stars' birth and current positions
@@ -943,17 +962,17 @@ class Output_Group():
                         ax.scatter(
                             np.array([star.position_xyz[t,x]]) / factor_x,
                             np.array([star.position_xyz[t,y]]) / factor_y,
-                            color=(0.0, 0.0, 1.0, 0.8), edgecolors=(0.0, 0.0, 1.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.2)
+                            color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2)
 
             # Draw vertical and horizontal lines through the Sun's position at the current epoch
-            ax.axhline(0., color='#000000', linewidth=0.5, linestyle=':', alpha=0.8, zorder=0.0)
-            ax.axvline(0., color='#000000', linewidth=0.5, linestyle=':', alpha=0.8, zorder=0.0)
+            ax.axhline(0., color=colors.black, alpha=0.8, linewidth=0.5, linestyle=':', zorder=0.0)
+            ax.axvline(0., color=colors.black, alpha=0.8, linewidth=0.5, linestyle=':', zorder=0.0)
 
         # Draw circles around the galactic center located at 8.122 kpc from the Sun
         for radius in range(1, 16):
             ax1.add_artist(plt.Circle(
-                (0, 8.122), radius, color='#000000', fill=False,
+                (0, 8.122), radius, color=colors.black, fill=False,
                 linewidth=0.5, linestyle=':', alpha=0.2, zorder=0.0))
 
         # Set title
@@ -1005,7 +1024,7 @@ class Output_Group():
         """ Draws the ξηζ trajectories of stars in the group. """
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.345, 3.315), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.345, 3.315), facecolor=colors.white, dpi=300)
         left, bottom = (0.133, 0.102)
         short1, short2  = (0.236, 0.2381)
         long1, long2 = (0.618, 0.6236)
@@ -1019,13 +1038,13 @@ class Output_Group():
             type(labels) != bool, 'TypeError',
             "'labels' must be a boolean ({} given).", type(labels))
 
-        # Birth epoch
-        birth = self.get_epoch(age=age, metric=metric, index=index)
+        # Birth index, age and age error
+        birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
 
         # Plot stars' trajectories
         for ax, x, y in ((ax1, 0, 1), (ax2, 2, 1), (ax3, 0, 2)):
             for star in self:
-                color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 0.0)
+                color = colors.red[6] if star.outlier else colors.black
                 ax.plot(
                     star.position_ξηζ.T[x], star.position_ξηζ.T[y],
                     color=color, alpha=0.6, linewidth=0.5,
@@ -1036,17 +1055,17 @@ class Output_Group():
                     ax.scatter(
                         np.array([star.position_ξηζ[0,x]]),
                         np.array([star.position_ξηζ[0,y]]),
-                        color=(0.0, 0.0, 0.0, 0.8), edgecolors=(0.0, 0.0, 0.0, 1.0),
-                        alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                        color=colors.black + (0.4,), edgecolors=colors.black,
+                        alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Plot stars' birth positions
-                    if birth is not None:
-                        color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 1.0)
+                    if birth_index is not None:
+                        color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            np.array([star.position_ξηζ[birth,x]]),
-                            np.array([star.position_ξηζ[birth,y]]),
-                            color=color + (0.8,), edgecolors=color + (1.0,),
-                            alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                            np.array([star.position_ξηζ[birth_index,x]]),
+                            np.array([star.position_ξηζ[birth_index,y]]),
+                            color=color + (0.4,), edgecolors=color + (1.0,),
+                            alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Show stars' names
                     if labels:
@@ -1055,27 +1074,27 @@ class Output_Group():
                             np.array(star.position_ξηζ.T[0,y]),
                             star.name, horizontalalignment='left', fontsize=6)
 
-            # Plot average model star's trajectory
+            # Plot the average model star's trajectory
             if self.series.from_model:
                 ax.plot(
                     self.average_model_star.position_ξηζ.T[x],
                     self.average_model_star.position_ξηζ.T[y],
-                    color=(0.0, 1.0, 0.0), alpha=0.8,
+                    color=colors.green[6], alpha=0.8,
                     linewidth=1.0, solid_capstyle='round', zorder=0.3)
 
-                # Plot average model star's birth and current positions
+                # Plot the average model star's birth and current positions
                 for t, size, marker in ((-1, 12, '*'), (0, 6, 'o')):
                     ax.scatter(
                         np.array([self.average_model_star.position_ξηζ[t,x]]),
                         np.array([self.average_model_star.position_ξηζ[t,y]]),
-                        color=(0.0, 1.0, 0.0, 0.8), edgecolors=(0.0, 1.0, 0.0, 1.0),
-                        alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.3)
+                        color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
+                        alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3)
 
                 # Plot model stars' trajectories
                 for star in self.model_stars:
                     ax.plot(
                         star.position_ξηζ.T[x], star.position_ξηζ.T[y],
-                        color=(0.0, 0.0, 1.0), alpha=0.6,
+                        color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2)
 
                     # Plot model stars' birth and current positions
@@ -1083,8 +1102,8 @@ class Output_Group():
                         ax.scatter(
                             np.array([star.position_ξηζ[t,x]]),
                             np.array([star.position_ξηζ[t,y]]),
-                            color=(0.0, 0.0, 1.0, 0.8), edgecolors=(0.0, 0.0, 1.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.2)
+                            color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2)
 
         # Set title
         self.series.stop(
@@ -1143,7 +1162,7 @@ class Output_Group():
 
         # Initialize a 2x2 figure
         if style == '2x2':
-            fig = plt.figure(facecolor='w', figsize=(7.090, 6.317), dpi=300)
+            fig = plt.figure(facecolor=colors.white, figsize=(7.090, 6.317), dpi=300)
             left1, bottom1 = (0.083, 0.528)
             left2, bottom2 = (0.507, 0.052)
             width, height = (0.410, 0.460)
@@ -1154,7 +1173,7 @@ class Output_Group():
 
         # Initialize a 1x3 figure
         if style == '1x3':
-            fig = plt.figure(facecolor='w', figsize=(3.345, 9.134), dpi=300)
+            fig = plt.figure(facecolor=colors.white, figsize=(3.345, 9.134), dpi=300)
             left, bottom = (0.133, 0.0355)
             width, height = (0.866, 0.3112)
             inside = 0.01095
@@ -1162,39 +1181,48 @@ class Output_Group():
             ax2 = fig.add_axes([left, bottom + height + inside, width, height])
             ax3 = fig.add_axes([left, bottom, width, height])
 
-        # Birth epoch
-        birth = [self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
+        # Birth index, age and age error
+        birth_index, age, age_error  = tuple(zip(*[
+            self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]))
 
         # Plot stars' trajectories
         for ax, y in ((ax1, 0), (ax2, 1), (ax3, 2)):
             for star in self:
                 ax.plot(
                     -self.series.time, (star.position_xyz - self.position_xyz)[:,y],
-                    color = (1.0, 0.0, 0.0) if star.outlier else greys[0],
-                    alpha=0.6, linewidth=0.5, solid_capstyle='round', zorder=0.1)
+                    color = colors.red[6] if star.outlier else colors.black, alpha=0.6,
+                    linewidth=0.5, solid_capstyle='round', zorder=0.1)
 
                 # Plot stars' current positions
                 if self.series.from_data:
                     ax.scatter(
                         -self.series.time[0], (star.position_xyz - self.position_xyz)[0,y],
-                        color=(0.0, 0.0, 0.0, 0.8), edgecolors=(0.0, 0.0, 0.0, 1.0),
-                        alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                        color=colors.black + (0.4,), edgecolors=colors.black, alpha=None,
+                        s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Plot stars' birth positions
-                    if birth is not None:
-                        color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 1.0)
+                    if birth_index[y] is not None:
+                        color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            -self.series.time[birth[y]],
-                            (star.position_xyz - self.position_xyz)[birth[y],y],
-                            color=color + (0.8,), edgecolors=color + (1.0,),
-                            alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                            -self.series.time[birth_index[y]],
+                            (star.position_xyz - self.position_xyz)[birth_index[y],y],
+                            color=color + (0.4,), edgecolors=color, alpha=None,
+                            s=6, marker='o', linewidths=0.25, zorder=0.2)
 
             # Show vectical dashed line
-            ax.axvline(
-                x=-self.series.time[birth[y]], color=greys[0],
-                linewidth=0.5, linestyle='--', zorder=0.0)
+            if birth_index[y] is not None:
+                ax.axvline(
+                    x=-self.series.time[birth_index[y]], color=colors.black,
+                    linewidth=0.5, linestyle='--', zorder=0.1)
 
-            # Plot average model star's trajectory
+                # Show a grey shaded area
+                if age_error[y] is not None:
+                    ax.fill_between(
+                        np.array([-age[y] - age_error[y], -age[y] + age_error[y]]), 0, 1,
+                        transform=ax.get_xaxis_transform(), color=colors.grey[9],
+                        alpha=0.1, linewidth=0.0, zorder=0.1)
+
+            # Plot the average model star's trajectory
             if self.series.from_model:
                 position_xyz = np.mean(
                     [star.position_xyz[:,y] for star in self.model_stars], axis=0)
@@ -1203,23 +1231,23 @@ class Output_Group():
                 ax.plot(
                     self.average_model_star.time,
                     average_model_star_position_xyz,
-                    color=(0.0, 1.0, 0.0), alpha=0.8,
+                    color=colors.green[6], alpha=0.8,
                     linewidth=1.0, solid_capstyle='round', zorder=0.3)
 
-                # Plot average model star's birth and current positions
+                # Plot the average model star's birth and current positions
                 for t, x, size, marker in ((-1, -1, 10, '*'), (0, 0, 6, 'o')):
                     ax.scatter(
                         np.array([self.average_model_star.time[t]]),
                         np.array([average_model_star_position_xyz[x]]),
-                        color=(0.0, 1.0, 0.0, 0.8), edgecolors=(0.0, 1.0, 0.0, 1.0),
-                        alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.3)
+                        color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
+                        alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3)
 
                 # Plot model stars' trajectories
                 for star in self.model_stars:
                     model_star_position_xyz = star.position_xyz[:,y] - position_xyz
                     ax.plot(
                         -star.time[::-1], model_star_position_xyz,
-                        color=(0.0, 0.0, 1.0), alpha=0.6,
+                        color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2)
 
                     # Plot model stars' birth and current positions
@@ -1227,66 +1255,65 @@ class Output_Group():
                         ax.scatter(
                             -np.array([star.time[t]]),
                             np.array([model_star_position_xyz[x]]),
-                            color=(0.0, 0.0, 1.0, 0.8), edgecolors=(0.0, 0.0, 1.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.2)
+                            color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2)
 
         # Plot stars' average trajectory
         if style == '2x2':
             for y, label, linestyle in ((0,'$<X>$', '-'), (1,'$<Y>$', '--'), (2, '$<Z>$', ':')):
                 ax0.plot(
                     -self.series.time, self.position_xyz[:,y] / 1000,
-                    label=label, color=(0.0, 0.0, 0.0), alpha=0.8, linestyle=linestyle,
-                    linewidth=1.0, solid_capstyle='round', zorder=0.1)
+                    label=label, color=colors.black, alpha=0.8, linestyle=linestyle,
+                    linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.1)
 
                 # Plot stars' average current positions
                 if self.series.from_data:
                     ax0.scatter(
                         -self.series.time[0], self.position_xyz[0,y] / 1000,
-                        color=(0.0, 0.0, 0.0, 0.8), edgecolors=(0.0, 0.0, 0.0, 1.0),
-                        alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                        color=colors.black + (0.4,), edgecolors=colors.black,
+                        alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Plot stars' average birth positions
-                    if birth is not None:
-                        color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 1.0)
+                    if birth_index[y] is not None:
+                        color = colors.red[6] if star.outlier else colors.blue[6]
                         ax0.scatter(
-                            -self.series.time[birth[y]], self.position_xyz[birth[y],y] / 1000,
-                            color=color + (0.8,), edgecolors=color + (1.0,),
-                            alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                            -self.series.time[birth_index[y]],
+                            self.position_xyz[birth_index[y],y] / 1000,
+                            color=color + (0.4,), edgecolors=color + (1.0,),
+                            alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
-                # Plot average model star's trajectory
+                # Plot the average model star's trajectory
                 if self.series.from_model:
                     average_model_star_position_xyz = self.average_model_star.position_xyz[:,y] / 1000
                     ax0.plot(
                         self.average_model_star.time,
                         average_model_star_position_xyz,
-                        color=(0.0, 1.0, 0.0), alpha=0.8, linestyle=linestyle,
-                        linewidth=1.0, solid_capstyle='round', zorder=0.3)
+                        color=colors.green[6], alpha=0.8, linestyle=linestyle,
+                        linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.3)
 
-                    # Plot average model star's birth and current positions
+                    # Plot the average model star's birth and current positions
                     for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                         ax0.scatter(
                             np.array([self.average_model_star.time[t]]),
                             np.array([average_model_star_position_xyz[x]]),
-                            color=(0.0, 1.0, 0.0, 0.8), edgecolors=(0.0, 1.0, 0.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.3)
-                            # s=6, marker=m, color=greens[y + 2], zorder=0.3)
+                            color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3)
 
                     # Plot model stars' trajectories
                     model_star_position_xyz = np.mean(
                         [star.position_xyz[:,y] for star in self.model_stars], axis=0) / 1000
                     ax0.plot(
                         -self.model_stars[0].time[::-1], model_star_position_xyz,
-                        color=(0.0, 0.0, 1.0), alpha=0.8, linestyle=linestyle,
-                        linewidth=1.0, solid_capstyle='round', zorder=0.2)
+                        color=colors.blue[6], alpha=0.8, linestyle=linestyle,
+                        linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.2)
 
                     # Plot model stars' birth and current positions
                     for t, x, size, marker in ((-1, 0, 12, '*'), (0, -1, 6, 'o')):
                         ax0.scatter(
                             -np.array([self.model_stars[0].time[t]]),
                             np.array([model_star_position_xyz[x]]),
-                            color=(0.0, 0.0, 1.0, 0.8), edgecolors=(0.0, 0.0, 1.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.2)
-                            # s=6, marker=m, color=blues[y + 2], zorder=0.2)
+                            color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2)
 
         # Set title
         self.series.stop(
@@ -1306,8 +1333,8 @@ class Output_Group():
         if style == '2x2':
             legend = ax0.legend(loc=4, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
             legend.get_frame().set_alpha(None)
-            legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
-            legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+            legend.get_frame().set_facecolor(colors.white + (0.8,))
+            legend.get_frame().set_edgecolor(colors.black)
             legend.get_frame().set_linewidth(0.5)
 
         # Set labels
@@ -1365,7 +1392,7 @@ class Output_Group():
 
         # Initialize a 2x2 figure
         if style == '2x2':
-            fig = plt.figure(facecolor='w', figsize=(7.090, 6.317), dpi=300)
+            fig = plt.figure(facecolor=colors.white, figsize=(7.090, 6.317), dpi=300)
             left1, bottom1 = (0.083, 0.528)
             left2, bottom2 = (0.507, 0.052)
             width, height = (0.410, 0.460)
@@ -1376,7 +1403,7 @@ class Output_Group():
 
         # Initialize a 1x3 figure
         if style == '1x3':
-            fig = plt.figure(facecolor='w', figsize=(3.345, 9.134), dpi=300)
+            fig = plt.figure(facecolor=colors.white, figsize=(3.345, 9.134), dpi=300)
             left, bottom = (0.133, 0.0355)
             width, height = (0.866, 0.3112)
             inside = 0.01095
@@ -1384,39 +1411,48 @@ class Output_Group():
             ax2 = fig.add_axes([left, bottom + height + inside, width, height])
             ax3 = fig.add_axes([left, bottom, width, height])
 
-        # Birth epoch
-        birth = [self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
+        # Birth index, age and age error
+        birth_index, age, age_error  = tuple(zip(*[
+            self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]))
 
         # Plot stars' trajectories
         for ax, y in ((ax1, 0), (ax2, 1), (ax3, 2)):
             for star in self:
                 ax.plot(
                     -self.series.time, (star.position_ξηζ - self.position_ξηζ)[:,y],
-                    color = (1.0, 0.0, 0.0) if star.outlier else greys[0],
+                    color = colors.red[6] if star.outlier else colors.black,
                     alpha=0.6, linewidth=0.5, solid_capstyle='round', zorder=0.1)
 
                 # Plot stars' current positions
                 if self.series.from_data:
                     ax.scatter(
                         -self.series.time[0], (star.position_ξηζ - self.position_ξηζ)[0,y],
-                        color=(0.0, 0.0, 0.0, 0.8), edgecolors=(0.0, 0.0, 0.0, 1.0),
-                        alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                        color=colors.black + (0.4,), edgecolors=colors.black,
+                        alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Plot stars' birth positions
-                    if birth is not None:
-                        color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 1.0)
+                    if birth_index[y] is not None:
+                        color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            -self.series.time[birth[y]],
-                            (star.position_ξηζ - self.position_ξηζ)[birth[y],y],
-                            color=color + (0.8,), edgecolors=color + (1.0,),
-                            alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                            -self.series.time[birth_index[y]],
+                            (star.position_ξηζ - self.position_ξηζ)[birth_index[y],y],
+                            color=color + (0.4,), edgecolors=color + (1.0,),
+                            alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
             # Show vectical dashed line
-            ax.axvline(
-                x=-self.series.time[birth[y]], color=greys[0],
-                linewidth=0.5, linestyle='--', zorder=0.0)
+            if birth_index[y] is not None:
+                ax.axvline(
+                    x=-self.series.time[birth_index[y]], color=colors.black,
+                    linewidth=0.5, linestyle='--', zorder=0.1)
 
-            # Plot average model star's trajectory
+                # Show a grey shaded area
+                if age_error[y] is not None:
+                    ax.fill_between(
+                        np.array([-age[y] - age_error[y], -age[y] + age_error[y]]), 0, 1,
+                        transform=ax.get_xaxis_transform(), color=colors.grey[9],
+                        alpha=0.1, linewidth=0.0, zorder=0.1)
+
+            # Plot the average model star's trajectory
             if self.series.from_model:
                 position_ξηζ = np.mean(
                     [star.position_ξηζ[:,y] for star in self.model_stars], axis=0)
@@ -1425,23 +1461,23 @@ class Output_Group():
                 ax.plot(
                     self.average_model_star.time,
                     average_model_star_position_ξηζ,
-                    color=(0.0, 1.0, 0.0), alpha=0.8,
+                    color=colors.green[6], alpha=0.8,
                     linewidth=1.0, solid_capstyle='round', zorder=0.3)
 
-                # Plot average model star's birth and current positions
+                # Plot the average model star's birth and current positions
                 for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                     ax.scatter(
                         np.array([self.average_model_star.time[t]]),
                         np.array([average_model_star_position_ξηζ[x]]),
-                        color=(0.0, 1.0, 0.0, 0.8), edgecolors=(0.0, 1.0, 0.0, 1.0),
-                        alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.3)
+                        color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
+                        alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3)
 
                 # Plot model stars' trajectories
                 for star in self.model_stars:
                     model_star_position_ξηζ = star.position_ξηζ[:,y] - position_ξηζ
                     ax.plot(
                         -star.time[::-1], model_star_position_ξηζ,
-                        color=(0.0, 0.0, 1.0), alpha=0.6,
+                        color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2)
 
                     # Plot model stars' birth and current positions
@@ -1449,8 +1485,8 @@ class Output_Group():
                         ax.scatter(
                             -np.array([star.time[t]]),
                             np.array([model_star_position_ξηζ[x]]),
-                            color=(0.0, 0.0, 1.0, 0.8), edgecolors=(0.0, 0.0, 1.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.2)
+                            color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2)
 
         # Plot stars' average trajectories
         if style == '2x2':
@@ -1458,48 +1494,48 @@ class Output_Group():
                     (0, '$<ξ^\prime>$', '-'), (1, '$<η^\prime>$', '--'), (2, '$<ζ^\prime>$', ':')):
                 ax0.plot(
                     -self.series.time, self.position_ξηζ[:,y],
-                    label=label, color=(0.0, 0.0, 0.0), alpha=0.8, linestyle=linestyle,
+                    label=label, color=colors.black, alpha=0.8, linestyle=linestyle,
                     linewidth=1.0, solid_capstyle='round', zorder=0.1)
 
                 # Plot stars' average current positions
                 if self.series.from_data:
                     ax0.scatter(
                         -self.series.time[0], self.position_ξηζ[0,y],
-                        color=(0.0, 0.0, 0.0, 0.8), edgecolors=(0.0, 0.0, 0.0, 1.0),
-                        alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                        color=colors.black + (0.4,), edgecolors=colors.black,
+                        alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
                     # Plot stars' average birth positions
-                    if birth is not None:
-                        color = (1.0, 0.0, 0.0) if star.outlier else (0.0, 0.0, 1.0)
+                    if birth_index[y] is not None:
+                        color = colors.red[6] if star.outlier else colors.blue[6]
                         ax0.scatter(
-                            -self.series.time[birth[y]], self.position_ξηζ[birth[y],y],
-                            color=color + (0.8,), edgecolors=color + (1.0,),
-                            alpha=None, s=6, marker='o', linewidths=0.5, zorder=0.2)
+                            -self.series.time[birth_index[y]],
+                            self.position_ξηζ[birth_index[y],y],
+                            color=color + (0.4,), edgecolors=color + (1.0,),
+                            alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2)
 
-                # Plot average model star's trajectory
+                # Plot the average model star's trajectory
                 if self.series.from_model:
                     average_model_star_position_ξηζ = self.average_model_star.position_ξηζ[:,y]
                     ax0.plot(
                         self.average_model_star.time,
                         average_model_star_position_ξηζ,
-                        color=(0.0, 1.0, 0.0), alpha=0.8, linestyle=linestyle,
+                        color=colors.green[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', zorder=0.3)
 
-                    # Plot average model star's birth and current positions
+                    # Plot the average model star's birth and current positions
                     for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                         ax0.scatter(
                             np.array([self.average_model_star.time[t]]),
                             np.array([average_model_star_position_ξηζ[x]]),
-                            color=(0.0, 1.0, 0.0, 0.8), edgecolors=(0.0, 1.0, 0.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.3)
-                            # s=6, marker=m, color=greens[y + 2], zorder=0.3)
+                            color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3)
 
                     # Plot model stars' trajectories
                     model_star_position_ξηζ = np.mean(
                         [star.position_ξηζ[:,y] for star in self.model_stars], axis=0)
                     ax0.plot(
                         -self.model_stars[0].time[::-1], model_star_position_ξηζ,
-                        color=(0.0, 0.0, 1.0), alpha=0.8, linestyle=linestyle,
+                        color=colors.blue[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', zorder=0.2)
 
                     # Plot model stars' birth and current positions
@@ -1507,9 +1543,8 @@ class Output_Group():
                         ax0.scatter(
                             -np.array([self.model_stars[0].time[t]]),
                             np.array([model_star_position_ξηζ[x]]),
-                            color=(0.0, 0.0, 1.0, 0.8), edgecolors=(0.0, 0.0, 1.0, 1.0),
-                            alpha=None, s=size, marker=marker, linewidths=0.5, zorder=0.2)
-                            # s=6, marker=m, color=blues[y + 2], zorder=0.2)
+                            color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
+                            alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2)
 
         # Set title
         self.series.stop(
@@ -1529,8 +1564,8 @@ class Output_Group():
         if style == '2x2':
             legend = ax0.legend(loc=4, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
             legend.get_frame().set_alpha(None)
-            legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
-            legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+            legend.get_frame().set_facecolor(colors.white + (0.8,))
+            legend.get_frame().set_edgecolor(colors.black)
             legend.get_frame().set_linewidth(0.5)
 
         # Set labels
@@ -1580,7 +1615,7 @@ class Output_Group():
         """
 
         # Initialize figure
-        fig = plt.figure(figsize=(6.66, 3.33), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(6.66, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111, projection="mollweide")
 
         # Compute coordinates
@@ -1593,7 +1628,7 @@ class Output_Group():
 
         # Plot trajectories
         for star in range(len(self)):
-            color = '#2635ff' if not self[star].outlier else '#ff2634'
+            color = colors.blue[6] if not self[star].outlier else colors.red[6]
 
             # Identify discontinuties
             discontinuties = (
@@ -1618,14 +1653,14 @@ class Output_Group():
                     horizontalalignment='left', fontsize=6, zorder=0.2)
 
         # Plot current-day positions
-        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color='#000000', zorder=0.3)
+        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color=colors.black, zorder=0.3)
 
         # Show proper motion arrows
         for star in self.series.data:
             ax.arrow(
                 star.position.values[2] - (2 * np.pi if star.position.values[2] > np.pi else 0.0),
                 star.position.values[1], -star.velocity.values[2]/4, -star.velocity.values[1]/4,
-                head_width=0.03, head_length=0.03, color='#000000', zorder=0.4)
+                head_width=0.03, head_length=0.03, color=colors.black, zorder=0.4)
 
         # Set title
         self.series.stop(
@@ -1707,13 +1742,13 @@ class Output_Group():
             age = round(step * self.series.timestep, 2)
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111)
 
         # Plot xyz positions
         ax.scatter(
             [star.position_xyz[step, i] for star in self.sample],
-            [star.position_xyz[step, j] for star in self.sample], marker='o', color='0.0')
+            [star.position_xyz[step, j] for star in self.sample], marker='o', color=colors.black)
 
         # Plot error bars
         self.series.stop(
@@ -1727,12 +1762,14 @@ class Output_Group():
                 # Horizontal error bars
                 ax.plot(
                     (position[i] - error[i], position[i] + error[i]),
-                    (position[j], position[j]), color='0.1', linewidth=0.7)
+                    (position[j], position[j]),
+                    color=colors.grey[1], linewidth=0.5)
 
                 # Vertical error bars
                 ax.plot(
                     (position[i], position[i]),
-                    (position[j] - error[j], position[j] + error[j]), color='0.1', linewidth=0.7)
+                    (position[j] - error[j], position[j] + error[j]),
+                    color=colors.grey[1], linewidth=0.5)
 
         # Show star labels
         self.series.stop(
@@ -1751,7 +1788,8 @@ class Output_Group():
             for branch in self.mst[step]:
                 ax.plot(
                     (branch.start.position[step, i], branch.end.position[step, i]),
-                    (branch.start.position[step, j], branch.end.position[step, j]), color='#0000ff')
+                    (branch.start.position[step, j], branch.end.position[step, j]),
+                    color=colors.blue[6])
 
         # Set title
         self.series.stop(
@@ -1818,7 +1856,7 @@ class Output_Group():
             age = round(step * self.series.timestep.value, 2)
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111, projection='3d')
 
         # Plot xyz relative positions
@@ -1826,7 +1864,7 @@ class Output_Group():
             [star.relative_position_xyz[step, 0] for star in self.sample],
             [star.relative_position_xyz[step, 1] for star in self.sample],
             [star.relative_position_xyz[step, 2] for star in self.sample],
-            marker='o', color='0.0')
+            marker='o', color=colors.black)
 
         # Plot error bars
         self.series.stop(
@@ -1841,17 +1879,19 @@ class Output_Group():
                 ax.plot(
                     (position[0] - error[0], position[0] + error[0]),
                     (position[1], position[1]), (position[2], position[2]),
-                    color='0.1', linewidth=0.7)
+                    color=colors.grey[1], linewidth=0.5)
 
                 # Y axis error bars
                 ax.plot(
                     (position[0], position[0]), (position[1] - error[1], position[1] + error[1]),
-                    (position[2], position[2]), color='0.1', linewidth=0.7)
+                    (position[2], position[2]),
+                    color=colors.grey[1], linewidth=0.5)
 
                 # Z axis error bars
                 ax.plot(
                     (position[0], position[0]), (position[1], position[1]),
-                    (position[2] - error[2], position[2] + error[2]), color='0.1', linewidth=0.7)
+                    (position[2] - error[2], position[2] + error[2]),
+                    color=colors.grey[1], linewidth=0.5)
 
         # Show star labels
         self.series.stop(
@@ -1876,7 +1916,8 @@ class Output_Group():
                     branch.start.relative_position_xyz[step, 1],
                     branch.end.relative_position_xyz[step, 1]), (
                     branch.start.relative_position_xyz[step, 2],
-                    branch.end.relative_position_xyz[step, 2]), color='#0000ff')
+                    branch.end.relative_position_xyz[step, 2]),
+                    color=colors.blue[6])
 
         # Set title
         self.series.stop(
@@ -1911,7 +1952,7 @@ class Output_Group():
             len(ages) != 3, 'ValueError', "'ages' must be have a length of 3 ({} given).", ages)
 
         # Initialize figure
-        self.fig = plt.figure(figsize=(9, 11.15), facecolor='w', dpi=300)
+        self.fig = plt.figure(figsize=(9, 11.15), facecolor=colors.white, dpi=300)
 
         # Create axes
         row1 = 0.795
@@ -2013,29 +2054,29 @@ class Output_Group():
         ax.scatter(
             [star.relative_position_xyz[step, i] for star in self.sample],
             [star.relative_position_xyz[step, j] for star in self.sample],
-            marker='o', s=8, color='#000000')
+            color=colors.black, s=8, marker='o')
 
         # Plot outliers' xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, i] for star in self.outliers],
             [star.relative_position_xyz[step, j] for star in self.outliers],
-            marker='o', s=8, color='#ff2634')
+            color=colors.red[6], s=8, marker='o')
 
         # Error bars
         for star in self:
             position = star.relative_position_xyz[step]
             error = star.position_xyz_error[step]
-            color = 'k' if not star.outlier else '#ff2634'
+            color = colors.black if not star.outlier else colors.red[6]
 
             # Horizontal error bars
             ax.plot(
                 (position[i] - error[i], position[i] + error[i]),
-                (position[j], position[j]), color=color, linewidth=0.7)
+                (position[j], position[j]), color=color, linewidth=0.5)
 
             # Vertical error bars
             ax.plot(
                 (position[i], position[i]),
-                (position[j] - error[j], position[j] + error[j]), color=color, linewidth=0.7)
+                (position[j] - error[j], position[j] + error[j]), color=color, linewidth=0.5)
 
         # Set labels
         ax.set_xlabel(f'${keys[i].upper()}$ (pc)')
@@ -2092,14 +2133,14 @@ class Output_Group():
             [star.relative_position_xyz[step, 0] for star in self.sample],
             [star.relative_position_xyz[step, 1] for star in self.sample],
             [star.relative_position_xyz[step, 2] for star in self.sample],
-            marker='o', color='0.0')
+            color=colors.black, marker='o')
 
         # Plot outliers' xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, 0] for star in self.outliers],
             [star.relative_position_xyz[step, 1] for star in self.outliers],
             [star.relative_position_xyz[step, 2] for star in self.outliers],
-            marker='o', color='#ff2634')
+            color=colors.red[6], marker='o')
 
         # Create branches
         for branch in self.mst[step]:
@@ -2109,7 +2150,8 @@ class Output_Group():
                 branch.start.relative_position_xyz[step, 1],
                 branch.end.relative_position_xyz[step, 1]), (
                 branch.start.relative_position_xyz[step, 2],
-                branch.end.relative_position_xyz[step, 2]), color='#2635ff')
+                branch.end.relative_position_xyz[step, 2]),
+                colors.blue[6])
 
         # Set labels
         ax.set_xlabel('$X$ (pc)')
@@ -2190,13 +2232,13 @@ class Output_Group():
             age = round(step * self.series.timestep, 2)
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111)
 
         # Plot xyz positions
         ax.scatter(
             [star.position_xyz[step, i] for star in self.sample],
-            [star.velocity_xyz[step, j] for star in self.sample], marker='o', color='0.0')
+            [star.velocity_xyz[step, j] for star in self.sample], marker='o', color=colors.black)
 
         # Plot error bars
         self.series.stop(
@@ -2213,13 +2255,13 @@ class Output_Group():
                 ax.plot(
                     (position[i] - position_error[i], position[i] + position_error[i]),
                     (velocity[j], velocity[j]),
-                    color='0.1', linewidth=0.7)
+                    color=colors.grey[1], linewidth=0.5)
 
                 # Velocity (vertical) error bars
                 ax.plot(
                     (position[i], position[i]),
                     (velocity[j] - velocity_error[j], velocity[j] + velocity_error[j]),
-                    color='0.1', linewidth=0.7)
+                    color=colors.grey[1], linewidth=0.5)
 
         # Show star labels
         self.series.stop(
@@ -2259,7 +2301,7 @@ class Output_Group():
         """
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.345, 3.401), facecolor='w', dpi=300)
+        fig = plt.figure(figsize=(3.345, 3.401), facecolor=colors.white, dpi=300)
         ax = fig.add_axes([0.104, 0.096, 0.895, 0.880])
 
         # Retrieve ages
@@ -2278,14 +2320,14 @@ class Output_Group():
         gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
         i, = (gauss > 0.001).nonzero()
         ax.plot(
-            x[i], gauss[i], color=blues[3], zorder=0.8,
-            label='$\\xi^\\prime$ variance', linewidth=1.0)
+            x[i], gauss[i], label='$\\xi^\\prime$ variance',
+            color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8)
         ax.hist(
             ages, bins=np.linspace(12, 32, 81), density=True,
-            color=blues[3], alpha=0.3, zorder=0.8)
+            color=colors.cyan[6], alpha=0.2, zorder=0.8)
         ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=blues[3],
-            linestyle='--', zorder=0.8, linewidth=1.0)
+            μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
+            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8)
 
         # Plot corrected histogram and gaussian curve
         x = np.linspace(8, 36, 1000)
@@ -2294,18 +2336,18 @@ class Output_Group():
         gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
         i, = (gauss > 0.001).nonzero()
         ax.plot(
-            x[i], gauss[i], color=blues[2], zorder=0.9,
-            label='Corrected $\\xi^\\prime$ variance', linewidth=1.0)
+            x[i], gauss[i], label='Corrected $\\xi^\\prime$ variance',
+            color=colors.lime[5], alpha=1.0, linewidth=1.0, zorder=0.9)
         ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
         ax.hist(
             ages, bins=np.linspace(12, 32, 81), density=True,
-            color=blues[2], alpha=0.3, zorder=0.9)
+            color=colors.lime[6], alpha=0.3, zorder=0.9)
         ax.fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=blues[2],
-            alpha=0.3, linewidth=0., zorder=0.3)
+            x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
+            alpha=0.2, linewidth=0., zorder=0.3)
         ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=blues[2],
-            linestyle='--', zorder=0.9, linewidth=1.0)
+            μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
+            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9)
 
         # Plot gaussian curve from Miret-Roig et al. (2020)
         μ = 18.5
@@ -2317,14 +2359,14 @@ class Output_Group():
         gauss = np.concatenate((gauss1, gauss2))
         i, = (gauss > 0.001).nonzero()
         ax.plot(
-            x[i], gauss[i], color=greens[3], zorder=0.75,
-            label='Miret-Roig et al. (2020)', linewidth=1.0)
+            x[i], gauss[i], label='Miret-Roig et al. (2020)',
+            color=colors.blue[6], alpha=1.0, linewidth=1.0, zorder=0.75)
         ax.fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=greens[1],
-            alpha=0.3, linewidth=0., zorder=0.7)
+            x[i], np.zeros_like(x[i]), gauss[i], color=colors.blue[6],
+            alpha=0.2, linewidth=0., zorder=0.7)
         ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=greens[1],
-            linestyle='--', zorder=0.75, linewidth=1.0)
+            μ, ymin=0.0, ymax=np.max(gauss), color=colors.blue[6],
+            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.75)
 
         # Plot gaussian curve from Crundall et al. (2019)
         μ = 18.3
@@ -2336,20 +2378,20 @@ class Output_Group():
         gauss = np.concatenate((gauss1, gauss2))
         i, = (gauss > 0.001).nonzero()
         ax.plot(
-            x[i], gauss[i], color=greens[2], zorder=0.6,
-            label='Crundall et al. (2019)', linewidth=1.0)
+            x[i], gauss[i], label='Crundall et al. (2019)',
+            color=colors.azure[6], alpha=1.0, linewidth=1.0, zorder=0.6)
         ax.fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=greens[2],
-            alpha=0.3, linewidth=0., zorder=0.6)
+            x[i], np.zeros_like(x[i]), gauss[i], color=colors.azure[6],
+            linewidth=0.0, alpha=0.2, zorder=0.6)
         ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=greens[2],
-            linestyle='--', zorder=0.6, linewidth=1.0)
+            μ, ymin=0.0, ymax=np.max(gauss), color=colors.azure[6],
+            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.6)
 
         # Show a shaded area for LDB and isochrone ages
         LDB_range = np.array([20, 26])
         ax.fill_between(
-            LDB_range, 0, 1, color='0.5', alpha=0.1,  linewidth=0.,
-            transform=ax.get_xaxis_transform(), zorder=0.5)
+            LDB_range, 0, 1, transform=ax.get_xaxis_transform(),
+            color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1)
 
         # Set title
         self.series.stop(
@@ -2364,8 +2406,8 @@ class Output_Group():
         # Set legend
         legend = ax.legend(loc=1, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
         legend.get_frame().set_alpha(None)
-        legend.get_frame().set_facecolor((1.0, 1.0, 1.0, 0.8))
-        legend.get_frame().set_edgecolor((0.0, 0.0, 0.0, 1.0))
+        legend.get_frame().set_facecolor(colors.white + (0.8,))
+        legend.get_frame().set_edgecolor(colors.black)
         legend.get_frame().set_linewidth(0.5)
 
         # Set labels
@@ -2443,7 +2485,7 @@ def create_histogram(
         "'age' must be greater than or equal to 0.0 ({} given).",type(age))
 
     # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
     ax = fig.add_subplot(111)
 
     # Plot histogram
@@ -2541,7 +2583,7 @@ def create_color_mesh(
     stop(type(method) != str, 'TypeError', "'method' must a string ({} given).", type(method))
 
     # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
     ax = fig.add_subplot(111)
 
     # Plot mesh
@@ -2584,7 +2626,7 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
     """
 
     # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
     ax = fig.add_subplot(111)
 
     # Plot + 0.0 km/s points
@@ -2598,7 +2640,7 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         yerr=np.array([
             0.376, 0.517, 0.850, 1.062, 1.204, 1.383,
             1.534, 1.612, 1.544, 1.579, 1.576, 1.538, 1.504]),
-        fmt='o', color='0.0', ms=6.0, elinewidth=1.0,
+        fmt='o', color=colors.black, ms=6.0, elinewidth=1.0,
         label='$\\Delta v_{r,grav}$ = 0,0 km/s')
 
     # Plot + 0.5 km/s points
@@ -2612,7 +2654,7 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         yerr=np.array([
             0.376, 0.425, 0.641, 0.773, 0.992, 1.136,
             1.129, 1.251, 1.338, 1.331, 1.272, 1.345, 1.323]),
-        fmt='D', color='0.33', ms=6.0, elinewidth=1.0,
+        fmt='D', color=colors.grey[5], ms=6.0, elinewidth=1.0,
         label='$\\Delta v_{r,grav}$ = 0,5 km/s')
 
     # Plot + 1.0 km/s points
@@ -2626,11 +2668,11 @@ def plot_age_error(title=False, forced=False, default=False, cancel=False):
         yerr=np.array([
             0.379, 0.453, 0.583, 0.685, 0.864, 0.930,
             0.951, 1.032, 1.147, 1.035, 1.142, 1.187, 1.149]),
-        fmt='^', color='0.67', ms=6.0, elinewidth=1.0,
+        fmt='^', color=colors.grey[13], ms=6.0, elinewidth=1.0,
         label='$\\Delta v_{r,grav}$ = 1,0 km/s')
 
     # Plot β Pictoris typical error line
-    ax.axvline(x=1.0105, ymin=0.0, ymax = 25.0, linewidth=1.0, color='#000000', ls='dashed')
+    ax.axvline(x=1.0105, ymin=0.0, ymax = 25.0, linewidth=1.0, color=colors.black, ls='dashed')
     ax.text(
         1.15, 6.95, 'Erreur de mesure\nsur $v_r$ typique des\nmembres de $\\beta\\,$PMG',
         horizontalalignment='left', fontsize=14)
@@ -2674,7 +2716,7 @@ def create_minimum_error_plots(title=False, forced=False, default=False, cancel=
     """
 
     # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor='w', dpi=300)
+    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
     ax = fig.add_subplot(111)
 
     # Plot ages as a function of errors
@@ -2685,7 +2727,7 @@ def create_minimum_error_plots(title=False, forced=False, default=False, cancel=
         24.001, 23.966, 23.901, 23.74, 23.525, 22.224, 20.301, 18.113, 15.977,
         11.293, 7.9950, 5.8030, 4.358, 3.3640, 2.6650, 2.2040, 1.7560, 1.2570,
         0.9330, 0.7350, 0.5800, 0.488, 0.3460, 0.2620, 0.1920, 0.1600, 0.1340])
-    ax.plot(errors, ages, '.-', color='0.0', linewidth=1.0)
+    ax.plot(errors, ages, '.-', color=colors.black, linewidth=1.0)
 
     # Set title
     stop(

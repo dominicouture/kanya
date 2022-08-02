@@ -34,9 +34,9 @@ file_path.value = None
 number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-# number_of_steps.value = 500
+number_of_steps.value = 500
 # number_of_steps.value = 250
-number_of_steps.value = 172
+# number_of_steps.value = 172
 
 # Number of stars in each simulated group of stars (integer, > 0)
 number_of_stars.value = 26

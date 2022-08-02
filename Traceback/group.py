@@ -77,10 +77,8 @@ class Group(list, Output_Group):
             are created, positions and velocities are scrambled based on measurement errors.
         """
 
-        # Radial velocity shift due to gravitational redshift and convective blueshift
-        for star in self.series.data:
-
-            # Observables conversion into equatorial spherical coordinates
+        # Observables conversion into equatorial spherical coordinates
+        for star in self.series.data.valid:
             if self.series.data.data.system.name == 'observables':
 
                 # Compute equatorial rδα position and velocity
@@ -92,7 +90,7 @@ class Group(list, Output_Group):
                     *star.position.errors, *star.velocity.errors)
 
                 # Apply radial velocity shift and its error
-                velocity_rδα -= np.array([star.rv_shift.value, 0., 0.])
+                velocity_rδα -= np.array([star.rv_shift.value, 0.0, 0.0])
                 velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
                 # Compute equatorial xyz position and velocity
@@ -101,7 +99,7 @@ class Group(list, Output_Group):
                 velocity_xyz, velocity_xyz_error = equatorial_rvμδμα_galactic_uvw(
                     *position_rδα, *velocity_rδα, *position_rδα_error, *velocity_rδα_error)
 
-            # From cartesian coordinates
+            # Cartesian coordinates conversion into equatorial spherical coordinates
             if self.series.data.data.system.name == 'cartesian':
 
                 # Compute equatorial rδα position and velocity
@@ -112,7 +110,7 @@ class Group(list, Output_Group):
                     *star.position.errors, *star.velocity.errors)
 
                 # Apply radial velocity shift and its error
-                velocity_rδα -= np.array([star.rv_shift.value, 0., 0.])
+                velocity_rδα -= np.array([star.rv_shift.value, 0.0, 0.0])
                 velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
                 # Compute equatorial xyz position and velocity
@@ -120,7 +118,7 @@ class Group(list, Output_Group):
                 velocity_xyz, velocity_xyz_error = equatorial_rvμδμα_galactic_uvw(
                     *position_rδα, *velocity_rδα, *position_rδα_error, *velocity_rδα_error)
 
-            # Create star
+            # Create a star
             self.append(self.Star(
                 self, name=star.name, backward=True,
                 velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
@@ -176,8 +174,8 @@ class Group(list, Output_Group):
                 *model_star.position_xyz[-1], *model_star.velocity_xyz[-1])[0]
 
             # Apply radial velocity shift and its error
-            # velocity_rδα += np.array([star.rv_shift.value, 0., 0.])
-            # velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
+            velocity_rδα += np.array([star.rv_shift.value, 0.0, 0.0])
+            velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
 
             # Velocity and position conversion to observables
             position_obs, velocity_obs = position_rδα_obs(*position_rδα, *velocity_rδα)[:2]
@@ -185,17 +183,20 @@ class Group(list, Output_Group):
             # Observables conversion back into equatorial spherical coordinates
             # Velocity and position scrambling based on actual measurement errors
             if self.series.data_errors:
-                star_errors = star - (star // len(self.series.data)) * len(self.series.data)
+                star_errors = star - (
+                    star // len(self.series.data.valid)) * len(self.series.data.valid)
                 # np.set_printoptions(precision=3)
                 # if self.number == 0:
                 #     print(
-                #         self.series.data[star_errors].position.errors, '    ',
-                #         self.series.data[star_errors].velocity.errors)
+                #         self.series.data.valid[star_errors].position.errors, '    ',
+                #         self.series.data.valid[star_errors].velocity.errors)
                 position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
-                    *np.random.normal(position_obs, self.series.data[star_errors].position.errors),
-                    *np.random.normal(velocity_obs, self.series.data[star_errors].velocity.errors),
-                    *self.series.data[star_errors].position.errors,
-                    *self.series.data[star_errors].velocity.errors)
+                    *np.random.normal
+                        (position_obs, self.series.data.valid[star_errors].position.errors),
+                    *np.random.normal(
+                        velocity_obs, self.series.data.valid[star_errors].velocity.errors),
+                    *self.series.data.valid[star_errors].position.errors,
+                    *self.series.data.valid[star_errors].velocity.errors)
 
             # Velocity and position scrambling based on average measurement errors
             else:
