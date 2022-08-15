@@ -24,6 +24,7 @@ collection.create()
 
 # Output creation
 for series in collection:
+    series.create_metrics_table(show=True, forced=True)
     series.create_covariances_xyz_plot(forced=True)
     series.create_covariances_ξηζ_plot(forced=True) # Valid
     series.create_covariances_xyz_plot(robust=True, forced=True)
@@ -40,11 +41,11 @@ for series in collection:
     series.create_ξηζ_mst_plot(forced=True)
     series.create_covariances_mad_ξηζ_plot(forced=True)
     series.create_age_distribution(forced=True)
-    series.show_metrics() # Valid
 
     # Group output
     for group in series:
         if group.number == 0:
+            group.create_kinematics_table(show=True, save=False)
             group.trajectory_xyz(forced=True, metric='covariances_xyz', index=0)
             group.trajectory_ξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
             group.trajectory_time_xyz('2x2', forced=True, metric='covariances_xyz')

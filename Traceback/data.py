@@ -162,14 +162,14 @@ class Data(list):
         self.variables = {**self.value_variables, **self.error_variables}
 
         # Valid labels (strings, numerial, all)
-        self.valid_labels_str = ('name', 'group', 'id', 'spectral_type')
+        self.valid_labels_str = ('name', 'group', 'id', 'sample', 'spectral_type')
         self.valid_labels_num = tuple(self.variables.keys()) + (
-            'mass', 'radius', 'rv_shift', 'rv_shift_error')
+            'mass', 'mass_error', 'radius', 'radius_error', 'rv_shift', 'rv_shift_error')
         self.valid_labels = self.valid_labels_str + self.valid_labels_num
 
         # Checks for the presence of a header in self.table
         self.header = np.vectorize(
-            lambda label: label.replace('.', '').replace(',', '').isdigit())(self.table[0]).any()
+            lambda label: label.replace('.', '').replace(',', '').replace('-', '').isdigit())(self.table[0]).any()
         if self.from_CSV:
             self.series.stop(
                 self.header, 'ValueError',
@@ -179,7 +179,7 @@ class Data(list):
 
         # Checks for the presence of a unit header in self.table
         self.unit_header = not np.vectorize(
-            lambda unit: unit.replace('.', '').replace(',', '').isdigit())(self.table[1]).any()
+            lambda unit: unit.replace('.', '').replace(',', '').replace('-', '').isdigit())(self.table[1]).any()
         # !!! Autre vérification pour voir si toutes les valeurs
         # non nulles peuvent être transformée en unit !!!
 
@@ -195,7 +195,7 @@ class Data(list):
                 self.data.units, list(systems.keys()))
 
             # Usual units of system retrieval
-            # !!! Should also include stellar mass and radius units !!!
+            # !!! Should also include stellar mass and radius (and errors) units !!!
             self.data.units = {
                 **{variable.label: variable.usual_unit.label
                     for variable in systems[self.data.units.lower()].position},
@@ -206,7 +206,7 @@ class Data(list):
         elif type(self.data.units) == dict:
 
             # Check if all labels can be matched to a data.system variable
-            # !!! The match should also include stellar mass and radius units !!!
+            # !!! The match should also include stellar mass and radius (and errors) units !!!
             self.data.units = {
                 self.Column.identify(self.Column, self, label):
                     self.data.units[label] for label in self.data.units.keys()}
@@ -457,21 +457,24 @@ class Data(list):
         # Basic permutations including uppercase and lowercase latin letters
         from string import ascii_uppercase
         basic_permutations = {
-            **{letter: letter.lower() for letter in ascii_uppercase}, '-': ' ', '_': ' '}
+            **{letter: letter.lower() for letter in ascii_uppercase}, '-': '_', ' ': '_'}
 
         # Advanced label permutations
         advanced_permutations = {
-            ' ': '',
+            '_': '',
             '(s)': '',
             'none': '',
             'fixed': '',
             'source': '',
             'new': '',
+            'final': '',
             'name': 'n',
+            'designation': 'n',
             'series': 'g',
             'movinggroup': 'g',
             'kinematicgroup': 'g',
             'association': 'g',
+            'sample': 's',
             'sptn': 't',
             'spt': 't',
             'spectraltype': 't',
@@ -504,20 +507,23 @@ class Data(list):
             'err': 'Δ'}
 
         # Label matches
-        # !!! Add mass, radius and spectral type error !!!
+        # !!! Add spectral type errors !!!
         matches = {
             'n': 'name',
             'g': 'group',
+            's': 'sample',
             't': 'spectral_type',
             'm': 'mass',
+            'Δm': 'mass_error',
             'r': 'radius',
+            'Δr': 'radius_error',
             'drv': 'rv_shift',
             'Δdrv': 'rv_shift_error'}
 
         def identify(self, data, label, missing=False):
-            """ Identifies a 'label' and returns a matching wanted label or, including coordinates
-                from 'data.system' or a reformatted label, if no match is found. If 'missing' is
-                True, an 'Δ' character is added.
+            """ Identifies a 'label' and returns a matching label or, including coordinates from
+                'data.system' or a reformatted label, if no match is found. If 'missing' is True,
+                an 'Δ' character is added.
             """
 
             # Check for blank labels
@@ -530,7 +536,7 @@ class Data(list):
             label = label.strip()
             old_label = label
 
-            # Advanced permutations to match a wanted label
+            # Advanced permutations to matching label
             for old, new in self.advanced_permutations.items():
                 label = label.replace(old, new)
 
@@ -596,9 +602,13 @@ class Data(list):
         for row in self.rows:
             self.append(self.Row(self, row))
 
-        # Create valid and invalid lists
-        self.valid = list(filter(lambda row: row.valid, self))
-        self.invalid = list(filter(lambda row: not row.valid, self))
+        # Create input, error, core and extended samples
+        self.input_sample = list(filter(lambda row: row.valid, self))
+        self.error_sample = list(filter(lambda row: not row.valid, self))
+        self.core_sample = list(filter(
+            lambda row: row.sample == 'core_sample', self.input_sample))
+        self.extended_sample = list(filter(
+            lambda row: row.sample == 'extended_sample', self.input_sample))
 
     class Row:
         """ Contains the data for an individual row (star), including name, type, id, position
@@ -667,18 +677,24 @@ class Data(list):
                 self.values['id'].strip()
                 if 'id' in self.data.columns and self.values['id'].strip() != '' else str(self.row))
 
+            # Final sample column
+            self.sample = (
+                self.values['sample'].strip()
+                if 'sample' in self.data.columns and self.values['sample'].strip() != ''
+                else 'core_sample')
+
             # Mass column
             self.mass = (
                 Quantity(self.values['mass'], self.data.columns['mass'].unit)
-                if 'mass' in self.data.columns and self.values['mass'] != 0.0 else None)
+                if 'mass' in self.data.columns and self.values['mass'] is not None else None)
 
             # Radius column
             self.radius = (
                 Quantity(self.values['radius'], self.data.columns['radius'].unit)
-                if 'radius' in self.data.columns and self.values['radius'] != 0.0 else None)
+                if 'radius' in self.data.columns and self.values['radius'] is not None else None)
 
-            # Radial velocity shift from a column
-            if 'rv_shift' in self.data.columns:
+            # Radial velocity shift column
+            if 'rv_shift' in self.data.columns and self.values['rv_shift'] is not None:
                 default_unit = Unit('km/s')
                 unit = self.data.columns['rv_shift'].unit
 
@@ -691,11 +707,12 @@ class Data(list):
                     error_unit = None
 
                 # Unit conversion
-                self.rv_shift = Quantity(
-                    self.values['rv_shift'],
-                    default_unit if unit is None else unit,
-                    0.0 if error is None else error,
-                    default_unit if error_unit is None else error_unit).to()
+                if self.values['rv_shift'] is not None:
+                    self.rv_shift = Quantity(
+                        self.values['rv_shift'],
+                        default_unit if unit is None else unit,
+                        0.0 if error is None else error,
+                        default_unit if error_unit is None else error_unit).to()
 
             # Radial velocity shift from mass and radius columns
             elif self.mass is not None and self.radius is not None:
@@ -709,7 +726,7 @@ class Data(list):
                 self.spectral_type, rv_shift = self.data.find_rv_shift(self.spectral_type)
                 self.rv_shift = Quantity(rv_shift, 'km/s', 0.0).to()
 
-            # Uniform radial velocity shift otherwise
+            # Configuration radial velocity shift otherwise
             else:
                  self.rv_shift = self.data.series.rv_shift
 
@@ -729,5 +746,5 @@ class Data(list):
                 [self.data.columns[label].unit
                     for label in self.data.velocity_error_variables.keys()]).to()
 
-            # Check for non numerical values in position and velocity
+            # Check for non-numerical values in position and velocity
             self.valid = (~np.isnan(self.position.values) & ~np.isnan(self.velocity.values)).all()

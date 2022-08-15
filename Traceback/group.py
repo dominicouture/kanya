@@ -58,7 +58,7 @@ class Group(list, Output_Group):
             self.get_covariances_robust()
 
         # Compute sklearn covariances metrics
-        if True:
+        if False:
             self.get_covariances_sklearn()
 
         # Compute median absolute deviation metrics
@@ -78,7 +78,7 @@ class Group(list, Output_Group):
         """
 
         # Observables conversion into equatorial spherical coordinates
-        for star in self.series.data.valid:
+        for star in self.series.data.core_sample:
             if self.series.data.data.system.name == 'observables':
 
                 # Compute equatorial rδα position and velocity
@@ -184,19 +184,19 @@ class Group(list, Output_Group):
             # Velocity and position scrambling based on actual measurement errors
             if self.series.data_errors:
                 star_errors = star - (
-                    star // len(self.series.data.valid)) * len(self.series.data.valid)
+                    star // len(self.series.data.input_sample)) * len(self.series.data.input_sample)
                 # np.set_printoptions(precision=3)
                 # if self.number == 0:
                 #     print(
-                #         self.series.data.valid[star_errors].position.errors, '    ',
-                #         self.series.data.valid[star_errors].velocity.errors)
+                #         self.series.data.input_sample[star_errors].position.errors, '    ',
+                #         self.series.data.input_sample[star_errors].velocity.errors)
                 position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
                     *np.random.normal
-                        (position_obs, self.series.data.valid[star_errors].position.errors),
+                        (position_obs, self.series.data.input_sample[star_errors].position.errors),
                     *np.random.normal(
-                        velocity_obs, self.series.data.valid[star_errors].velocity.errors),
-                    *self.series.data.valid[star_errors].position.errors,
-                    *self.series.data.valid[star_errors].velocity.errors)
+                        velocity_obs, self.series.data.input_sample[star_errors].velocity.errors),
+                    *self.series.data.input_sample[star_errors].position.errors,
+                    *self.series.data.input_sample[star_errors].velocity.errors)
 
             # Velocity and position scrambling based on average measurement errors
             else:

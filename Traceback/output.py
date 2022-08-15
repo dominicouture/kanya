@@ -11,8 +11,8 @@ from matplotlib import pyplot as plt, lines, ticker as tkr
 from mpl_toolkits.mplot3d import Axes3D
 from colorsys import hls_to_rgb
 from scipy.interpolate import griddata
-from scipy.stats import linregress
 from Traceback.collection import *
+from Traceback.coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -51,42 +51,16 @@ class colors():
     # Metric colors
     metric = (green[3], green[6], green[9], green[12], azure[3], azure[6], azure[9], azure[12])
 
-def save_figure(name, file_path=None, tight=True, forced=False, default=False, cancel=False):
+def choose(
+        name, extension, save, *save_args, file_path=None,
+        forced=False, default=False, cancel=False):
     """ Checks whether a path already exists and asks for user input if it does. The base path
         is assumed to be the output directory. Also, if the path does not have an extension, a
-        '.pdf' extension is added.
+        an extension is added.
     """
 
-    def save(file_path, tight):
-        """ Saves figure with or without tight layout and some padding. """
-
-        # Check 'tight' argument
-        stop(
-            type(forced) != bool, 'TypeError',
-            "'forced' must be a boolean ({} given).", type(forced))
-
-        # Save figure
-        if tight:
-            plt.savefig(file_path, bbox_inches='tight', pad_inches=0.01)
-        else:
-            plt.savefig(file_path)
-
-    # file_path parameter
-    file_path = file_path if file_path is not None else output(create=True) + '/'
-
-    # Check if file_path parameter is a string, which must be done before the directory call
-    stop(
-        type(file_path) != str, 'TypeError',
-        "'file_path' must be a string ({} given).", type(file_path))
-
-    # file_path redefined as the absolute path, default name and directory creation
-    file_path = path.join(
-        directory(output(), path.dirname(file_path), 'file_path', create=True),
-        path.basename(file_path) if path.basename(file_path) != '' else f'{name}.pdf')
-
-    # Check if there's an extension and add a '.pdf' extension, if needed
-    if path.splitext(file_path)[1] == '':
-        file_path += '.pdf'
+    # Get file path
+    file_path = get_file_path(name, extension, file_path=file_path)
 
     # Check if a file already exists
     if path.exists(file_path):
@@ -127,7 +101,7 @@ def save_figure(name, file_path=None, tight=True, forced=False, default=False, c
             if default or choice in ('k', 'keep'):
                 from Traceback.tools import default_name
                 file_path = default_name(file_path)
-                save(file_path, tight)
+                save(file_path, *save_args)
 
                 # Logging
                 log("'{}': file name changed and file saved at '{}'.", name, file_path)
@@ -136,20 +110,184 @@ def save_figure(name, file_path=None, tight=True, forced=False, default=False, c
         if forced or choice in ('y', 'yes'):
             from os import remove
             remove(file_path)
-            save(file_path, tight)
+            save(file_path, *save_args)
 
             # Logging
             log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
 
     # Save figure
     else:
-        save(file_path, tight)
+        save(file_path, *save_args)
 
         # Logging
         log("'{}': file saved at '{}'.", name, file_path)
 
+def get_file_path(name, extension, file_path=None):
+    """ Returns a proper file path given a name, an extension and, optionnally, a filepath. """
+
+    # file_path parameter
+    file_path = file_path if file_path is not None else output(create=True) + '/'
+
+    # Check if file_path parameter is a string, which must be done before the directory call
+    stop(
+        type(file_path) != str, 'TypeError',
+        "'file_path' must be a string ({} given).", type(file_path))
+
+    # file_path redefined as the absolute path, default name and directory creation
+    file_path = path.join(
+        directory(output(), path.dirname(file_path), 'file_path', create=True),
+        path.basename(file_path) if path.basename(file_path) != '' else f'{name}.{extension}')
+
+    # Check if there's an extension and add an extension, if needed
+    if path.splitext(file_path)[1] == '':
+        file_path += f'.{extension}'
+
+    return file_path
+
+def save_figure(
+        name, file_path=None, extension='pdf', tight=True,
+        forced=False, default=False, cancel=False):
+    """ Saves figure with or without tight layout and some padding. """
+
+    # Check 'tight' argument
+    stop(
+        type(forced) != bool, 'TypeError',
+        "'tight' must be a boolean ({} given).", type(tight))
+
+    # Save figure
+    def save(file_path, tight):
+        if tight:
+            plt.savefig(file_path, bbox_inches='tight', pad_inches=0.01)
+        else:
+            plt.savefig(file_path)
+
+    # Choose behavior
+    choose(
+        name, extension, save, tight, file_path=file_path,
+        cancel=cancel, forced=forced, default=default)
+
+def save_table(
+        name, lines, header=None, file_path=None, extension='txt',
+        forced=False, default=False, cancel=False):
+    """ Saves a table to a CSV file for a given header and data. """
+
+    # Save table
+    def save(file_path, lines, header):
+        with open(file_path, 'w') as output_file:
+            if header is not None:
+                output_file.write(header + '\n')
+            output_file.writelines([line + '\n' for line in lines])
+
+    # Choose behavior
+    choose(
+        name, extension, save, lines, header, file_path=file_path,
+        cancel=cancel, forced=forced, default=default)
+
 class Output_Series():
     """ Output methods for a series of groups. """
+
+    def create_metrics_table(
+            self, save=False, show=False, machine=False,
+            forced=False, default=False, cancel=False):
+        """ Creates a table of the association size metrics. If 'save' if True, the table is
+            saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
+            machine-readable table, without units in the header and '.csv' extension instead of a
+            '.txt', is created. The machine-readable table also has an additional column 'status'
+            to indicate whether a metric is valid or rejected, whereas the non-machine-readable
+            table uses side heads.
+        """
+
+        # Returns a converted, rounded string for display
+        def convert(value):
+
+            return str(np.round(value, 2)).replace('[', '').replace(']', '')
+
+        # Creates a single metric line
+        def create_line(metric, valid=True):
+            valid = np.copy(metric.valid) if valid else np.invert(metric.valid)
+
+            # Create a machine-readable line
+            if machine:
+                return [
+                    f'{metric.name[i]},'
+                    f'{metric.latex_name[i]},'
+                    f"{'Valid' if metric.valid[i] else 'Rejected'},"
+                    f'{str(metric.age[i])},'
+                    f'{str(metric.age_int_error[i])},'
+                    f'{str(metric.age_ext_error[i])},'
+                    f'{str(metric.age_error[i])},'
+                    f'{str(metric.min_change[i])},'
+                    f'{str(metric.age_shift[i])}' for i in np.arange(valid.size)]
+
+            # Create a human-readable line
+            else:
+                return [
+                    f'{metric.name[i]:<50}'
+                    f'{convert(metric.age[i]):>15}'
+                    f'{convert(metric.age_int_error[i]):>20}'
+                    f'{convert(metric.age_ext_error[i]):>20}'
+                    f'{convert(metric.age_error[i]):>15}'
+                    f'{convert(metric.min_change[i]):>20}'
+                    f'{convert(metric.age_shift[i]):>15}'
+                        for i in filter(lambda i: valid[i], np.arange(valid.size))]
+
+        # Check save, show and machine
+        self.stop(
+            type(save) != bool, 'TypeError',
+            "'save' must be a boolean ({} given).", type(save))
+        self.stop(
+            type(show) != bool, 'TypeError',
+            "'show' must be a boolean ({} given).", type(show))
+        self.stop(
+            type(machine) != bool, 'TypeError',
+            "'machine' must be a boolean ({} given).", type(machine))
+
+        # Set precision and order
+        np.set_printoptions(precision=2)
+        order = np.argsort([i.order for i in self.metrics])
+
+        # Create header
+        if machine:
+            lines = [
+                'Metric,LaTeX_name,Status,Age,Jack-knife_error,'
+                'Measurement_error,Total_error,Minimum_change,Offset']
+
+            # Create lines
+            for i in order:
+                lines += create_line(self.metrics[i], valid=True)
+
+        # Create header
+        else:
+            lines = [
+                f"{'':-<155}",
+                f"{'Metric':<50}{'Age':>15}{'Jack-knife Error':>20}{'Measurement Error':>20}"
+                f"{'Total Error':>15}{'Minimum Change':>20}{'Offset':>15}",
+                f"{'[Myr]':>65}{'[Myr]':>20}{'[Myr]':>20}{'[Myr]':>15}{'[%]':>20}{'[Myr]':>15}",
+                f"{'':-<155}"]
+
+            # Create lines of valid association size metrics
+            lines.append('Valid\n' f"{'':-<155}")
+            for i in order:
+                lines += create_line(self.metrics[i], valid=True)
+            lines.append(f"{'':-<155}")
+
+            # Create lines of rejected association size metrics
+            lines.append('Rejected\n' f"{'':-<155}")
+            for i in order:
+                lines += create_line(self.metrics[i], valid=False)
+            lines.append(f"{'':-<155}")
+
+        # Show table
+        if show:
+            for line in lines:
+                print(line)
+
+        # Save table
+        if save:
+            save_table(
+                self.name, lines, file_path=f'metrics_{self.name}',
+                extension='csv' if machine else 'txt',
+                forced=forced, default=default, cancel=cancel)
 
     def initialize_figure_metric(self):
         """ Initializes a figure and an axis to plot association size metrics. """
@@ -197,7 +335,7 @@ class Output_Series():
             -self.time,
             metric.value.T[index] - metric.value_error.T[index],
             metric.value.T[index] + metric.value_error.T[index],
-            color=color, alpha=0.2, linewidth=0.0, zorder=zorder - 0.5)
+            color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5)
 
         # Plot secondary lines
         self.stop(
@@ -728,90 +866,87 @@ class Output_Series():
             tight=title, forced=forced, default=default, cancel=cancel)
         # plt.show()
 
-    def show_metrics(self):
-        """ Creates a table of all association size metrics of a series. """
-
-        def convert(value):
-            """ Returns a converted, rounded string for display. """
-
-            return str(np.round(value, 2)).replace('[', '').replace(']', '')
-
-        def create_line(metric, valid=True):
-            """ Creates a single metric (i) line. """
-
-            valid = np.copy(metric.valid) if valid else np.invert(metric.valid)
-
-            for i in filter(lambda i: valid[i], np.arange(valid.size)):
-                print(
-                    f'{metric.name[i]:<50}'
-                    f'{convert(metric.age[i]):>15}'
-                    f'{convert(metric.age_int_error[i]):>20}'
-                    f'{convert(metric.age_ext_error[i]):>20}'
-                    f'{convert(metric.age_error[i]):>15}'
-                    f'{convert(metric.min_change[i]):>20}'
-                    f'{convert(metric.age_shift[i]):>15}')
-
-        # Set precision and order
-        np.set_printoptions(precision=2)
-        order = np.argsort([i.order for i in self.metrics])
-
-        # Line list
-        lines = []
-
-        # Display header
-        print(f"{'':-<155}")
-        print(
-            f"{'Metric':<50}{'Age':>15}{'Jack-knife Error':>20}{'Measurement Error':>20}"
-            f"{'Total Error':>15}{'Minimum Change':>20}{'Offset':>15}")
-        print(f"{'[Myr]':>65}{'[Myr]':>20}{'[Myr]':>20}{'[Myr]':>15}{'[%]':>20}{'[Myr]':>15}")
-        print(f"{'':-<155}")
-
-        # Display errors on age of valid
-        print('Valid\n' f"{'':-<155}")
-        for i in order:
-            create_line(self.metrics[i], valid=True)
-        print(f"{'':-<155}")
-
-        # Display errors on age of invalid association size metrics
-        print('Rejected\n' f"{'':-<155}")
-        for i in order:
-            create_line(self.metrics[i], valid=False)
-        print(f"{'':-<155}")
-
-    def convert_to_LaTeX_table(self, table):
-        """ Converts a table or array to a LaTeX compatible format. """
-
-        for row in table:
-            print(' & '.join([str(i) for i in row], end='\n') + '\\\\')
-
-    def create_table_observations(self):
-        """ Creates a table of observations: right ascension, declination, proper motion in right
-            ascension and declination, parallax and radial velocity.
-        """
-
-        # Name and spectral type
-        for row in self.data:
-            line = [row.name, row.type]
-
-            # Radius and mass
-            # line += [row.radius.get_LaTeX(), row.mass.get_LaTeX()]
-
-            # Position and velocity
-            position = row.position.to(['mas', 'deg', 'deg'])
-            velocity = row.velocity.to(['km/s', 'mas/yr', 'mas/yr'])
-            line += [
-                position[2].convert_deg(True), position[1].convert_deg(False),
-                velocity[2].get_LaTeX(), velocity[1].get_LaTeX(),
-                position[0].get_LaTeX(), velocity[0].get_LaTeX()]
-
-            # line += [i.get_LaTeX() for i in (position[0], position[1], position[2])]
-            # line += [i.get_LaTeX() for i in (velocity[0], velocity[1], velocity[2])]
-
-            print(' & '.join([str(i) for i in line]) + '\\\\')
-
-
 class Output_Group():
     """ Output methods for a group of stars. """
+
+    def create_kinematics_table(
+            self, save=False, show=False, machine=False,
+            forced=False, default=False, cancel=False):
+        """ Creates a table of the 6D kinematics (XYZ Galactic positions and UVW space velocities)
+            at the current-day epoch of all members in the group. If 'save' if True, the table is
+            saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
+            machine-readable table, with separate columns for values and errors, no units in the
+            header and '.csv' extension instead of a '.txt', is created.
+        """
+
+        # Retrieve xyz positions and uvw velocities and convert units
+        def get_position_velocity_xyz(star):
+            position_xyz = Quantity(
+                star.position_xyz[0], 'pc', star.position_xyz_error)
+            velocity_xyz = Quantity(
+                star.velocity_xyz[0], 'pc/Myr', star.velocity_xyz_error).to('km/s')
+
+            return position_xyz, velocity_xyz
+
+        # Check save, show and machine
+        self.series.stop(
+            type(save) != bool, 'TypeError',
+            "'save' must be a boolean ({} given).", type(save))
+        self.series.stop(
+            type(show) != bool, 'TypeError',
+            "'show' must be a boolean ({} given).", type(show))
+        self.series.stop(
+            type(machine) != bool, 'TypeError',
+            "'machine' must be a boolean ({} given).", type(machine))
+
+        # Create header
+        if machine:
+            lines = ['Designation,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW']
+
+            # Create lines
+            for star in self:
+                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
+                lines.append(','.join([star.name] + [str(float(i)) for i in [
+                    position_xyz.values[0], position_xyz.errors[0],
+                    position_xyz.values[1], position_xyz.errors[1],
+                    position_xyz.values[2], position_xyz.errors[2],
+                    velocity_xyz.values[0], velocity_xyz.errors[0],
+                    velocity_xyz.values[1], velocity_xyz.errors[1],
+                    velocity_xyz.values[2], velocity_xyz.errors[2]]]))
+
+        # Create header
+        else:
+            lines = [
+                f"{'':-<155}",
+                f"{'Designation':<35}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}",
+                f"{'[pc]':>55}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}{'[km/s]':>20}{'[km/s]':>20}",
+                f"{'':-<155}"]
+
+            # Create lines
+            for star in self:
+                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
+                x = f'{position_xyz.values[0]:.2f} ± {position_xyz.errors[0]:.2f}'
+                y = f'{position_xyz.values[1]:.2f} ± {position_xyz.errors[1]:.2f}'
+                z = f'{position_xyz.values[2]:.2f} ± {position_xyz.errors[2]:.2f}'
+                u = f'{velocity_xyz.values[0]:.2f} ± {velocity_xyz.errors[0]:.2f}'
+                v = f'{velocity_xyz.values[1]:.2f} ± {velocity_xyz.errors[1]:.2f}'
+                w = f'{velocity_xyz.values[2]:.2f} ± {velocity_xyz.errors[2]:.2f}'
+                lines.append(f'{star.name:<35}{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}')
+
+            # Creater footer
+            lines.append(f"{'':-<155}")
+
+        # Show table
+        if show:
+            for line in lines:
+                print(line)
+
+        # Save table
+        if save:
+            save_table(
+                self.name, lines, file_path=f'kinematics_{self.name}',
+                extension='csv' if machine else 'txt',
+                forced=forced, default=default, cancel=cancel)
 
     def get_epoch(self, age=None, metric=None, index=None):
         """ Computes the time index of the epoch for a given association age or, association size
@@ -972,8 +1107,8 @@ class Output_Group():
         # Draw circles around the galactic center located at 8.122 kpc from the Sun
         for radius in range(1, 16):
             ax1.add_artist(plt.Circle(
-                (0, 8.122), radius, color=colors.black, fill=False,
-                linewidth=0.5, linestyle=':', alpha=0.2, zorder=0.0))
+                (0, 8.122), radius, color=colors.grey[17], fill=False,
+                linewidth=0.5, linestyle=':', zorder=0.0))
 
         # Set title
         self.series.stop(
@@ -2324,7 +2459,7 @@ class Output_Group():
             color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8)
         ax.hist(
             ages, bins=np.linspace(12, 32, 81), density=True,
-            color=colors.cyan[6], alpha=0.2, zorder=0.8)
+            color=colors.cyan[6], alpha=0.15, zorder=0.8)
         ax.vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8)
@@ -2344,7 +2479,7 @@ class Output_Group():
             color=colors.lime[6], alpha=0.3, zorder=0.9)
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
-            alpha=0.2, linewidth=0., zorder=0.3)
+            alpha=0.15, linewidth=0., zorder=0.3)
         ax.vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9)
@@ -2363,7 +2498,7 @@ class Output_Group():
             color=colors.blue[6], alpha=1.0, linewidth=1.0, zorder=0.75)
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=colors.blue[6],
-            alpha=0.2, linewidth=0., zorder=0.7)
+            alpha=0.15, linewidth=0., zorder=0.7)
         ax.vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.blue[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.75)
@@ -2382,7 +2517,7 @@ class Output_Group():
             color=colors.azure[6], alpha=1.0, linewidth=1.0, zorder=0.6)
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=colors.azure[6],
-            linewidth=0.0, alpha=0.2, zorder=0.6)
+            linewidth=0.0, alpha=0.15, zorder=0.6)
         ax.vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.azure[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.6)
