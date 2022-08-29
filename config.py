@@ -31,15 +31,15 @@ name.value = 'beta_pictoris'
 file_path.value = None
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 1
+number_of_groups.value = 100
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 500
-# number_of_steps.value = 250
-number_of_steps.value = 172
+number_of_steps.value = 250
+# number_of_steps.value = 172
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 26
+number_of_stars.value = 25
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
@@ -47,53 +47,57 @@ initial_time.value = 0.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
 # final_time.value = 50.1951006
-final_time.value = 51.0
+# final_time.value = 51.0
+final_time.value = 40.0
 
 # Age of simulated groups of stars (float, ≥ 0.0)
 age.value = 24.0
 
 # Average position of the simulated sample of stars (tuple)
-position.values = (18.726, -4.500, -18.938) # new
-# position.values = (15.194, -4.936, -17.074)
+position.value = (22.686, -4.304, -18.495) # Core sample
+# position.values = (18.726, -4.500, -18.938) # Gaia DR3
 # position.values = (0.0, 0.0, 0.0)
 
 # Average position error of the simulated sample of stars (tuple)
-# position_error.values = (0.19846,   0.0,    0.0)
-position_error.values = (0.0218, 0.0136, 0.0165)
-# position_error.values = (0.0, 0.0, 0.0)
+# position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
+# position_error.values = (0.19846, 0.0, 0.0) # Gaia DR2
+position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'observables'
 position_error.system = 'observables'
 position_error.axis = 'equatorial'
 
 # Average position scatter of the simulated sample of stars (tuple)
-position_scatter.values = (3.0, 3.0, 3.0)
-# position_scatter.values = (29.3, 14.0, 9.0)
+position_scatter.values = (3.0, 3.0, 3.0) # Initial XYZ scatter
+# position_scatter.values = (29.3, 14.0, 9.0) # Current-day XYZ scatter
 
 # Average velocity of the simulated sample of stars (tuple)
-velocity.values = (-10.278, -15.726, -8.759) # new
-# velocity.values = (-10.549, -15.889,  -8.711)
-# velocity.values = (-10.93, -15.79,  -8.94)
-# velocity.values = (-11.344, -11.344, -11.344)
+velocity.values = (-10.12, -15.67, -8.75) # Core sample
+# velocity.values = (-10.278, -15.726, -8.759) # Gaia DR3
+# velocity.values = (-11.15, -11.15, -11.15) # Core sample
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-# velocity_error.values = (1.0112, 0.30754, 0.26432)
-velocity_error.values = (0.2634,  0.0196, 0.0231)
-# velocity_error.values = (0.0, 0.0, 0.0)
+# velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
+# velocity_error.values = (1.0112, 0.30754, 0.26432) # Gaia DR2
+velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
 velocity_error.axis = 'equatorial'
 
 # Average velocity scatter of the simulated sample of stars (tuple)
-velocity_scatter.values = (1.6805, 1.6805, 1.6805)
-# velocity_scatter.values = (2.21753, 1.36009, 1.57355)
+# velocity_scatter.values = (1.66, 0.52, 0.73) # Core sample
+# velocity_scatter.values = (2.21753, 1.36009, 1.57355) # Gaia DR2
+# velocity_scatter.values = (0.86, 0.86, 0.86) # Core sample
+velocity_scatter.values = (1.0, 1.0, 1.0) # Core sample (modified)
+# velocity_scatter.values = (1.6805, 1.6805, 1.6805) # Gaia DR2
 velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
 # data.value = '../Data/bpic_Crundall2019.csv'
 # data.value = '../Data/β Pictoris Moving Group - Core Sample (New dRV).csv'
-data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 2.csv'
+# data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 2.csv'
+data.value = '../Data/β Pictoris Moving Group - Member Stars.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -181,15 +185,15 @@ data.axis = 'observables'
 #     [ 19.57, -18.94, -24.54, -10.25, -15.84,  -7.98,   0.73,     0.83]]}
 
 # Radial velocity shift added (from model) or substracted (from data) to all stars (float)
-# rv_shift.value = 0.5
+# rv_shift.value = 0.6
 rv_shift.value = 0.0
 rv_shift.unit = 'km/s'
 
 # Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = True
+data_rv_shifts.value = False
 
 # Whether to use actual or simulated measurement errors (boolean)
-data_errors.value = True
+data_errors.value = False
 
 # Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
 jackknife_number.value = 500
@@ -201,7 +205,7 @@ jackknife_fraction.value = 0.5
 mst_fraction.value = 1.0
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
-cutoff.value = 3.
+cutoff.value = 3.0
 
 # Whether to use the full (with outliers), standard sample or the subsample (str)
 sample.value = 'full'

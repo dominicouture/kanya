@@ -603,8 +603,10 @@ class Data(list):
             self.append(self.Row(self, row))
 
         # Create input, error, core and extended samples
-        self.input_sample = list(filter(lambda row: row.valid, self))
-        self.error_sample = list(filter(lambda row: not row.valid, self))
+        self.input_sample = list(filter(
+                lambda row: row.valid and row.sample in ('core_sample', 'extended_sample'), self))
+        self.rejected_sample = list(filter(
+                lambda row: not row.valid or row.sample not in ('core_sample', 'extended_sample'), self))
         self.core_sample = list(filter(
             lambda row: row.sample == 'core_sample', self.input_sample))
         self.extended_sample = list(filter(

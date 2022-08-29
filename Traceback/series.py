@@ -8,6 +8,7 @@
 """
 
 import numpy as np
+from gc import collect
 from Traceback.init import *
 from Traceback.output import *
 
@@ -633,7 +634,8 @@ class Series(list, Output_Series):
             self.series = series
             self.label = deepcopy(metric.label)
             self.name = deepcopy(metric.name)
-            self.latex_name = deepcopy(metric.latex_name)
+            self.latex_short = deepcopy(metric.latex_short)
+            self.latex_long = deepcopy(metric.latex_long)
             self.valid = deepcopy(metric.valid)
             self.order = deepcopy(metric.order)
             self.status = False
@@ -1193,40 +1195,54 @@ class Series(list, Output_Series):
 
             # !!! Temporary age shift dictionary, move to the configuration file !!!
             self.age_shift = {
+
+                # Spatial covariance matrix
                 'covariances_xyz': np.array([0.0, 0.0, 0.0]),
                 'covariances_xyz_matrix_det': np.array([0.0]),
                 'covariances_xyz_matrix_trace': np.array([0.0]),
-                'cross_covariances_xyz': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_xyz_matrix_det': np.array([0.0]),
-                'cross_covariances_xyz_matrix_trace': np.array([0.0]),
-                'covariances_ξηζ': np.array([3.84, 0.0, 0.0]),
-                'covariances_ξηζ_matrix_det': np.array([0.0]),
-                'covariances_ξηζ_matrix_trace': np.array([0.0]),
-                'cross_covariances_ξηζ': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_ξηζ_matrix_det': np.array([0.0]),
-                'cross_covariances_ξηζ_matrix_trace': np.array([0.0]),
                 'covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
                 'covariances_xyz_matrix_det_robust': np.array([0.0]),
                 'covariances_xyz_matrix_trace_robust': np.array([0.0]),
-                'cross_covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_xyz_matrix_det_robust': np.array([0.0]),
-                'cross_covariances_xyz_matrix_trace_robust': np.array([0.0]),
-                'covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
-                'covariances_ξηζ_matrix_det_robust': np.array([0.0]),
-                'covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
-                'cross_covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_ξηζ_matrix_det_robust': np.array([0.0]),
-                'cross_covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
                 'covariances_xyz_sklearn': np.array([0.0, 0.0, 0.0]),
                 'covariances_xyz_matrix_det_sklearn': np.array([0.0]),
                 'covariances_xyz_matrix_trace_sklearn': np.array([0.0]),
+                'covariances_ξηζ': np.array([3.84, 0.0, 0.0]),
+                'covariances_ξηζ_matrix_det': np.array([0.0]),
+                'covariances_ξηζ_matrix_trace': np.array([0.0]),
+                'covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
+                'covariances_ξηζ_matrix_det_robust': np.array([0.0]),
+                'covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
                 'covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
                 'covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
                 'covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),
+
+                # Spatial-kinematic cross covariance matrix
+                'cross_covariances_xyz': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_xyz_matrix_det': np.array([0.0]),
+                'cross_covariances_xyz_matrix_trace': np.array([0.0]),
+                'cross_covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_xyz_matrix_det_robust': np.array([0.0]),
+                'cross_covariances_xyz_matrix_trace_robust': np.array([0.0]),
+                'cross_covariances_xyz_sklearn': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_xyz_matrix_det_sklearn': np.array([0.0]),
+                'cross_covariances_xyz_matrix_trace_sklearn': np.array([0.0]),
+                'cross_covariances_ξηζ': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_ξηζ_matrix_det': np.array([0.0]),
+                'cross_covariances_ξηζ_matrix_trace': np.array([0.0]),
+                'cross_covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_ξηζ_matrix_det_robust': np.array([0.0]),
+                'cross_covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
+                'cross_covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
+                'cross_covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
+                'cross_covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),
+
+                # Median absolute deviation
                 'mad_xyz': np.array([0.0, 0.0, 0.0]),
                 'mad_xyz_total': np.array([0.0]),
                 'mad_ξηζ': np.array([0.0, 0.0, 0.0]),
                 'mad_ξηζ_total': np.array([0.0]),
+
+                # Minimum spanning tree
                 'mst_xyz_mean': np.array([0.0]),
                 'mst_xyz_mean_robust': np.array([0.0]),
                 'mst_xyz_mad': np.array([0.0]),

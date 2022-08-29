@@ -210,7 +210,7 @@ class Output_Series():
             if machine:
                 return [
                     f'{metric.name[i]},'
-                    f'{metric.latex_name[i]},'
+                    f'{metric.latex_long[i]},'
                     f"{'Valid' if metric.valid[i] else 'Rejected'},"
                     f'{str(metric.age[i])},'
                     f'{str(metric.age_int_error[i])},'
@@ -260,8 +260,8 @@ class Output_Series():
         else:
             lines = [
                 f"{'':-<155}",
-                f"{'Metric':<50}{'Age':>15}{'Jack-knife Error':>20}{'Measurement Error':>20}"
-                f"{'Total Error':>15}{'Minimum Change':>20}{'Offset':>15}",
+                f"{'Association size metric':<50}{'Age':>15}{'Jack-knife Error':>20}"
+                f"{'Measurement Error':>20}{'Total Error':>15}{'Minimum Change':>20}{'Offset':>15}",
                 f"{'[Myr]':>65}{'[Myr]':>20}{'[Myr]':>20}{'[Myr]':>15}{'[%]':>20}{'[Myr]':>15}",
                 f"{'':-<155}"]
 
@@ -325,7 +325,7 @@ class Output_Series():
         # Plot the value of the metric over time
         ax.plot(
             -self.time, metric.value.T[index], label=(
-                f'{metric.latex_name[index]} : ({metric.age[index]:.1f}'
+                f'{metric.latex_short[index]} : ({metric.age[index]:.1f}'
                 f' ± {metric.age_error[index]:.1f}) Myr'),
             color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
             solid_capstyle='round', dash_capstyle='round', zorder=zorder)
@@ -2569,7 +2569,7 @@ class Output_Group():
         # plt.show()
 
 def create_histogram(
-        ages, initial_scatter, number_of_stars, number_of_groups, age,
+        self, ages, initial_scatter, number_of_stars, number_of_groups, age,
         title=False, forced=False, default=False, cancel=False):
     """ Creates an histogram of ages computed by multiple tracebacks. """
 
@@ -2651,7 +2651,7 @@ def create_histogram(
     # plt.show()
 
 def create_color_mesh(
-        initial_scatter, number_of_stars, errors, age, number_of_groups, method,
+        self, initial_scatter, number_of_stars, errors, age, number_of_groups, method,
         title=False, forced=False, default=False, cancel=False):
     """ Creates a color mesh of errors over the initial scatter and number_of_stars.
         !!! Créer une fonction pour passer d'un array Numpy de shape (n, 3) à un !!!
