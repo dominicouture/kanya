@@ -21,7 +21,7 @@ class Collection(list):
     def __init__(self):
         """ Initializes a collection by creating a self.series dictionary, as well as default
             output directories and log path. A base directory is also created and represents the
-            directory where the Traceback package is located, from which other relative directory
+            directory where the kanya package is located, from which other relative directory
             paths originate. By default, an 'Output' directory is created and the logs are saved
             in a 'Logs' directory inside the 'Output' directory.
         """
@@ -75,7 +75,7 @@ class Collection(list):
         # logs_path redefined as the absolute path
         self.logs_path = path.join(
             directory(self.base_dir, path.dirname(self.logs_path), 'logs_path'),
-            'Traceback_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
+            'kanya_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
             if path.basename(self.logs_path) == '' else path.basename(self.logs_path))
         self.logs_configured = False
 
@@ -91,7 +91,7 @@ class Collection(list):
             Series.__init__.
         """
 
-        from Traceback.series import Series
+        from kanya.series import Series
         Series(parent, path, args, forced, default, cancel, logging, **parameters)
 
     def add(self, *series, forced=False, default=False, cancel=False, logging=True):

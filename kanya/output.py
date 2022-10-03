@@ -7,12 +7,11 @@
 
 import numpy as np
 from os import path
-from matplotlib import pyplot as plt, lines, ticker as tkr
-from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import pyplot as plt, ticker as tkr
 from colorsys import hls_to_rgb
 from scipy.interpolate import griddata
-from Traceback.collection import *
-from Traceback.coordinate import *
+from kanya.collection import *
+from kanya.coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -99,7 +98,7 @@ def choose(
 
             # Set default name and save figure
             if default or choice in ('k', 'keep'):
-                from Traceback.tools import default_name
+                from kanya.tools import default_name
                 file_path = default_name(file_path)
                 save(file_path, *save_args)
 
@@ -1754,7 +1753,7 @@ class Output_Group():
         ax = fig.add_subplot(111, projection="mollweide")
 
         # Compute coordinates
-        from Traceback.coordinate import galactic_xyz_equatorial_rδα
+        from kanya.coordinate import galactic_xyz_equatorial_rδα
         positions = np.array([[
             galactic_xyz_equatorial_rδα(*star.position_xyz[step])[0]
             for step in range(self.series.number_of_steps)] for star in self])
@@ -2449,24 +2448,26 @@ class Output_Group():
             ages = ages[self.number,:,index]
 
         # Plot uncorrected histogram and gaussian curve
-        x = np.linspace(8, 36, 1000)
-        μ = metric.age[index]
-        σ = metric.age_int_error[index]
-        gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
-        i, = (gauss > 0.001).nonzero()
-        ax.plot(
-            x[i], gauss[i], label='$\\xi^\\prime$ variance',
-            color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8)
-        ax.hist(
-            ages, bins=np.linspace(12, 32, 81), density=True,
-            color=colors.cyan[6], alpha=0.15, zorder=0.8)
-        ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
-            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8)
+        if False:
+            x = np.linspace(8, 36, 1000)
+            μ = metric.age[index]
+            σ = metric.age_int_error[index]
+            gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
+            i, = (gauss > 0.001).nonzero()
+            ax.plot(
+                x[i], gauss[i], label='$\\xi^\\prime$ variance',
+                color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8)
+            ax.hist(
+                ages, bins=np.linspace(12, 32, 81), density=True,
+                color=colors.cyan[6], alpha=0.15, zorder=0.8)
+            ax.vlines(
+                μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
+                alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8)
 
         # Plot corrected histogram and gaussian curve
         x = np.linspace(8, 36, 1000)
         μ = metric.age_ajusted[index]
+        μ = 18.4
         σ = (metric.age_int_error[index]**2 + 1.56**2)**0.5
         gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
         i, = (gauss > 0.001).nonzero()
@@ -2476,10 +2477,10 @@ class Output_Group():
         ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
         ax.hist(
             ages, bins=np.linspace(12, 32, 81), density=True,
-            color=colors.lime[6], alpha=0.3, zorder=0.9)
-        ax.fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
-            alpha=0.15, linewidth=0., zorder=0.3)
+            color=colors.lime[6], alpha=0.3, zorder=0.6)
+        # ax.fill_between(
+        #     x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
+        #     alpha=0.15, linewidth=0., zorder=0.6)
         ax.vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9)
@@ -2495,13 +2496,13 @@ class Output_Group():
         i, = (gauss > 0.001).nonzero()
         ax.plot(
             x[i], gauss[i], label='Miret-Roig et al. (2020)',
-            color=colors.blue[6], alpha=1.0, linewidth=1.0, zorder=0.75)
+            color=colors.orange[6], alpha=1.0, linewidth=1.0, zorder=0.8)
         ax.fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=colors.blue[6],
-            alpha=0.15, linewidth=0., zorder=0.7)
+            x[i], np.zeros_like(x[i]), gauss[i], color=colors.orange[6],
+            alpha=0.15, linewidth=0., zorder=0.5)
         ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=colors.blue[6],
-            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.75)
+            μ, ymin=0.0, ymax=np.max(gauss), color=colors.orange[6],
+            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8)
 
         # Plot gaussian curve from Crundall et al. (2019)
         μ = 18.3
@@ -2514,13 +2515,13 @@ class Output_Group():
         i, = (gauss > 0.001).nonzero()
         ax.plot(
             x[i], gauss[i], label='Crundall et al. (2019)',
-            color=colors.azure[6], alpha=1.0, linewidth=1.0, zorder=0.6)
+            color=colors.azure[6], alpha=1.0, linewidth=1.0, zorder=0.7)
         ax.fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=colors.azure[6],
-            linewidth=0.0, alpha=0.15, zorder=0.6)
+            linewidth=0.0, alpha=0.15, zorder=0.4)
         ax.vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.azure[6],
-            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.6)
+            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.7)
 
         # Show a shaded area for LDB and isochrone ages
         LDB_range = np.array([20, 26])
@@ -2550,10 +2551,11 @@ class Output_Group():
         ax.set_ylabel('Density', fontsize=8)
 
         # Set limits
-        ax.set_xlim(13, 29)
+        ax.set_xlim(13, 27)
+        ax.set_ylim(0.0, 0.7)
 
         # Set ticks
-        ax.set_xticks([14., 16., 18., 20., 22., 24., 26., 28.])
+        ax.set_xticks([14., 16., 18., 20., 22., 24., 26.])
         ax.tick_params(
             top=True, right=True, which='both',
             direction='in', width=0.5, labelsize=8)

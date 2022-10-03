@@ -11,10 +11,11 @@ __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
-from csv import reader, writer, Sniffer
+import pandas as pd
+from csv import reader, Sniffer
 import re
-from Traceback.collection import *
-from Traceback.coordinate import *
+from kanya.collection import *
+from kanya.coordinate import *
 
 class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.
@@ -49,7 +50,7 @@ class Data(list):
 
         # Data configuration
         self.configure_data()
-        self.get_rv_shift_sequences()
+        self.get_spectral_sequences()
 
         # Columns and rows creation
         self.create_columns()
@@ -248,43 +249,53 @@ class Data(list):
                 "'data.units' component must be a string, "
                 "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units))
 
-    def get_rv_shift_sequences(self):
-        """ Import radial velocity shift sequences based on spectral type, including the effects
-            of both gravitational redshift and convective blueshift.
+    def get_spectral_sequences(self):
+        """ Import stellar mass and radius, and gravitational, convective and total radial velocity
+            shift sequences based on spectral type, including the effects.
         """
 
         # Total radial velocity shift sequences data
         total_rv_shift_sequences_file = '../Radial velocity shift/total_rv_shift_sequences.csv'
         data = np.loadtxt(total_rv_shift_sequences_file, dtype='object', skiprows=1, delimiter=',')
+        dataframe = pd.read_csv(total_rv_shift_sequences_file, delimiter=',')
 
         # Convert to float and delete spectral types with NaN
         data[:,1:] = np.array(data[:,1:], dtype=float)
         rows_with_NaN = [
             row for row in range(data.shape[0])
             if np.isnan(np.array(data[row,1:], dtype=float)).any()]
-        data = np.delete(data, np.array(rows_with_NaN, dtype=int), axis=0).T
+        data = np.delete(data, np.array(rows_with_NaN, dtype=int), axis=0)
+
+        # Convert column names and change spectral type number definition
+        dataframe = pd.DataFrame(data=data, columns=[
+            col.strip().lower() for col in list(dataframe.columns)])
+        dataframe['sptn'] = dataframe['sptn'] + 60.0
 
         # Spectral types
-        self.spectral_types_str = data[0]
+        self.spectral_types_str = dataframe['spt']
         self.spectral_types_num = np.array([
             self.convert_spt(spt) for spt in self.spectral_types_str], dtype=float)
-        data = np.array(data[1:], dtype=float)
+        # data = np.array(data[1:], dtype=float)
+
+        # Stellar mass
+        self.mass = dataframe['mass_ms']
+        self.mass_error = dataframe['emass_ms']
+
+        # Stellar radius
+        self.radius = dataframe['radius_ms']
+        self.radius_error = dataframe['eradius_ms']
 
         # Gravitational radial velocity shift
-        self.grav_shift_ms = data[12]
-        self.grav_shift_ms_error = data[13]
-        self.grav_shift_prems = data[14]
-        self.grav_shift_prems_error = data[15]
+        self.grav_shift = dataframe['grav_redshift_ms']
+        self.grav_shift_error = dataframe['egrav_redshift_ms']
 
         # Convective radial velocity shift
-        self.conv_shift = data[10]
-        self.conv_shift_error = data[11]
+        self.conv_shift = dataframe['conv_blueshift']
+        self.conv_shift_error = dataframe['econv_blueshift']
 
         # Total radial velocity shift
-        self.total_shift_ms = data[16]
-        self.total_shift_ms_error = data[17]
-        self.total_shift_prems = data[18]
-        self.total_shift_prems_error = data[19]
+        self.total_shift = dataframe['total_shift_ms']
+        self.total_shift_error = dataframe['etotal_shift_ms']
 
     def convert_spt(self, spt):
         """ Converts spectral type letter into a number. """
@@ -297,7 +308,7 @@ class Data(list):
         # Match spectral type components
         new_spt = spt.replace(' ', '').replace('(', '').replace(')', '')
         try:
-            letter, number, spt_class = re.split('(\d+\.?\d*)', new_spt)
+            letter, number, other = re.split('(\d+\.?\d*)', new_spt)
         except ValueError as e:
             raise ValueError(f"{spt} is an invalid spectral type.") from e
 
@@ -346,18 +357,37 @@ class Data(list):
             of a star or brown dwarf.
         """
 
-        # Convert a spectral type into a number if needed
+        # Convert a spectral type into a number if needed (assuming Jonathan's convention)
         if np.char.isnumeric(spt):
             sptn = float(spt) + 60.0
         else:
             sptn = self.convert_spt(spt)
 
-        # Find matching spectral type and total radial velocity shift
+        # Find index and matching spectral type
         index = (np.abs(self.spectral_types_num - sptn)).argmin()
         spectral_type = self.spectral_types_str[index]
-        rv_shift = self.total_shift_ms[index]
 
-        return spectral_type, rv_shift
+        # Stellar mass
+        mass = self.mass[index]
+        mass_error = self.mass_error[index]
+
+        # Stellar radius
+        radius = self.radius[index]
+        radius_error = self.radius_error[index]
+
+        # Gravitational radial velocity shift
+        grav_shift = self.grav_shift[index]
+        grav_shift_error = self.grav_shift_error[index]
+
+        # Convective radial velocity shift
+        conv_shift = self.conv_shift[index]
+        conv_shift_error = self.conv_shift_error[index]
+
+        # Total radial velocity shift
+        rv_shift = self.total_shift[index]
+        rv_shift_error = self.total_shift_error[index]
+
+        return spectral_type, rv_shift, rv_shift_error
 
     def create_columns(self):
         """ Creates a self.columns dictionary along with self.Column objects for every column
@@ -612,6 +642,13 @@ class Data(list):
         self.extended_sample = list(filter(
             lambda row: row.sample == 'extended_sample', self.input_sample))
 
+        # Uncomment this line to use the input sample
+        # self.core_sample = self.input_sample
+
+        # Uncomment this line to limit radial velocity precision
+         self.core_sample = list(filter(
+            lambda row: row.sample == 'core_sample' and row.velocity.errors[0] < 2.5, self.input_sample))
+
     class Row:
         """ Contains the data for an individual row (star), including name, type, id, position
             and velocity.
@@ -716,21 +753,25 @@ class Data(list):
                         0.0 if error is None else error,
                         default_unit if error_unit is None else error_unit).to()
 
+            # Radial velocity shift based on spectral type
+            if self.spectral_type is not None:
+                self.spectral_type, rv_shift, rv_shift_error = self.data.find_rv_shift(
+                    self.spectral_type)
+                self.rv_shift = Quantity(rv_shift, 'km/s', rv_shift_error).to()
+
             # Radial velocity shift from mass and radius columns
             elif self.mass is not None and self.radius is not None:
-                rv_shift = (
-                    c.value * ((1 - 2 * G.value * self.mass.value * M_sun.value / (
-                    c.value**2 * self.radius.value * R_sun.value))**0.5 - 1) / 1000)
-                self.rv_shift = Quantity(rv_shift, Unit('km/s'), 0.0)
-
-            # Radial velocity shift based on spectral type
-            elif self.spectral_type is not None:
-                self.spectral_type, rv_shift = self.data.find_rv_shift(self.spectral_type)
-                self.rv_shift = Quantity(rv_shift, 'km/s', 0.0).to()
+                rv_shift = c.value / 1000 * (
+                    (1 - 2 * G.value * self.mass.value * M_sun.value / (
+                        c.value**2 * self.radius.value * R_sun.value))**(-0.5) - 1)
+                self.rv_shift = Quantity(rv_shift, Unit('km/s'), 0.0).to()
 
             # Configuration radial velocity shift otherwise
             else:
                  self.rv_shift = self.data.series.rv_shift
+
+            # Uncomment this line to use configuration radial velocity shifts
+            # self.rv_shift = self.data.series.rv_shift
 
             # Position columns and unit conversion
             self.position = Quantity(

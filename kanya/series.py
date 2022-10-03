@@ -9,8 +9,8 @@
 
 import numpy as np
 from gc import collect
-from Traceback.init import *
-from Traceback.output import *
+from kanya.init import *
+from kanya.output import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -385,7 +385,7 @@ class Series(list, Output_Series):
             "Required traceback parameter 'data' is missing in the configuration.")
 
         # Stars creation from data
-        from Traceback.data import Data
+        from kanya.data import Data
         self.data = Data(self)
 
         # number_of_stars parameter
@@ -637,6 +637,7 @@ class Series(list, Output_Series):
             self.latex_short = deepcopy(metric.latex_short)
             self.latex_long = deepcopy(metric.latex_long)
             self.valid = deepcopy(metric.valid)
+            self.age_shift = deepcopy(metric.age_shift)
             self.order = deepcopy(metric.order)
             self.status = False
 
@@ -694,7 +695,6 @@ class Series(list, Output_Series):
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
                 # Age shift based on simulation
-                self.age_shift = self.series.age_shift[self.label]
                 self.age_ajusted = self.age + self.age_shift
 
                 # Minimum change
@@ -740,7 +740,7 @@ class Series(list, Output_Series):
 
                 # Age shift based on simulation
                 self.age_shift = self.series.age.value - self.age
-                self.age_ajusted = self.age
+                self.age_ajusted = self.series.age.value
 
                 # Minimum change
                 self.min_change = (self.min / self.value[0] - 1.) * 100.
@@ -1172,7 +1172,7 @@ class Series(list, Output_Series):
         if forced:
 
             # Traceback configuration
-            from Traceback.group import Group
+            from kanya.group import Group
             self.configure_traceback()
 
             # Traceback
@@ -1192,63 +1192,6 @@ class Series(list, Output_Series):
 
             # Logging
             log("'{}' series succesfully traced back.", self.name, logging=logging)
-
-            # !!! Temporary age shift dictionary, move to the configuration file !!!
-            self.age_shift = {
-
-                # Spatial covariance matrix
-                'covariances_xyz': np.array([0.0, 0.0, 0.0]),
-                'covariances_xyz_matrix_det': np.array([0.0]),
-                'covariances_xyz_matrix_trace': np.array([0.0]),
-                'covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
-                'covariances_xyz_matrix_det_robust': np.array([0.0]),
-                'covariances_xyz_matrix_trace_robust': np.array([0.0]),
-                'covariances_xyz_sklearn': np.array([0.0, 0.0, 0.0]),
-                'covariances_xyz_matrix_det_sklearn': np.array([0.0]),
-                'covariances_xyz_matrix_trace_sklearn': np.array([0.0]),
-                'covariances_ξηζ': np.array([3.84, 0.0, 0.0]),
-                'covariances_ξηζ_matrix_det': np.array([0.0]),
-                'covariances_ξηζ_matrix_trace': np.array([0.0]),
-                'covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
-                'covariances_ξηζ_matrix_det_robust': np.array([0.0]),
-                'covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
-                'covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
-                'covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
-                'covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),
-
-                # Spatial-kinematic cross covariance matrix
-                'cross_covariances_xyz': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_xyz_matrix_det': np.array([0.0]),
-                'cross_covariances_xyz_matrix_trace': np.array([0.0]),
-                'cross_covariances_xyz_robust': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_xyz_matrix_det_robust': np.array([0.0]),
-                'cross_covariances_xyz_matrix_trace_robust': np.array([0.0]),
-                'cross_covariances_xyz_sklearn': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_xyz_matrix_det_sklearn': np.array([0.0]),
-                'cross_covariances_xyz_matrix_trace_sklearn': np.array([0.0]),
-                'cross_covariances_ξηζ': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_ξηζ_matrix_det': np.array([0.0]),
-                'cross_covariances_ξηζ_matrix_trace': np.array([0.0]),
-                'cross_covariances_ξηζ_robust': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_ξηζ_matrix_det_robust': np.array([0.0]),
-                'cross_covariances_ξηζ_matrix_trace_robust': np.array([0.0]),
-                'cross_covariances_ξηζ_sklearn': np.array([0.0, 0.0, 0.0]),
-                'cross_covariances_ξηζ_matrix_det_sklearn': np.array([0.0]),
-                'cross_covariances_ξηζ_matrix_trace_sklearn': np.array([0.0]),
-
-                # Median absolute deviation
-                'mad_xyz': np.array([0.0, 0.0, 0.0]),
-                'mad_xyz_total': np.array([0.0]),
-                'mad_ξηζ': np.array([0.0, 0.0, 0.0]),
-                'mad_ξηζ_total': np.array([0.0]),
-
-                # Minimum spanning tree
-                'mst_xyz_mean': np.array([0.0]),
-                'mst_xyz_mean_robust': np.array([0.0]),
-                'mst_xyz_mad': np.array([0.0]),
-                'mst_ξηζ_mean': np.array([0.0]),
-                'mst_ξηζ_mean_robust': np.array([0.0]),
-                'mst_ξηζ_mad': np.array([0.0])}
 
             # Compute average association size metrics
             for metric in self.metrics:
@@ -1317,7 +1260,7 @@ class Series(list, Output_Series):
 
                 # Default name and saving
                 if default or choice in ('k', 'keep'):
-                    from Traceback.tools import default_name
+                    from kanya.tools import default_name
                     self.file_path = default_name(self.file_path)
                     save(self)
 

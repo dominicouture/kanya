@@ -1,7 +1,7 @@
 # !/usr/local/bin/env python3
 # -*- coding: utf-8 -*-
 
-""" __main__.py: Main pipeline of the Traceback package. It executes the following steps:
+""" __main__.py: Main pipeline of the kanya package. It executes the following steps:
 
     1 - Series creation: arguments, parameters, data and configuration file import, format and
         check, and conversions.
@@ -11,7 +11,7 @@
 
 """
 
-from Traceback import *
+from kanya import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -24,7 +24,8 @@ collection.create()
 
 # Output creation
 for series in collection:
-    series.create_metrics_table(show=False, save=True, forced=True, machine=False)
+    series.create_metrics_table(show=True, save=False, machine=False)
+    series.create_metrics_table(show=False, save=True, forced=True, machine=True)
     series.create_covariances_xyz_plot(forced=True)
     series.create_covariances_ξηζ_plot(forced=True) # Valid
     series.create_covariances_xyz_plot(robust=True, forced=True)

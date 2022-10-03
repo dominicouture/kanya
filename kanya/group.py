@@ -12,9 +12,8 @@ import numpy as np
 import galpy.util.coords as coords
 from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
-from Traceback.data import Data
-from Traceback.output import Output_Group
-from Traceback.coordinate import *
+from kanya.output import Output_Group
+from kanya.coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -289,7 +288,7 @@ class Group(list, Output_Group):
 
             # Iteratively validate stars coordinates
             outliers = False if self.series.cutoff is None else True
-            while outliers and len(self.sample) > int(0.8 * self.series.number_of_stars):
+            while outliers and len(self.sample) > int(0.8 * len(self)):
 
                 # Remove stars beyond the σ cutoff of the average position or velocity
                 outliers = False
@@ -682,7 +681,8 @@ class Group(list, Output_Group):
         covariances(np.abs(covariances_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
 
         # Covariances matrix determinant
-        covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 6))
+        # covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 6))
+        covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 2))
 
         # Covariances matrix trace
         covariances_matrix_trace(np.abs(np.trace(covariances_matrix, axis1=2, axis2=3) / 3)**0.5)

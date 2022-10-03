@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """ config.py: Configuration of a traceback from a simulated group of stars or data. A 'system'
-    refers to a coordinate system (e.g. 'observables', 'spherical' or 'cartesian'), an 'axis' to
+    refers to a coordinate system (e.g., 'observables', 'spherical' or 'cartesian'), an 'axis' to
     the orientation of a coordinate system axes (e.g. 'equatorial' or 'galactic') and 'origin' to
     the origin of a coordinate system axes (e.g. 'sun' or 'galaxy'). 'units' must be a string
     convertible to a Astropy.Unit object. The default units are:
@@ -22,8 +22,8 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Name of series of groups
 name.value = 'beta_pictoris'
-# name.value = 'beta_pictoris_eDR3'
 # name.value = 'beta_pictoris_Miret-Roig'
+# name.value = 'beta_pictoris_Crundall'
 
 # Path to the file or directory used as input or output relative the base directory (str). If the
 # is None or absent, by default, the  data is loaded or saved to a file in the output directory
@@ -31,15 +31,15 @@ name.value = 'beta_pictoris'
 file_path.value = None
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 100
+number_of_groups.value = 80
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-# number_of_steps.value = 500
+# number_of_steps.value = 400
 number_of_steps.value = 250
 # number_of_steps.value = 172
 
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 25
+number_of_stars.value = 50
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
@@ -59,9 +59,9 @@ position.value = (22.686, -4.304, -18.495) # Core sample
 # position.values = (0.0, 0.0, 0.0)
 
 # Average position error of the simulated sample of stars (tuple)
-# position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
+position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
 # position_error.values = (0.19846, 0.0, 0.0) # Gaia DR2
-position_error.values = (0.0, 0.0, 0.0)
+# position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'observables'
 position_error.system = 'observables'
 position_error.axis = 'equatorial'
@@ -77,9 +77,9 @@ velocity.values = (-10.12, -15.67, -8.75) # Core sample
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-# velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
+velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
 # velocity_error.values = (1.0112, 0.30754, 0.26432) # Gaia DR2
-velocity_error.values = (0.0, 0.0, 0.0)
+# velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
@@ -94,10 +94,10 @@ velocity_scatter.values = (1.0, 1.0, 1.0) # Core sample (modified)
 velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
-# data.value = '../Data/bpic_Crundall2019.csv'
-# data.value = '../Data/β Pictoris Moving Group - Core Sample (New dRV).csv'
-# data.value = '../Data/β Pictoris Moving Group - Member Stars (newer eDR3) - 2.csv'
-data.value = '../Data/β Pictoris Moving Group - Member Stars.csv'
+# data.value = '../Data/β Pictoris Moving Group - Gaia EDR3.csv'
+data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
+# data.value = '../Data/β Pictoris Moving Group - Gaia DR3_noERV.csv'
+# data.value = '../DATA/Database_BPMG_Gaia_DR3.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -151,9 +151,17 @@ data.axis = 'observables'
 #     [47.9420, -33.250998, 341.24241, 1.10000, -123.103,  179.904],
 #     [36.5320, -12.264637, 353.12918, 1.38000, -81.8890,  139.260]]}
 
+# Data from Crundall et al. 2019
+# data.values = '../Data/Crundall_BPMG_core.csv'
+# data.units = ['', '', '', 'pc', 'pc', 'pc', 'km/s', 'km/s', 'km/s']
 # data.system = 'cartesian'
 # data.axis = 'equatorial'
-# data.units = ['pc',   'pc',   'pc', 'km/s', 'km/s', 'km/s']
+
+# Data from Miret-Roig et al 2020
+# data.values = '../Data/β Pictoris Moving Group - Miret-Roig et al. 2020.csv'
+# data.system = 'cartesian'
+# data.axis = 'equatorial'
+# data.units = ['pc',   'pc',   'pc', 'km/s', 'km/s', 'km/s', '', '']
 # data.values = {'beta_pictoris_Miret-Roig': [
 #     [   'X',    'Y',    'Z',    'U',    'V',    'W', 'mass', 'radius'],
 #     [  'pc',   'pc',   'pc', 'km/s', 'km/s', 'km/s',     '',       ''],
@@ -185,7 +193,8 @@ data.axis = 'observables'
 #     [ 19.57, -18.94, -24.54, -10.25, -15.84,  -7.98,   0.73,     0.83]]}
 
 # Radial velocity shift added (from model) or substracted (from data) to all stars (float)
-# rv_shift.value = 0.6
+# rv_shift.value = 0.5
+# rv_shift.value = 0.2
 rv_shift.value = 0.0
 rv_shift.unit = 'km/s'
 
@@ -193,10 +202,10 @@ rv_shift.unit = 'km/s'
 data_rv_shifts.value = False
 
 # Whether to use actual or simulated measurement errors (boolean)
-data_errors.value = False
+data_errors.value = True
 
 # Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
-jackknife_number.value = 500
+jackknife_number.value = 300
 
 # Fraction of stars included in every jack-knife Monte Carlo iteration (0 < float ≤ 1)
 jackknife_fraction.value = 0.5

@@ -8,8 +8,8 @@
 """
 
 import numpy as np
-from math import cos, sin, asin, atan2, pi, degrees, radians
-from Traceback.quantity import *
+from math import cos, sin, asin, atan2, radians, pi
+from kanya.quantity import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -52,7 +52,7 @@ class System():
         'angular speed': Unit('rad/Myr', 'radian per megayear'),
         'mass': Unit('solMass', 'solar mass')}
 
-    # Usual units used for observalbes per physical type and magnitude
+    # Usual units used for observables per physical type and magnitude
     usual_units = {
         'speed': Unit('km/s', 'kilometer per second'),
         'angle': Unit('deg', 'degree'),
@@ -92,15 +92,21 @@ class System():
     class Variable():
         """ Defines a Variable object and required variables from all systems. """
 
-        def __init__(self, label, name, unit, usual_unit=None):
+        def __init__(
+                self, label, name, unit, usual_unit=None,
+                unit_error=None, usual_unit_error=None):
             """ Initializes a Variable from a name, label and Unit object. """
 
             # Initialization
             self.label = label
             self.name = name
             self.unit = unit
-            self.physical_type = unit.physical_type
+            self.unit_error = self.unit if unit_error is None else unit_error
             self.usual_unit = self.unit if usual_unit is None else usual_unit
+            self.usual_unit_error = self.usual_unit if usual_unit_error is None else usual_unit_error
+
+            # Set physical type
+            self.physical_type = unit.physical_type
 
         def __eq__(self, other):
             """ Tests whether self is not the equal to other. """

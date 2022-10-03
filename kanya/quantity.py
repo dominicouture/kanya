@@ -8,8 +8,7 @@
 import numpy as np
 from decimal import Decimal
 from astropy import units as u
-from astropy.constants import c, G, M_sun, R_sun
-from Traceback.tools import squeeze, broadcast, full
+from kanya.tools import squeeze, broadcast, full
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -485,7 +484,7 @@ class Quantity:
 
         # Default units per physical types if 'units' is None.
         if units is None:
-            from Traceback.coordinate import System
+            from kanya.coordinate import System
             units = Unit(
                 np.vectorize(lambda unit: System.default_units[unit.physical_type].unit
                 if unit.physical_type in System.default_units.keys() else unit)(self.units.units))
