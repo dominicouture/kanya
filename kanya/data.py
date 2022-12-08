@@ -12,10 +12,10 @@ __email__ = 'dominic.couture.1@umontreal.ca'
 
 import numpy as np
 import pandas as pd
-from csv import reader, Sniffer
 import re
-from kanya.collection import *
-from kanya.coordinate import *
+from csv import reader, Sniffer
+from .collection import *
+from .coordinate import *
 
 class Data(list):
     """ Contains the data imported from a CSV file or a Python dictionary and related methods.
@@ -646,8 +646,8 @@ class Data(list):
         # self.core_sample = self.input_sample
 
         # Uncomment this line to limit radial velocity precision
-         self.core_sample = list(filter(
-            lambda row: row.sample == 'core_sample' and row.velocity.errors[0] < 2.5, self.input_sample))
+        # self.core_sample = list(filter(
+        #     lambda row: row.sample == 'core_sample' and row.velocity.errors[0] < 2.5, self.input_sample))
 
     class Row:
         """ Contains the data for an individual row (star), including name, type, id, position

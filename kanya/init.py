@@ -6,8 +6,8 @@
 """
 
 from copy import deepcopy
-from kanya.collection import *
-from kanya.coordinate import *
+from .collection import *
+from .coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -39,20 +39,31 @@ class Config():
         # xyz spatial covariances matrix
         Metric(
             'covariances_xyz',
-            np.array(['X Variance', 'Y Variance', 'Z Variance']),
-            np.array(['$X-X$', '$Y-Y$', '$Z-Z$']),
-            np.array(['$X$ Variance', '$Y$ Variance', '$Z$ Variance']),
+            np.array([
+                'X Variance',
+                'Y Variance',
+                'Z Variance']),
+            np.array([
+                'Var.${{}}_{{X}}$',
+                'Var.${{}}_{{Y}}$',
+                'Var.${{}}_{{Z}}$']),
+            np.array([
+                '$X$ Variance',
+                '$Y$ Variance',
+                '$Z$ Variance']),
             np.array([True, False, False]),
             np.array([0.94, 0.36, -0.15]), 0),
         Metric(
             'covariances_xyz_matrix_det',
             'XYZ Covariance Matrix Determinant',
-            'Det.${{}}_{{XYZ}}$', 'Determinant${{}}_{{XYZ}}$',
+            'Det.${{}}_{{XYZ}}$',
+            'Determinant${{}}_{{XYZ}}$',
             False, 0.26, 1),
         Metric(
             'covariances_xyz_matrix_trace',
             'XYZ Covariance Matrix Trace',
-            'Trace${{}}_{{XYZ}}$', 'Trace${{}}_{{XYZ}}$',
+            'Trace${{}}_{{XYZ}}$',
+            'Trace${{}}_{{XYZ}}$',
             False, 0.4, 2),
 
         # xyz spatial robust covariances matrix
@@ -63,9 +74,9 @@ class Config():
                 'Y Variance (robust)',
                 'Z Variance (robust)']),
             np.array([
-                '$X-X$ (robust)',
-                '$Y-Y$ (robust)',
-                '$Z-Z$ (robust)']),
+                'Var.${{}}_{{X}}$ (robust)',
+                'Var.${{}}_{{Y}}$ (robust)',
+                'Var.${{}}_{{Z}}$ (robust)']),
             np.array([
                 '$X$ Variance (robust)',
                 '$Y$ Variance (robust)',
@@ -93,9 +104,9 @@ class Config():
                 'Y Variance (sklearn)',
                 'Z Variance (sklearn)']),
             np.array([
-                '$X-X$ (sklearn)',
-                '$Y-Y$ (sklearn)',
-                '$Z-Z$ (sklearn)']),
+                'Var.${{}}_{{X}}$ (sklearn)',
+                'Var.${{}}_{{Y}}$ (sklearn)',
+                'Var.${{}}_{{Z}}$ (sklearn)']),
             np.array([
                 '$X$ Variance (sklearn)',
                 '$Y$ Variance (sklearn)',
@@ -118,11 +129,14 @@ class Config():
         # ξηζ position covariances matrix
         Metric(
             'covariances_ξηζ',
-            np.array(['ξ Variance', 'η Variance', 'ζ Variance']),
             np.array([
-                '$ξ^\\prime-ξ^\\prime$',
-                '$η^\\prime-η^\\prime$',
-                '$ζ^\\prime-ζ^\\prime$']),
+                'ξ Variance',
+                'η Variance',
+                'ζ Variance']),
+            np.array([
+                'Var.${{}}_{{ξ^\\prime}}$',
+                'Var.${{}}_{{η^\\prime}}$',
+                'Var.${{}}_{{ζ^\\prime}}$']),
             np.array([
                 '$ξ^\\prime$ Variance',
                 '$η^\\prime$ Variance',
@@ -150,9 +164,9 @@ class Config():
                 'η Variance (robust)',
                 'ζ Variance (robust)']),
             np.array([
-                '$ξ^\\prime-ξ^\\prime$ (robust)',
-                '$η^\\prime-η^\\prime$ (robust)',
-                '$ζ^\\prime-ζ^\\prime$ (robust)']),
+                'Var.${{}}_{{ξ^\\prime}}$ (robust)',
+                'Var.${{}}_{{η^\\prime}}$ (robust)',
+                'Var.${{}}_{{ζ^\\prime}}$ (robust)']),
             np.array([
                 '$ξ^\\prime$ Variance (robust)',
                 '$η^\\prime$ Variance (robust)',
@@ -180,9 +194,9 @@ class Config():
                 'η Variance (sklearn)',
                 'ζ Variance (sklearn)']),
             np.array([
-                '$ξ^\\prime-ξ^\\prime$ (sklearn)',
-                '$η^\\prime-η^\\prime$ (sklearn)',
-                '$ζ^\\prime-ζ^\\prime$ (sklearn)']),
+                'Var.${{}}_{{ξ^\\prime}}$ (sklearn)',
+                'Var.${{}}_{{η^\\prime}}$ (sklearn)',
+                'Var.${{}}_{{ζ^\\prime}}$ (sklearn)']),
             np.array([
                 '$ξ^\\prime$ Variance (sklearn)',
                 '$η^\\prime$ Variance (sklearn)',
@@ -209,7 +223,10 @@ class Config():
                 'X-U Cross Covariance',
                 'Y-V Cross Covariance',
                 'Z-W Cross Covariance']),
-            np.array(['$X-U$', '$Y-V$', '$Z-W$']),
+            np.array([
+                '$X-U$',
+                '$Y-V$',
+                '$Z-W$']),
             np.array([
                 '$X-U$ Cross Covariance',
                 '$Y-V$ Cross Covariance',

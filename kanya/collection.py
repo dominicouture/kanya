@@ -91,7 +91,7 @@ class Collection(list):
             Series.__init__.
         """
 
-        from kanya.series import Series
+        from .series import Series
         Series(parent, path, args, forced, default, cancel, logging, **parameters)
 
     def add(self, *series, forced=False, default=False, cancel=False, logging=True):

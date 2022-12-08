@@ -47,8 +47,8 @@ initial_time.value = 0.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
 # final_time.value = 50.1951006
-# final_time.value = 51.0
-final_time.value = 40.0
+final_time.value = 51.0
+# final_time.value = 40.0
 
 # Age of simulated groups of stars (float, ≥ 0.0)
 age.value = 24.0
@@ -96,8 +96,6 @@ velocity_scatter.units = 'km/s'
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
 # data.value = '../Data/β Pictoris Moving Group - Gaia EDR3.csv'
 data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
-# data.value = '../Data/β Pictoris Moving Group - Gaia DR3_noERV.csv'
-# data.value = '../DATA/Database_BPMG_Gaia_DR3.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -205,7 +203,7 @@ data_rv_shifts.value = False
 data_errors.value = True
 
 # Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
-jackknife_number.value = 300
+jackknife_number.value = 200
 
 # Fraction of stars included in every jack-knife Monte Carlo iteration (0 < float ≤ 1)
 jackknife_fraction.value = 0.5

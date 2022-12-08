@@ -12,8 +12,8 @@ import numpy as np
 import galpy.util.coords as coords
 from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
-from kanya.output import Output_Group
-from kanya.coordinate import *
+from .output import Output_Group
+from .coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -53,19 +53,19 @@ class Group(list, Output_Group):
             self.get_covariances()
 
         # Compute robust covariances metrics
-        if False:
+        if True:
             self.get_covariances_robust()
 
         # Compute sklearn covariances metrics
-        if False:
+        if True:
             self.get_covariances_sklearn()
 
         # Compute median absolute deviation metrics
-        if False:
+        if True:
             self.get_median_absolute_deviation()
 
         # Compute minimum spanning tree metrics
-        if False:
+        if True:
             self.get_minimum_spanning_tree()
 
     def stars_from_data(self):
@@ -284,7 +284,7 @@ class Group(list, Output_Group):
         """
 
         # Filter outliers for the first group
-        if self.number == 0:
+        if True:
 
             # Iteratively validate stars coordinates
             outliers = False if self.series.cutoff is None else True
@@ -307,26 +307,27 @@ class Group(list, Output_Group):
                 self.get_stars_coordinates()
 
             # Display a message if outliers have been found
-            if self.number_of_outliers > 0:
-                print(
-                    f'{self.number_of_outliers:d} outlier'
-                    f"{'s' if self.number_of_outliers > 1 else ''} "
-                    f'found in {self.series.name} series during traceback:')
-                for star in self.outliers:
-                    outlier_type = (
-                        'Position' if star.position_outlier else
-                        'Velocity' if star.velocity_outlier else '')
-                    if outlier_type == 'Position':
-                        outlier_sigma = np.max(
-                            np.abs(star.relative_position_ξηζ) / self.scatter_position_ξηζ)
-                    if outlier_type == 'Velocity':
-                        outlier_sigma = np.max(
-                            np.abs(star.relative_velocity_ξηζ) / self.scatter_velocity_ξηζ)
-                    print(f'{star.name}: {outlier_type} > {outlier_sigma:.1f}σ')
+            if self.number == 0:
+                if self.number_of_outliers > 0:
+                    print(
+                        f'{self.number_of_outliers:d} outlier'
+                        f"{'s' if self.number_of_outliers > 1 else ''} "
+                        f'found in {self.series.name} series during traceback:')
+                    for star in self.outliers:
+                        outlier_type = (
+                            'Position' if star.position_outlier else
+                            'Velocity' if star.velocity_outlier else '')
+                        if outlier_type == 'Position':
+                            outlier_sigma = np.max(
+                                np.abs(star.relative_position_ξηζ) / self.scatter_position_ξηζ)
+                        if outlier_type == 'Velocity':
+                            outlier_sigma = np.max(
+                                np.abs(star.relative_velocity_ξηζ) / self.scatter_velocity_ξηζ)
+                        print(f'{star.name}: {outlier_type} > {outlier_sigma:.1f}σ')
 
-            # Display message if no outliers are found
-            elif self.series.cutoff is not None:
-                print(f'No outliers found in {self.series.name}.')
+                # Display message if no outliers are found
+                elif self.series.cutoff is not None:
+                    print(f'No outliers found in {self.series.name}.')
 
             # Robust covariances matrix and support fraction
             if False:
@@ -412,7 +413,7 @@ class Group(list, Output_Group):
             self.Metric(self, metric)
 
         # For the first group, randomly select stars for the jack-knife Monte Carlo
-        if self.number == 0:
+        if True:
             self.sample_size_jackknife = int(self.sample_size * self.series.jackknife_fraction)
             self.stars_monte_carlo = np.array([
                 np.random.choice(self.sample_size, self.sample_size_jackknife, replace=False)
@@ -681,8 +682,8 @@ class Group(list, Output_Group):
         covariances(np.abs(covariances_matrix[:, :, (0, 1, 2), (0, 1, 2)])**0.5)
 
         # Covariances matrix determinant
-        # covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 6))
-        covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 2))
+        covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 6))
+        # covariances_matrix_det(np.abs(np.linalg.det(covariances_matrix))**(1 / 2))
 
         # Covariances matrix trace
         covariances_matrix_trace(np.abs(np.trace(covariances_matrix, axis1=2, axis2=3) / 3)**0.5)

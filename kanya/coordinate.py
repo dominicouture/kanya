@@ -9,7 +9,8 @@
 
 import numpy as np
 from math import cos, sin, asin, atan2, radians, pi
-from kanya.quantity import *
+from astropy.constants import c, G, M_sun, R_sun
+from .quantity import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'

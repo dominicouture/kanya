@@ -9,9 +9,9 @@ import numpy as np
 from os import path
 from matplotlib import pyplot as plt, ticker as tkr
 from colorsys import hls_to_rgb
-from scipy.interpolate import griddata
-from kanya.collection import *
-from kanya.coordinate import *
+from scipy.interpolate import griddata, interp1d
+from .collection import *
+from .coordinate import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -98,7 +98,7 @@ def choose(
 
             # Set default name and save figure
             if default or choice in ('k', 'keep'):
-                from kanya.tools import default_name
+                from .tools import default_name
                 file_path = default_name(file_path)
                 save(file_path, *save_args)
 
@@ -321,9 +321,23 @@ class Output_Series():
             displayed as well.
         """
 
+        # Redefine time, value and value error arrays
+        time = -self.time
+        value = metric.value.T[index]
+        value_error = metric.value_error.T[index]
+
+        # Extrapolate one point in the future
+        value_1 = interp1d(time, value, fill_value='extrapolate')(1.0)
+        value_error_1 = interp1d(time, value_error, fill_value='extrapolate')(1.0)
+
+        # Add the point in the time, value and value error arrays
+        time = np.insert(time, 0, 1.0)
+        value = np.insert(value, 0, value_1)
+        value_error = np.insert(value_error, 0, value_error_1)
+
         # Plot the value of the metric over time
         ax.plot(
-            -self.time, metric.value.T[index], label=(
+            time, value, label=(
                 f'{metric.latex_short[index]} : ({metric.age[index]:.1f}'
                 f' ± {metric.age_error[index]:.1f}) Myr'),
             color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
@@ -331,9 +345,7 @@ class Output_Series():
 
         # Plot an enveloppe to display the uncertainty
         ax.fill_between(
-            -self.time,
-            metric.value.T[index] - metric.value_error.T[index],
-            metric.value.T[index] + metric.value_error.T[index],
+            time, value - value_error, value + value_error,
             color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5)
 
         # Plot secondary lines
@@ -389,7 +401,7 @@ class Output_Series():
         ax.set_ylabel('Association size (pc)', fontsize=8)
 
         # Set limits
-        ax.set_xlim(-self.final_time.value + 14, -self.initial_time.value + 1)
+        ax.set_xlim(-self.final_time.value + 15, -self.initial_time.value + 1)
         ax.set_ylim(-1., 39.)
 
         # Set ticks
@@ -1753,7 +1765,7 @@ class Output_Group():
         ax = fig.add_subplot(111, projection="mollweide")
 
         # Compute coordinates
-        from kanya.coordinate import galactic_xyz_equatorial_rδα
+        from .coordinate import galactic_xyz_equatorial_rδα
         positions = np.array([[
             galactic_xyz_equatorial_rδα(*star.position_xyz[step])[0]
             for step in range(self.series.number_of_steps)] for star in self])
@@ -2467,8 +2479,8 @@ class Output_Group():
         # Plot corrected histogram and gaussian curve
         x = np.linspace(8, 36, 1000)
         μ = metric.age_ajusted[index]
-        μ = 18.4
-        σ = (metric.age_int_error[index]**2 + 1.56**2)**0.5
+        μ = 20.3
+        σ = 2.5
         gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
         i, = (gauss > 0.001).nonzero()
         ax.plot(
@@ -2505,8 +2517,8 @@ class Output_Group():
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8)
 
         # Plot gaussian curve from Crundall et al. (2019)
-        μ = 18.3
-        σ1, σ2 = 1.2, 1.3
+        μ = 17.7
+        σ1, σ2 = 1.2, 1.2
         x1, x2 = np.arange(μ - 10, μ, 0.01), np.arange(μ, μ + 10, 0.01)
         gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
         gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))

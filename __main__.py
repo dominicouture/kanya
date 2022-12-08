@@ -8,22 +8,21 @@
     2 - Groups creation: traceback members' positions from data or a model, and age computation
         by minimizing association size metrics.
     3 - Output creation: series and groups output.
-
 """
 
-from kanya import *
+import kanya
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
 
 # Series creation
-Series(path='config.py', args=True)
+kanya.Series(path='config.py', args=True)
 
 # Groups creation
-collection.create()
+kanya.collection.create()
 
 # Output creation
-for series in collection:
+for series in kanya.collection:
     series.create_metrics_table(show=True, save=False, machine=False)
     series.create_metrics_table(show=False, save=True, forced=True, machine=True)
     series.create_covariances_xyz_plot(forced=True)

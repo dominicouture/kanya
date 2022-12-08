@@ -9,8 +9,8 @@
 
 import numpy as np
 from gc import collect
-from kanya.init import *
-from kanya.output import *
+from .init import *
+from .output import *
 
 __author__ = 'Dominic Couture'
 __email__ = 'dominic.couture.1@umontreal.ca'
@@ -385,7 +385,7 @@ class Series(list, Output_Series):
             "Required traceback parameter 'data' is missing in the configuration.")
 
         # Stars creation from data
-        from kanya.data import Data
+        from .data import Data
         self.data = Data(self)
 
         # number_of_stars parameter
@@ -1172,7 +1172,7 @@ class Series(list, Output_Series):
         if forced:
 
             # Traceback configuration
-            from kanya.group import Group
+            from .group import Group
             self.configure_traceback()
 
             # Traceback
@@ -1260,7 +1260,7 @@ class Series(list, Output_Series):
 
                 # Default name and saving
                 if default or choice in ('k', 'keep'):
-                    from kanya.tools import default_name
+                    from .tools import default_name
                     self.file_path = default_name(self.file_path)
                     save(self)
 

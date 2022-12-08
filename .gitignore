@@ -1,16 +1,61 @@
-# Compiled source #
-###################
+# Compiled source
 *.com
 *.class
 *.dll
 *.exe
 *.o
 *.so
+*.pyc
+*.pyd
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Packages #
-############
-# it's better to unpack these files and commit the raw source
-# git has its own built in compression methods
+# Distribution / packaging
+.Python
+bin/
+build/
+develop-eggs/
+dist/
+downloads/
+*.egg-info/
+*.egg
+eggs/
+.eggs/
+.installed.cfg
+lib/
+lib64/
+MANIFEST
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+
+# Environments
+.env
+.venv
+env/
+venv/
+env.bak/
+venv.bak/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Packages
 *.7z
 *.dmg
 *.gz
@@ -20,15 +65,26 @@
 *.tar
 *.zip
 
-# Logs and databases #
-######################
+# Logs and databases
 *.log
 *.sql
 *.sqlite
 *.db
 
-# OS generated files #
-######################
+# Translations
+*.mo
+*.pot
+
+# Output files
+*.pdf
+
+# VSCode
+.vscode
+
+# Pytest
+.pytest_cache
+
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -36,3 +92,7 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+*~
+*.swp
+*.swo
+.tmp
