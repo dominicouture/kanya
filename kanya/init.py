@@ -1,29 +1,28 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" init.py: Imports information from config.py, command line arguments and parameters into a
-    Config object. This script must be run first to create a Series object.
+"""
+init.py: Imports information from config.py, command line arguments and parameters into a
+Config object. This script must be run first to create a Series object.
 """
 
 from copy import deepcopy
 from .collection import *
 from .coordinate import *
 
-__author__ = 'Dominic Couture'
-__email__ = 'dominic.couture.1@umontreal.ca'
-
 class Config():
-    """ Contains the parameters imported from a configuration file (which must be a Python file),
-        command line arguments, parameters in the __init__ function call or another Config object,
-        as well as related methods, a Parameter class and a dictionary of default values. A Config
-        object can then be used as the input of a Series object.
+    """
+    Contains the parameters imported from a configuration file (which must be a Python file),
+    command line arguments, parameters in the __init__ function call or another Config object,
+    as well as related methods, a Parameter class and a dictionary of default values. A Config
+    object can then be used as the input of a Series object.
     """
 
     class Metric():
-        """ Basic parameters of an association size metric. """
+        """Basic parameters of an association size metric."""
 
         def __init__(self, label, name, latex_short, latex_long, valid, age_shift, order):
-            """ Initializes an association size metric. """
+            """Initializes an association size metric."""
 
             self.label = label
             self.name = np.atleast_1d(name)
@@ -465,7 +464,7 @@ class Config():
             False, 0.0, 45))}
 
     class Parameter():
-        """ Components of a configuration parameter. """
+        """Components of a configuration parameter."""
 
         # Default components
         default_components = {component: None for component in
@@ -481,9 +480,10 @@ class Config():
             self.update(components.copy())
 
         def update(self, parameter):
-            """ Updates the components of 'self' with those of another 'parameter' or a dictionary
-                of components, only if those new components are part of the default components
-                tuple or singular forms of default components.
+            """
+            Updates the components of 'self' with those of another 'parameter' or a dictionary
+            of components, only if those new components are part of the default components
+            tuple or singular forms of default components.
             """
 
             # Parameter conversion into a dictionary
@@ -494,7 +494,8 @@ class Config():
             stop(
                 type(parameter) != dict, 'TypeError',
                 "A parameter must be a Config.Parameter object or a dictionary ({} given).",
-                type(parameter))
+                type(parameter)
+            )
 
             # Component conversion from singular to plural form
             for component in ('value', 'unit'):
@@ -515,21 +516,25 @@ class Config():
             if type(parameter) == dict:
                 vars(self).update({
                     key: component for key, component in parameter.items()
-                    if key in self.default_components})
+                    if key in self.default_components
+                })
 
         def __repr__(self):
-            """ Returns a string with all the components of the parameter. """
+            """Returns a string with all the components of the parameter."""
 
             return '({})'.format(
-                ', '.join(['{}: {}'.format(key, value) for key, value in vars(self).items()]))
+                ', '.join(['{}: {}'.format(key, value) for key, value in vars(self).items()])
+            )
 
     # Null parameters
     null_position = dict(
         values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
-        units=tuple(variable.unit.label for variable in systems['cartesian'].position))
+        units=tuple(variable.unit.label for variable in systems['cartesian'].position)
+    )
     null_velocity = dict(
         values=(0.0, 0.0, 0.0), system='cartesian', axis='galactic', origin='sun',
-        units=tuple(variable.unit.label for variable in systems['cartesian'].velocity))
+        units=tuple(variable.unit.label for variable in systems['cartesian'].velocity)
+    )
     null_time = dict(units=System.default_units['time'].label)
 
     # Default parameters
@@ -556,27 +561,32 @@ class Config():
         Parameter(label='data_errors', name='Data errors', values=False),
         Parameter(
             label='rv_shift', name='Radial velocity shift', values=0.0,
-            units=System.default_units['speed'].label, system='cartesian'),
+            units=System.default_units['speed'].label, system='cartesian'
+        ),
         Parameter(label='data_rv_shifts', name='Data radial velocity shifts', values=False),
         Parameter(label='jackknife_number', name='Jack-knife number', values=1),
-        Parameter(label='jackknife_fraction', name='Jack-knife fraction', values=1.0, units=''),
+        Parameter(label='jackknife_fraction', name='Jack-knife fraction', values=1.0, units=''
+        ),
         Parameter(
-            label='mst_fraction', name='Minimum spanning tree fraction', values=1.0, units=''),
+            label='mst_fraction', name='Minimum spanning tree fraction', values=1.0, units=''
+        ),
         Parameter(label='cutoff', name='Cutoff', values=None),
         Parameter(label='sample', name='Sample', values=None),
-        Parameter(label='potential', name='Galactic potential', values=None))}
+        Parameter(label='potential', name='Galactic potential', values=None)
+    )}
 
     # Position and velocity paramaters
     position_parameters = ('position', 'position_error', 'position_scatter')
     velocity_parameters = ('velocity', 'velocity_error', 'velocity_scatter')
 
     def __init__(self, parent=None, path=None, args=False, **parameters):
-        """ Configures a Config objects from, in order, 'parent', an existing Config object,
-            'path', a string representing a path to a configuration file, 'args' a boolean value
-            that sets whether command line arguments are used, and '**parameters', a dictionary
-            of dictionaries, where keys must match values in Parameter.default_components, or
-            Config.Parameter objects. Only values that match a key in self.default_parameters are
-            used. If no value are given the default parameter is used instead.
+        """
+        Configures a Config objects from, in order, 'parent', an existing Config object,
+        'path', a string representing a path to a configuration file, 'args' a boolean value
+        that sets whether command line arguments are used, and '**parameters', a dictionary
+        of dictionaries, where keys must match values in Parameter.default_components, or
+        Config.Parameter objects. Only values that match a key in self.default_parameters are
+        used. If no value are given the default parameter is used instead.
         """
 
         # Default or parent's parameters import
@@ -587,7 +597,8 @@ class Config():
         else:
             stop(
                 True, 'TypeError',
-                "'parent' can either be a Config object or None ({} given).", type(parent))
+                "'parent' can either be a Config object or None ({} given).", type(parent)
+            )
 
         # Parameters import
         if path is not None:
@@ -598,15 +609,17 @@ class Config():
             self.initialize_from_parameters(parameters)
 
     def initialize_from_path(self, config_path):
-        """ Initializes a Config object from a configuration file located at 'config_path', and
-            checks for NameError, TypeError and ValueError exceptions. 'config_path' can be an
-            absolute path or relative to the current working directory.
+        """
+        Initializes a Config object from a configuration file located at 'config_path', and
+        checks for NameError, TypeError and ValueError exceptions. 'config_path' can be an
+        absolute path or relative to the current working directory.
         """
 
         # Check if config_path is a string
         stop(
             type(config_path) != str, 'TypeError',
-            "The path to the configuration file must be a string ('{}' given).", type(config_path))
+            "The path to the configuration file must be a string ('{}' given).", type(config_path)
+        )
 
         # Absolute path
         config_path = directory(collection.base_dir, config_path, 'config_path')
@@ -614,17 +627,21 @@ class Config():
         # Check if the configuration file exists
         stop(
             not path.exists(config_path), 'FileNotFoundError',
-            "No configuration file located at '{}'.", config_path)
+            "No configuration file located at '{}'.", config_path
+        )
 
         # Check if the configuration is a Python file
         stop(
             path.splitext(config_path)[1] != '.py', 'TypeError',
-            "'{}' is not a Python file. (with a .py extension)", path.basename(config_path))
+            "'{}' is not a Python file. (with a .py extension)", path.basename(config_path)
+        )
 
         # Configuration file import
         from importlib.util import spec_from_file_location, module_from_spec
         try:
-            spec = spec_from_file_location(path.splitext(path.basename(config_path))[0], config_path)
+            spec = spec_from_file_location(
+                path.splitext(path.basename(config_path))[0], config_path
+            )
             parameters = module_from_spec(spec)
             vars(parameters).update(vars(self))
             spec.loader.exec_module(parameters)
@@ -633,42 +650,51 @@ class Config():
         except NameError as error:
             stop(
                 True, 'NameError',
-                "{}, only values in 'default_parameters' are configurable.", error.args[0])
+                "{}, only values in 'default_parameters' are configurable.", error.args[0]
+            )
 
         # Parameters import
         self.initialize_from_parameters(vars(parameters))
 
     def initialize_from_arguments(self, args):
-        """ Parses arguments from the commmand line, creates an arguments object and adds these
-            new values to the Config object. Also checks if 'args' is a boolean value. Overwrites
-            values given in a configuration file.
+        """
+        Parses arguments from the commmand line, creates an arguments object and adds these
+        new values to the Config object. Also checks if 'args' is a boolean value. Overwrites
+        values given in a configuration file.
         """
 
         # Check if 'args' is a boolean value
         stop(
             type(args) != bool, 'TypeError',
-            "'args' must be a boolean value ({} given).", type(args))
+            "'args' must be a boolean value ({} given).", type(args)
+        )
 
         # Arguments parsing
         from argparse import ArgumentParser
         parser = ArgumentParser(
             prog='kanya',
-            description='traces given or simulated moving groups of stars back to their origin.')
+            description='traces given or simulated moving groups of stars back to their origin.'
+        )
         parser.add_argument(
             '-n', '--name', action='store', type=str,
-            help='name of the series of tracebacks.')
+            help='name of the series of tracebacks.'
+        )
         parser.add_argument(
             '-d', '--data', action='store_true',
-            help='use the data parameter in the configuration file as input.')
+            help='use the data parameter in the configuration file as input.'
+        )
         parser.add_argument(
             '-m', '--model', action='store_true',
-            help='model an input based on simulation parameters in the configuration file.')
+            help='model an input based on simulation parameters in the configuration file.'
+        )
         parser.add_argument(
             '-l', '--from_file', action='store_true',
-            help='load the input data from a file.')
+            help='load the input data from a file.'
+        )
         parser.add_argument(
             '-s', '--to_file', action='store_true',
-            help='save the output data to a file.')
+            help='save the output data to a file.'
+        )
         args = parser.parse_args()
 
         # Series name import if not None
@@ -682,14 +708,16 @@ class Config():
         self.to_file.values = args.to_file
 
     def initialize_from_parameters(self, parameters):
-        """ Initializes a Config object from a parameters dictionary. Overwrites values given in
-            a configuration file or as arguments in command line. Values in the dictionary can
-            either be Parameter objects or dictionaries of components.
+        """
+        Initializes a Config object from a parameters dictionary. Overwrites values given in
+        a configuration file or as arguments in command line. Values in the dictionary can
+        either be Parameter objects or dictionaries of components.
         """
 
         # Filter parameters that don't match a default parameter
         for key, parameter in filter(
-                lambda item: item[0] in self.default_parameters.keys(), parameters.items()):
+                lambda item: item[0] in self.default_parameters.keys(), parameters.items()
+            ):
 
             # Parameter update from a Parameter object or dictionary
             if key in vars(self).keys() and type(vars(self)[key]) == Config.Parameter:
@@ -700,6 +728,6 @@ class Config():
                 vars(self)[key] = parameter
 
     def __repr__(self):
-        """ Returns a string of name of the configuration. """
+        """Returns a string of name of the configuration."""
 
         return '{} Configuration'.format(self.name.values)

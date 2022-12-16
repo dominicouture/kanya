@@ -1,7 +1,8 @@
 # !/usr/local/bin/env python3
 # -*- coding: utf-8 -*-
 
-""" __main__.py: Main pipeline of the kanya package. It executes the following steps:
+"""
+__main__.py: Main pipeline of the kanya package. It executes the following steps:
 
     1 - Series creation: arguments, parameters, data and configuration file import, format and
         check, and conversions.
@@ -11,9 +12,6 @@
 """
 
 import kanya
-
-__author__ = 'Dominic Couture'
-__email__ = 'dominic.couture.1@umontreal.ca'
 
 # Series creation
 kanya.Series(path='config.py', args=True)
@@ -57,5 +55,8 @@ for series in kanya.collection:
             group.create_2D_and_3D_scatter([15, 20, 25], forced=True)
             group.create_cross_covariances_scatter('x', 'u', age=10, errors=True, forced=True)
             group.create_age_distribution(forced=True, metric='covariances_ξηζ', index=0)
-            for metric in ('covariances_ξηζ_matrix_det', 'covariances_ξηζ', 'mad_ξηζ', 'mst_ξηζ_mean'):
+            for metric in (
+                'covariances_ξηζ_matrix_det', 'covariances_ξηζ',
+                'mad_ξηζ', 'mst_ξηζ_mean'
+            ):
                 group.create_age_distribution(forced=True, metric=metric, index=0)

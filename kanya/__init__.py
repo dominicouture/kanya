@@ -1,13 +1,17 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" __init__.py: Initializes the Kanya Python package. """
+"""
+Kanya (Kinematic Age for Nearby Young Associations) is a Python package that performs
+three-dimensional traceback analysis of members of a nearby young association (NYA) and
+computes their kinematic age by finding the epoch when the spatial extent of the NYA was
+minimal.
+"""
 
-from .series import *
+from .__version__ import *
+from .series import Series, collection
 
-__author__ = 'Dominic Couture'
-__email__ = 'dominic.couture.1@umontreal.ca'
-__uri__ = 'https://github.com/dominicouture/kanya'
-__license__ = 'MIT'
-__description__ = 'Kanya: Kinematic Age for Nearby Young Associations'
-__all__ = ['Series']
+__all__ = [
+    'Series',
+    'collection'
+]

@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-""" setup.py: setup file for the kanya Python package. Inspired by:
-    https://hynek.me/articles/sharing-your-labor-of-love-pypi-quick-and-dirty/
+"""
+setup.py: setup file for the kanya Python package. Inspired by:
+https://hynek.me/articles/sharing-your-labor-of-love-pypi-quick-and-dirty/
 """
 
 import codecs
@@ -20,7 +21,8 @@ classifiers = [
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: MIT License',
     'Operating System :: OS Independent',
-    'Programming Language :: Python']
+    'Programming Language :: Python'
+]
 install_requires = [
     'numpy',
     'scipy',
@@ -28,14 +30,17 @@ install_requires = [
     'astropy',
     'galpy',
     'sklearn',
-    'pandas']
+    'pandas'
+]
 setup_requires = [
     'setuptools>=40.6.0',
     'setuptools_scm',
-    'wheel']
+    'wheel'
+]
 extra_require = {
     'extras': ['h5py'],
-    'tests': ['pdb']}
+    'tests': ['pdb']
+}
 
 # Current file real location
 here = os.path.dirname(os.path.realpath(__file__))
@@ -56,11 +61,13 @@ if __name__ == '__main__':
         name=name,
         use_scm_version={
             'write_to': os.path.join(name, '{0}_version.py'.format(name)),
-            'write_to_template': '__version__ = "{version}"\n'},
+            'write_to_template': '__version__ = "{version}"\n'
+        },
         author=find_meta('author'),
         author_email=find_meta('email'),
         maintainer=find_meta('author'),
         maintainer_email=find_meta('email'),
+        version=find_meta('version'),
         url=find_meta('uri'),
         project_urls=project_urls,
         license=find_meta('license'),

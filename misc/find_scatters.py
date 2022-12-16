@@ -1,39 +1,44 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" find_scatter.py: Finds the initial scatter of β Pictoris. """
+"""find_scatter.py: Finds the initial scatter of the β Pictoris Moving Group."""
 
 import numpy as np
 from astropy import units as un
 from matplotlib import rcParams, pyplot as plt
 
-__author__ = 'Dominic Couture'
-__email__ = 'dominic.couture.1@umontreal.ca'
-
 def find_scatters(
         number_of_stars: int, age: int, avg_position_xyz: tuple, avg_position_scatter_xyz: tuple,
         avg_velocity_xyz: tuple, avg_velocity_scatter_xyz: tuple):
-    """ Cumputes scatters of a simulated group after a given age. """
+    """Cumputes scatters of a simulated group after a given age."""
 
     # Initial and final positions
     intial_positions_xyz = np.random.normal(
-        np.full((number_of_stars, 3), avg_position_xyz), avg_position_scatter_xyz)
+        np.full((number_of_stars, 3), avg_position_xyz), avg_position_scatter_xyz
+    )
     final_positions_xyz = intial_positions_xyz + age * np.random.normal(
-        np.full((number_of_stars, 3), avg_velocity_xyz), avg_velocity_scatter_xyz)
+        np.full((number_of_stars, 3), avg_velocity_xyz), avg_velocity_scatter_xyz
+    )
 
     # Scatter computations
     final_scatter_xyz = np.std(final_positions_xyz, axis=0)
     final_scatter3 = np.prod(final_scatter_xyz)**(1 / 3)
     final_scatter1 = np.linalg.norm(final_scatter_xyz)
     final_scatter2 = np.std(np.linalg.norm(final_positions_xyz, axis=1))
-    final_scatter4 = np.sqrt(sum([ # 1 et 4 are equivalent
-        sum([x**2, y**2, z**2]) for x, y, z in final_positions_xyz - np.average(
-            final_positions_xyz, axis=0)]) / number_of_stars)
+    final_scatter4 = np.sqrt( # 1 et 4 are equivalent
+        sum(
+            (
+                sum([x**2, y**2, z**2]) for x, y, z in final_positions_xyz - np.average(
+                    final_positions_xyz, axis=0
+                )
+            )
+        ) / number_of_stars
+    )
 
     return (final_scatter3, final_scatter_xyz)
 
 def create_graph(x, y, y_ans):
-    """ Creates a plot of the scatter with a linear regression curve. """
+    """Creates a plot of the scatter with a linear regression curve."""
 
     # Figure initialization
     rcParams.update({'font.family': 'serif', 'font.size': '15'})
@@ -68,13 +73,15 @@ current_avg_position_scatter_x = np.prod(current_avg_position_scatter_xyz)**(1 /
 max_scatter_x = 25.0
 initial_avg_position_scatters_x = np.arange(0, max_scatter_x, max_scatter_x/number_of_groups)
 initial_avg_position_scatters_xyz = np.full(
-    (number_of_groups, 3), (initial_avg_position_scatters_x).reshape((number_of_groups, 1)))
+    (number_of_groups, 3), (initial_avg_position_scatters_x).reshape((number_of_groups, 1))
+)
 
 # Velocity scatter
 avg_velocity_xyz = (0.0, 0.0, 0.0)
 avg_velocity_scatter_xyz = (2.2, 1.2, 1.0) # Typical of β Pictoris Pictoris Moving Group
 avg_velocity_scatter_xyz = np.full(
-    (3,), np.prod(avg_velocity_scatter_xyz)**(1 / 3) * (un.km / un.s).to(un.pc / un.Myr))
+    (3,), np.prod(avg_velocity_scatter_xyz)**(1 / 3) * (un.km / un.s).to(un.pc / un.Myr)
+)
 # avg_velocity_xyz = np.full(
 #     (3,), np.linalg.norm(avg_velocity) / 3**0.5) * (un.km / un.s).to(un.pc / un.Myr)
 # avg_velocity_xyz = np.array(avg_velocity) * (un.km / un.s).to(un.pc / un.Myr)
@@ -87,7 +94,8 @@ for initial_avg_position_scatter_xyz in initial_avg_position_scatters_xyz:
     scatter_x, scatter_xyz = find_scatters(
         number_of_stars, age,
         initial_avg_position_xyz, initial_avg_position_scatter_xyz,
-        avg_velocity_xyz, avg_velocity_scatter_xyz)
+        avg_velocity_xyz, avg_velocity_scatter_xyz
+    )
     print(initial_avg_position_scatter_xyz, ' : ', scatter_x, scatter_xyz)
     scatters_x.append(scatter_x)
     scatters_xyz.append(scatter_xyz)
@@ -104,7 +112,8 @@ for t in time:
     scatter_x, scatter_xyz = find_scatters(
         number_of_stars, t,
         initial_avg_position_xyz, (0.0, 0.0, 0.0),
-        avg_velocity_xyz, avg_velocity_scatter_xyz)
+        avg_velocity_xyz, avg_velocity_scatter_xyz
+    )
     print(t, ' Myr : ', scatter_x, scatter_xyz)
     scatters_x.append(scatter_x)
     scatters_xyz.append(scatter_xyz)
