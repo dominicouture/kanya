@@ -25,6 +25,7 @@ for series in kanya.collection:
     series.create_metrics_table(show=False, save=True, forced=True, machine=True)
     series.create_covariances_xyz_plot(forced=True)
     series.create_covariances_ξηζ_plot(forced=True) # Valid
+    series.create_mahalanobis_plot(forced=True)
     series.create_covariances_xyz_plot(robust=True, forced=True)
     series.create_covariances_ξηζ_plot(robust=True, forced=True)
     series.create_covariances_xyz_plot(sklearn=True, forced=True)
@@ -45,7 +46,7 @@ for series in kanya.collection:
         if group.number == 0:
             group.create_kinematics_table(save=True, machine=True)
             group.trajectory_xyz(forced=True, metric='covariances_xyz', index=0)
-            group.trajectory_ξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
+            group.trajectory_ξηζ(forced=True, age=19.75) # Valid
             group.trajectory_time_xyz('2x2', forced=True, metric='covariances_xyz')
             group.trajectory_time_xyz('1x3', forced=True, metric='covariances_xyz')
             group.trajectory_time_ξηζ('2x2', forced=True, metric='covariances_ξηζ')

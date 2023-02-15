@@ -841,11 +841,11 @@ class Data(list):
                     ).to()
 
             # Radial velocity shift based on spectral type
-            if self.spectral_type is not None:
-                self.spectral_type, rv_shift, rv_shift_error = self.data.find_rv_shift(
-                    self.spectral_type
-                )
-                self.rv_shift = Quantity(rv_shift, 'km/s', rv_shift_error).to()
+            # if self.spectral_type is not None:
+            #     self.spectral_type, rv_shift, rv_shift_error = self.data.find_rv_shift(
+            #         self.spectral_type
+            #     )
+            #     self.rv_shift = Quantity(rv_shift, 'km/s', rv_shift_error).to()
 
             # Radial velocity shift from mass and radius columns
             elif self.mass is not None and self.radius is not None:

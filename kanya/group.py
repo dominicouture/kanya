@@ -47,25 +47,32 @@ class Group(list, Output_Group):
         # Set association size metrics
         self.set_metrics()
 
-        # Compute empirical covariances metrics
-        if True:
-            self.get_covariances()
+        # Principal component analysis
+        if self.series.pca:
+            self.principal_component_analysis(version=1)
 
-        # Compute robust covariances metrics
-        if True:
-            self.get_covariances_robust()
+        # Compute association size metrics
+        if self.series.size_metrics:
 
-        # Compute sklearn covariances metrics
-        if False:
-            self.get_covariances_sklearn()
+            # Compute empirical covariances metrics
+            if self.series.cov_metrics:
+                self.get_covariances()
 
-        # Compute median absolute deviation metrics
-        if True:
-            self.get_median_absolute_deviation()
+            # Compute robust covariances metrics
+            if self.series.cov_robust_metrics:
+                self.get_covariances_robust()
 
-        # Compute minimum spanning tree metrics
-        if False:
-            self.get_minimum_spanning_tree()
+            # Compute sklearn covariances metrics
+            if self.series.cov_sklearn_metrics:
+                self.get_covariances_sklearn()
+
+            # Compute median absolute deviation metrics
+            if self.series.mad_metrics:
+                self.get_median_absolute_deviation()
+
+            # Compute minimum spanning tree metrics
+            if self.series.mst_metrics:
+                self.get_minimum_spanning_tree()
 
     def stars_from_data(self):
         """
@@ -403,36 +410,6 @@ class Group(list, Output_Group):
                 # Compute stars coordinates
                 self.get_stars_coordinates()
 
-        # Principal component analysis
-        if False:
-            a = np.array([star.position_xyz for star in self.sample]) - self.position_xyz
-            a = np.tile(a.T, (a.shape[-1], 1, 1, 1))
-            b = np.swapaxes(a, 0, 1)
-            covariances_matrix = np.mean(a * b, axis=3).T
-            eigen_values, eigen_vectors = np.linalg.eig(covariances_matrix)
-            rotation_matrix = np.linalg.inv(eigen_vectors)
-
-            # Rotate star positions
-            for star in self:
-                star.position_xyz = np.squeeze(
-                    np.matmul(
-                        star.position_xyz[:,None], rotation_matrix
-                    )
-                )
-                star.position_xyz_other = np.squeeze(
-                    np.matmul(
-                        np.swapaxes(rotation_matrix, 1, 2), star.position_xyz[:,:,None]
-                        )
-                    )
-
-            # Compute eigen values association size metric
-            self.Metric(
-                self, 'eigen_values', np.repeat(
-                    (np.sum(eigen_values**2, axis=1)**0.5)[None],
-                    self.series.jackknife_number, axis=0
-                )
-            )
-
     def set_metrics(self):
         """
         Sets the parameters to compute association size metrics, including weights based on
@@ -484,8 +461,11 @@ class Group(list, Output_Group):
             [star.velocity_ξηζ for star in self.sample]
         )[self.stars_monte_carlo]
 
-        # Principal component analysis
-        if True:
+    def principal_component_analysis(self, version):
+        """Rotate the axes of the positions and velocities along the principal components."""
+
+        # Principal component analysis (First version)
+        if version==1:
             def rotate(positions, velocities):
                 """Rotate positions and velocities along the main components of the positions."""
 
@@ -507,13 +487,43 @@ class Group(list, Output_Group):
                     np.squeeze(np.matmul(velocities[:,:,:,None], rotation_matrix))
                 )
 
-            # Rotate along principal components
-            self.positions_xyz, self.velocities_xyz = rotate(
-                self.positions_xyz, self.velocities_xyz
+        # Rotate along principal components
+        self.positions_xyz, self.velocities_xyz = rotate(
+            self.positions_xyz, self.velocities_xyz
+        )
+        self.positions_ξηζ, self.velocities_ξηζ = rotate(
+            self.positions_ξηζ, self.velocities_ξηζ
+        )
+
+        # Principal component analysis (Second version)
+        if version==2:
+            a = np.array([star.position_xyz for star in self.sample]) - self.position_xyz
+            a = np.tile(a.T, (a.shape[-1], 1, 1, 1))
+            b = np.swapaxes(a, 0, 1)
+            covariances_matrix = np.mean(a * b, axis=3).T
+            eigen_values, eigen_vectors = np.linalg.eig(covariances_matrix)
+            rotation_matrix = np.linalg.inv(eigen_vectors)
+
+            # Rotate star positions
+            for star in self:
+                star.position_xyz = np.squeeze(
+                    np.matmul(
+                        star.position_xyz[:,None], rotation_matrix
+                    )
+                )
+                star.position_xyz_other = np.squeeze(
+                    np.matmul(
+                        np.swapaxes(rotation_matrix, 1, 2), star.position_xyz[:,:,None]
+                        )
+                    )
+
+        # Compute eigen values association size metric
+        self.Metric(
+            self, 'eigen_values', np.repeat(
+                (np.sum(eigen_values**2, axis=1)**0.5)[None],
+                self.series.jackknife_number, axis=0
             )
-            self.positions_ξηζ, self.velocities_ξηζ = rotate(
-                self.positions_ξηζ, self.velocities_ξηζ
-            )
+        )
 
     class Metric():
         """
@@ -658,6 +668,14 @@ class Group(list, Output_Group):
             self.cross_covariances_ξηζ_matrix_trace_robust
         )
 
+        # xyz Mahalanobis distance mean and median
+        self.mahalanobis_xyz_mean(np.mean(self.Mahalanobis_xyz, axis=0))
+        self.mahalanobis_xyz_median(np.median(self.Mahalanobis_xyz, axis=0))
+
+        # ξηζ Mahalanobis distance mean and median
+        self.mahalanobis_ξηζ_mean(np.mean(self.Mahalanobis_ξηζ, axis=0))
+        self.mahalanobis_ξηζ_median(np.median(self.Mahalanobis_ξηζ, axis=0))
+
     def get_covariances_sklearn(self):
         """
         Computes the xyz and ξηζ position covariances matrix using the sklearn package. The
@@ -748,7 +766,8 @@ class Group(list, Output_Group):
         if covariances_matrix is None:
             covariances_matrix = self.get_covariances_matrix(a, b)
         covariances_matrix_invert = np.repeat(
-            np.linalg.inv(covariances_matrix)[None], self.sample_size_jackknife, axis=0
+            np.linalg.inv(covariances_matrix)[None],
+            self.sample_size_jackknife, axis=0
         )
 
         # Compute Mahalanobis distances

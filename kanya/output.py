@@ -16,7 +16,7 @@ from .coordinate import *
 
 # Set pyplot rc parameters
 plt.rc('font', serif='Latin Modern Math', family='serif', size='8')
-plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Math:roman')
+plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Roman:roman')
 plt.rc('lines', markersize=4)
 plt.rc('pdf', fonttype=42)
 
@@ -357,54 +357,63 @@ class Output_Series():
         displayed as well.
         """
 
-        # Redefine time, value and value error arrays
-        time = -self.time
-        value = metric.value.T[index]
-        value_error = metric.value_error.T[index]
+        # Check metric status
+        if metric.status:
 
-        # Extrapolate one point in the future
-        value_1 = interp1d(time, value, fill_value='extrapolate')(1.0)
-        value_error_1 = interp1d(time, value_error, fill_value='extrapolate')(1.0)
+            # Redefine time, value and value error arrays
+            time = -self.time
+            value = metric.value.T[index]
+            value_error = metric.value_error.T[index]
 
-        # Add the point in the time, value and value error arrays
-        time = np.insert(time, 0, 1.0)
-        value = np.insert(value, 0, value_1)
-        value_error = np.insert(value_error, 0, value_error_1)
+            # Extrapolate one point in the future
+            value_1 = interp1d(time, value, fill_value='extrapolate')(1.0)
+            value_error_1 = interp1d(time, value_error, fill_value='extrapolate')(1.0)
 
-        # Plot the value of the metric over time
-        ax.plot(
-            time, value, label=(
-                f'{metric.latex_short[index]} : ({metric.age[index]:.1f}'
-                f' ± {metric.age_error[index]:.1f}) Myr'
-            ),
-            color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
-            solid_capstyle='round', dash_capstyle='round', zorder=zorder
-        )
+            # Add the point in the time, value and value error arrays
+            time = np.insert(time, 0, 1.0)
+            value = np.insert(value, 0, value_1)
+            value_error = np.insert(value_error, 0, value_error_1)
 
-        # Plot an enveloppe to display the uncertainty
-        ax.fill_between(
-            time, value - value_error, value + value_error,
-            color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5
-        )
-
-        # Plot secondary lines
-        self.stop(
-            type(secondary) != bool, 'TypeError',
-            "'secondary' must be a boolean ({} given).", type(secondary)
-        )
-        if secondary:
-            values = metric.values.reshape((
-                metric.values.shape[0] * metric.values.shape[1],
-                metric.values.shape[2], metric.values.shape[3])
+            # Plot the value of the metric over time
+            ax.plot(
+                time, value, label=(
+                    f'{metric.latex_short[index]} : ({metric.age[index]:.1f}'
+                    f' ± {metric.age_error[index]:.1f}) Myr'
+                ),
+                color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
+                solid_capstyle='round', dash_capstyle='round', zorder=zorder
             )
-            for i in np.unique(
-                np.round(np.linspace(0, self.number_of_groups * self.jackknife_number - 1, 20))
-            ):
-                ax.plot(
-                    -self.time, values[int(i),:,index],
-                    color=color, alpha=0.6, linewidth=0.5,
-                    linestyle=linestyle, zorder=zorder - 0.25
+
+            # Plot an enveloppe to display the uncertainty
+            ax.fill_between(
+                time, value - value_error, value + value_error,
+                color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5
+            )
+
+            # Plot secondary lines
+            self.stop(
+                type(secondary) != bool, 'TypeError',
+                "'secondary' must be a boolean ({} given).", type(secondary)
+            )
+            if secondary:
+                values = metric.values.reshape((
+                    metric.values.shape[0] * metric.values.shape[1],
+                    metric.values.shape[2], metric.values.shape[3])
                 )
+                for i in np.unique(
+                    np.round(np.linspace(0, self.number_of_groups * self.jackknife_number - 1, 20))
+                ):
+                    ax.plot(
+                        -self.time, values[int(i),:,index],
+                        color=color, alpha=0.6, linewidth=0.5,
+                        linestyle=linestyle, zorder=zorder - 0.25
+                    )
+        # Logging
+        else:
+            log(
+                "Could not plot '{}' metric for '{}' series. It was not computed.",
+                str(metric.name[index]), self.name, display=True
+            )
 
     def set_title_metric(self, ax, title, metric):
         """Sets a title for association size metrics plots if 'title' is True."""
@@ -795,6 +804,32 @@ class Output_Series():
         )
         # plt.show()
 
+    def create_mahalanobis_plot(self, title=False, forced=False, default=False, cancel=False):
+        """Creates a plot of the xyz and ξηζ Mahalanobis distance mean and median."""
+
+        # Initialize figure
+        fig, ax = self.initialize_figure_metric()
+
+        # Plot total xyz MAD, x MAD, y and z MAD
+        self.plot_metric(ax, self.mahalanobis_xyz_mean, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, self.mahalanobis_xyz_median, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, self.mahalanobis_ξηζ_mean, 0, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, self.mahalanobis_ξηζ_median, 0, colors.metric[7], ':', 0.5)
+
+        # Set title
+        self.set_title_metric(ax, title, 'Mahalanobis distance')
+
+        # Set legend, limits, labels and axes
+        self.set_axis_metric(ax)
+        ax.set_ylim(-0.1, 2.9)
+
+        # Save figure
+        save_figure(
+            self.name, f'Mahalanobis_{self.name}.pdf',
+            tight=title, forced=forced, default=default, cancel=cancel
+        )
+        # plt.show()
+
     def create_covariances_mad_ξηζ_plot(
         self, title=False, forced=False, default=False, cancel=False
     ):
@@ -1089,10 +1124,17 @@ class Output_Group():
         # Index from the epoch of minimum of an association size metric
         elif metric is not None:
             metric, index = self.get_metric(metric, index)
-            return (
-                int(metric.age[index] / self.series.final_time.value * self.series.number_of_steps),
-                metric.age[index], metric.age_error[index]
-            )
+            if metric.status:
+                return (
+                    int(metric.age[index] / self.series.final_time.value * self.series.number_of_steps),
+                    metric.age[index], metric.age_error[index]
+                )
+            else:
+                log(
+                    "Could not use '{}' metric for '{}' group. It was not computed.",
+                    str(metric.name[index]), self.name, display=True
+                )
+                return (None, None, None)
 
         # No birth index, age or age error
         else:
@@ -1725,20 +1767,30 @@ class Output_Group():
 
         # Initialize a 1x3 figure
         if style == '1x3':
-            fig = plt.figure(facecolor=colors.white, figsize=(3.345, 9.134), dpi=300)
-            left, bottom = (0.133, 0.0355)
-            width, height = (0.866, 0.3112)
-            inside = 0.01095
+            # fig = plt.figure(facecolor=colors.white, figsize=(3.345, 9.134), dpi=300)
+            # left, bottom = (0.133, 0.0355)
+            # width, height = (0.866, 0.3112)
+            # inside = 0.01095
+
+            fig = plt.figure(facecolor=colors.white, figsize=(3.345, 7.5), dpi=300)
+            left, bottom = (0.133, 0.0432)
+            width, height = (0.866, 0.3064)
+            inside = 0.0133
+
             ax1 = fig.add_axes([left, bottom + 2 * (height + inside), width, height])
             ax2 = fig.add_axes([left, bottom + height + inside, width, height])
             ax3 = fig.add_axes([left, bottom, width, height])
 
         # Birth index, age and age error
-        birth_index, age, age_error  = tuple(
-            zip(
-                *[self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
-            )
-        )
+        # birth_index, age, age_error  = tuple(
+        #     zip(
+        #         *[self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
+        #     )
+        # )
+
+        age = np.array((19.8, 0.0, 36.3))
+        age_error = np.array((2.5, 7.2, 9.7))
+        birth_index = np.array(age / self.series.final_time.value * self.series.number_of_steps, dtype=int)
 
         # Plot stars' trajectories
         for ax, y in ((ax1, 0), (ax2, 1), (ax3, 2)):
@@ -2777,57 +2829,65 @@ class Output_Group():
 
         # Retrieve ages
         metric, index = self.get_metric(metric, index)
-        metric_name = metric.label
-        ages = metric.ages
-        if ages.ndim == 2:
-            ages = ages[self.number]
-        elif ages.ndim == 3:
-            ages = ages[self.number,:,index]
+        if metric.status:
+            metric_name = metric.label
+            ages = metric.ages
+            if ages.ndim == 2:
+                ages = ages[self.number]
+            elif ages.ndim == 3:
+                ages = ages[self.number,:,index]
 
-        # Plot uncorrected histogram and gaussian curve
-        if False:
+            # Plot uncorrected histogram and gaussian curve
+            if False:
+                x = np.linspace(8, 36, 1000)
+                μ = metric.age[index]
+                σ = metric.age_int_error[index]
+                gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
+                i, = (gauss > 0.001).nonzero()
+                ax.plot(
+                    x[i], gauss[i], label='$\\xi^\\prime$ variance',
+                    color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8
+                )
+                ax.hist(
+                    ages, bins=np.linspace(12, 32, 81), density=True,
+                    color=colors.cyan[6], alpha=0.15, zorder=0.8
+                )
+                ax.vlines(
+                    μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
+                    alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8
+                )
+
+            # Plot corrected histogram and gaussian curve
             x = np.linspace(8, 36, 1000)
-            μ = metric.age[index]
-            σ = metric.age_int_error[index]
+            μ = metric.age_ajusted[index]
+            μ = 20.4
+            σ = 2.5
             gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
             i, = (gauss > 0.001).nonzero()
             ax.plot(
-                x[i], gauss[i], label='$\\xi^\\prime$ variance',
-                color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8
+                x[i], gauss[i], label='Corrected $\\xi^\\prime$ variance',
+                color=colors.lime[5], alpha=1.0, linewidth=1.0, zorder=0.9
             )
+            ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
             ax.hist(
                 ages, bins=np.linspace(12, 32, 81), density=True,
-                color=colors.cyan[6], alpha=0.15, zorder=0.8
+                color=colors.lime[6], alpha=0.3, zorder=0.6
             )
+            # ax.fill_between(
+            #     x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
+            #     alpha=0.15, linewidth=0., zorder=0.6
+            # )
             ax.vlines(
-                μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
-                alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8
+                μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
+                alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9
             )
 
-        # Plot corrected histogram and gaussian curve
-        x = np.linspace(8, 36, 1000)
-        μ = metric.age_ajusted[index]
-        μ = 20.3
-        σ = 2.5
-        gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
-        i, = (gauss > 0.001).nonzero()
-        ax.plot(
-            x[i], gauss[i], label='Corrected $\\xi^\\prime$ variance',
-            color=colors.lime[5], alpha=1.0, linewidth=1.0, zorder=0.9
-        )
-        ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
-        ax.hist(
-            ages, bins=np.linspace(12, 32, 81), density=True,
-            color=colors.lime[6], alpha=0.3, zorder=0.6
-        )
-        # ax.fill_between(
-        #     x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
-        #     alpha=0.15, linewidth=0., zorder=0.6
-        # )
-        ax.vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
-            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9
-        )
+        # Logging
+        else:
+            log(
+                "Could not use '{}' metric for '{}' group. It was not computed.",
+                str(metric.name[index]), self.name, display=True
+            )
 
         # Plot gaussian curve from Miret-Roig et al. (2020)
         μ = 18.5
@@ -2887,9 +2947,10 @@ class Output_Group():
         )
         if title:
             ax.set_title(
-                f'Distribution of {self.series.jackknife_number} jack-knife Monte Carlo,\n'
-                f'Average age: ({metric.age[0]:.1f} '
-                f'± {metric.age_int_error[0]:.1F}) Myr\n', fontsize=8
+                f'Distribution of {self.series.jackknife_number} jack-knife Monte Carlo' + (
+                    f',\nAverage age: ({metric.age[0]:.1f} '
+                    f'± {metric.age_int_error[0]:.1F}) Myr\n'
+                ) if metric.status else '', fontsize=8
             )
 
         # Set legend

@@ -215,180 +215,180 @@ class Config():
             'Trace${{}}_{{ξ^\\prime η^\\prime ζ^\\prime}}$ (sklearn)',
             False, 0.18, 17),
 
-        # xyz position and velocity cross covariances matrix, determinant and trace
+        # xyz position and velocity cross-covariances matrix, determinant and trace
         Metric(
             'cross_covariances_xyz',
             np.array([
-                'X-U Cross Covariance',
-                'Y-V Cross Covariance',
-                'Z-W Cross Covariance']),
+                'X-U Cross-Covariance',
+                'Y-V Cross-Covariance',
+                'Z-W Cross-Covariance']),
             np.array([
                 '$X-U$',
                 '$Y-V$',
                 '$Z-W$']),
             np.array([
-                '$X-U$ Cross Covariance',
-                '$Y-V$ Cross Covariance',
-                '$Z-W$ Cross Covariance']),
+                '$X-U$ Cross-Covariance',
+                '$Y-V$ Cross-Covariance',
+                '$Z-W$ Cross-Covariance']),
             np.array([False, False, False]),
             np.array([0.96, 0.4, 10.31]), 18),
         Metric(
             'cross_covariances_xyz_matrix_det',
-            'XYZ Cross Covariance Matrix Determinant',
+            'XYZ Cross-Covariance Matrix Determinant',
             'Det.${{}}_{{XUYVZW}}$', 'Determinant${{}}_{{XUYVZW}}$',
             False, 0.28, 19),
         Metric(
             'cross_covariances_xyz_matrix_trace',
-            'XYZ Cross Covariance Matrix Trace',
+            'XYZ Cross-Covariance Matrix Trace',
             'Trace${{}}_{{XUYVZW}}$', 'Trace${{}}_{{XUYVZW}}$',
             False, 0.42, 20),
 
-        # xyz position and velocity robust cross covariances matrix, determinant and trace
+        # xyz position and velocity robust cross-covariances matrix, determinant and trace
         Metric(
             'cross_covariances_xyz_robust',
             np.array([
-                'X-U Cross Covariance (robust)',
-                'Y-V Cross Covariance (robust)',
-                'Z-W Cross Covariance (robust)']),
+                'X-U Cross-Covariance (robust)',
+                'Y-V Cross-Covariance (robust)',
+                'Z-W Cross-Covariance (robust)']),
             np.array([
                 '$X-U$ (robust)',
                 '$Y-V$ (robust)',
                 '$Z-W$ (robust)']),
             np.array([
-                '$X-U$ Cross Covariance (robust)',
-                '$Y-V$ Cross Covariance (robust)',
-                '$Z-W$ Cross Covariance (robust)']),
+                '$X-U$ Cross-Covariance (robust)',
+                '$Y-V$ Cross-Covariance (robust)',
+                '$Z-W$ Cross-Covariance (robust)']),
             np.array([False, False, False]),
             np.array([0.70, 0.24, 6.37]), 21),
         Metric(
             'cross_covariances_xyz_matrix_det_robust',
-            'XYZ Cross Covariance Matrix Determinant (robust)',
+            'XYZ Cross-Covariance Matrix Determinant (robust)',
             'Det.${{}}_{{XUYVZW}}$ (robust)',
             'Determinant${{}}_{{XUYVZW}}$ (robust)',
             False, 0.29, 22),
         Metric(
             'cross_covariances_xyz_matrix_trace_robust',
-            'XYZ Cross Covariance Matrix Trace (robust)',
+            'XYZ Cross-Covariance Matrix Trace (robust)',
             'Trace${{}}_{{XUYVZW}}$ (robust)',
             'Trace${{}}_{{XUYVZW}}$ (robust)',
             False, 0.35, 23),
 
-       # xyz position and velocity sklearn cross covariances matrix, determinant and trace
+       # xyz position and velocity sklearn cross-covariances matrix, determinant and trace
         Metric(
             'cross_covariances_xyz_sklearn',
             np.array([
-                'X-U Cross Covariance (sklearn)',
-                'Y-V Cross Covariance (sklearn)',
-                'Z-W Cross Covariance (sklearn)']),
+                'X-U Cross-Covariance (sklearn)',
+                'Y-V Cross-Covariance (sklearn)',
+                'Z-W Cross-Covariance (sklearn)']),
             np.array([
                 '$X-U$ (sklearn)',
                 '$Y-V$ (sklearn)',
                 '$Z-W$ (sklearn)']),
             np.array([
-                '$X-U$ Cross covariance (sklearn)',
-                '$Y-V$ Cross covariance (sklearn)',
-                '$Z-W$ Cross covariance (sklearn)']),
+                '$X-U$ Cross-Covariance (sklearn)',
+                '$Y-V$ Cross-Covariance (sklearn)',
+                '$Z-W$ Cross-Covariance (sklearn)']),
             np.array([False, False, False]),
             np.array([0.0, 0.0, 0.0]), 24),
         Metric(
             'cross_covariances_xyz_matrix_det_sklearn',
-            'XYZ Cross Covariance Matrix Determinant (sklearn)',
+            'XYZ Cross-Covariance Matrix Determinant (sklearn)',
             'Det.${{}}_{{XUYVZW}}$ (sklearn)',
             'Determinant${{}}_{{XUYVZW}}$ (sklearn)',
             False, 0.0, 25),
         Metric(
             'cross_covariances_xyz_matrix_trace_sklearn',
-            'XYZ Cross Covariance Matrix Trace (sklearn)',
+            'XYZ Cross-Covariance Matrix Trace (sklearn)',
             'Trace${{}}_{{XUYVZW}}$ (sklearn)',
             'Trace${{}}_{{XUYVZW}}$ (sklearn)',
             False, 0.0, 26),
 
-        # ξηζ position and velocity cross covariances matrix, determinant and trace
+        # ξηζ position and velocity cross-covariances matrix, determinant and trace
         Metric(
             'cross_covariances_ξηζ',
             np.array([
-                'ξ-vξ Cross Covariance',
-                'η-vη Cross Covariance',
-                'ζ-vζ Cross Covariance']),
+                'ξ-vξ Cross-Covariance',
+                'η-vη Cross-Covariance',
+                'ζ-vζ Cross-Covariance']),
             np.array([
                 '$ξ^\\prime-\\dot{ξ}^\\prime$',
                 '$η^\\prime-\\dot{η}^\\prime$',
                 '$ζ^\\prime-\\dot{ζ}^\\prime$']),
             np.array([
-                '$ξ^\\prime-\\dot{ξ}^\\prime$ Cross Covariance',
-                '$η^\\prime-\\dot{η}^\\prime$ Cross Covariance',
-                '$ζ^\\prime-\\dot{ζ}^\\prime$ Cross Covariance']),
+                '$ξ^\\prime-\\dot{ξ}^\\prime$ Cross-Covariance',
+                '$η^\\prime-\\dot{η}^\\prime$ Cross-Covariance',
+                '$ζ^\\prime-\\dot{ζ}^\\prime$ Cross-Covariance']),
             np.array([False, False, False]),
             np.array([0.63, 0.58, 10.31]), 27),
         Metric(
             'cross_covariances_ξηζ_matrix_det',
-            'ξηζ Cross Covariance Matrix Determinant',
+            'ξηζ Cross-Covariance Matrix Determinant',
             'Det.${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$',
             'Determinant${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$',
             False, 0.30, 28),
         Metric(
             'cross_covariances_ξηζ_matrix_trace',
-            'ξηζ Cross Covariance Matrix Trace',
+            'ξηζ Cross-Covariance Matrix Trace',
             'Trace${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$',
             'Trace${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$',
             False, 0.01, 29),
 
-        # ξηζ position and velocity robust cross covariances matrix, determinant and trace
+        # ξηζ position and velocity robust cross-covariances matrix, determinant and trace
         Metric(
             'cross_covariances_ξηζ_robust',
             np.array([
-                'ξ-vξ Cross Covariance (robust)',
-                'η-vη Cross Covariance (robust)',
-                'ζ-vζ Cross Covariance (robust)']),
+                'ξ-vξ Cross-Covariance (robust)',
+                'η-vη Cross-Covariance (robust)',
+                'ζ-vζ Cross-Covariance (robust)']),
             np.array([
                 '$ξ^\\prime-\\dot{ξ}^\\prime$ (robust)',
                 '$η^\\prime-\\dot{η}^\\prime$ (robust)',
                 '$ζ^\\prime-\\dot{ζ}^\\prime$ (robust)']),
             np.array([
-                '$ξ^\\prime-\\dot{ξ}^\\prime$ Cross Covariance (robust)',
-                '$η^\\prime-\\dot{η}^\\prime$ Cross Covariance (robust)',
-                '$ζ^\\prime-\\dot{ζ}^\\prime$ Cross Covariance (robust)']),
+                '$ξ^\\prime-\\dot{ξ}^\\prime$ Cross-Covariance (robust)',
+                '$η^\\prime-\\dot{η}^\\prime$ Cross-Covariance (robust)',
+                '$ζ^\\prime-\\dot{ζ}^\\prime$ Cross-Covariance (robust)']),
             np.array([False, False, False]),
             np.array([0.52, 0.51, 6.16]), 30),
         Metric(
             'cross_covariances_ξηζ_matrix_det_robust',
-            'ξηζ Cross Covariance Matrix Determinant (robust)',
+            'ξηζ Cross-Covariance Matrix Determinant (robust)',
             'Det.${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (robust)',
             'Determinant${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (robust)',
             False, 0.30, 31),
         Metric(
             'cross_covariances_ξηζ_matrix_trace_robust',
-            'ξηζ Cross Covariance Matrix Trace (robust)',
+            'ξηζ Cross-Covariance Matrix Trace (robust)',
             'Trace${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (robust)',
             'Trace${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (robust)',
             False, 0.14, 32),
 
-        # ξηζ position and velocity sklearn cross covariances matrix, determinant and trace
+        # ξηζ position and velocity sklearn cross-covariances matrix, determinant and trace
         Metric(
             'cross_covariances_ξηζ_sklearn',
             np.array([
-                'ξ-vξ Cross Covariance (sklearn)',
-                'η-vη Cross Covariance (sklearn)',
-                'ζ-vζ Cross Covariance (sklearn)']),
+                'ξ-vξ Cross-Covariance (sklearn)',
+                'η-vη Cross-Covariance (sklearn)',
+                'ζ-vζ Cross-Covariance (sklearn)']),
             np.array([
                 '$ξ^\\prime-\\dot{ξ}^\\prime$ (sklearn)',
                 '$η^\\prime-\\dot{η}^\\prime$ (sklearn)',
                 '$ζ^\\prime-\\dot{ζ}^\\prime$ (sklearn)']),
             np.array([
-                '$ξ^\\prime-\\dot{ξ}^\\prime$ Cross Covariance (sklearn)',
-                '$η^\\prime-\\dot{η}^\\prime$ Cross Covariance (sklearn)',
-                '$ζ^\\prime-\\dot{ζ}^\\prime$ Cross Covariance (sklearn)']),
+                '$ξ^\\prime-\\dot{ξ}^\\prime$ Cross-Covariance (sklearn)',
+                '$η^\\prime-\\dot{η}^\\prime$ Cross-Covariance (sklearn)',
+                '$ζ^\\prime-\\dot{ζ}^\\prime$ Cross-Covariance (sklearn)']),
             np.array([False, False, False]),
             np.array([0.0, 0.0, 0.0]), 33),
         Metric(
             'cross_covariances_ξηζ_matrix_det_sklearn',
-            'ξηζ Cross Covariance Matrix Determinant (sklearn)',
+            'ξηζ Cross-Covariance Matrix Determinant (sklearn)',
             'Det.${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (sklearn)',
             'Determinant${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (sklearn)',
             False, 0.0, 34),
         Metric(
             'cross_covariances_ξηζ_matrix_trace_sklearn',
-            'ξηζ Cross Covariance Matrix Trace (sklearn)',
+            'ξηζ Cross-Covariance Matrix Trace (sklearn)',
             'Trace${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (sklearn)',
             'Trace${{}}_{{ξ^\\prime \\dot{ξ}^\\prime η^\\prime \\dot{η}^\\prime ζ^\\prime \\dot{ζ}^\\prime}}$ (sklearn)',
             False, 0.0, 35),
@@ -431,6 +431,30 @@ class Config():
             'MAD${{}}_{{ξ^\\prime η^\\prime ζ^\\prime}}$',
             'MAD${{}}_{{ξ^\\prime η^\\prime ζ^\\prime}}$',
             False, 0.48, 39),
+
+        # xyz Mahalanobis distance mean
+        Metric(
+            'mahalanobis_xyz_mean', 'Mahalanobis XYZ Mean',
+            'MD${{}}_{{XYZ}}$ Mean', 'MD${{}}_{{XYZ}}$ Mean',
+            False, 0.0, 46),
+
+        # xyz Mahalanobis distance median
+        Metric(
+            'mahalanobis_xyz_median', 'Mahalanobis XYZ Median',
+            'MD${{}}_{{XYZ}}$ Median', 'MD${{}}_{{XYZ}}$ Median',
+            False, 0.0, 47),
+
+        # ξηζ Mahalanobis distance mean
+        Metric(
+            'mahalanobis_ξηζ_mean', 'Mahalanobis ξηζ Mean',
+            'MD${{}}_{{ξηζ}}$ Mean', 'MD${{}}_{{ξηζ}}$ Mean',
+            False, 0.0, 48),
+
+        # ξηζ Mahalanobis distance median
+        Metric(
+            'mahalanobis_ξηζ_median', 'Mahalanobis ξηζ Median',
+            'MD${{}}_{{ξηζ}}$ Median', 'MD${{}}_{{ξηζ}}$ Median',
+            False, 0.0, 49),
 
         # xyz minimum spanning tree average branch length and median absolute deviation
         Metric(
@@ -538,42 +562,51 @@ class Config():
     null_time = dict(units=System.default_units['time'].label)
 
     # Default parameters
-    default_parameters = {parameter.label: parameter for parameter in (
-        Parameter(label='name', name='Name'),
-        Parameter(label='file_path', name='Series path'),
-        Parameter(label='from_data', name='From data', values=False),
-        Parameter(label='from_model', name='From model', values=False),
-        Parameter(label='from_file', name='From file', values=False),
-        Parameter(label='to_file', name='To file', values=False),
-        Parameter(label='number_of_groups', name='Number of groups', values=1),
-        Parameter(label='number_of_steps', name='Number of steps', values=1),
-        Parameter(label='number_of_stars', name='Number of star'),
-        Parameter(label='initial_time', name='Initial time', values=0.0, **null_time),
-        Parameter(label='final_time', name='Final time', **null_time),
-        Parameter(label='age', name='Age', **null_time),
-        Parameter(label='position', name='Average position', **null_position),
-        Parameter(label='position_error', name='Average position error', **null_position),
-        Parameter(label='position_scatter', name='Average position scatter', **null_position),
-        Parameter(label='velocity', name='Average velocity', **null_velocity),
-        Parameter(label='velocity_error', name='Average velocity error', **null_velocity),
-        Parameter(label='velocity_scatter', name='Average velocity scatter', **null_velocity),
-        Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
-        Parameter(label='data_errors', name='Data errors', values=False),
-        Parameter(
-            label='rv_shift', name='Radial velocity shift', values=0.0,
-            units=System.default_units['speed'].label, system='cartesian'
-        ),
-        Parameter(label='data_rv_shifts', name='Data radial velocity shifts', values=False),
-        Parameter(label='jackknife_number', name='Jack-knife number', values=1),
-        Parameter(label='jackknife_fraction', name='Jack-knife fraction', values=1.0, units=''
-        ),
-        Parameter(
-            label='mst_fraction', name='Minimum spanning tree fraction', values=1.0, units=''
-        ),
-        Parameter(label='cutoff', name='Cutoff', values=None),
-        Parameter(label='sample', name='Sample', values=None),
-        Parameter(label='potential', name='Galactic potential', values=None)
-    )}
+    default_parameters = {
+        parameter.label: parameter for parameter in (
+            Parameter(label='name', name='Name'),
+            Parameter(label='file_path', name='Series path'),
+            Parameter(label='from_data', name='From data', values=False),
+            Parameter(label='from_model', name='From model', values=False),
+            Parameter(label='from_file', name='From file', values=False),
+            Parameter(label='to_file', name='To file', values=False),
+            Parameter(label='size_metrics', name='Association Size Metrics', values=True),
+            Parameter(label='cov_metrics', name='Covariance Metrics', values=True),
+            Parameter(label='cov_robust_metrics', name='Covariance Robust Metrics', values=True),
+            Parameter(label='cov_sklearn_metrics', name='Covariance Sklearn Metrics', values=True),
+            Parameter(label='mad_metrics', name='Median Absolute Deviation Metrics', values=True),
+            Parameter(label='mst_metrics', name='Minimum Spanning Tree Metrics', values=True),
+            Parameter(label='number_of_groups', name='Number of groups', values=1),
+            Parameter(label='number_of_steps', name='Number of steps', values=1),
+            Parameter(label='number_of_stars', name='Number of star'),
+            Parameter(label='initial_time', name='Initial time', values=0.0, **null_time),
+            Parameter(label='final_time', name='Final time', **null_time),
+            Parameter(label='age', name='Age', **null_time),
+            Parameter(label='position', name='Average position', **null_position),
+            Parameter(label='position_error', name='Average position error', **null_position),
+            Parameter(label='position_scatter', name='Average position scatter', **null_position),
+            Parameter(label='velocity', name='Average velocity', **null_velocity),
+            Parameter(label='velocity_error', name='Average velocity error', **null_velocity),
+            Parameter(label='velocity_scatter', name='Average velocity scatter', **null_velocity),
+            Parameter(label='data', name='Data', system='cartesian', axis='galactic', origin='sun'),
+            Parameter(label='data_errors', name='Data errors', values=False),
+            Parameter(
+                label='rv_shift', name='Radial velocity shift', values=0.0,
+                units=System.default_units['speed'].label, system='cartesian'
+            ),
+            Parameter(label='data_rv_shifts', name='Data radial velocity shifts', values=False),
+            Parameter(label='jackknife_number', name='Jack-knife number', values=1),
+            Parameter(label='jackknife_fraction', name='Jack-knife fraction', values=1.0, units=''
+            ),
+            Parameter(
+                label='mst_fraction', name='Minimum spanning tree fraction', values=1.0, units=''
+            ),
+            Parameter(label='cutoff', name='Cutoff', values=None),
+            Parameter(label='sample', name='Sample', values=None),
+            Parameter(label='potential', name='Galactic potential', values=None),
+            Parameter(label='pca', name='Principal Component Analysis', values=False)
+        )
+    }
 
     # Position and velocity paramaters
     position_parameters = ('position', 'position_error', 'position_scatter')

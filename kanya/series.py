@@ -184,8 +184,12 @@ class Series(list, Output_Series):
         from time import strftime
         self.date = strftime('%Y-%m-%d %H:%M:%S')
 
-        # from_data, from_model, from_file and to_file parameters
-        for argument in ('from_data', 'from_model', 'from_file', 'to_file'):
+        # from_data, from_model, from_file, to_file and size_metrics parameters
+        for argument in (
+            'from_data', 'from_model', 'from_file', 'to_file',
+            'size_metrics', 'cov_metrics', 'cov_robust_metrics',
+            'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics', 'pca'
+        ):
             vars(self)[argument] = vars(self.config)[argument].values
             self.stop(
                 vars(self)[argument] is None, 'NameError',
@@ -718,6 +722,7 @@ class Series(list, Output_Series):
             self.age_shift = deepcopy(metric.age_shift)
             self.order = deepcopy(metric.order)
             self.status = False
+            self.ndim = self.valid.size
 
             # Add the association size metric to the series
             vars(self.series)[self.label] = self
@@ -842,38 +847,54 @@ class Series(list, Output_Series):
 
             # Null average association size metric
             else:
-                null = np.full(self.valid.shape, np.nan)
+                null_1d = np.full((self.ndim,), np.nan)
+                null_2d = np.full((self.series.number_of_steps, self.ndim), np.nan)
+                null_3d = np.full(
+                    (
+                        self.series.number_of_groups - (1 if self.series.from_data else 0),
+                        self.series.jackknife_number,
+                        self.ndim
+                    ), np.nan
+                )
+                null_4d = np.full(
+                    (
+                        self.series.number_of_groups - (1 if self.series.from_data else 0),
+                        self.series.jackknife_number,
+                        self.series.number_of_steps,
+                        self.ndim
+                    ), np.nan
+                )
 
                 # Value and errors
-                self.value = null
-                self.value_int_error = null
-                self.value_ext_error = null
-                self.values = null
-                self.value_error = null
-                self.value_error_quad = null
+                self.value = null_2d
+                self.value_int_error = null_2d
+                self.value_ext_error = null_2d
+                self.values = null_4d
+                self.value_error = null_2d
+                self.value_error_quad = null_2d
 
                 # Age and errors
-                self.age = null
-                self.age_int_error = null
-                self.age_ext_error = null
-                self.ages = null
-                self.age_error = null
-                self.age_error_quad = null
+                self.age = null_1d
+                self.age_int_error = null_1d
+                self.age_ext_error = null_1d
+                self.ages = null_3d
+                self.age_error = null_1d
+                self.age_error_quad = null_1d
 
                 # Minimum and errors
-                self.min = null
-                self.min_int_error = null
-                self.min_ext_error = null
-                self.minima = null
-                self.min_error = null
-                self.min_error_quad = null
+                self.min = null_1d
+                self.min_int_error = null_1d
+                self.min_ext_error = null_1d
+                self.minima = null_3d
+                self.min_error = null_1d
+                self.min_error_quad = null_1d
 
                 # Age shift based on simulation
-                self.age_shift = null
-                self.age_ajusted = null
+                self.age_shift = null_1d
+                self.age_ajusted = null_1d
 
                 # Minimum change
-                self.min_change = null
+                self.min_change = null_1d
 
             # Box size (Myr) converted to the corresponding number of steps
             # box_size = 1. # Transform in to parameter

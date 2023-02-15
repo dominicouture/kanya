@@ -19,6 +19,7 @@ given parameter.
 """
 
 # Name of series of groups
+# name.value = 'tucana'
 name.value = 'beta_pictoris'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
@@ -28,10 +29,19 @@ name.value = 'beta_pictoris'
 # named 'name.values'.series.
 file_path.value = None
 
+# Association size metrics
+size_metrics.value = True
+cov_metrics.value = True
+cov_robust_metrics.value = False
+cov_sklearn_metrics.value = False
+mad_metrics.value = False
+mst_metrics.value = False
+
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 5
+number_of_groups.value = 3
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
+
 # number_of_steps.value = 400
 number_of_steps.value = 250
 # number_of_steps.value = 172
@@ -44,8 +54,8 @@ initial_time.value = 0.0
 # initial_time.value = -1.0
 
 # Final age of the traceback (float, > initial_time, inclusive)
-# final_time.value = 50.1951006
-final_time.value = 51.0
+final_time.value = 50.1951006
+# final_time.value = 51.0
 # final_time.value = 40.0
 
 # Age of simulated groups of stars (float, ≥ 0.0)
@@ -94,6 +104,7 @@ velocity_scatter.units = 'km/s'
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
 # data.value = '../Data/β Pictoris Moving Group - Gaia EDR3.csv'
 data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
+# data.value = '../Data/Database_THA_Gaia_DR3.csv'
 data.units = 'observables'
 data.system = 'observables'
 data.axis = 'observables'
@@ -201,13 +212,13 @@ rv_shift.value = 0.0
 rv_shift.unit = 'km/s'
 
 # Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = False
+data_rv_shifts.value = True
 
 # Whether to use actual or simulated measurement errors (boolean)
 data_errors.value = True
 
 # Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
-jackknife_number.value = 200
+jackknife_number.value = 500
 
 # Fraction of stars included in every jack-knife Monte Carlo iteration (0 < float ≤ 1)
 jackknife_fraction.value = 0.5
@@ -227,3 +238,6 @@ sample.value = 'subsample'
 # potential.value = None
 # potential.value = 'MWPotential2014'
 potential.value = 'Irrgang13I'
+
+# Principal component analysis
+pca.value = False
