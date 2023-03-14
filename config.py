@@ -32,13 +32,13 @@ file_path.value = None
 # Association size metrics
 size_metrics.value = True
 cov_metrics.value = True
-cov_robust_metrics.value = False
+cov_robust_metrics.value = True
 cov_sklearn_metrics.value = False
-mad_metrics.value = False
+mad_metrics.value = True
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 3
+number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 
@@ -72,7 +72,6 @@ position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
 # position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'observables'
 position_error.system = 'observables'
-position_error.axis = 'equatorial'
 
 # Average position scatter of the simulated sample of stars (tuple)
 position_scatter.values = (3.0, 3.0, 3.0) # Initial XYZ scatter
@@ -91,7 +90,6 @@ velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
-velocity_error.axis = 'equatorial'
 
 # Average velocity scatter of the simulated sample of stars (tuple)
 # velocity_scatter.values = (1.66, 0.52, 0.73) # Core sample
@@ -107,7 +105,6 @@ data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
 # data.value = '../Data/Database_THA_Gaia_DR3.csv'
 data.units = 'observables'
 data.system = 'observables'
-data.axis = 'observables'
 # data.values =  {
 #     'beta_pictoris': [
 #         [    'p',        'δ',       'α',    'rv',     'μδ',     'μα'],
@@ -165,12 +162,10 @@ data.axis = 'observables'
 # data.values = '../Data/Crundall_BPMG_core.csv'
 # data.units = ['', '', '', 'pc', 'pc', 'pc', 'km/s', 'km/s', 'km/s']
 # data.system = 'cartesian'
-# data.axis = 'equatorial'
 
 # Data from Miret-Roig et al 2020
 # data.values = '../Data/β Pictoris Moving Group - Miret-Roig et al. 2020.csv'
 # data.system = 'cartesian'
-# data.axis = 'equatorial'
 # data.units = ['pc',   'pc',   'pc', 'km/s', 'km/s', 'km/s', '', '']
 # data.values = {
 #     'beta_pictoris_Miret-Roig': [
@@ -205,6 +200,9 @@ data.axis = 'observables'
 #     ]
 # }
 
+# Whether to use actual or simulated measurement errors (boolean)
+data_errors.value = True
+
 # Radial velocity shift added (from model) or substracted (from data) to all stars (float)
 # rv_shift.value = 0.5
 # rv_shift.value = 0.2
@@ -213,9 +211,6 @@ rv_shift.unit = 'km/s'
 
 # Whether to use actual or simulated rv shifts (boolean)
 data_rv_shifts.value = True
-
-# Whether to use actual or simulated measurement errors (boolean)
-data_errors.value = True
 
 # Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
 jackknife_number.value = 500

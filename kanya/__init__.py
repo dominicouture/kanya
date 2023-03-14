@@ -9,9 +9,10 @@ minimal.
 """
 
 from .__version__ import *
-from .series import Series, collection
+from .series import Series, collection, Config
 
 __all__ = [
     'Series',
-    'collection'
+    'collection',
+    'Config'
 ]

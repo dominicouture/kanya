@@ -10,8 +10,9 @@ identified and converted to default units.
 
 import numpy as np
 import pandas as pd
-import re
 from csv import reader, Sniffer
+from re import split
+from os.path import join
 from .collection import *
 from .coordinate import *
 
@@ -51,7 +52,9 @@ class Data(list):
 
         # Data configuration
         self.configure_data()
-        self.get_spectral_sequences()
+
+        # Stellar spectral parameters
+        self.get_stellar_spectal_parameters()
 
         # Columns and rows creation
         self.create_columns()
@@ -90,7 +93,7 @@ class Data(list):
 
         # Data import into a table and CSV file closing
         self.table = np.array(
-            [row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))],dtype=object
+            [row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))], dtype=object
         )
         data_csv.close()
 
@@ -278,57 +281,57 @@ class Data(list):
                 "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units)
             )
 
-    def get_spectral_sequences(self):
+    def get_stellar_spectal_parameters(self):
         """
         Import stellar mass and radius, and gravitational, convective and total radial velocity
-        shift sequences based on spectral type, including the effects.
+        shift sequences based on spectral type.
         """
 
-        # Total radial velocity shift sequences data
-        total_rv_shift_sequences_file = '../Radial velocity shift/total_rv_shift_sequences.csv'
-        data = np.loadtxt(total_rv_shift_sequences_file, dtype='object', skiprows=1, delimiter=',')
-        dataframe = pd.read_csv(total_rv_shift_sequences_file, delimiter=',')
+        # Stellar spectral parameters data
+        stellar_spectral_parameters_file = join(
+            path.dirname(__file__),
+            'resources/stellar_spectral_parameters.csv'
+        )
+        dataframe = pd.read_csv(stellar_spectral_parameters_file, delimiter=',')
 
-        # Convert to float and delete spectral types with NaN
+        # Convert values to float and delete spectral types with NaN
+        data = dataframe.to_numpy()[2:]
         data[:,1:] = np.array(data[:,1:], dtype=float)
         rows_with_NaN = [
             row for row in range(data.shape[0])
             if np.isnan(np.array(data[row,1:], dtype=float)).any()
         ]
         data = np.delete(data, np.array(rows_with_NaN, dtype=int), axis=0)
+        dataframe = pd.DataFrame(data=data, columns=list(dataframe.columns))
 
-        # Convert column names and change spectral type number definition
-        dataframe = pd.DataFrame(
-            data=data, columns=[col.strip().lower() for col in list(dataframe.columns)]
-        )
-        dataframe['sptn'] = dataframe['sptn'] + 60.0
+        # Uncomment if the file uses Jonathan's spectral type numbers definition
+        # dataframe['sptn'] = dataframe['sptn'] + 60.0
 
         # Spectral types
         self.spectral_types_str = dataframe['spt']
         self.spectral_types_num = np.array(
             [self.convert_spt(spt) for spt in self.spectral_types_str], dtype=float
         )
-        # data = np.array(data[1:], dtype=float)
 
-        # Stellar mass
+        # Stellar masses
         self.mass = dataframe['mass_ms']
-        self.mass_error = dataframe['emass_ms']
+        self.mass_error = dataframe['mass_ms_error']
 
-        # Stellar radius
+        # Stellar radii
         self.radius = dataframe['radius_ms']
-        self.radius_error = dataframe['eradius_ms']
+        self.radius_error = dataframe['radius_ms_error']
 
-        # Gravitational radial velocity shift
+        # Gravitational radial velocity shifts
         self.grav_shift = dataframe['grav_redshift_ms']
-        self.grav_shift_error = dataframe['egrav_redshift_ms']
+        self.grav_shift_error = dataframe['grav_redshift_ms_error']
 
-        # Convective radial velocity shift
+        # Convective radial velocity shifts
         self.conv_shift = dataframe['conv_blueshift']
-        self.conv_shift_error = dataframe['econv_blueshift']
+        self.conv_shift_error = dataframe['conv_blueshift_error']
 
-        # Total radial velocity shift
+        # Total radial velocity shifts
         self.total_shift = dataframe['total_shift_ms']
-        self.total_shift_error = dataframe['etotal_shift_ms']
+        self.total_shift_error = dataframe['total_shift_ms_error']
 
     def convert_spt(self, spt):
         """Converts spectral type letter into a number."""
@@ -342,7 +345,7 @@ class Data(list):
         # Match spectral type components
         new_spt = spt.replace(' ', '').replace('(', '').replace(')', '')
         try:
-            letter, number, other = re.split('(\d+\.?\d*)', new_spt)
+            letter, number, other = split('(\d+\.?\d*)', new_spt)
         except ValueError as e:
             raise ValueError(f"{spt} is an invalid spectral type.") from e
 
@@ -393,9 +396,10 @@ class Data(list):
         of a star or brown dwarf.
         """
 
-        # Convert a spectral type into a number if needed (assuming Jonathan's convention)
+        # Convert a spectral type into a number if needed
         if np.char.isnumeric(spt):
-            sptn = float(spt) + 60.0
+            sptn = float(spt)
+            # sptn = float(spt) + 60.0
         else:
             sptn = self.convert_spt(spt)
 
@@ -841,11 +845,11 @@ class Data(list):
                     ).to()
 
             # Radial velocity shift based on spectral type
-            # if self.spectral_type is not None:
-            #     self.spectral_type, rv_shift, rv_shift_error = self.data.find_rv_shift(
-            #         self.spectral_type
-            #     )
-            #     self.rv_shift = Quantity(rv_shift, 'km/s', rv_shift_error).to()
+            if self.spectral_type is not None:
+                self.spectral_type, rv_shift, rv_shift_error = self.data.find_rv_shift(
+                    self.spectral_type
+                )
+                self.rv_shift = Quantity(rv_shift, 'km/s', rv_shift_error).to()
 
             # Radial velocity shift from mass and radius columns
             elif self.mass is not None and self.radius is not None:

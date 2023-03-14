@@ -1,0 +1,36 @@
+label;name;values;units;system
+'name';'Name';None;None;None
+'file_path';'Series Path';None;None;None
+'from_data';'From Data';False;None;None
+'from_model';'From Model';False;None;None
+'from_file';'From File';False;None;None
+'to_file';'To File';False;None;None
+'size_metrics';'Association Size Metrics';True;None;None
+'cov_metrics';'Covariance Metrics';True;None;None
+'cov_robust_metrics';'Covariance Robust Metrics';True;None;None
+'cov_sklearn_metrics';'Covariance Sklearn Metrics';True;None;None
+'mad_metrics';'Median Absolute Deviation Metrics';True;None;None
+'mst_metrics';'Minimum Spanning Tree Metrics';True;None;None
+'number_of_groups';'Number of Groups';1;None;None
+'number_of_steps';'Number of Steps';1;None;None
+'number_of_stars';'Number of Stars';None;None;None
+'initial_time';'Initial Time';0.0;time_unit;None
+'final_time';'Final Time';None;time_unit;None
+'age';'Age';None;time_unit;None
+'position';'Position';(0.0, 0.0, 0.0);length_units;'cartesian'
+'position_error';'Position Error';(0.0, 0.0, 0.0);length_units;'cartesian'
+'position_scatter';'Position Scatter';(0.0, 0.0, 0.0);length_units;'cartesian'
+'velocity';'Velocity';(0.0, 0.0, 0.0);speed_units;'cartesian'
+'velocity_error';'Velocity Error';(0.0, 0.0, 0.0);speed_units;'cartesian'
+'velocity_scatter';'Velocity Scatter';(0.0, 0.0, 0.0);speed_units;'cartesian'
+'data';'Data';None;'cartesian';'cartesian'
+'data_errors';'Data Errors';False;None;None
+'rv_shift';'Radial Velocity Shift';0.0;speed_unit;None
+'data_rv_shifts';'Data Radial Velocity Shifts';False;None;None
+'jackknife_number';'Jackknife Number';1;None;None
+'jackknife_fraction';'Jackknife Fraction';1.0;unitless;None
+'mst_fraction';'Minimum Spanning Tree Fraction';1.0;unitless;None
+'cutoff';'Cutoff';None;None;None
+'sample';'Sample';None;None;None
+'potential';'Galactic Potential';None;None;None
+'pca';'Principal Component Analysis';False;None;None

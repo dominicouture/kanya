@@ -9,6 +9,7 @@ checks for the presence of output and logs directories and creates them, if need
 """
 
 import numpy as np
+import pandas as pd
 from gc import collect
 from .init import *
 from .output import Output_Series
@@ -62,9 +63,8 @@ class Series(list, Output_Series):
         """
         Checks if all parameters are present and are Config.Parameter objects with all their
         components, and checks for invalid parameters and components. The type of 'label',
-        'name', 'system', 'axis' and 'origin' components is checked (str), and 'system',
-        'axis' and 'origin' components are converted to their respective classes if they are
-        not None.
+        'name' and 'system' components is checked (str), and the 'system' component is converted
+        to its corresponding class if it is not None.
         """
 
         # Check if all parameters are present and are Config.Parameter objects
@@ -104,9 +104,7 @@ class Series(list, Output_Series):
                 # strings or None
                 if component_label not in ('values', 'units'):
                     self.stop(
-                        component is not None and type(component) not in (
-                            str, System, System.Axis, System.Origin
-                        ), 'TypeError',
+                        component is not None and type(component) not in (str, System), 'TypeError',
                         "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
                         component_label, parameter_label, type(component)
                     )
@@ -132,32 +130,6 @@ class Series(list, Output_Series):
                 parameter.system = systems[parameter.system.lower()]
             elif default_parameter.system is not None:
                 parameter.system = systems[default_parameter.system]
-
-            # Check if parameter.axis is valid and converts it to a System.Axis object
-            if type(parameter.axis) == System.Axis:
-                pass
-            elif parameter.axis is not None:
-                self.stop(
-                    parameter.axis.lower() not in parameter.system.axes.keys(), 'ValueError',
-                    "'axis' component of '{}' is not a valid ({} required, {} given).",
-                    parameter.label, list(parameter.system.axes.keys()), parameter.axis
-                )
-                parameter.axis = parameter.system.axes[parameter.axis.lower()]
-            elif default_parameter.axis is not None:
-                parameter.axis = parameter.system.axes[default_parameter.axis]
-
-            # Check if parameter.origin is valid and converts it to a System.Origin object
-            if type(parameter.origin) == System.Origin:
-                pass
-            elif parameter.origin is not None:
-                self.stop(
-                    parameter.origin.lower() not in parameter.system.origins.keys(), 'ValueError',
-                    "'origin' component of '{}' is not a valid ({} required, {} given).",
-                    parameter.label, list(parameter.system.origins.keys()), parameter.origin
-                )
-                parameter.origin = parameter.system.origins[parameter.origin.lower()]
-            elif default_parameter.origin is not None:
-                parameter.origin = parameter.system.origins[default_parameter.origin]
 
     def configure_series(self):
         """
@@ -206,10 +178,14 @@ class Series(list, Output_Series):
                 "The file will not be updated with its own data.", self.name)
             self.to_file = False
 
+        # Import the association size metrics file and skip the header line
+        metrics_file = join(path.dirname(__file__), 'resources/association_size_metrics.csv')
+        metrics_dataframe = pd.read_csv(metrics_file, delimiter=';')
+
         # Association size metric configuration
         self.metrics = []
-        for metric in self.config.metrics.keys():
-            self.Metric(self, self.config.metrics[metric])
+        for index, metric in metrics_dataframe.iterrows():
+            self.Metric(self, metric)
 
     def configure_mode(self, mode=None):
         """ Checks if selected mode is valid, and if one and no more than one mode has been
@@ -714,13 +690,13 @@ class Series(list, Output_Series):
 
             # Initialization
             self.series = series
-            self.label = deepcopy(metric.label)
-            self.name = deepcopy(metric.name)
-            self.latex_short = deepcopy(metric.latex_short)
-            self.latex_long = deepcopy(metric.latex_long)
-            self.valid = deepcopy(metric.valid)
-            self.age_shift = deepcopy(metric.age_shift)
-            self.order = deepcopy(metric.order)
+            self.label = eval(metric['label'])
+            self.name = np.array(eval(metric['name']))
+            self.latex_short = np.array(eval( metric['latex_short']))
+            self.latex_long = np.array(eval( metric['latex_long']))
+            self.valid = np.array(eval(metric['valid']))
+            self.order = int(metric['order'])
+            self.age_shift = np.array(eval(metric['age_shift']))
             self.status = False
             self.ndim = self.valid.size
 

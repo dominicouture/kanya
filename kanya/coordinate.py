@@ -19,7 +19,7 @@ class System():
     origins, and Variable, Axis and Origin classes.
     """
 
-    def __init__(self, name: str, position: tuple, velocity: tuple):
+    def __init__(self, name: str, position: tuple, velocity: tuple, axis: str, origin: str):
         """Initializes a System from position and velocity tuples with 3 Variables objects."""
 
         # Name
@@ -32,6 +32,10 @@ class System():
         # Errors
         self.position_error = [self.variables['Δ' + label] for label in position]
         self.velocity_error = [self.variables['Δ' + label] for label in velocity]
+
+        # Axis and origin
+        self.axis = System.axes[axis]
+        self.origin = System.origins[origin]
 
     def __eq__(self, other):
         """Tests whether self is not the equal to other."""
@@ -168,10 +172,10 @@ class System():
 # Coordinate systems
 systems = {
     system.name: system for system in (
-        System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w')),
-        System('cylindrical', ('r', 'θ', 'z'), ('μρ', 'μθ', 'w')),
-        System('spherical', ('ρ', 'δ', 'α'), ('rv', 'μδ', 'μα')),
-        System('observables', ('π', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ'))
+        System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w'), 'equatorial', 'sun'),
+        System('cylindrical', ('r', 'θ', 'z'), ('μρ', 'μθ', 'w'), 'galactic', 'galaxy'),
+        System('spherical', ('ρ', 'δ', 'α'), ('rv', 'μδ', 'μα'), 'equatorial', 'sun'),
+        System('observables', ('π', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ'), 'equatorial', 'sun')
     )
 }
 
@@ -213,7 +217,6 @@ class Coordinate:
     costheta = sun_position[0] / distance_galactic_center
     sintheta = sun_position[2] / distance_galactic_center
 
-    # !!! This part should be moved to Axis !!!
     # Galactic-galactocentric rotation matrix
     # Rotates a vector from a galactic to a galactocentric right-handed reference frame
     ggrm = np.array(
@@ -347,10 +350,10 @@ class Coordinate:
         self.system = None
         self.axis = None
 
-    def to(self, system=None, axis=None):
+    def to(self, system=None):
         """
-        Converts a Coordinate object from its original coordinate system, axis and origin to
-        a new coordinate system, axis and origin by wrapping conversion functions together.
+        Converts a Coordinate object from its original coordinate system, to a new coordinate
+        system.
         """
 
         pass
@@ -998,7 +1001,7 @@ def position_obs_rδα(p, δ, α, rv, μδ, μα_cos_δ, Δp=0, Δδ=0, Δα=0, 
     and right ascension proper motion * cos(δ) (μα_cos_δ; rad/Myr), into an equatorial
     spherical coordinate, distance (r; pc), declination (δ, DEC; rad), right ascension
     (α, RA; rad), radial velocity (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and
-    right ascension proper motion (μα_cos_δ; rad/Myr), along with measurement errors.
+    right ascension proper motion (μα; rad/Myr), along with measurement errors.
     """
 
     # Cosine calculation
@@ -1022,7 +1025,7 @@ def position_rδα_obs(r, δ, α, rv, μδ, μα, Δr=0, Δδ=0, Δα=0, Δrv=0,
     """
     Converts an equatorial spherical coordinate, distance (r; pc), declination (δ, DEC; rad)
     and right ascension (α, RA; rad), radial velocity (rv; pc/Myr), declination proper motion
-    (µδ; rad/Myr) and right ascension proper motion (μα_cos_δ; rad/Myr)) into observables,
+    (µδ; rad/Myr) and right ascension proper motion (μα; rad/Myr)) into observables,
     paralax (p; rad), declination (δ, DEC; rad), right ascension (α, RA; rad), radial velocity
     (rv; pc/Myr), declination proper motion (µδ; rad/Myr) and and right ascension proper motion
     * cos(δ) (μα_cos_δ; rad/Myr), along with measurement errors.

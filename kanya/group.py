@@ -27,8 +27,7 @@ class Group(list, Output_Group):
         Initializes a Group object and embedded Star objects from a simulated sample of stars
         in a moving group or raw data in the form a Data object. This dataset is then moved
         backwards in time from the initial time to the final time, and its age is estimated
-        by minimizing: the 3D scatter, median absolute deviation, covariances, and the minimum
-        spanning tree branch length mean and median absolute deviation.
+        by minimizing various association size metrics.
         """
 
         # Initialization
