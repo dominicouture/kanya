@@ -276,7 +276,7 @@ class Output_Series():
         # Create header
         if machine:
             lines = [
-                'Metric,LaTeX_name,Status,Age,Jack-knife_error,'
+                'Metric,LaTeX_name,Status,Age,Jackknife_error,'
                 'Measurement_error,Total_error,Minimum_change,Offset'
             ]
 
@@ -288,7 +288,7 @@ class Output_Series():
         else:
             lines = [
                 f"{'':-<155}",
-                f"{'Association size metric':<50}{'Age':>15}{'Jack-knife Error':>20}"
+                f"{'Association size metric':<50}{'Age':>15}{'Jackknife Error':>20}"
                 f"{'Measurement Error':>20}{'Total Error':>15}{'Minimum Change':>20}{'Offset':>15}",
                 f"{'[Myr]':>65}{'[Myr]':>20}{'[Myr]':>20}{'[Myr]':>15}{'[%]':>20}{'[Myr]':>15}",
                 f"{'':-<155}"
@@ -401,7 +401,7 @@ class Output_Series():
                     metric.values.shape[2], metric.values.shape[3])
                 )
                 for i in np.unique(
-                    np.round(np.linspace(0, self.number_of_groups * self.jackknife_number - 1, 20))
+                    np.round(np.linspace(0, self.number_of_groups * self.number_of_iterations - 1, 20))
                 ):
                     ax.plot(
                         -self.time, values[int(i),:,index],
@@ -952,7 +952,7 @@ class Output_Series():
     ):
         """
         Creates a plot of the distribution of ages computed in a series, including the effects
-        of measurement errors and the jack-knife Monte Carlo.
+        of measurement errors and the jackknife Monte Carlo.
         """
 
         # Initialize figure
@@ -2819,7 +2819,7 @@ class Output_Group():
         forced=False, default=False, cancel=False
     ):
         """
-        Creates a plot of the distribution of jack-knife Monte Carlo ages computed in a
+        Creates a plot of the distribution of jackknife Monte Carlo ages computed in a
         group.
         """
 
@@ -2947,7 +2947,7 @@ class Output_Group():
         )
         if title:
             ax.set_title(
-                f'Distribution of {self.series.jackknife_number} jack-knife Monte Carlo' + (
+                f'Distribution of {self.series.number_of_iterations} jackknife Monte Carlo' + (
                     f',\nAverage age: ({metric.age[0]:.1f} '
                     f'± {metric.age_int_error[0]:.1F}) Myr\n'
                 ) if metric.status else '', fontsize=8

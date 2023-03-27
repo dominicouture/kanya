@@ -27,10 +27,10 @@ label;name;values;units;system
 'data_errors';'Data Errors';False;None;None
 'rv_shift';'Radial Velocity Shift';0.0;speed_unit;None
 'data_rv_shifts';'Data Radial Velocity Shifts';False;None;None
-'jackknife_number';'Jackknife Number';1;None;None
-'jackknife_fraction';'Jackknife Fraction';1.0;unitless;None
-'mst_fraction';'Minimum Spanning Tree Fraction';1.0;unitless;None
+'number_of_iterations';'Number of iterations';1;None;None
+'iteration_fraction';'Iteration Fraction';1.0;unitless;None
 'cutoff';'Cutoff';None;None;None
 'sample';'Sample';None;None;None
 'potential';'Galactic Potential';None;None;None
 'pca';'Principal Component Analysis';False;None;None
+'timer';'Timer';False;None;None

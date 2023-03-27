@@ -160,7 +160,8 @@ class Series(list, Output_Series):
         for argument in (
             'from_data', 'from_model', 'from_file', 'to_file',
             'size_metrics', 'cov_metrics', 'cov_robust_metrics',
-            'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics', 'pca'
+            'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics',
+            'pca', 'timer'
         ):
             vars(self)[argument] = vars(self.config)[argument].values
             self.stop(
@@ -311,26 +312,18 @@ class Series(list, Output_Series):
             "'data_errors' must be a boolean ({} given).", type(self.data_errors)
         )
 
-        # jackknife_number parameter
-        self.jackknife_number = self.configure_integer(self.config.jackknife_number)
+        # number_of_iterations parameter
+        self.number_of_iterations = self.configure_integer(self.config.number_of_iterations)
         self.stop(
-            self.jackknife_number <= 0, 'ValueError',
-            "'jackknife_number' must be greater to 0 ({} given).", self.jackknife_number
+            self.number_of_iterations <= 0, 'ValueError',
+            "'number_of_iterations' must be greater to 0 ({} given).", self.number_of_iterations
         )
 
-        # jackknife_fraction parameter
-        self.jackknife_fraction = self.configure_quantity(self.config.jackknife_fraction).value
+        # iteration_fraction parameter
+        self.iteration_fraction = self.configure_quantity(self.config.iteration_fraction).value
         self.stop(
-            self.jackknife_fraction <= 0 or self.jackknife_fraction > 1, 'ValueError',
-            "'jackknife_fraction' must be between 0 and 1 ({} given).", self.jackknife_fraction
-        )
-
-        # mst_fraction parameter
-        self.mst_fraction = self.configure_quantity(self.config.mst_fraction).value
-        # self.mst_fraction = self.config.mst_fraction
-        self.stop(
-            self.mst_fraction <= 0 or self.mst_fraction > 1, 'ValueError',
-            "'mst_fraction' must be between 0 and 1 ({} given).", self.mst_fraction
+            self.iteration_fraction <= 0 or self.iteration_fraction > 1, 'ValueError',
+            "'iteration_fraction' must be between 0 and 1 ({} given).", self.iteration_fraction
         )
 
         # cutoff parameter
@@ -828,14 +821,14 @@ class Series(list, Output_Series):
                 null_3d = np.full(
                     (
                         self.series.number_of_groups - (1 if self.series.from_data else 0),
-                        self.series.jackknife_number,
+                        self.series.number_of_iterations,
                         self.ndim
                     ), np.nan
                 )
                 null_4d = np.full(
                     (
                         self.series.number_of_groups - (1 if self.series.from_data else 0),
-                        self.series.jackknife_number,
+                        self.series.number_of_iterations,
                         self.series.number_of_steps,
                         self.ndim
                     ), np.nan

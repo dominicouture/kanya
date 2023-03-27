@@ -21,6 +21,7 @@ given parameter.
 # Name of series of groups
 # name.value = 'tucana'
 name.value = 'beta_pictoris'
+# name.value = 'IC2602'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
 
@@ -32,10 +33,10 @@ file_path.value = None
 # Association size metrics
 size_metrics.value = True
 cov_metrics.value = True
-cov_robust_metrics.value = True
+cov_robust_metrics.value = False
 cov_sklearn_metrics.value = False
 mad_metrics.value = True
-mst_metrics.value = False
+mst_metrics.value = True
 
 # Number of groups to be simulated in the series (integer, > 0)
 number_of_groups.value = 1
@@ -103,6 +104,7 @@ velocity_scatter.units = 'km/s'
 # data.value = '../Data/β Pictoris Moving Group - Gaia EDR3.csv'
 data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
 # data.value = '../Data/Database_THA_Gaia_DR3.csv'
+# data.value = '../THA_CAR_COL/sample_IC2602_corrected_rv.csv'
 data.units = 'observables'
 data.system = 'observables'
 # data.values =  {
@@ -212,14 +214,11 @@ rv_shift.unit = 'km/s'
 # Whether to use actual or simulated rv shifts (boolean)
 data_rv_shifts.value = True
 
-# Number of jack-knife Monte Carlo iterations (integer, ≥ 1)
-jackknife_number.value = 500
+# Number of jackknife Monte Carlo iterations (integer, ≥ 1)
+number_of_iterations.value = 500
 
-# Fraction of stars included in every jack-knife Monte Carlo iteration (0 < float ≤ 1)
-jackknife_fraction.value = 0.5
-
-# Fraction of step for which a new MST is computed (0 < float ≤ 1)
-mst_fraction.value = 1.0
+# Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
+iteration_fraction.value = 0.5
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
 cutoff.value = 3.0
@@ -236,3 +235,6 @@ potential.value = 'Irrgang13I'
 
 # Principal component analysis
 pca.value = False
+
+# Whether to show the timer
+timer.value = True

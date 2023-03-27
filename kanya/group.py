@@ -14,6 +14,8 @@ from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
 from .output import Output_Group
 from .coordinate import *
+from time import time as get_time
+from itertools import combinations
 
 class Group(list, Output_Group):
     """
@@ -35,6 +37,11 @@ class Group(list, Output_Group):
         self.number = number
         self.name = name
 
+        # Set timers
+        if self.series.timer:
+            self.time_integrate = 0.0
+            self.t0 = get_time()
+
         # Stars from data
         if self.series.from_data:
             self.stars_from_data()
@@ -44,9 +51,13 @@ class Group(list, Output_Group):
             self.stars_from_model()
 
         # Set association size metrics
+        if self.series.timer:
+            self.t1 = get_time()
         self.set_metrics()
 
         # Principal component analysis
+        if self.series.timer:
+            self.t2 = get_time()
         if self.series.pca:
             self.principal_component_analysis(version=1)
 
@@ -54,24 +65,38 @@ class Group(list, Output_Group):
         if self.series.size_metrics:
 
             # Compute empirical covariances metrics
+            if self.series.timer:
+                self.t3 = get_time()
             if self.series.cov_metrics:
                 self.get_covariances()
 
             # Compute robust covariances metrics
+            if self.series.timer:
+                self.t4 = get_time()
             if self.series.cov_robust_metrics:
                 self.get_covariances_robust()
 
             # Compute sklearn covariances metrics
+            if self.series.timer:
+                self.t5 = get_time()
             if self.series.cov_sklearn_metrics:
                 self.get_covariances_sklearn()
 
             # Compute median absolute deviation metrics
+            if self.series.timer:
+                self.t6 = get_time()
             if self.series.mad_metrics:
                 self.get_median_absolute_deviation()
 
             # Compute minimum spanning tree metrics
+            if self.series.timer:
+                self.t7 = get_time()
             if self.series.mst_metrics:
                 self.get_minimum_spanning_tree()
+
+        # Show timers
+        if self.series.timer:
+            self.show_timer()
 
     def stars_from_data(self):
         """
@@ -85,6 +110,26 @@ class Group(list, Output_Group):
         # Create stars from data
         for star in self.series.data.core_sample:
 
+            # Position and velocity errors based on data
+            if self.series.data_errors:
+                position_errors = star.position.errors
+                velocity_errors = star.velocity.errors
+
+            # Position and velocity errors based on models
+            else:
+                position_errors = self.series.position_error.values
+                velocity_errors = self.series.velocity_error.values
+
+            # Radial velocity shift based on data
+            if self.series.data_rv_shifts:
+                rv_shift_value = star.rv_shift.value
+                rv_shift_error = star.rv_shift.error
+
+            # Radial velocity shift based on models
+            else:
+                rv_shift_value = self.series.rv_shift.value
+                rv_shift_error = self.series.rv_shift.error
+
             # From an observables coordinates system
             if self.series.data.data.system.name == 'observables':
 
@@ -92,16 +137,16 @@ class Group(list, Output_Group):
                 position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
                     *(
                         star.position.values if self.number == 0 else
-                        np.random.normal(star.position.values, star.position.errors)
+                        np.random.normal(star.position.values, position_errors)
                     ), *(
                         star.velocity.values if self.number == 0 else
-                        np.random.normal(star.velocity.values, star.velocity.errors)
-                    ), *star.position.errors, *star.velocity.errors
+                        np.random.normal(star.velocity.values, velocity_errors)
+                    ), *position_errors, *velocity_errors
                 )
 
                 # Apply radial velocity shift correction and its error
-                velocity_rδα -= np.array([star.rv_shift.value, 0.0, 0.0])
-                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
+                velocity_rδα -= np.array([rv_shift_value, 0.0, 0.0])
+                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + rv_shift_error**2)**0.5
 
                 # Convert position and velocity into Galactic cartesian coordinates
                 position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
@@ -118,24 +163,24 @@ class Group(list, Output_Group):
                 position_rδα, position_rδα_error = galactic_xyz_equatorial_rδα(
                     *(
                         star.position.values if self.number == 0 else
-                        np.random.normal(star.position.values, star.position.errors)
+                        np.random.normal(star.position.values, position_errors)
                     ), *star.position.errors
                 )
                 velocity_rδα, velocity_rδα_error = galactic_uvw_equatorial_rvμδμα(
                     *(
                         star.position.values if self.number == 0 else
-                        np.random.normal(star.position.values, star.position.errors)
+                        np.random.normal(star.position.values, position_errors)
                     ), *(
                         star.velocity.values if self.number == 0 else
-                        np.random.normal(star.velocity.values, star.velocity.errors)
-                    ), *star.position.errors, *star.velocity.errors)
+                        np.random.normal(star.velocity.values, velocity_errors)
+                    ), *position_errors, *velocity_errors)
 
                 # Apply radial velocity shift correction and its error
-                velocity_rδα -= np.array([star.rv_shift.value, 0.0, 0.0])
-                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + star.rv_shift.error**2)**0.5
+                velocity_rδα -= np.array([rv_shift_value, 0.0, 0.0])
+                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + rv_shift_error**2)**0.5
 
                 # Convert position and velocity back into Galactic cartesian coordinates
-                position_xyz, position_xyz_error = (star.position.values, star.position.errors)
+                position_xyz, position_xyz_error = (star.position.values, position_errors)
                 velocity_xyz, velocity_xyz_error = equatorial_rvμδμα_galactic_uvw(
                     *position_rδα, *velocity_rδα, *position_rδα_error, *velocity_rδα_error
                 )
@@ -207,11 +252,11 @@ class Group(list, Output_Group):
 
             # Scramble position and velocity based on data
             if self.series.data_errors:
-                star_errors = star - (
+                errors = star - (
                     star // len(self.series.data.core_sample)
                 ) * len(self.series.data.core_sample)
-                position_obs_error = self.series.data.core_sample[star_errors].position.errors
-                velocity_obs_error = self.series.data.core_sample[star_errors].velocity.errors
+                position_obs_error = self.series.data.core_sample[errors].position.errors
+                velocity_obs_error = self.series.data.core_sample[errors].velocity.errors
 
             # Scramble position and velocity based on models
             else:
@@ -225,21 +270,21 @@ class Group(list, Output_Group):
                 *position_obs_error, *velocity_obs_error
             )
 
-            # Radial velocity shift bias and its error based on data
+            # Radial velocity shift based on data
             if self.series.data_rv_shifts:
-                star_rv_shifts = star - (
-                    star // len(self.series.data.core_sample)) * len(self.series.data.core_sample
-                )
-                rv_shift = self.series.data.core_sample[star_rv_shifts].rv_shift.value
-                rv_shift_error = self.series.data.core_sample[star_rv_shifts].rv_shift.error
+                rv_shift = star - (
+                    star // len(self.series.data.core_sample)
+                ) * len(self.series.data.core_sample)
+                rv_shift_value = self.series.data.core_sample[rv_shift].rv_shift.value
+                rv_shift_error = self.series.data.core_sample[rv_shift].rv_shift.error
 
-            # Radial velocity shift bias and its error based on models
+            # Radial velocity shift based on models
             else:
-                rv_shift = self.series.rv_shift.value
+                rv_shift_value = self.series.rv_shift.value
                 rv_shift_error = self.series.rv_shift.error
 
             # Apply radial velocity shift bias and its error
-            velocity_rδα += np.array([rv_shift, 0.0, 0.0])
+            velocity_rδα += np.array([rv_shift_value, 0.0, 0.0])
             velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + rv_shift_error**2)**0.5
 
             # Convert position and velocity back into Galactic cartesian coordinates
@@ -317,7 +362,7 @@ class Group(list, Output_Group):
         """
 
         # Filter outliers for the first group
-        if True:
+        if self.number == 0:
 
             # Iteratively validate stars coordinates
             outliers = False if self.series.cutoff is None else True
@@ -412,13 +457,13 @@ class Group(list, Output_Group):
     def set_metrics(self):
         """
         Sets the parameters to compute association size metrics, including weights based on
-        Mahalanobis distances computed with empirical covariances matrices, and jack-knife
+        Mahalanobis distances computed with empirical covariances matrices, and jackknife
         Monte Carlo itrations.
         """
 
         # Compute Mahalanobis distance
         self.positions_xyz = np.array([star.position_xyz for star in self.sample])[:,None]
-        self.sample_size_jackknife = 1
+        self.number_of_stars_iteration = 1
         self.Mahalanobis_xyz = self.get_Mahalanobis_distance('positions_xyz')
 
         # Compute weights
@@ -431,19 +476,19 @@ class Group(list, Output_Group):
         for metric in self.series.metrics:
             self.Metric(self, metric)
 
-        # For the first group, randomly select stars for the jack-knife Monte Carlo
+        # For the first group, randomly select stars for the jackknife Monte Carlo
         if True:
-            self.sample_size_jackknife = int(self.sample_size * self.series.jackknife_fraction)
+            self.number_of_stars_iteration = int(self.sample_size * self.series.iteration_fraction)
             self.stars_monte_carlo = np.array(
                 [
-                    np.random.choice(self.sample_size, self.sample_size_jackknife, replace=False)
-                    for i in range(self.series.jackknife_number)
+                    np.random.choice(self.sample_size, self.number_of_stars_iteration, replace=False)
+                    for i in range(self.series.number_of_iterations)
                 ]
             ).T
 
-        # For other groups, use the same stars for the jack-knife Monte Carlo as the first group
+        # For other groups, use the same stars for the jackknife Monte Carlo as the first group
         else:
-            self.sample_size_jackknife = self.series[0].sample_size_jackknife
+            self.number_of_stars_iteration = self.series[0].number_of_stars_iteration
             self.stars_monte_carlo = self.series[0].stars_monte_carlo
 
         # Create selected stars xyz and ξηζ positions and velocities arrays
@@ -520,14 +565,14 @@ class Group(list, Output_Group):
         self.Metric(
             self, 'eigen_values', np.repeat(
                 (np.sum(eigen_values**2, axis=1)**0.5)[None],
-                self.series.jackknife_number, axis=0
+                self.series.number_of_iterations, axis=0
             )
         )
 
     class Metric():
         """
         Association size metric including its values, age at minimum and minimum. Computes
-        errors on values, age and minium using a jack-knife Monte Carlo method.
+        errors on values, age and minium using a jackknife Monte Carlo method.
         """
 
         def __init__(self, group, metric):
@@ -542,7 +587,7 @@ class Group(list, Output_Group):
             self.group.metrics.append(self)
 
         def __call__(self, values):
-            """Computes errors on values, age and minium using a jack-knife Monte Carlo method."""
+            """Computes errors on values, age and minium using a jackknife Monte Carlo method."""
 
             # Average values and errors
             self.values = np.atleast_3d(values)
@@ -561,6 +606,14 @@ class Group(list, Output_Group):
 
             # Set status
             self.metric.status = True
+
+        def __repr__(self):
+            """"""
+            return '{}: {} ± {} Myr'.format(
+                self.metric.name,
+                self.age,
+                self.age_int_error
+            )
 
     def get_covariances(self):
         """
@@ -723,7 +776,7 @@ class Group(list, Output_Group):
 
             return np.repeat(
                 np.array(covariances_matrix)[None],
-                self.series.jackknife_number, axis=0
+                self.series.number_of_iterations, axis=0
             )
 
         # Weights from the Mahalanobis distance
@@ -758,7 +811,7 @@ class Group(list, Output_Group):
     def get_Mahalanobis_distance(self, a, b=None, covariances_matrix=None):
         """
         Computes the Mahalanobis distances using the covariances matrix of a of all stars in
-        the group for all jack-knife iterations.
+        the group for all jackknife iterations.
         """
 
         # Compute the covariances matrix and inverse covariances matrix
@@ -766,7 +819,7 @@ class Group(list, Output_Group):
             covariances_matrix = self.get_covariances_matrix(a, b)
         covariances_matrix_invert = np.repeat(
             np.linalg.inv(covariances_matrix)[None],
-            self.sample_size_jackknife, axis=0
+            self.number_of_stars_iteration, axis=0
         )
 
         # Compute Mahalanobis distances
@@ -829,97 +882,123 @@ class Group(list, Output_Group):
 
     def get_minimum_spanning_tree(self):
         """
-        Builds the minimum spanning tree (MST) of a group for all timesteps using a Kruskal
+        Builds the minimum spanning trees (MST) of a group for all timesteps using a Kruskal
         algorithm, and computes the average branch length and the branch length median absolute
-        absolute deviation of branch length. The age of the moving is then estimated by finding
-        the epoch when these value are minimal.
+        absolute deviation of branch length. The age of the association is then estimated by
+        finding the epoch when these values are minimal.
         """
 
-        # Branches initialization
-        self.branches = []
+        # Compute the number of minimum spanning tree branches
         self.number_of_branches = self.sample_size - 1
-        for start in range(self.number_of_branches):
-            for end in range(start + 1, self.number_of_branches + 1):
-                self.branches.append(self.Branch(self.sample[start], self.sample[end]))
-
-        # Create minimum spanning tree
-        self.mst_xyz, self.mst_xyz_lengths, self.mst_xyz_weights = self.get_branches('length_xyz')
-        self.mst_ξηζ, self.mst_ξηζ_lengths, self.mst_ξηζ_weights = self.get_branches('length_ξηζ')
-
-        # Jack-knife Monte Carlo branch lengths
-        sample_size_jackknife = int(self.number_of_branches * self.series.jackknife_fraction)
-        branches_monte_carlo = np.array(
-            [
-                np.random.choice(self.number_of_branches, sample_size_jackknife, replace=False)
-                for i in range(self.series.jackknife_number)
-            ]
+        self.number_of_branches_monte_carlo = (
+            int(self.sample_size * self.series.iteration_fraction) - 1
         )
-        mst_xyz_lengths = self.mst_xyz_lengths.T[branches_monte_carlo].swapaxes(0, 1)
-        mst_xyz_weights = self.mst_xyz_weights.T[branches_monte_carlo].swapaxes(0, 1)
-        mst_ξηζ_lengths = self.mst_ξηζ_lengths.T[branches_monte_carlo].swapaxes(0, 1)
-        mst_ξηζ_weights = self.mst_ξηζ_weights.T[branches_monte_carlo].swapaxes(0, 1)
+
+        # Create branches for all possible pairs of stars
+        self.branches = []
+        branch_indexes = []
+        for start, end in combinations(range(self.sample_size), 2):
+            self.branches.append(self.Branch(self.sample[start], self.sample[end]))
+            branch_indexes.append((start, end))
+        self.branches = np.array(self.branches, dtype=object)
+        branch_indexes = np.array(branch_indexes, dtype=int)
+
+        # Find the corresponding branches for every jackknife Monte Carlo iteration
+        self.branches_monte_carlo = (
+            np.all(
+                np.any(
+                    branch_indexes[:,None,:,None] == self.stars_monte_carlo.T[None,:,None,:],
+                axis=3),
+            axis=2)
+        )
+
+        # Create minimum spanning trees
+        self.mst_xyz, self.mst_xyz_lengths, self.mst_xyz_weights = self.get_branches('xyz')
+        self.mst_ξηζ, self.mst_ξηζ_lengths, self.mst_ξηζ_weights = self.get_branches('ξηζ')
 
         # xyz minimum spanning tree average branch length and median absolute deviation ages
-        self.mst_xyz_mean(np.mean(mst_xyz_lengths, axis=0))
-        self.mst_xyz_mean_robust(np.average(mst_xyz_lengths, weights=mst_xyz_weights, axis=0))
+        self.mst_xyz_mean(np.mean(self.mst_xyz_lengths, axis=0))
+        self.mst_xyz_mean_robust(
+            np.average(self.mst_xyz_lengths, weights=self.mst_xyz_weights, axis=0)
+        )
         self.mst_xyz_mad(
             np.median(
-                np.abs(mst_xyz_lengths - np.median(mst_xyz_lengths, axis=0)), axis=0
+                np.abs(self.mst_xyz_lengths - np.median(self.mst_xyz_lengths, axis=0)), axis=0
             )
         )
 
         # ξηζ minimum spanning tree average branch length and median absolute deviation ages
-        self.mst_ξηζ_mean(np.mean(mst_ξηζ_lengths, axis=0))
-        self.mst_ξηζ_mean_robust(np.average(mst_ξηζ_lengths, weights=mst_ξηζ_weights, axis=0))
+        self.mst_ξηζ_mean(np.mean(self.mst_ξηζ_lengths, axis=0))
+        self.mst_ξηζ_mean_robust(
+            np.average(self.mst_ξηζ_lengths, weights=self.mst_ξηζ_weights, axis=0)
+        )
         self.mst_ξηζ_mad(
             np.median(
-                np.abs(mst_ξηζ_lengths - np.median(mst_ξηζ_lengths, axis=0)), axis=0
+                np.abs(self.mst_ξηζ_lengths - np.median(self.mst_ξηζ_lengths, axis=0)), axis=0
             )
         )
 
-    def get_branches(self, length):
+        # xyz minimum spanning tree 90 percentile
+        mst_xyz_lengths_sorted = np.sort(self.mst_xyz_lengths, axis=0)
+        mst_xyz_lengths_sorted90 = mst_xyz_lengths_sorted[
+            int(self.number_of_branches * 0.2):int(self.number_of_branches * 0.80) - 1,:
+        ]
+        self.mst_xyz_90(np.mean(mst_xyz_lengths_sorted90, axis=0))
+
+    def get_branches(self, system):
         """Computes the branches, lengths and weights of a minimum spanning tree."""
 
-        mst = np.empty((self.series.number_of_steps, self.number_of_branches), dtype=object)
+        # Initialization
+        mst = np.empty(
+            (
+                self.series.number_of_iterations,
+                self.series.number_of_steps,
+                self.number_of_branches_monte_carlo
+            ), dtype=object
+        )
         mst_lengths = np.zeros(mst.shape)
         mst_weights = np.zeros(mst.shape)
+        length = 'length_{}'.format(system)
 
-        # Minimum spanning tree computation for every timestep
-        for step in range(self.series.number_of_steps):
+        # Sort branches by length for every timestep with respect to branch length
+        branches_order = np.argsort(
+            np.array(
+                [vars(branch)[length] for branch in self.branches],
+                dtype=float
+            ), axis=0
+        ).T
+        branches_monte_carlo_sorted = np.moveaxis(self.branches_monte_carlo[branches_order], -1, 0)
+        branches_sorted = self.branches[branches_order]
 
-            # Sort by length
-            self.branches.sort(key=lambda branch: vars(branch)[length][step])
+        # Find the branches for every jackknife Monte Carlo iteration and timestep
+        for iteration in range(self.series.number_of_iterations):
+            for step in range(self.series.number_of_steps):
+                branches = branches_sorted[step, branches_monte_carlo_sorted[iteration, step]]
 
-            # Nodes, tree and branch number initialization
-            for star in self.sample:
-                star.node = self.Node()
-            i = 0
-            j = 0
+                # Nodes, tree and branch number initialization
+                for star in self.sample:
+                    star.node = self.Node()
+                test_index = 0
+                valid_index = 0
 
-            # Branches verification and addition to tree
-            while j < self.number_of_branches:
-                branch = self.branches[i]
-                i += 1
+                # Branches verification and addition to tree
+                while valid_index < self.number_of_branches_monte_carlo:
+                    branch = branches[test_index]
+                    test_index += 1
 
-                # Replace branch start and end stars' current nodes with their largest parent node
-                while branch.start.node.parent != None: branch.start.node = branch.start.node.parent
-                while branch.end.node.parent != None: branch.end.node = branch.end.node.parent
+                    # Replace branch start and end stars' current nodes with their largest parent node
+                    while branch.start.node.parent != None: branch.start.node = branch.start.node.parent
+                    while branch.end.node.parent != None: branch.end.node = branch.end.node.parent
 
-                # Branch confirmation if both stars have different parent nodes
-                if branch.start.node != branch.end.node:
-                    branch.start.node.parent = branch.end.node.parent = self.Node()
-                    mst[step, j] = branch
-                    j += 1
+                    # Branch validation if both stars have different parent nodes
+                    if branch.start.node != branch.end.node:
+                        branch.start.node.parent = branch.end.node.parent = self.Node()
+                        mst[iteration, step, valid_index] = branch
+                        mst_lengths[iteration, step, valid_index] = vars(branch)[length][step]
+                        mst_weights[iteration, step, valid_index] = branch.weight[step]
+                        valid_index += 1
 
-            # Minimum spanning tree branches length
-            mst_lengths[step] = np.vectorize(
-                lambda branch: vars(branch)[length][step]
-            )(mst[step])
-            mst_weights[step] = np.vectorize(
-                lambda branch: branch.weight[step]
-            )(mst[step])
-
-        return mst, mst_lengths, mst_weights
+        return mst, mst_lengths.T.swapaxes(1, 2), mst_weights.T.swapaxes(1, 2)
 
     class Branch:
         """Line connecting two stars used for the calculation of the minimum spanning tree."""
@@ -939,6 +1018,9 @@ class Group(list, Output_Group):
                 (self.start.position_ξηζ - self.end.position_ξηζ)**2, axis=1
             )**0.5
             self.weight = np.mean(np.vstack((self.start.weight, self.end.weight)), axis=0)
+
+            start.branches.append(self)
+            end.branches.append(self)
 
         def __repr__(self):
             """Returns a string of name of the branch."""
@@ -975,6 +1057,7 @@ class Group(list, Output_Group):
             self.subsample = False
             self.model = False
             self.age = None
+            self.branches = []
             vars(self).update(values)
 
             # Forward or backward, and model or data time
@@ -1103,6 +1186,8 @@ class Group(list, Output_Group):
             velocity_rθz /= Coordinate.lsr_velocity[1]
 
             # Orbit initialization and integration
+            if self.group.series.timer:
+                t0 = get_time()
             orbit = Orbit(
                 [
                     position_rθz[0], velocity_rθz[0], velocity_rθz[1],
@@ -1113,6 +1198,8 @@ class Group(list, Output_Group):
             )
             orbit.turn_physical_off()
             orbit.integrate(time, self.group.series.potential, method='odeint')
+            if self.group.series.timer:
+                self.group.time_integrate += get_time() - t0
 
             # rθz positions and velocities, and conversion to physical units
             position_rθz = np.array(
@@ -1175,3 +1262,28 @@ class Group(list, Output_Group):
             """Returns a string of name of the star."""
 
             return self.name
+
+    def show_timer(self):
+        """Displays the time required to perform various steps in the group's creation."""
+
+        # Set missing timers
+        if self.number == 0:
+            if not self.series.size_metrics:
+                self.t2 = self.t3 = self.t4 = self.t5 = self.t6 = self.t7 = get_time()
+            self.t8 = get_time()
+            self.tt = self.t8 - self.t0
+
+            # Create the time string
+            def create_time_str(name, delay, total):
+                print('{}: {:.2f} ms, {:.2f}%'.format(name, delay * 1000, delay / total * 100))
+
+            # Show times
+            create_time_str('stars', (self.t1 - self.t0), self.tt)
+            create_time_str('set_metrics', (self.t2 - self.t1), self.tt)
+            create_time_str('pca', (self.t3 - self.t2), self.tt)
+            create_time_str('cov', (self.t4 - self.t3), self.tt)
+            create_time_str('cov_robust', (self.t5 - self.t4), self.tt)
+            create_time_str('cov_sklearn', (self.t6 - self.t5), self.tt)
+            create_time_str('mad', (self.t7 - self.t6), self.tt)
+            create_time_str('mst', (self.t8 - self.t7), self.tt)
+            create_time_str('orbit integration', self.time_integrate, self.tt)

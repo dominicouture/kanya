@@ -23,3 +23,4 @@ This tool uses the following non-standard Python (version 3.7.4) packages:
 - astropy 4.2.1
 - galpy 1.7.1
 - sklearn 0.23.2
+- pandas 1.3.5
