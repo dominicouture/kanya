@@ -12,7 +12,7 @@ import numpy as np
 import galpy.util.coords as coords
 from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
-from .output import Output_Group
+from .output import Output_Group, Output_Star
 from .coordinate import *
 from time import time as get_time
 from itertools import combinations
@@ -108,6 +108,7 @@ class Group(list, Output_Group):
         """
 
         # Create stars from data
+        index = 0
         for star in self.series.data.core_sample:
 
             # Position and velocity errors based on data
@@ -186,9 +187,10 @@ class Group(list, Output_Group):
                 )
 
             # Create star
+            index += 1
             self.append(
                 self.Star(
-                    self, name=star.name, backward=True,
+                    self, index=index, name=star.name, time=self.series.time,
                     velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
                     position_xyz=position_xyz, position_xyz_error=position_xyz_error
                 )
@@ -208,10 +210,10 @@ class Group(list, Output_Group):
         shift is also added.
         """
 
-        # Integrate model backward orbit from the current-day epoch to the epoch of star formation
+        # Model average star's backward orbit integration from the current-day epoch
+        # to the epoch of star formation
         self.average_model_star = self.Star(
-            self, name='average_model_star',
-            backward=True, model=True, age=self.series.age.value,
+            self, name='average_model_star', time=self.series.model_time,
             velocity_xyz=self.series.velocity.values, velocity_xyz_error=np.zeros(3),
             position_xyz=self.series.position.values, position_xyz_error=np.zeros(3)
         )
@@ -230,10 +232,10 @@ class Group(list, Output_Group):
         self.model_stars = []
         for star in range(self.series.number_of_stars):
 
-            # Integrate model star forward galactic orbit
+            # Model star's forward orbit integration from the epoch of star formation
+            # to the current-day epoch
             model_star = self.Star(
-                self, name='model_star_{}'.format(star + 1),
-                backward=False, model=True, age=self.series.age.value,
+                self, name='model_star_{}'.format(star + 1), time=self.series.model_time[::-1],
                 velocity_xyz=np.random.normal(velocity, velocity_scatter),
                 velocity_xyz_error=np.zeros(3),
                 position_xyz=np.random.normal(position, position_scatter),
@@ -298,7 +300,7 @@ class Group(list, Output_Group):
             # Create star
             self.append(
                 self.Star(
-                    self, name='star_{}'.format(star + 1), backward=True,
+                    self, index=star + 1, name='star_{}'.format(star + 1), time=self.series.time,
                     velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
                     position_xyz=position_xyz, position_xyz_error=position_xyz_error
                 )
@@ -1009,8 +1011,11 @@ class Group(list, Output_Group):
             'start' and 'end', for all timestep.
             """
 
+            # Set start and end branches
             self.start = start
             self.end = end
+
+            # Compute branch lengths and weigth
             self.length_xyz = np.sum(
                 (self.start.position_xyz - self.end.position_xyz)**2, axis=1
             )**0.5
@@ -1018,9 +1023,6 @@ class Group(list, Output_Group):
                 (self.start.position_ξηζ - self.end.position_ξηζ)**2, axis=1
             )**0.5
             self.weight = np.mean(np.vstack((self.start.weight, self.end.weight)), axis=0)
-
-            start.branches.append(self)
-            end.branches.append(self)
 
         def __repr__(self):
             """Returns a string of name of the branch."""
@@ -1040,32 +1042,24 @@ class Group(list, Output_Group):
 
             return 'None' if self.parent is None else self.parent
 
-    class Star:
+    class Star(Output_Star):
         """Parameters and methods of a star in a moving group."""
 
         def __init__(self, group, **values):
             """
-            Initializes a Star object with at least a name, velocity, velocity error, initial
-            position and position error. More values can be added (when initializing from a
-            file for instance). If a traceback is needed, the star's position and velocity
-            overtime is computed with galpy.
+            Initializes a Star object with at least a name, integration times, initial veloctiy,
+            velocity error, initial position and position error. More values can be added (when
+            initializing from a file for instance). If a traceback is needed, the star's positions
+            and velocities over time is computed with a linear approximation or galpy, in both xyz
+            and ξηζ coordinate systems. The initial position and velocity corresponds to the first
+            timestep in the integration time array, even if it is nonzero.
             """
 
             # Initialization
             self.group = group
             self.outlier = False
             self.subsample = False
-            self.model = False
-            self.age = None
-            self.branches = []
             vars(self).update(values)
-
-            # Forward or backward, and model or data time
-            self.time = (
-                np.copy(self.group.series.time) if not self.model
-                else np.linspace(0., self.age, 100)
-            )
-            self.time *= (-1 if self.backward else 1)
 
             # Trajectory integration
             if self.group.series.potential is None:
@@ -1081,10 +1075,10 @@ class Group(list, Output_Group):
             self.velocity_outlier = velocity_outlier
 
         def get_linear(self):
-            """Computes a star's backward or forward linear trajectory."""
+            """Computes a star's backward or forward linear trajectory in space."""
 
             # Compute linear xyz positions and velocities
-            self.position_xyz = self.position_xyz + self.time[:,None] * (
+            self.position_xyz = self.position_xyz + (self.time - self.time[0])[:,None] * (
                 self.velocity_xyz + Coordinate.galactic_velocity
             )
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
@@ -1118,20 +1112,14 @@ class Group(list, Output_Group):
                 )
             )
 
-            # Change time for forward computation
-            if not self.backward and self.model:
-                time = self.time - self.age
-            else:
-                time = self.time
-
             # Linear ξηζ positions and velocities
-            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, time)
+            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, self.time)
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
-            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, time)
+            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, self.time)
             self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
         def get_orbit(self):
-            """Computes a star's backward or forward galactic orbit using Galpy."""
+            """Computes a star's backward or forward galactic orbit in the Gaalaxy using Galpy."""
 
             # New method to check previous method
             # from astropy import units as u
@@ -1180,7 +1168,7 @@ class Group(list, Output_Group):
             # if self.name == 'Star_30':
             #     covariances_self.velocity_rθz_other - self.velocity_rθz)
 
-            # Conversion to natural units
+            # Conversions to Galpy's natural units
             time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
             position_rθz /= np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
             velocity_rθz /= Coordinate.lsr_velocity[1]
@@ -1228,16 +1216,10 @@ class Group(list, Output_Group):
             )
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-            # Change time for forward orbital computation
-            if not self.backward and self.model:
-                time = self.time - self.age
-            else:
-                time = self.time
-
             # ξηζ positions and velocities
-            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, time)
+            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, self.time)
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
-            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, time)
+            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, self.time)
             self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
         def get_relative_coordinates(self):

@@ -233,6 +233,7 @@ class Series(list, Output_Series):
             else self.config.file_path.values if self.config.file_path.values is not None
             else output(check=self.from_file, create=self.to_file) + '/'
         )
+        print(self.file_path)
 
         # Check if file_path parameter is a string, which must be done before the directory call
         self.stop(
@@ -275,17 +276,21 @@ class Series(list, Output_Series):
         # final_time parameter
         self.final_time = self.configure_quantity(self.config.final_time)
         self.stop(
-            not self.final_time > self.initial_time, 'ValueError',
-            "'final_time' must be greater than initial_time ({} and {} given).",
+            self.final_time.value == self.initial_time.value, 'ValueError',
+            "'final_time' cannot be equal to 'initial_time' ({} and {} given).",
             self.final_time, self.initial_time
         )
 
-        # duration, timesteps and time parameters
-        self.duration = self.final_time - self.initial_time
+        # duration, timesteps and integration times parameters
+        self.duration = abs(self.final_time - self.initial_time)
         self.timestep = self.duration / (self.number_of_steps - 1)
         self.time = np.linspace(
             self.initial_time.value, self.final_time.value, self.number_of_steps
         )
+
+        # Direction of the orbit integration
+        self.forward = self.final_time.value > self.initial_time.value
+        self.backward = not self.forward
 
         # rv_shift paramater
         self.rv_shift = self.configure_quantity(self.config.rv_shift)
@@ -395,7 +400,8 @@ class Series(list, Output_Series):
         """
 
         # Logging
-        log("Initializing '{}' series from data.", self.name)
+        if self.from_data:
+            log("Initializing '{}' series from data.", self.name)
 
         # Check if data is present
         self.stop(
@@ -416,6 +422,14 @@ class Series(list, Output_Series):
                     'age', *self.config.position_parameters, *self.config.velocity_parameters
                 ):
                 vars(self)[parameter] = None
+
+            # Simulated position and velocity errors parameters
+            if not self.data_errors:
+                self.position_error = self.configure_coordinate(self.config.position_error)
+                self.velocity_error = self.configure_coordinate(self.config.velocity_error)
+
+            # Model stars integration times
+            self.model_time = None
 
     def configure_model(self):
         """ Checks if traceback and output from a model is possible. """
@@ -439,8 +453,9 @@ class Series(list, Output_Series):
         # age parameter
         self.age = self.configure_quantity(self.config.age)
         self.stop(
-            self.age.value < 0.0, 'ValueError',
-            "'age' must be greater than or equal to 0.0 Myr ({} given).", self.age
+            self.age.value == self.initial_time.value, 'ValueError',
+            "'age' cannot be equal to 'initial_time' ({} and {} given).",
+            self.age, self.initial_time
         )
 
         # position parameter
@@ -474,6 +489,12 @@ class Series(list, Output_Series):
         # Data set to None since measurement errors and radial velocity shifts are simulated
         else:
             self.data = None
+
+        # Model stars integration times
+        self.model_time = np.linspace(
+            self.initial_time.value, self.age.value,
+            int(abs(self.age.value - self.initial_time.value) / self.timestep.value) + 1
+        )
 
     def configure_integer(self, parameter):
         """Checks if an integer value is valid and converts it if needed."""

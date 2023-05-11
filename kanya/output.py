@@ -141,6 +141,7 @@ def get_file_path(name, extension, file_path=None):
     # file_path parameter
     file_path = file_path if file_path is not None else output(create=True) + '/'
 
+
     # Check if file_path parameter is a string, which must be done before the directory call
     stop(
         type(file_path) != str, 'TypeError',
@@ -154,7 +155,7 @@ def get_file_path(name, extension, file_path=None):
     )
 
     # Check if there's an extension and add an extension, if needed
-    if path.splitext(file_path)[1] == '':
+    if path.splitext(file_path)[-1] != f'.{extension}':
         file_path += f'.{extension}'
 
     return file_path
@@ -360,19 +361,16 @@ class Output_Series():
         # Check metric status
         if metric.status:
 
-            # Redefine time, value and value error arrays
-            time = -self.time
-            value = metric.value.T[index]
-            value_error = metric.value_error.T[index]
-
-            # Extrapolate one point in the future
-            value_1 = interp1d(time, value, fill_value='extrapolate')(1.0)
-            value_error_1 = interp1d(time, value_error, fill_value='extrapolate')(1.0)
-
-            # Add the point in the time, value and value error arrays
-            time = np.insert(time, 0, 1.0)
-            value = np.insert(value, 0, value_1)
-            value_error = np.insert(value_error, 0, value_error_1)
+            # Extrapolate one point in time, value and value error arrays
+            time = np.insert(self.time, 0, 1.0)
+            value = np.insert(
+                metric.value.T[index], 0,
+                interp1d(self.time, metric.value.T[index], fill_value='extrapolate')(1.0)
+            )
+            value_error = np.insert(
+                metric.value_error.T[index], 0,
+                interp1d(self.time, metric.value_error.T[index], fill_value='extrapolate')(1.0)
+            )
 
             # Plot the value of the metric over time
             ax.plot(
@@ -404,7 +402,7 @@ class Output_Series():
                     np.round(np.linspace(0, self.number_of_groups * self.number_of_iterations - 1, 20))
                 ):
                     ax.plot(
-                        -self.time, values[int(i),:,index],
+                        self.time, values[int(i),:,index],
                         color=color, alpha=0.6, linewidth=0.5,
                         linestyle=linestyle, zorder=zorder - 0.25
                     )
@@ -456,12 +454,13 @@ class Output_Series():
         ax.set_ylabel('Association size (pc)', fontsize=8)
 
         # Set limits
-        ax.set_xlim(-self.final_time.value + 15, -self.initial_time.value + 1)
-        ax.set_ylim(-1., 39.)
+        ax.set_xlim(self.final_time.value + 15, self.initial_time.value + 1)
+        # ax.set_xlim(self.final_time.value, self.initial_time.value + 1)
+        # ax.set_ylim(-1., 39.)
 
         # Set ticks
-        ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35.])
-        ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
+        # ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35., -40, -45, -50])
+        # ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
         ax.tick_params(top=True, right=True, which='both', direction='in', width=0.5, labelsize=8)
 
         # Set spines
@@ -1001,25 +1000,130 @@ class Output_Series():
 class Output_Group():
     """Output methods for a group of stars."""
 
-    def create_kinematics_table(
+    def create_time_kinematics_table(
         self, save=False, show=False, machine=False,
         forced=False, default=False, cancel=False
     ):
         """
+        Creates a table of the group average kinematics over time. If 'save' if True, the table
+        is saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
+        machine-readable table, without units in the header and '.csv' extension instead of a
+        '.txt', is created. The machine-readable table also has an additional column 'status'
+        to indicate whether a metric is valid or rejected, whereas the non-machine-readable
+        table uses side heads.
+        """
+
+        # Check save, show and machine
+        self.series.stop(
+            type(save) != bool, 'TypeError',
+            "'save' must be a boolean ({} given).", type(save)
+        )
+        self.series.stop(
+            type(show) != bool, 'TypeError',
+            "'show' must be a boolean ({} given).", type(show)
+        )
+        self.series.stop(
+            type(machine) != bool, 'TypeError',
+            "'machine' must be a boolean ({} given).", type(machine)
+        )
+
+        # Create header
+        if machine:
+            lines = [
+                'Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta'
+            ]
+
+            # Create lines
+            for t in np.arange(self.series.time.size):
+                lines.append(
+                    (
+                        f'{self.series.time[t]},'
+                        f'{self.position_xyz[t,0]},'
+                        f'{self.position_xyz[t,1]},'
+                        f'{self.position_xyz[t,2]},'
+                        f'{self.velocity_xyz[t,0]},'
+                        f'{self.velocity_xyz[t,1]},'
+                        f'{self.velocity_xyz[t,2]},'
+                        f'{self.position_ξηζ[t,0]},'
+                        f'{self.position_ξηζ[t,1]},'
+                        f'{self.position_ξηζ[t,2]},'
+                        f'{self.velocity_ξηζ[t,0]},'
+                        f'{self.velocity_ξηζ[t,1]},'
+                        f'{self.velocity_ξηζ[t,2]}'
+                    )
+                )
+
+        # Create header
+        else:
+            lines = [
+                f"{'':-<152}",
+                f"{'Time':<8}{'X':>12}{'Y':>12}{'Z':>12}{'U':>12}{'V':>12}{'W':>12}"
+                f"{'ξ':>12}{'η':>12}{'ζ':>12}{'vξ':>12}{'vη':>12}{'vζ':>12}",
+                f"{'[Myr]':<8}{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
+                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}"
+                f"{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
+                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}",
+                f"{'':-<152}"
+            ]
+
+            # Create lines
+            for t in np.arange(self.series.time.size):
+                lines.append(
+                    (
+                        f'{self.series.time[t]:<8.1f}'
+                        f'{self.position_xyz[t,0]:>12.2f}'
+                        f'{self.position_xyz[t,1]:>12.2f}'
+                        f'{self.position_xyz[t,2]:>12.2f}'
+                        f'{self.velocity_xyz[t,0]:>12.2f}'
+                        f'{self.velocity_xyz[t,1]:>12.2f}'
+                        f'{self.velocity_xyz[t,2]:>12.2f}'
+                        f'{self.position_ξηζ[t,0]:>12.2f}'
+                        f'{self.position_ξηζ[t,1]:>12.2f}'
+                        f'{self.position_ξηζ[t,2]:>12.2f}'
+                        f'{self.velocity_ξηζ[t,0]:>12.2f}'
+                        f'{self.velocity_ξηζ[t,1]:>12.2f}'
+                        f'{self.velocity_ξηζ[t,2]:>12.2f}'
+                    )
+                )
+
+            # Create footer
+            lines.append(f"{'':-<152}")
+
+        # Show table
+        if show:
+            for line in lines:
+                print(line)
+
+        # Save table
+        if save:
+            save_table(
+                self.name, lines, file_path=f'kinematics_time_{self.name}',
+                extension='csv' if machine else 'txt',
+                forced=forced, default=default, cancel=cancel
+            )
+
+    def create_kinematics_table(
+        self, save=False, show=False, machine=False, age=None,
+        forced=False, default=False, cancel=False
+    ):
+        """
         Creates a table of the 6D kinematics (XYZ Galactic positions and UVW space velocities)
-        at the current-day epoch of all members in the group. If 'save' if True, the table is
+        at the given age of all members in the group. If 'save' if True, the table is
         saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
         machine-readable table, with separate columns for values and errors, no units in the
         header and '.csv' extension instead of a '.txt', is created.
         """
 
+        # Retrieve the epoch index
+        epoch_index = self.get_epoch(age=age)[0]
+
         # Retrieve xyz positions and uvw velocities and convert units
         def get_position_velocity_xyz(star):
             position_xyz = Quantity(
-                star.position_xyz[0], 'pc', star.position_xyz_error
+                star.position_xyz[epoch_index], 'pc', star.position_xyz_error
             )
             velocity_xyz = Quantity(
-                star.velocity_xyz[0], 'pc/Myr', star.velocity_xyz_error
+                star.velocity_xyz[epoch_index], 'pc/Myr', star.velocity_xyz_error
             ).to('km/s')
 
             return position_xyz, velocity_xyz
@@ -1091,7 +1195,7 @@ class Output_Group():
         # Save table
         if save:
             save_table(
-                self.name, lines, file_path=f'kinematics_{self.name}',
+                self.name, lines, file_path=f'kinematics_{self.name}_{age}Myr',
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -1109,32 +1213,30 @@ class Output_Group():
                 "'age' must be an integer, float or None ({} given).", type(age)
             )
             self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", age
+                age < np.min(self.series.time), 'ValueError',
+                "'age' must be younger the oldest time ({} Myr given, earliest time: {} Myr).",
+                age, np.min(self.series.time)
             )
             self.series.stop(
-                age > self.series.final_time.value, 'ValueError',
-                "'age' must be younger than the final time ({} Myr, {} Myr given).",
-                self.series.final_time.value, age
+                age > np.max(self.series.time), 'ValueError',
+                "'age' must be older the latest time ({} Myr given, latest time: {} Myr).",
+                age, np.max(self.series.time)
             )
-            return (
-                int(age / self.series.final_time.value * self.series.number_of_steps), age, None
-            )
+            return np.argmin(np.abs(age - self.series.time)), age, None
 
         # Index from the epoch of minimum of an association size metric
         elif metric is not None:
             metric, index = self.get_metric(metric, index)
             if metric.status:
-                return (
-                    int(metric.age[index] / self.series.final_time.value * self.series.number_of_steps),
-                    metric.age[index], metric.age_error[index]
-                )
+                age = metric.age[index]
+                return np.argmin(np.abs(age - self.series.time)), age, metric.age_error[index]
+
             else:
                 log(
                     "Could not use '{}' metric for '{}' group. It was not computed.",
                     str(metric.name[index]), self.name, display=True
                 )
-                return (None, None, None)
+                return None, None, None
 
         # No birth index, age or age error
         else:
@@ -1382,6 +1484,7 @@ class Output_Group():
                     # Plot stars' birth positions
                     if birth_index is not None:
                         color = colors.red[6] if star.outlier else colors.blue[6]
+                        color = colors.green[6] if star.name == 'HR 8799' else colors.blue[6]
                         ax.scatter(
                             np.array([star.position_ξηζ[birth_index,x]]),
                             np.array([star.position_ξηζ[birth_index,y]]),
@@ -1450,12 +1553,12 @@ class Output_Group():
         ax3.set_ylabel('$ζ^\prime$ (pc)', fontsize=8)
 
         # Set limits
-        ax1.set_xlim(-225, 60)
-        ax1.set_ylim(-45, 110)
-        ax2.set_xlim(-40, 49)
-        ax2.set_ylim(-45, 110)
-        ax3.set_xlim(-225, 60)
-        ax3.set_ylim(-40, 49)
+        # ax1.set_xlim(-225, 60)
+        # ax1.set_ylim(-45, 110)
+        # ax2.set_xlim(-40, 49)
+        # ax2.set_ylim(-45, 110)
+        # ax3.set_xlim(-225, 60)
+        # ax3.set_ylim(-40, 49)
 
         # Set ticks
         ax1.set_xticklabels([])
@@ -1517,16 +1620,14 @@ class Output_Group():
 
         # Birth index, age and age error
         birth_index, age, age_error  = tuple(
-            zip(
-                *[self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
-            )
+            zip(*[self.get_epoch(age=age, metric=metric, index=index) for index in range(3)])
         )
 
         # Plot stars' trajectories
         for ax, y in ((ax1, 0), (ax2, 1), (ax3, 2)):
             for star in self:
                 ax.plot(
-                    -self.series.time, (star.position_xyz - self.position_xyz)[:,y],
+                    self.series.time, (star.position_xyz - self.position_xyz)[:,y],
                     color = colors.red[6] if star.outlier else colors.black, alpha=0.6,
                     linewidth=0.5, solid_capstyle='round', zorder=0.1
                 )
@@ -1534,7 +1635,7 @@ class Output_Group():
                 # Plot stars' current positions
                 if self.series.from_data:
                     ax.scatter(
-                        -self.series.time[0], (star.position_xyz - self.position_xyz)[0,y],
+                        self.series.time[0], (star.position_xyz - self.position_xyz)[0,y],
                         color=colors.black + (0.4,), edgecolors=colors.black, alpha=None,
                         s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
@@ -1543,7 +1644,7 @@ class Output_Group():
                     if birth_index[y] is not None:
                         color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            -self.series.time[birth_index[y]],
+                            self.series.time[birth_index[y]],
                             (star.position_xyz - self.position_xyz)[birth_index[y],y],
                             color=color + (0.4,), edgecolors=color, alpha=None,
                             s=6, marker='o', linewidths=0.25, zorder=0.2
@@ -1552,14 +1653,14 @@ class Output_Group():
             # Show vectical dashed line
             if birth_index[y] is not None:
                 ax.axvline(
-                    x=-self.series.time[birth_index[y]], color=colors.black,
+                    x=self.series.time[birth_index[y]], color=colors.black,
                     linewidth=0.5, linestyle='--', zorder=0.1
                 )
 
                 # Show a grey shaded area
                 if age_error[y] is not None:
                     ax.fill_between(
-                        np.array([-age[y] - age_error[y], -age[y] + age_error[y]]), 0, 1,
+                        np.array([age[y] - age_error[y], age[y] + age_error[y]]), 0, 1,
                         transform=ax.get_xaxis_transform(), color=colors.grey[9],
                         alpha=0.1, linewidth=0.0, zorder=0.1
                     )
@@ -1573,7 +1674,7 @@ class Output_Group():
                     self.average_model_star.position_xyz[:,y] - position_xyz[::-1]
                 )
                 ax.plot(
-                    self.average_model_star.time,
+                    self.series.model_time,
                     average_model_star_position_xyz,
                     color=colors.green[6], alpha=0.8,
                     linewidth=1.0, solid_capstyle='round', zorder=0.3
@@ -1582,7 +1683,7 @@ class Output_Group():
                 # Plot the average model star's birth and current positions
                 for t, x, size, marker in ((-1, -1, 10, '*'), (0, 0, 6, 'o')):
                     ax.scatter(
-                        np.array([self.average_model_star.time[t]]),
+                        np.array([self.series.model_time[t]]),
                         np.array([average_model_star_position_xyz[x]]),
                         color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                         alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
@@ -1592,7 +1693,7 @@ class Output_Group():
                 for star in self.model_stars:
                     model_star_position_xyz = star.position_xyz[:,y] - position_xyz
                     ax.plot(
-                        -star.time[::-1], model_star_position_xyz,
+                        self.series.model_time[::-1], model_star_position_xyz,
                         color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2
                     )
@@ -1600,7 +1701,7 @@ class Output_Group():
                     # Plot model stars' birth and current positions
                     for t, x, size, marker in ((-1, 0, 10, '*'), (0, -1, 6, 'o')):
                         ax.scatter(
-                            -np.array([star.time[t]]),
+                            np.array([self.series.model_time[t]]),
                             np.array([model_star_position_xyz[x]]),
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
@@ -1610,7 +1711,7 @@ class Output_Group():
         if style == '2x2':
             for y, label, linestyle in ((0,'$<X>$', '-'), (1,'$<Y>$', '--'), (2, '$<Z>$', ':')):
                 ax0.plot(
-                    -self.series.time, self.position_xyz[:,y] / 1000,
+                    self.series.time, self.position_xyz[:,y] / 1000,
                     label=label, color=colors.black, alpha=0.8, linestyle=linestyle,
                     linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.1
                 )
@@ -1618,7 +1719,7 @@ class Output_Group():
                 # Plot stars' average current positions
                 if self.series.from_data:
                     ax0.scatter(
-                        -self.series.time[0], self.position_xyz[0,y] / 1000,
+                        self.series.time[0], self.position_xyz[0,y] / 1000,
                         color=colors.black + (0.4,), edgecolors=colors.black,
                         alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
@@ -1627,7 +1728,7 @@ class Output_Group():
                     if birth_index[y] is not None:
                         color = colors.red[6] if star.outlier else colors.blue[6]
                         ax0.scatter(
-                            -self.series.time[birth_index[y]],
+                            self.series.time[birth_index[y]],
                             self.position_xyz[birth_index[y],y] / 1000,
                             color=color + (0.4,), edgecolors=color + (1.0,),
                             alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
@@ -1637,7 +1738,7 @@ class Output_Group():
                 if self.series.from_model:
                     average_model_star_position_xyz = self.average_model_star.position_xyz[:,y] / 1000
                     ax0.plot(
-                        self.average_model_star.time,
+                        self.series.model_time,
                         average_model_star_position_xyz,
                         color=colors.green[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.3
@@ -1646,7 +1747,7 @@ class Output_Group():
                     # Plot the average model star's birth and current positions
                     for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                         ax0.scatter(
-                            np.array([self.average_model_star.time[t]]),
+                            np.array([self.series.model_time[t]]),
                             np.array([average_model_star_position_xyz[x]]),
                             color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
@@ -1657,7 +1758,7 @@ class Output_Group():
                         [star.position_xyz[:,y] for star in self.model_stars], axis=0
                     ) / 1000
                     ax0.plot(
-                        -self.model_stars[0].time[::-1], model_star_position_xyz,
+                        self.series.model_time[::-1], model_star_position_xyz,
                         color=colors.blue[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.2
                     )
@@ -1665,7 +1766,7 @@ class Output_Group():
                     # Plot model stars' birth and current positions
                     for t, x, size, marker in ((-1, 0, 12, '*'), (0, -1, 6, 'o')):
                         ax0.scatter(
-                            -np.array([self.model_stars[0].time[t]]),
+                            np.array([self.series.model_time[t]]),
                             np.array([model_star_position_xyz[x]]),
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
@@ -1709,7 +1810,7 @@ class Output_Group():
 
         # Set limits
         for ax in (ax1, ax2, ax3) + ((ax0,) if style == '2x2' else ()):
-            ax.set_xlim(-np.max(self.series.time), -(np.min(self.series.time) - 1))
+            ax.set_xlim(np.min(self.series.time), np.max(self.series.time) + 1)
 
         # Set ticks
         if style == '1x3':
@@ -1782,21 +1883,15 @@ class Output_Group():
             ax3 = fig.add_axes([left, bottom, width, height])
 
         # Birth index, age and age error
-        # birth_index, age, age_error  = tuple(
-        #     zip(
-        #         *[self.get_epoch(age=age, metric=metric, index=index) for index in range(3)]
-        #     )
-        # )
-
-        age = np.array((19.8, 0.0, 36.3))
-        age_error = np.array((2.5, 7.2, 9.7))
-        birth_index = np.array(age / self.series.final_time.value * self.series.number_of_steps, dtype=int)
+        birth_index, age, age_error  = tuple(
+            zip(*[self.get_epoch(age=age, metric=metric, index=index) for index in range(3)])
+        )
 
         # Plot stars' trajectories
         for ax, y in ((ax1, 0), (ax2, 1), (ax3, 2)):
             for star in self:
                 ax.plot(
-                    -self.series.time, (star.position_ξηζ - self.position_ξηζ)[:,y],
+                    self.series.time, (star.position_ξηζ - self.position_ξηζ)[:,y],
                     color = colors.red[6] if star.outlier else colors.black,
                     alpha=0.6, linewidth=0.5, solid_capstyle='round', zorder=0.1
                 )
@@ -1804,7 +1899,7 @@ class Output_Group():
                 # Plot stars' current positions
                 if self.series.from_data:
                     ax.scatter(
-                        -self.series.time[0], (star.position_ξηζ - self.position_ξηζ)[0,y],
+                        self.series.time[0], (star.position_ξηζ - self.position_ξηζ)[0,y],
                         color=colors.black + (0.4,), edgecolors=colors.black,
                         alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
@@ -1813,7 +1908,7 @@ class Output_Group():
                     if birth_index[y] is not None:
                         color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            -self.series.time[birth_index[y]],
+                            self.series.time[birth_index[y]],
                             (star.position_ξηζ - self.position_ξηζ)[birth_index[y],y],
                             color=color + (0.4,), edgecolors=color + (1.0,),
                             alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
@@ -1822,14 +1917,14 @@ class Output_Group():
             # Show vectical dashed line
             if birth_index[y] is not None:
                 ax.axvline(
-                    x=-self.series.time[birth_index[y]], color=colors.black,
+                    x=self.series.time[birth_index[y]], color=colors.black,
                     linewidth=0.5, linestyle='--', zorder=0.1
                 )
 
                 # Show a grey shaded area
                 if age_error[y] is not None:
                     ax.fill_between(
-                        np.array([-age[y] - age_error[y], -age[y] + age_error[y]]), 0, 1,
+                        np.array([age[y] - age_error[y], age[y] + age_error[y]]), 0, 1,
                         transform=ax.get_xaxis_transform(), color=colors.grey[9],
                         alpha=0.1, linewidth=0.0, zorder=0.1
                     )
@@ -1843,7 +1938,7 @@ class Output_Group():
                     self.average_model_star.position_ξηζ[:,y] - position_ξηζ[::-1]
                 )
                 ax.plot(
-                    self.average_model_star.time,
+                    self.series.model_time,
                     average_model_star_position_ξηζ,
                     color=colors.green[6], alpha=0.8,
                     linewidth=1.0, solid_capstyle='round', zorder=0.3
@@ -1852,7 +1947,7 @@ class Output_Group():
                 # Plot the average model star's birth and current positions
                 for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                     ax.scatter(
-                        np.array([self.average_model_star.time[t]]),
+                        np.array([self.series.model_time[t]]),
                         np.array([average_model_star_position_ξηζ[x]]),
                         color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                         alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
@@ -1862,7 +1957,7 @@ class Output_Group():
                 for star in self.model_stars:
                     model_star_position_ξηζ = star.position_ξηζ[:,y] - position_ξηζ
                     ax.plot(
-                        -star.time[::-1], model_star_position_ξηζ,
+                        self.series.model_time[::-1], model_star_position_ξηζ,
                         color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2
                     )
@@ -1870,7 +1965,7 @@ class Output_Group():
                     # Plot model stars' birth and current positions
                     for t, x, size, marker in ((-1, 0, 12, '*'), (0, -1, 6, 'o')):
                         ax.scatter(
-                            -np.array([star.time[t]]),
+                            np.array([self.series.model_time[t]]),
                             np.array([model_star_position_ξηζ[x]]),
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
@@ -1882,7 +1977,7 @@ class Output_Group():
                 (0, '$<ξ^\prime>$', '-'), (1, '$<η^\prime>$', '--'), (2, '$<ζ^\prime>$', ':')
             ):
                 ax0.plot(
-                    -self.series.time, self.position_ξηζ[:,y],
+                    self.series.time, self.position_ξηζ[:,y],
                     label=label, color=colors.black, alpha=0.8, linestyle=linestyle,
                     linewidth=1.0, solid_capstyle='round', zorder=0.1
                 )
@@ -1890,7 +1985,7 @@ class Output_Group():
                 # Plot stars' average current positions
                 if self.series.from_data:
                     ax0.scatter(
-                        -self.series.time[0], self.position_ξηζ[0,y],
+                        self.series.time[0], self.position_ξηζ[0,y],
                         color=colors.black + (0.4,), edgecolors=colors.black,
                         alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
@@ -1899,7 +1994,7 @@ class Output_Group():
                     if birth_index[y] is not None:
                         color = colors.red[6] if star.outlier else colors.blue[6]
                         ax0.scatter(
-                            -self.series.time[birth_index[y]],
+                            self.series.time[birth_index[y]],
                             self.position_ξηζ[birth_index[y],y],
                             color=color + (0.4,), edgecolors=color + (1.0,),
                             alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
@@ -1909,7 +2004,7 @@ class Output_Group():
                 if self.series.from_model:
                     average_model_star_position_ξηζ = self.average_model_star.position_ξηζ[:,y]
                     ax0.plot(
-                        self.average_model_star.time,
+                        self.series.model_time,
                         average_model_star_position_ξηζ,
                         color=colors.green[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', zorder=0.3
@@ -1918,7 +2013,7 @@ class Output_Group():
                     # Plot the average model star's birth and current positions
                     for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                         ax0.scatter(
-                            np.array([self.average_model_star.time[t]]),
+                            np.array([self.series.model_time[t]]),
                             np.array([average_model_star_position_ξηζ[x]]),
                             color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
@@ -1929,7 +2024,7 @@ class Output_Group():
                         [star.position_ξηζ[:,y] for star in self.model_stars], axis=0
                     )
                     ax0.plot(
-                        -self.model_stars[0].time[::-1], model_star_position_ξηζ,
+                        self.series.model_time[::-1], model_star_position_ξηζ,
                         color=colors.blue[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', zorder=0.2
                     )
@@ -1937,7 +2032,7 @@ class Output_Group():
                     # Plot model stars' birth and current positions
                     for t, x, size, marker in ((-1, 0, 12, '*'), (0, -1, 6, 'o')):
                         ax0.scatter(
-                            -np.array([self.model_stars[0].time[t]]),
+                            np.array([self.series.model_time[t]]),
                             np.array([model_star_position_ξηζ[x]]),
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
@@ -1981,7 +2076,7 @@ class Output_Group():
 
         # Set limits
         for ax in (ax1, ax2, ax3) + ((ax0,) if style == '2x2' else ()):
-            ax.set_xlim(-np.max(self.series.time), -(np.min(self.series.time) - 1))
+            ax.set_xlim(np.min(self.series.time), np.max(self.series.time) + 1)
         ax2.set_ylim(-70, 70)
 
         # Set ticks
@@ -2985,6 +3080,111 @@ class Output_Group():
             tight=False, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
+
+class Output_Star():
+    """Ouput methods for a star."""
+
+    def create_time_kinematics_table(
+        self, save=False, show=False, machine=False,
+        forced=False, default=False, cancel=False
+    ):
+        """
+        Creates a table of the star 6D kinematics over time. If 'save' if True, the table is
+        saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
+        machine-readable table, without units in the header and '.csv' extension instead of a
+        '.txt', is created. The machine-readable table also has an additional column 'status'
+        to indicate whether a metric is valid or rejected, whereas the non-machine-readable
+        table uses side heads.
+        """
+
+        # Check save, show and machine
+        self.group.series.stop(
+            type(save) != bool, 'TypeError',
+            "'save' must be a boolean ({} given).", type(save)
+        )
+        self.group.series.stop(
+            type(show) != bool, 'TypeError',
+            "'show' must be a boolean ({} given).", type(show)
+        )
+        self.group.series.stop(
+            type(machine) != bool, 'TypeError',
+            "'machine' must be a boolean ({} given).", type(machine)
+        )
+
+        # Create header
+        if machine:
+            lines = [
+                'Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta'
+            ]
+
+            # Create lines
+            for t in np.arange(self.group.series.time.size):
+                lines.append(
+                    (
+                        f'{self.group.series.time[t]},'
+                        f'{self.position_xyz[t,0]},'
+                        f'{self.position_xyz[t,1]},'
+                        f'{self.position_xyz[t,2]},'
+                        f'{self.velocity_xyz[t,0]},'
+                        f'{self.velocity_xyz[t,1]},'
+                        f'{self.velocity_xyz[t,2]},'
+                        f'{self.position_ξηζ[t,0]},'
+                        f'{self.position_ξηζ[t,1]},'
+                        f'{self.position_ξηζ[t,2]},'
+                        f'{self.velocity_ξηζ[t,0]},'
+                        f'{self.velocity_ξηζ[t,1]},'
+                        f'{self.velocity_ξηζ[t,2]}'
+                    )
+                )
+
+        # Create header
+        else:
+            lines = [
+                f"{'':-<152}",
+                f"{'Time':<8}{'X':>12}{'Y':>12}{'Z':>12}{'U':>12}{'V':>12}{'W':>12}"
+                f"{'ξ':>12}{'η':>12}{'ζ':>12}{'vξ':>12}{'vη':>12}{'vζ':>12}",
+                f"{'[Myr]':<8}{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
+                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}"
+                f"{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
+                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}",
+                f"{'':-<152}"
+            ]
+
+            # Create lines
+            for t in np.arange(self.group.series.time.size):
+                lines.append(
+                    (
+                        f'{self.group.series.time[t]:<8.1f}'
+                        f'{self.position_xyz[t,0]:>12.2f}'
+                        f'{self.position_xyz[t,1]:>12.2f}'
+                        f'{self.position_xyz[t,2]:>12.2f}'
+                        f'{self.velocity_xyz[t,0]:>12.2f}'
+                        f'{self.velocity_xyz[t,1]:>12.2f}'
+                        f'{self.velocity_xyz[t,2]:>12.2f}'
+                        f'{self.position_ξηζ[t,0]:>12.2f}'
+                        f'{self.position_ξηζ[t,1]:>12.2f}'
+                        f'{self.position_ξηζ[t,2]:>12.2f}'
+                        f'{self.velocity_ξηζ[t,0]:>12.2f}'
+                        f'{self.velocity_ξηζ[t,1]:>12.2f}'
+                        f'{self.velocity_ξηζ[t,2]:>12.2f}'
+                    )
+                )
+
+            # Create footer
+            lines.append(f"{'':-<152}")
+
+        # Show table
+        if show:
+            for line in lines:
+                print(line)
+
+        # Save table
+        if save:
+            save_table(
+                self.name, lines, file_path=f'kinematics_time_{self.name}',
+                extension='csv' if machine else 'txt',
+                forced=forced, default=default, cancel=cancel
+            )
 
 def create_histogram(
     self, ages, initial_scatter, number_of_stars, number_of_groups, age,

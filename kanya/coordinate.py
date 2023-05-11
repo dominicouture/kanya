@@ -1059,7 +1059,7 @@ def position_rθz_ξηζ(r, θ, z, t):
     """
 
     return np.dot(
-        Coordinate.ggrm.T, np.array(
+        Coordinate.ggrm.T,np.array(
             (
                 r - Coordinate.sun_position[0],
                 Coordinate.sun_position[0] * (θ - Coordinate.sun_angular_frequency * t),

@@ -181,7 +181,11 @@ class Data(list):
         # Valid labels (strings, numerial, all)
         self.valid_labels_str = ('name', 'group', 'id', 'sample', 'spectral_type')
         self.valid_labels_num = tuple(self.variables.keys()) + (
-            'mass', 'mass_error', 'radius', 'radius_error', 'rv_shift', 'rv_shift_error'
+            'mass', 'mass_error',
+            'radius', 'radius_error',
+            'rv_shift', 'rv_shift_error',
+            'grav_shift', 'grav_shift_error',
+            'conv_shift', 'conv_shift_error'
         )
         self.valid_labels = self.valid_labels_str + self.valid_labels_num
 
@@ -201,8 +205,8 @@ class Data(list):
         self.unit_header = not np.vectorize(
             lambda unit: unit.replace('.', '').replace(',', '').replace('-', '').isdigit()
         )(self.table[1]).any()
-        # !!! Autre vérification pour voir si toutes les valeurs
-        # non nulles peuvent être transformée en unit !!!
+
+        # !!! Additional check to see nonzero values can be transformed in units !!!
 
         # Units from a unit header, if present
         if self.data.units is None:
@@ -217,7 +221,7 @@ class Data(list):
             )
 
             # Usual units of system retrieval
-            # !!! Should also include stellar mass and radius (and errors) units !!!
+            # !!! Should also include units for mass and radius (and errors) units !!!
             self.data.units = {
                 **{
                     variable.label: variable.usual_unit.label
@@ -231,7 +235,8 @@ class Data(list):
         elif type(self.data.units) == dict:
 
             # Check if all labels can be matched to a data.system variable
-            # !!! The match should also include stellar mass and radius (and errors) units !!!
+            # !!! The match should also include units for mass, radius, rv_shift, !!!
+            # !!! grav_shift and conv_shift, and their error units !!!
             self.data.units = {
                 self.Column.identify(self.Column, self, label):
                     self.data.units[label] for label in self.data.units.keys()
@@ -865,9 +870,6 @@ class Data(list):
             # Configuration radial velocity shift otherwise
             else:
                  self.rv_shift = self.data.series.rv_shift
-
-            # Uncomment this line to use configuration radial velocity shifts
-            # self.rv_shift = self.data.series.rv_shift
 
             # Position columns and unit conversion
             self.position = Quantity(

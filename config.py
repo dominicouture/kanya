@@ -20,8 +20,11 @@ given parameter.
 
 # Name of series of groups
 # name.value = 'tucana'
+# name.value = 'carina'
+# name.value = 'columba'
+# name.value = 'ic2602'
+# name.value = 'platais8'
 name.value = 'beta_pictoris'
-# name.value = 'IC2602'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
 
@@ -33,8 +36,8 @@ file_path.value = None
 # Association size metrics
 size_metrics.value = True
 cov_metrics.value = True
-cov_robust_metrics.value = False
-cov_sklearn_metrics.value = False
+cov_robust_metrics.value = True
+cov_sklearn_metrics.value = True
 mad_metrics.value = True
 mst_metrics.value = True
 
@@ -42,25 +45,28 @@ mst_metrics.value = True
 number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-
 # number_of_steps.value = 400
 number_of_steps.value = 250
 # number_of_steps.value = 172
 
+# Number of jackknife Monte Carlo iterations (integer, ≥ 1)
+number_of_iterations.value = 100
+
+# Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
+iteration_fraction.value = 0.5
+
 # Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 50
+number_of_stars.value = 25
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
-# initial_time.value = -1.0
 
-# Final age of the traceback (float, > initial_time, inclusive)
-final_time.value = 50.1951006
-# final_time.value = 51.0
-# final_time.value = 40.0
+# Final age of the traceback (float, ≠ initial_time, inclusive)
+final_time.value = -50.1951006
+# final_time.value = -40.0
 
-# Age of simulated groups of stars (float, ≥ 0.0)
-age.value = 24.0
+# Age of simulated groups of stars (float, ≠ initial_time)
+age.value = -24.0
 
 # Average position of the simulated sample of stars (tuple)
 position.value = (22.686, -4.304, -18.495) # Core sample
@@ -68,9 +74,9 @@ position.value = (22.686, -4.304, -18.495) # Core sample
 # position.values = (0.0, 0.0, 0.0)
 
 # Average position error of the simulated sample of stars (tuple)
-position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
+# position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
 # position_error.values = (0.19846, 0.0, 0.0) # Gaia DR2
-# position_error.values = (0.0, 0.0, 0.0)
+position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'observables'
 position_error.system = 'observables'
 
@@ -85,9 +91,9 @@ velocity.values = (-10.12, -15.67, -8.75) # Core sample
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (tuple)
-velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
+# velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
 # velocity_error.values = (1.0112, 0.30754, 0.26432) # Gaia DR2
-# velocity_error.values = (0.0, 0.0, 0.0)
+velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
@@ -104,7 +110,12 @@ velocity_scatter.units = 'km/s'
 # data.value = '../Data/β Pictoris Moving Group - Gaia EDR3.csv'
 data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
 # data.value = '../Data/Database_THA_Gaia_DR3.csv'
-# data.value = '../THA_CAR_COL/sample_IC2602_corrected_rv.csv'
+# data.value = '../THA/THA_corrected_rv.csv'
+# data.value = '../CAR/CAR_corrected_rv.csv'
+# data.value = '../COL/COL_corrected_rv.csv'
+# data.value = '../IC 2602/IC206_corrected_rv.csv'
+# data.value = '../COL/COL_corrected_rv_with_hr8799.csv'
+# data.value = '../PL8/PL8_corrected_rv.csv'
 data.units = 'observables'
 data.system = 'observables'
 # data.values =  {
@@ -214,12 +225,6 @@ rv_shift.unit = 'km/s'
 # Whether to use actual or simulated rv shifts (boolean)
 data_rv_shifts.value = True
 
-# Number of jackknife Monte Carlo iterations (integer, ≥ 1)
-number_of_iterations.value = 500
-
-# Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
-iteration_fraction.value = 0.5
-
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
 cutoff.value = 3.0
 
@@ -237,4 +242,4 @@ potential.value = 'Irrgang13I'
 pca.value = False
 
 # Whether to show the timer
-timer.value = True
+# timer.value = True
