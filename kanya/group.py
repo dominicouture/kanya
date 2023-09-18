@@ -196,6 +196,9 @@ class Group(list, Output_Group):
                 )
             )
 
+            # Update progress bar
+            self.series.progress_bar.update(1)
+
         # Compute stars' coordinates
         self.get_stars_coordinates()
 
@@ -306,6 +309,9 @@ class Group(list, Output_Group):
                 )
             )
 
+            # Update progress bar
+            self.series.progress_bar.update(1)
+
         # Compute stars coordinates
         self.get_stars_coordinates()
 
@@ -391,11 +397,11 @@ class Group(list, Output_Group):
             # Display a message if outliers have been found
             if self.number == 0:
                 if self.number_of_outliers > 0:
-                    print(
+                    self.outliers_messages = [
                         f'{self.number_of_outliers:d} outlier'
                         f"{'s' if self.number_of_outliers > 1 else ''} "
-                        f'found in {self.series.name} series during traceback:'
-                    )
+                        f"found in '{self.series.name}' series during traceback:"
+                    ]
                     for star in self.outliers:
                         outlier_type = (
                             'Position' if star.position_outlier else
@@ -409,11 +415,13 @@ class Group(list, Output_Group):
                             outlier_sigma = np.max(
                                 np.abs(star.relative_velocity_ξηζ) / self.scatter_velocity_ξηζ
                             )
-                        print(f'{star.name}: {outlier_type} > {outlier_sigma:.1f}σ')
+                        self.outliers_messages.append(
+                            f'{star.name}: {outlier_type} > {outlier_sigma:.1f}σ'
+                        )
 
                 # Display message if no outliers are found
                 elif self.series.cutoff is not None:
-                    print(f'No outliers found in {self.series.name}.')
+                    self.outliers_messages = [f"No outliers found in '{self.series.name}'."]
 
             # Robust covariances matrix and support fraction
             if False:
@@ -1062,10 +1070,14 @@ class Group(list, Output_Group):
             vars(self).update(values)
 
             # Trajectory integration
+            if self.group.series.timer:
+                t0 = get_time()
             if self.group.series.potential is None:
                 self.get_linear()
             else:
                 self.get_orbit()
+            if self.group.series.timer:
+                self.group.time_integrate += get_time() - t0
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """Sets the star as an outlier."""
@@ -1077,15 +1089,16 @@ class Group(list, Output_Group):
         def get_linear(self):
             """Computes a star's backward or forward linear trajectory in space."""
 
-            # Compute linear xyz positions and velocities
-            self.position_xyz = self.position_xyz + (self.time - self.time[0])[:,None] * (
-                self.velocity_xyz + Coordinate.galactic_velocity
+            # xyz positions and velocities
+            self.position_xyz = (
+                self.position_xyz + (self.time - self.time[0])[:,None] * (
+                    self.velocity_xyz + Coordinate.sun_velocity
+                )
             )
-            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
             self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
+            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-            # Compute linear rθz positions and velocities
             position_rθz = np.array(
                 coords.XYZ_to_galcencyl(
                     *self.position_xyz.T,
@@ -1112,114 +1125,56 @@ class Group(list, Output_Group):
                 )
             )
 
-            # Linear ξηζ positions and velocities
-            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, self.time)
+            # rθz positions and velocities
+            # position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz)
+            # velocity_rθz = galactic_uvw_galactocentric_ρθz(*self.position_xyz, *self.velocity_xyz)
+
+            # ξηζ positions and velocities
+            self.position_ξηζ = position_ρθz_ξηζ(*position_rθz.T, self.time)
+            self.velocity_ξηζ = velocity_ρθz_ξηζ(*velocity_rθz.T)
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
-            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, self.time)
             self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
         def get_orbit(self):
-            """Computes a star's backward or forward galactic orbit in the Gaalaxy using Galpy."""
+            """Computes the star's galactic orbit using Galpy over time."""
 
-            # New method to check previous method
-            # from astropy import units as u
-            # self.position_rδα, self.position_rδα_error = xyz_to_rδα(*self.position_xyz)
-            # r = self.position_rδα[0] * u.Unit('pc')
-            # δ = self.position_rδα[1] * u.Unit('rad')
-            # α = self.position_rδα[2] * u.Unit('rad')
-            # u, v, w = self.velocity_xyz * 0.9777922216731283
+            # Initial rθz position and velocity
+            position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz)
+            velocity_rθz = galactic_uvw_galactocentric_ρθz(*self.position_xyz, *self.velocity_xyz)
 
-            # Other position and velocity computations
-            # self.position_rθz_other, self.position_rθz_error_other = galactic_xyz_galactocentric_ρθz(
-            #     *self.position_xyz
-            # )
-            # self.velocity_rθz_other, self.velocity_rθz_error_other = galactic_uvw_galactocentric_ρθz(
-            #     *self.position_xyz, *self.velocity_xyz
-            # )
-
-            # Initial rθz position and velocity in galactocentric cylindrical coordinates
-            position_rθz = np.array(
-                coords.XYZ_to_galcencyl(
-                    *self.position_xyz,
-                    Xsun=Coordinate.sun_position[0],
-                    Zsun=Coordinate.sun_position[2],
-                    _extra_rot=False
-                )
-            )
-            velocity_rθz = np.array(
-                coords.vxvyvz_to_galcencyl(
-                    *self.velocity_xyz,
-                    *np.array(
-                        coords.XYZ_to_galcenrect(
-                            *self.position_xyz,
-                            Xsun=Coordinate.sun_position[0],
-                            Zsun=Coordinate.sun_position[2],
-                            _extra_rot=False
-                        )
-                    ),
-                    vsun=Coordinate.sun_velocity,
-                    Xsun=Coordinate.sun_position[0],
-                    Zsun=Coordinate.sun_position[2],
-                    _extra_rot=False
-                )
-            )
-
-            # Somehow, adding  * np.array([-1, 1, 1]) to vsun above makes this work
-            # if self.name == 'Star_30':
-            #     covariances_self.velocity_rθz_other - self.velocity_rθz)
-
-            # Conversions to Galpy's natural units
+            # Conversion to Galpy's natural units
             time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
             position_rθz /= np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
             velocity_rθz /= Coordinate.lsr_velocity[1]
 
-            # Orbit initialization and integration
-            if self.group.series.timer:
-                t0 = get_time()
+            # Orbit integration
             orbit = Orbit(
                 [
                     position_rθz[0], velocity_rθz[0], velocity_rθz[1],
                     position_rθz[2], velocity_rθz[2], position_rθz[1]
-                ],
-                ro=Coordinate.ro, vo=Coordinate.vo, zo=Coordinate.zo,
-                solarmotion=Coordinate.sun_velocity_peculiar_kms
+                ]
             )
             orbit.turn_physical_off()
             orbit.integrate(time, self.group.series.potential, method='odeint')
-            if self.group.series.timer:
-                self.group.time_integrate += get_time() - t0
 
             # rθz positions and velocities, and conversion to physical units
             position_rθz = np.array(
                 [orbit.R(time), orbit.phi(time), orbit.z(time)]
-            ).T * np.array(
-                [Coordinate.sun_position[0], 1., Coordinate.sun_position[0]]
-            )
+            ).T * np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
             velocity_rθz = np.array(
                 [orbit.vR(time), orbit.vT(time), orbit.vz(time)]
             ).T * Coordinate.lsr_velocity[1]
 
             # xyz positions and velocities
-            self.position_xyz = coords.galcencyl_to_XYZ(
-                *position_rθz.T,
-                Xsun=Coordinate.sun_position[0],
-                Zsun=Coordinate.sun_position[2],
-                _extra_rot=False
-            )
+            self.position_xyz = galactocentric_ρθz_galactic_xyz(*position_rθz.T)
+            self.velocity_xyz = galactocentric_ρθz_galactic_uvw(*position_rθz.T, *velocity_rθz.T)
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
-            self.velocity_xyz = coords.galcencyl_to_vxvyvz(
-                *velocity_rθz.T, position_rθz.T[1],
-                vsun=Coordinate.sun_velocity,
-                Xsun=Coordinate.sun_position[0],
-                Zsun=Coordinate.sun_position[2],
-                _extra_rot=False
-            )
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
             # ξηζ positions and velocities
-            self.position_ξηζ = position_rθz_ξηζ(*position_rθz.T, self.time)
+            self.position_ξηζ = position_ρθz_ξηζ(*position_rθz.T, self.time)
+            self.velocity_ξηζ = velocity_ρθz_ξηζ(*velocity_rθz.T)
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
-            self.velocity_ξηζ = velocity_rθz_ξηζ(*velocity_rθz.T, self.time)
             self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
         def get_relative_coordinates(self):

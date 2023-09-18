@@ -1,10 +1,14 @@
 label;name;values;units;system
 'name';'Name';None;None;None
-'file_path';'Series Path';None;None;None
 'from_data';'From Data';False;None;None
 'from_model';'From Model';False;None;None
-'from_file';'From File';False;None;None
-'to_file';'To File';False;None;None
+'load';'Load from File';False;None;None
+'save';'Save to File';False;None;None
+'data_dir';'Data Directory';'Data';None;None
+'output_dir';'Output Directory';'Output';None;None
+'logs_path';'Logs Directory of Path';'Logs';None;None
+'load_path';'Load Directory or Path';'';None;None
+'save_path';'Save Directory or Path';'';None;None
 'size_metrics';'Association Size Metrics';True;None;None
 'cov_metrics';'Covariance Metrics';True;None;None
 'cov_robust_metrics';'Covariance Robust Metrics';True;None;None
@@ -27,7 +31,7 @@ label;name;values;units;system
 'data_errors';'Data Errors';False;None;None
 'rv_shift';'Radial Velocity Shift';0.0;speed_unit;None
 'data_rv_shifts';'Data Radial Velocity Shifts';False;None;None
-'number_of_iterations';'Number of iterations';1;None;None
+'number_of_iterations';'Number of Iterations';1;None;None
 'iteration_fraction';'Iteration Fraction';1.0;unitless;None
 'cutoff';'Cutoff';None;None;None
 'sample';'Sample';None;None;None

@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-init.py: Imports information from config.py, command line arguments and parameters into a Config.
-This script must be run first to configure a Series.
+init.py: Imports information from the configuration file, command line arguments and parameters
+into a Config. This script must be run first to configure a Series.
 """
 
 import pandas as pd
 from copy import deepcopy
-from os.path import join
 from .collection import *
 from .coordinate import *
 
@@ -29,7 +28,7 @@ class Config():
         }
 
         def __init__(self, **components):
-            """ Initializes a Parameter object with the given 'components'. """
+            """Initializes a Parameter object with the given 'components'."""
 
             # Initialization
             vars(self).update(deepcopy(self.default_components))
@@ -85,7 +84,7 @@ class Config():
     speed_units = tuple(variable.unit.label for variable in systems['cartesian'].velocity)
 
     # Default parameters configuration
-    default_parameters_file = join(path.dirname(__file__), 'resources/default_parameters.csv')
+    default_parameters_file = path.join(path.dirname(__file__), 'resources/default_parameters.csv')
     parameter_dataframe = pd.read_csv(default_parameters_file, delimiter=';')
     default_parameters = {}
     for index, row in parameter_dataframe.iterrows():
@@ -208,11 +207,11 @@ class Config():
             help='model an input based on simulation parameters in the configuration file.'
         )
         parser.add_argument(
-            '-l', '--from_file', action='store_true',
+            '-l', '--load', action='store_true',
             help='load the input data from a file.'
         )
         parser.add_argument(
-            '-s', '--to_file', action='store_true',
+            '-s', '--save', action='store_true',
             help='save the output data to a file.'
         )
         args = parser.parse_args()
@@ -224,8 +223,8 @@ class Config():
         # Mode import, overwrites any value imported from a path
         self.from_data.values = args.data
         self.from_model.values = args.model
-        self.from_file.values = args.from_file
-        self.to_file.values = args.to_file
+        self.load.values = args.load
+        self.save.values = args.save
 
     def initialize_from_parameters(self, parameters):
         """

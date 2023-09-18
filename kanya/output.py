@@ -8,6 +8,7 @@ over time, 2D and 3D scatters at a given time, histograms, color mesh, etc.
 
 import numpy as np
 from os import path
+from cycler import cycler
 from matplotlib import pyplot as plt, ticker as tkr
 from colorsys import hls_to_rgb
 from scipy.interpolate import griddata, interp1d
@@ -57,155 +58,157 @@ class colors():
     # Metric colors
     metric = (green[3], green[6], green[9], green[12], azure[3], azure[6], azure[9], azure[12])
 
-def choose(
-    name, extension, save, *save_args, file_path=None,
-    forced=False, default=False, cancel=False
-):
-    """
-    Checks whether a path already exists and asks for user input if it does. The base path
-    is assumed to be the output directory. Also, if the path does not have an extension, a
-    an extension is added.
-    """
-
-    # Get file path
-    file_path = get_file_path(name, extension, file_path=file_path)
-
-    # Check if a file already exists
-    if path.exists(file_path):
-        choice = None
-        stop(
-            type(forced) != bool, 'TypeError',
-            "'forced' must be a boolean ({} given).", type(forced)
-        )
-        if not forced:
-            stop(
-                type(default) != bool, 'TypeError',
-                "'default' must be a default ({} given).", type(default)
-            )
-            if not default:
-                stop(
-                    type(cancel) != bool, 'TypeError',
-                    "'cancel' must be a boolean ({} given).", type(cancel)
-                )
-                if not cancel:
-
-                    # User input
-                    while choice == None:
-                        choice = input(
-                            "A file already exists at '{}'. Do you wish to overwrite (Y), "
-                            "keep both (K) or cancel (N)? ".format(file_path)
-                        ).lower()
-
-                        # Loop over question if input could not be interpreted
-                        if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
-                            print("Could not understand '{}'.".format(choice))
-                            choice = None
-
-                # Cancel save
-                if cancel or choice in ('n', 'no'):
-
-                    # Logging
-                    log(
-                        "'{}': file not saved because a file already exists at '{}'.",
-                        name, file_path
-                    )
-
-            # Set default name and save figure
-            if default or choice in ('k', 'keep'):
-                from .tools import default_name
-                file_path = default_name(file_path)
-                save(file_path, *save_args)
-
-                # Logging
-                log("'{}': file name changed and file saved at '{}'.", name, file_path)
-
-        # Delete existing file and save figure
-        if forced or choice in ('y', 'yes'):
-            from os import remove
-            remove(file_path)
-            save(file_path, *save_args)
-
-            # Logging
-            log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
-
-    # Save figure
-    else:
-        save(file_path, *save_args)
-
-        # Logging
-        log("'{}': file saved at '{}'.", name, file_path)
-
-def get_file_path(name, extension, file_path=None):
-    """Returns a proper file path given a name, an extension and, optionnally, a filepath. """
-
-    # file_path parameter
-    file_path = file_path if file_path is not None else output(create=True) + '/'
-
-
-    # Check if file_path parameter is a string, which must be done before the directory call
-    stop(
-        type(file_path) != str, 'TypeError',
-        "'file_path' must be a string ({} given).", type(file_path)
-    )
-
-    # file_path redefined as the absolute path, default name and directory creation
-    file_path = path.join(
-        directory(output(), path.dirname(file_path), 'file_path', create=True),
-        path.basename(file_path) if path.basename(file_path) != '' else f'{name}.{extension}'
-    )
-
-    # Check if there's an extension and add an extension, if needed
-    if path.splitext(file_path)[-1] != f'.{extension}':
-        file_path += f'.{extension}'
-
-    return file_path
-
-def save_figure(
-    name, file_path=None, extension='pdf', tight=True,
-    forced=False, default=False, cancel=False
-):
-    """Saves figure with or without tight layout and some padding."""
-
-    # Check 'tight' argument
-    stop(
-        type(forced) != bool, 'TypeError',
-        "'tight' must be a boolean ({} given).", type(tight)
-    )
-
-    # Save figure
-    def save(file_path, tight):
-        if tight:
-            plt.savefig(file_path, bbox_inches='tight', pad_inches=0.01)
-        else:
-            plt.savefig(file_path)
-
-    # Choose behavior
-    choose(
-        name, extension, save, tight, file_path=file_path,
-        cancel=cancel, forced=forced, default=default
-    )
-
-def save_table(
-    name, lines, header=None, file_path=None, extension='txt',
-    forced=False, default=False, cancel=False
-):
-    """Saves a table to a CSV file for a given header and data."""
-
-    # Save table
-    def save(file_path, lines, header):
-        with open(file_path, 'w') as output_file:
-            if header is not None:
-                output_file.write(header + '\n')
-            output_file.writelines([line + '\n' for line in lines])
-
-    # Choose behavior
-    choose(
-        name, extension, save, lines, header, file_path=file_path,
-        cancel=cancel, forced=forced, default=default
-    )
+    # Color cycle
+    cycle = cycler(color=(azure[6], pink[6], chartreuse[6], indigo[9], orange[9], lime[9]))
 
 class Output_Series():
     """Output methods for a series of groups."""
+
+    def save_figure(
+        self, name, file_path=None, extension='pdf', tight=True,
+        forced=False, default=False, cancel=False
+    ):
+        """Saves figure with or without tight layout and some padding."""
+
+        # Check 'tight' argument
+        self.stop(
+            type(forced) != bool, 'TypeError',
+            "'tight' must be a boolean ({} given).", type(tight)
+        )
+
+        # Save figure
+        def save(file_path, tight):
+            if tight:
+                plt.savefig(file_path, bbox_inches='tight', pad_inches=0.01)
+            else:
+                plt.savefig(file_path)
+
+        # Choose behavior
+        self.choose(
+            name, extension, save, tight, file_path=file_path,
+            cancel=cancel, forced=forced, default=default
+        )
+
+    def save_table(
+        self, name, lines, header=None, file_path=None, extension='txt',
+        forced=False, default=False, cancel=False
+    ):
+        """Saves a table to a CSV file for a given header and data."""
+
+        # Save table
+        def save(file_path, lines, header):
+            with open(file_path, 'w') as output_file:
+                if header is not None:
+                    output_file.write(header + '\n')
+                output_file.writelines([line + '\n' for line in lines])
+
+        # Choose behavior
+        self.choose(
+            name, extension, save, lines, header, file_path=file_path,
+            cancel=cancel, forced=forced, default=default
+        )
+
+    def choose(
+        self, name, extension, save, *save_args, file_path=None,
+        forced=False, default=False, cancel=False
+    ):
+        """
+        Checks whether a path already exists and asks for user input if it does. The base path
+        is assumed to be the output directory. Also, if the path does not have an extension, a
+        an extension is added.
+        """
+
+        # Get file path
+        file_path = self.get_file_path(name, extension, file_path=file_path)
+
+        # Check if a file already exists
+        if path.exists(file_path):
+            choice = None
+            self.stop(
+                type(forced) != bool, 'TypeError',
+                "'forced' must be a boolean ({} given).", type(forced)
+            )
+            if not forced:
+                self.stop(
+                    type(default) != bool, 'TypeError',
+                    "'default' must be a default ({} given).", type(default)
+                )
+                if not default:
+                    self.stop(
+                        type(cancel) != bool, 'TypeError',
+                        "'cancel' must be a boolean ({} given).", type(cancel)
+                    )
+                    if not cancel:
+
+                        # User input
+                        while choice == None:
+                            choice = input(
+                                "A file already exists at '{}'. Do you wish to overwrite (Y), "
+                                "keep both (K) or cancel (N)? ".format(file_path)
+                            ).lower()
+
+                            # Loop over question if input could not be interpreted
+                            if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
+                                print("Could not understand '{}'.".format(choice))
+                                choice = None
+
+                    # Cancel save
+                    if cancel or choice in ('n', 'no'):
+
+                        # Logging
+                        self.log(
+                            "'{}': file not saved because a file already exists at '{}'.",
+                            name, file_path
+                        )
+
+                # Set default name and save figure
+                if default or choice in ('k', 'keep'):
+                    from .tools import default_name
+                    file_path = default_name(file_path)
+                    save(file_path, *save_args)
+
+                    # Logging
+                    self.log("'{}': file name changed and file saved at '{}'.", name, file_path)
+
+            # Delete existing file and save figure
+            if forced or choice in ('y', 'yes'):
+                from os import remove
+                remove(file_path)
+                save(file_path, *save_args)
+
+                # Logging
+                self.log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
+
+        # Save figure
+        else:
+            save(file_path, *save_args)
+
+            # Logging
+            self.log("'{}': file saved at '{}'.", name, file_path)
+
+    def get_file_path(self, name, extension, file_path=None):
+        """Returns a proper file path given a name, an extension and, optionnally, a filepath."""
+
+        # file_path parameter
+        file_path = file_path if file_path is not None else self.output(create=True) + '/'
+
+        # Check if file_path parameter is a string, which must be done before the directory call
+        self.stop(
+            type(file_path) != str, 'TypeError',
+            "'file_path' must be a string ({} given).", type(file_path)
+        )
+
+        # file_path redefined as the absolute path, default name and directory creation
+        file_path = path.join(
+            directory(self.output(), path.dirname(file_path), 'file_path', create=True),
+            path.basename(file_path) if path.basename(file_path) != '' else f'{name}.{extension}'
+        )
+
+        # Check if there's an extension and add an extension, if needed
+        if path.splitext(file_path)[-1] != f'.{extension}':
+            file_path += f'.{extension}'
+
+        return file_path
 
     def create_metrics_table(
         self, save=False, show=False, machine=False,
@@ -314,7 +317,7 @@ class Output_Series():
 
         # Save table
         if save:
-            save_table(
+            self.save_table(
                 self.name, lines, file_path=f'metrics_{self.name}',
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
@@ -408,7 +411,7 @@ class Output_Series():
                     )
         # Logging
         else:
-            log(
+            self.log(
                 "Could not plot '{}' metric for '{}' series. It was not computed.",
                 str(metric.name[index]), self.name, display=True
             )
@@ -454,7 +457,7 @@ class Output_Series():
         ax.set_ylabel('Association size (pc)', fontsize=8)
 
         # Set limits
-        ax.set_xlim(self.final_time.value + 15, self.initial_time.value + 1)
+        ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
         # ax.set_xlim(self.final_time.value, self.initial_time.value + 1)
         # ax.set_ylim(-1., 39.)
 
@@ -522,7 +525,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'covariances_xyz_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
@@ -577,7 +580,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'covariances_ξηζ_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
@@ -631,7 +634,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'Cross_covariances_xyz_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
@@ -686,7 +689,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'Cross_covariances_ξηζ_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
@@ -715,7 +718,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'MAD_xyz_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -743,7 +746,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'MAD_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -770,7 +773,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'MST_xyz_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -797,7 +800,7 @@ class Output_Series():
         self.set_axis_metric(ax)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'MST_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -823,7 +826,7 @@ class Output_Series():
         ax.set_ylim(-0.1, 2.9)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'Mahalanobis_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -866,7 +869,7 @@ class Output_Series():
         self.set_axis_metric(ax2)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'covariances_MAD_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -940,7 +943,7 @@ class Output_Series():
         self.set_axis_metric(ax1)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'covariances_MAD_MST_Cross_covariannces_xyz_{self.name}_{other.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -991,7 +994,7 @@ class Output_Series():
             spine.set_linewidth(0.5)
 
         # Save figure
-        save_figure(
+        self.save_figure(
             self.name, f'age_distribution_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -1096,7 +1099,7 @@ class Output_Group():
 
         # Save table
         if save:
-            save_table(
+            self.series.save_table(
                 self.name, lines, file_path=f'kinematics_time_{self.name}',
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
@@ -1194,7 +1197,7 @@ class Output_Group():
 
         # Save table
         if save:
-            save_table(
+            self.series.save_table(
                 self.name, lines, file_path=f'kinematics_{self.name}_{age}Myr',
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
@@ -1232,7 +1235,7 @@ class Output_Group():
                 return np.argmin(np.abs(age - self.series.time)), age, metric.age_error[index]
 
             else:
-                log(
+                self.series.log(
                     "Could not use '{}' metric for '{}' group. It was not computed.",
                     str(metric.name[index]), self.name, display=True
                 )
@@ -1432,7 +1435,7 @@ class Output_Group():
                 spine.set_linewidth(0.5)
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'trajectory_xyz_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -1575,7 +1578,7 @@ class Output_Group():
                 spine.set_linewidth(0.5)
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'trajectory_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -1833,7 +1836,7 @@ class Output_Group():
                 spine.set_linewidth(0.5)
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f"trajectory_time_xyz_{style}_{self.name}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -2100,7 +2103,7 @@ class Output_Group():
                 spine.set_linewidth(0.5)
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'trajectory_time_ξηζ_{style}_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -2180,7 +2183,7 @@ class Output_Group():
         ax.grid(zorder=1)
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'Mollweide_{self.name}.pdf',
             forced=forced, default=default, cancel=cancel
         )
@@ -2338,7 +2341,7 @@ class Output_Group():
         ax.set_ylabel(f'${keys[j].lower()}$ (pc)')
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name,
             f'2D_Scatter_{self.name}_{keys[i].upper()}{keys[j].upper()}_at_{age:.1f}Myr.pdf',
             forced=forced, default=default, cancel=cancel
@@ -2488,7 +2491,7 @@ class Output_Group():
         ax.set_zlabel('\n $z$ (pc)')
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'3D_Scatter_{self.name}_at_{age:.1f}Myr.pdf',
             forced=forced, default=default, cancel=cancel
         )
@@ -2545,7 +2548,7 @@ class Output_Group():
             )
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, '2D_Scatter_{}_{}_{}_{}_Myr.pdf'.format(self.name, *ages),
             forced=forced, default=default, cancel=cancel
         )
@@ -2902,7 +2905,7 @@ class Output_Group():
         ax.set_ylabel(f'{velocity_keys[j].upper()} (pc/Myr)')
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'covariances_scatter_{self.name}_'
             f'{position_keys[i].upper()}-{velocity_keys[j].upper()}.pdf',
             forced=forced, default=default, cancel=cancel
@@ -2979,7 +2982,7 @@ class Output_Group():
 
         # Logging
         else:
-            log(
+            self.series.log(
                 "Could not use '{}' metric for '{}' group. It was not computed.",
                 str(metric.name[index]), self.name, display=True
             )
@@ -3075,7 +3078,7 @@ class Output_Group():
             spine.set_linewidth(0.5)
 
         # Save figure
-        save_figure(
+        self.series.save_figure(
             self.name, f'age_distribution_jackknife_{self.name}_{metric_name}.pdf',
             tight=False, forced=forced, default=default, cancel=cancel
         )
@@ -3180,401 +3183,8 @@ class Output_Star():
 
         # Save table
         if save:
-            save_table(
+            self.group.series.save_table(
                 self.name, lines, file_path=f'kinematics_time_{self.name}',
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
-
-def create_histogram(
-    self, ages, initial_scatter, number_of_stars, number_of_groups, age,
-    title=False, forced=False, default=False, cancel=False
-):
-    """Creates an histogram of ages computed by multiple tracebacks."""
-
-    # Check if ages are valid
-    stop(
-        type(ages) not in (tuple, list), 'TypeError',
-        "'ages' must either must be a tuple or list ({} given)", type(ages)
-    )
-    for age in ages:
-        stop(
-            type(age) not in (int, float), 'TypeError',
-            "All 'ages' must be an integer or float ({} given).", type(age)
-        )
-        stop(
-            age < 0, 'ValueError',
-            "All 'ages' must be greater than or equal to 0.0 ({} given).", type(age)
-        )
-
-    # Check if initial scatter is valid
-    stop(
-        type(initial_scatter) not in (int, float), 'TypeError',
-        "'initial_scatter' must be an integer or float ({} given).", type(initial_scatter)
-    )
-    stop(
-        initial_scatter < 0, 'ValueError',
-        "'initial_scatter' must be greater than or equal to 0.0 ({} given).", type(initial_scatter)
-    )
-
-    # Check if number_of_stars is valid
-    stop(
-        type(number_of_stars) not in (int, float), 'TypeError',
-        "'number_of_stars' must an integer or float ({} given).", type(number_of_stars)
-    )
-    stop(
-        number_of_stars % 1 != 0, 'ValueError',
-        "'number_of_stars' must be convertible to an integer ({} given).", number_of_stars
-    )
-    number_of_stars = int(number_of_stars)
-
-    # Check if number_of_groups is valid
-    stop(
-        type(number_of_groups) not in (int, float), 'TypeError',
-        "'number_of_groups' must an integer or float ({} given).", type(number_of_groups)
-    )
-    stop(
-        number_of_groups % 1 != 0, 'ValueError',
-        "'number_of_groups' must be convertible to an integer ({} given).", number_of_groups
-    )
-    number_of_groups = int(number_of_groups)
-
-    # Check if age is valid
-    stop(
-        type(age) not in (int, float), 'TypeError',
-        "'age' must be an integer or float ({} given).", type(age)
-    )
-    stop(
-        age < 0, 'ValueError',
-        "'age' must be greater than or equal to 0.0 ({} given).",type(age)
-    )
-
-    # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
-    ax = fig.add_subplot(111)
-
-    # Plot histogram
-    hist, bin_edges = np.histogram(ages, density=True)
-    ax.hist(ages, bins='auto', density=True) # bins=np.arange(21.975, 26.025, 0.05)
-
-    # Set title
-    stop(
-        type(title) != bool, 'TypeError',
-        "'title' must be a boolean ({} given).", type(title)
-    )
-    if title:
-        ax.set_title(
-            'Distribution of ages ({} groups, {} Myr, {} stars,\n'
-            'initial scatter = {} pc, {})'.format(
-                number_of_groups, age, number_of_stars, initial_scatter,
-                'calculated age = ({} ± {}) Myr'.format(
-                    np.round(np.average(ages), 3), np.round(np.std(ages), 3)
-                )
-            ), fontsize=8
-        )
-
-    # Set labels
-    ax.set_xlabel('Age (Myr)')
-    ax.set_ylabel('Number of groups')
-
-    # Save figure
-    save_figure(
-        self.name, f'Distribution of ages for {number_of_groups} groups, {age:.1f}Myr, '
-        f'{number_of_stars} stars, initial scatter = {initial_scatter}pc.pdf',
-        forced=forced, default=default, cancel=cancel
-    )
-    # plt.show()
-
-def create_color_mesh(
-    self, initial_scatter, number_of_stars, errors, age, number_of_groups, method,
-    title=False, forced=False, default=False, cancel=False
-):
-    """
-    Creates a color mesh of errors over the initial scatter and number_of_stars.
-    !!! Créer une fonction pour passer d'un array Numpy de shape (n, 3) à un !!!
-    !!! color mesh + smoothing, genre create_color_mesh(x, y, z, smoothing). !!!
-    """
-
-    # Check if initial scatter is valid
-    stop(
-        type(initial_scatter) not in (tuple, list, np.ndarray),
-        "'initial_scatter' must either must be a tuple or list ({} given)", type(initial_scatter)
-    )
-    for scatter in np.array(initial_scatter).flatten():
-        stop(
-            type(scatter) not in (int, float, np.int64, np.float64), 'TypeError',
-            "All 'initial_scatter' must be an integer or float ({} given).", type(scatter)
-        )
-        stop(
-            age < 0, 'ValueError',
-            "All 'initial_scatter' must be greater than or equal to 0.0 ({} given).", type(scatter)
-        )
-
-    # Check if number_of_stars is valid
-    stop(
-        type(number_of_stars) not in (tuple, list, np.ndarray),
-        "'number_of_stars' must either must be a tuple or list ({} given)", type(errors)
-    )
-    for star in np.array(number_of_stars).flatten():
-        stop(
-            type(star) not in (int, float, np.int64, np.float64), 'TypeError',
-            "All 'initial_scatter' must be an integer or float ({} given).", type(star)
-        )
-        stop(
-            star < 0, 'ValueError',
-            "All 'initial_scatter' must be greater than or equal to 0.0 ({} given).", type(star)
-        )
-        stop(
-            star % 1 != 0, 'ValueError',
-            "All 'number_of_stars' must be convertible to an integer ({} given).", star
-        )
-
-    # Check if errors are valid
-    stop(
-        type(errors) not in (tuple, list, np.ndarray),
-        "'errors' must either must be a tuple or list ({} given)", type(errors)
-    )
-    for error in np.array(errors).flatten():
-        stop(
-            type(error) not in (int, float, np.int64, np.float64), 'TypeError',
-            "All 'errors' must be an integer or float ({} given).", type(error)
-        )
-        stop(
-            error < 0, 'ValueError',
-            "All 'errors' must be greater than or equal to 0.0 ({} given).", type(error)
-        )
-
-    # Check if age is valid
-    stop(
-        type(age) not in (int, float, np.int64, np.float64), 'TypeError',
-        "'age' must be an integer or float ({} given).", type(age)
-    )
-    stop(
-        age < 0, 'ValueError',
-        "'age' must be greater than or equal to 0.0 ({} given).",type(age)
-    )
-
-    # Check if number_of_groups is valid
-    stop(
-        type(number_of_groups) not in (int, float, np.int64, np.float64), 'TypeError',
-        "'number_of_groups' must an integer or float ({} given).", type(number_of_groups)
-    )
-    stop(
-        number_of_groups % 1 != 0, 'ValueError',
-        "'number_of_groups' must be convertible to an integer ({} given).", number_of_groups
-    )
-    number_of_groups = int(number_of_groups)
-
-    # Check if method is valid
-    stop(type(method) != str, 'TypeError', "'method' must a string ({} given).", type(method))
-
-    # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
-    ax = fig.add_subplot(111)
-
-    # Plot mesh
-    x, y = np.meshgrid(initial_scatter, number_of_stars)
-    grid_x, grid_y = np.mgrid[0:20:81j, 20:100:81j]
-    grid_z = griddata(
-        np.array([(i, j) for i in initial_scatter for j in number_of_stars]),
-        errors.T.flatten(), (grid_x, grid_y), method='linear'
-    )
-    ax.pcolormesh(grid_x, grid_y, grid_z, cmap=plt.cm.PuBu_r, vmin=0, vmax=6)
-    fig.colorbar(
-        mappable=plt.cm.ScalarMappable(norm=plt.Normalize(0.0, 6.0), cmap=plt.cm.PuBu_r),
-        ax=ax, ticks=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], format='%0.1f'
-    )
-
-    # Set title
-    stop(
-        type(title) != bool, 'TypeError',
-        "'title' must be a boolean ({} given).", type(title))
-    if title:
-        ax.set_title(
-            'Scatter on age (Myr) over the initial scatter (pc)\n'
-            f'and the number of stars ({number_of_groups} groups, {age:.1f}Myr)', fontsize=8
-        )
-
-    # Set labels
-    ax.set_xlabel('Initial scatter (pc)')
-    ax.set_ylabel('Number of stars')
-
-    # Set ticks
-    ax.set_xticks([0., 5., 10., 15., 20.])
-    ax.set_yticks([20., 40., 60., 80., 100.])
-
-    # Save figure
-    save_figure(
-        self.name, f'Scatter on age ({age:.1f}Myr, {method}).pdf',
-        forced=forced, default=default, cancel=cancel
-    )
-    # plt.show()
-
-def plot_age_error(self, title=False, forced=False, default=False, cancel=False):
-    """
-    Creates a plot of ages obtained for diffrent measurement errors on radial velocity and
-    radial velocity shifts due to gravitationnal redshift.
-    """
-
-    # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
-    ax = fig.add_subplot(111)
-
-    # Plot + 0.0 km/s points
-    ax.errorbar(
-        np.array(
-            [
-                0.0, 0.25, 0.50, 0.75, 1.0, 1.25,
-                1.5, 1.75, 2.0, 2.25, 2.50, 2.75, 3.0
-            ]
-        ), np.array(
-            [
-                23.824, 23.506, 22.548, 21.238, 19.454, 17.639,
-                16.008, 14.202, 12.670, 11.266, 9.7320, 8.8740, 8.044
-            ]
-        ), yerr=np.array(
-            [
-                0.376, 0.517, 0.850, 1.062, 1.204, 1.383,
-                1.534, 1.612, 1.544, 1.579, 1.576, 1.538, 1.504
-            ]
-        ), fmt='o', color=colors.black, ms=6.0, elinewidth=1.0,
-        label='$\\Delta v_{r,grav}$ = 0,0 km/s'
-    )
-
-    # Plot + 0.5 km/s points
-    ax.errorbar(
-        np.array(
-            [
-                0.0, 0.25, 0.50, 0.75, 1.0, 1.25,
-                1.5, 1.75, 2.00, 2.25, 2.5, 2.75, 3.0
-            ]
-        ), np.array(
-            [
-                19.858, 19.655, 19.116, 19.292, 17.246, 15.988,
-                14.749, 13.577, 12.379, 11.222, 10.229, 9.2100, 8.446
-            ]
-        ), yerr=np.array(
-            [
-                0.376, 0.425, 0.641, 0.773, 0.992, 1.136,
-                1.129, 1.251, 1.338, 1.331, 1.272, 1.345, 1.323
-            ]
-        ), fmt='D', color=colors.grey[5], ms=6.0, elinewidth=1.0,
-        label='$\\Delta v_{r,grav}$ = 0,5 km/s'
-    )
-
-    # Plot + 1.0 km/s points
-    ax.errorbar(
-        np.array(
-            [
-                0.0, 0.25, 0.50, 0.75, 1.0, 1.25,
-                1.5, 1.75, 2.00, 2.25, 2.5, 2.75, 3.0
-            ]
-        ), np.array(
-            [
-                16.870, 16.743, 16.404, 15.884, 15.26, 14.522,
-                13.529, 12.619, 11.751, 10.847, 9.982, 9.3530, 8.461
-            ]
-        ), yerr=np.array(
-            [
-                0.379, 0.453, 0.583, 0.685, 0.864, 0.930,
-                0.951, 1.032, 1.147, 1.035, 1.142, 1.187, 1.149
-            ]
-        ), fmt='^', color=colors.grey[13], ms=6.0, elinewidth=1.0,
-        label='$\\Delta v_{r,grav}$ = 1,0 km/s'
-    )
-
-    # Plot β Pictoris typical error line
-    ax.axvline(x=1.0105, ymin=0.0, ymax = 25.0, linewidth=1.0, color=colors.black, ls='dashed')
-    ax.text(
-        1.15, 6.95, 'Erreur de mesure\nsur $v_r$ typique des\nmembres de $\\beta\\,$PMG',
-        horizontalalignment='left', fontsize=14
-    )
-
-    # Set title
-    stop(
-        type(title) != bool, 'TypeError',
-        "'title' must be a boolean ({} given).", type(title)
-    )
-    if title:
-        ax.set_title(
-            "Measured age of a simulation of 1000 24 Myr-old groups\n"
-            "over the measurement error on RV (other errors typical of Gaia EDR3)\n", fontsize=8
-        )
-
-    # Set legend
-    ax.legend(loc=1, fontsize=8)
-
-    # Set labels
-    ax.set_xlabel('Error on radial velocity (km/s)', fontsize=8)
-    ax.set_ylabel('Age (Myr)', fontsize=8)
-
-    # Set limits
-    ax.set_xlim(-0.1, 3.1)
-    ax.set_ylim(6, 24.5)
-
-    # Set ticks
-    ax.set_xticks([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
-    ax.set_yticks([6.0, 9.0, 12.0, 15.0, 18.0, 21.0, 24.0])
-    ax.tick_params(
-        top=True, right=True, which='both',
-        direction='in', width=0.5, labelsize=8
-    )
-
-    # Save figure
-    save_figure(
-        self.name, f'Errors_rv_shift_plot_{self.name}.pdf',
-        forced=forced, default=default, cancel=cancel
-    )
-    # plt.show()
-
-def create_minimum_error_plots(self, title=False, forced=False, default=False, cancel=False):
-    """
-    Creates a plot of the error on the age of minimal scatter as a function of the error on
-    the uvw velocity.
-    """
-
-    # Initialize figure
-    fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
-    ax = fig.add_subplot(111)
-
-    # Plot ages as a function of errors
-    errors = np.array(
-        [
-            0.0, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1., 1.5, 2., 2.5, 3.,
-            3.5, 4., 4.5, 5., 6., 7., 8., 9., 10., 12., 14., 16., 18., 20.
-        ]
-    )
-    ages = np.array(
-        [
-            24.001, 23.966, 23.901, 23.74, 23.525, 22.224, 20.301, 18.113, 15.977,
-            11.293, 7.9950, 5.8030, 4.358, 3.3640, 2.6650, 2.2040, 1.7560, 1.2570,
-            0.9330, 0.7350, 0.5800, 0.488, 0.3460, 0.2620, 0.1920, 0.1600, 0.1340
-        ]
-    )
-    ax.plot(errors, ages, '.-', color=colors.black, linewidth=1.0)
-
-    # Set title
-    stop(
-        type(title) != bool, 'TypeError',
-        "'title' must be a boolean ({} given).", type(title)
-    )
-    if title:
-        ax.set_title('Impact of UVW velocity on the age of minimal scatter.', fontsize=8
-    )
-
-    # Set labels
-    ax.set_xlabel('Error on UVW velocity (km/s)', fontsize=8)
-    ax.set_ylabel('Age at minimal XYZ scatter (Myr)', fontsize=8)
-
-    # Set ticks
-    ax.tick_params(
-        top=True, right=True, which='both',
-        direction='in', width=0.5, labelsize=8
-    )
-
-    # Save figure
-    save_figure(
-        self.name, f'Minimum_error_plot_{self.name}.pdf',
-        forced=forced, default=default, cancel=cancel
-    )
-    # plt.show()

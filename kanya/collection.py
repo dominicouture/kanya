@@ -3,10 +3,10 @@
 
 """
 collection.py: Defines the Collection class and initializes global parameters. Global functions
-used by Series class and more, such as directory, output, log and stop are also defined.
+used by the Series class and more, such as directory, output, log and stop are also defined.
 """
 
-from os import path
+from os import path, makedirs, getcwd, chdir
 
 class Collection(list):
     """
@@ -16,22 +16,23 @@ class Collection(list):
     self.series.
     """
 
-    def __init__(self):
+    def __init__(self, base_dir=None, data_dir=None, output_dir=None, logs_path=None):
         """
-        Initializes a collection by creating a self.series dictionary, as well as default
-        output directories and log path. A base directory is also created and represents the
-        directory where the kanya package is located, from which other relative directory
-        paths originate. By default, an 'Output' directory is created and the logs are saved
-        in a 'Logs' directory inside the 'Output' directory.
+        Initializes a collection by creating a self.series dictionary, as well as default output
+        directories and logs path. A base directory is also created, from which other relative
+        directory paths originate.
         """
 
         # Initialize self.series dictionary
         self.initialize_series()
 
-        # Initialize default values for the base and output directories, and logs path
-        self.base_dir = path.abspath(path.join(path.dirname(path.realpath(__file__)), '..'))
-        self.set_output()
-        self.set_logs()
+        # Set the base directory
+        self.set_base(base_dir)
+
+        # Set default values for data and output directories, and logs path
+        self.set_default_data(data_dir)
+        self.set_default_output(output_dir)
+        self.set_default_logs(logs_path)
 
     def initialize_series(self):
         """
@@ -41,56 +42,92 @@ class Collection(list):
 
         self.series = {self[i].name: i for i in range(len(self))}
 
-    def set_output(self, output_dir=None):
+    def set_base(self, base_dir=None):
         """
-        Sets the collection output directory ('output_dir'). The directory is only created if
-        something is actually saved in it. By default, the output directory is set to 'Output'.
+        Sets the default base directory ('base_dir'), from which other relative directory paths
+        originate. This directory is not created if it doesn't already exist. By default, the data
+        directory is set to the working directory.
+        """
+
+        # Check if base_dir parameter is a string
+        stop(
+            base_dir is not None and type(base_dir) != str, 'TypeError',
+            "'base_dir' must be a string or None ({} given).", type(base_dir)
+        )
+
+        # Set the base directory
+        # self.base_dir = path.abspath(path.join(path.dirname(path.realpath(__file__)), '..'))
+        self.base_dir = path.abspath(getcwd() if base_dir is None else base_dir)
+
+    def set_default_data(self, data_dir=None):
+        """
+        Sets the default data directory ('data_dir'). This directory is not created if it doesn't
+        already exist. By default, the data directory is set to 'Data' in the base directory.
+        """
+
+        # Check if base_dir parameter is a string, which must be done before the directory call
+        stop(
+            data_dir is not None and type(data_dir) != str, 'TypeError',
+            "'data_dir' must be a string or None ({} given).", type(data_dir)
+        )
+
+        # Define the base directory
+        self.data_dir = directory(
+            self.base_dir, 'Data' if data_dir is None else data_dir, 'data_dir'
+        )
+
+    def set_default_output(self, output_dir=None):
+        """
+        Sets the default output directory ('output_dir'). The directory is only created if
+        something is actually saved in it. By default, the output directory is set to 'Output' in
+        the base directory.
         """
 
         # Check if output_dir parameter is a string, which must be done before the directory call
         stop(
             output_dir is not None and type(output_dir) != str, 'TypeError',
-            "'output_dir' must be a string ({} given).", type(output_dir)
+            "'output_dir' must be a string or None ({} given).", type(output_dir)
         )
 
-        # self.output_dir parameter
+        # Define the default output directory
         self.output_dir = directory(
-            self.base_dir, '../Output' if output_dir is None else output_dir, 'output_dir'
+            self.base_dir, 'Output' if output_dir is None else output_dir, 'output_dir'
         )
 
-    def set_logs(self, logs_path=None):
+    def set_default_logs(self, logs_path=None):
         """
-        Sets the global log path. The log file and directory are only created if a message is
-        actually logged. The file name must end with an '.log' extension. By default, a 'Logs'
-        directory is created in the output directory.
+        Sets the default logs path ('logs_path'). The log file and directory are only created if a
+        message is actually logged. The file name must end with an '.log' extension. By default,
+        a 'Logs' directory is created in the output directory and the name is based on the current
+        date and time.
         """
 
         from time import strftime
 
-        # self.logs_path parameter
+        # Check if logs_path parameter is a string, which must be done before the directory call
+        stop(
+            logs_path is not None and type(logs_path) != str, 'TypeError',
+            "'logs_path' must be a string or None ({} given).", type(logs_path)
+        )
+
+        # Define the default logs path
         self.logs_path = (
             path.join(self.output_dir, 'Logs') + '/' if logs_path is None else logs_path
         )
-
-        # Check if logs_path parameter is a string, which must be done before the directory call
-        stop(
-            type(self.logs_path) != str, 'TypeError',
-            "'logs_path' must be a string ({} given).", type(self.logs_path)
-        )
-
-        # logs_path redefined as the absolute path
         self.logs_path = path.join(
             directory(self.base_dir, path.dirname(self.logs_path), 'logs_path'),
             'kanya_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
             if path.basename(self.logs_path) == '' else path.basename(self.logs_path)
         )
-        self.logs_configured = False
 
         # Check if the file is a logs file
         stop(
             path.splitext(self.logs_path)[1].lower() != '.log', 'TypeError',
             "'{}' is not a log file (with a .log extension).", path.basename(self.logs_path)
         )
+
+        # Set logs configuration as False
+        self.logs_configured = False
 
     def new(
         self, parent=None, path=None, args=False, forced=False, default=False,
@@ -159,13 +196,13 @@ class Collection(list):
         for series in self.select(*series):
             series.copy(parent, path, args, logging, traceback, **parameters)
 
-    def load(self, *series, file_path=None, forced=False):
+    def load_from_file(self, *series, file_path=None, forced=False):
         """ Loads one or multiple series from the binary file. If forced, existing groups are
             overwritten.
         """
 
         for series in self.select(*series):
-            series.load(file_path, forced)
+            series.load_from_file(file_path, forced)
 
     def traceback(self, *series, forced=False, mode=None):
         """
@@ -176,14 +213,14 @@ class Collection(list):
         for series in self.select(*series):
             series.traceback(forced, mode)
 
-    def save(self, *series, file_path=None, forced=False, default=False, cancel=False):
+    def save_to_file(self, *series, file_path=None, forced=False, default=False, cancel=False):
         """
         Saves one or multiple series to a binary file. If forced, existing files are
         overwritten.
         """
 
         for series in self.select(*series):
-            series.save(file_path, forced, default, cancel)
+            series.save_to_file(file_path, forced, default, cancel)
 
     def create(self, *series, forced=False, default=False, cancel=False):
         """
@@ -226,7 +263,7 @@ class Collection(list):
 
             return [self[self.series[name]] for name in series]
 
-    def default_name(self, name=None):
+    def get_default_name(self, name=None):
         """
         Loops over all Series in self and returns a default 'name-i' name where i is the
         lowest possible number for an series titled 'name'.
@@ -248,24 +285,25 @@ class Collection(list):
 
         return '{}-{}'.format(name, i)
 
-def directory(base, directory, name, check=False, create=False):
+def directory(base, directory, parameter, check=False, create=False):
     """
     Checks for type errors, checks if 'directory' already exists, creates it if needed and
     returns the absolute directory path. The directory can either be relative path to 'base'
     or an absolute path.
     """
 
-    from os import makedirs, getcwd, chdir
-
     # Check the type of name, base and directory
-    stop(type(name) != str, 'TypeError', "'name' must be a string ({} given).", type(name))
+    stop(
+        type(parameter) != str, 'TypeError',
+        "'parameter' must be a string ({} given).", type(parameter)
+    )
     stop(
         type(base) != str, 'TypeError',
-        "The base of '{}' must be a string ({} given).", name, type(base)
+        "The base of '{}' must be a string ({} given).", parameter, type(base)
     )
     stop(
         type(directory) != str, 'TypeError',
-        "The base '{}' must be a string ({} given).", name, type(directory)
+        "The base '{}' must be a string ({} given).", parameter, type(directory)
     )
 
     # Output directory formatting
@@ -295,25 +333,32 @@ def directory(base, directory, name, check=False, create=False):
 
     return directory
 
-def output(output_dir=None, check=False, create=True):
+def get_default_filename(file_path):
     """
-    Returns the absolute path of the output directory and creates it if needed. 'output_dir'
-    is either relative to collection.base_dir or absolute (str). If blank (i.e. ''), output
-    files will be created in the base directory. By default, if 'output_dir' is None, an
-    'Output' directory is created.
+    Loops over all files and sub-directories in the directory of 'file_path' and returns a
+    default 'path/name-i.extension' path where i is the lowest possible number for a file
+    titled 'name'.
     """
 
-    # Collection output directory if None is provided
-    output_dir = collection.output_dir if output_dir is None else output_dir
+    from os import path, listdir
 
-    # Check if output_dir is a string
-    stop(
-        type(output_dir) != str, 'TypeError',
-        "'output_dir' must be a string ({} given).", type(output_dir)
-    )
+    # Initialization
+    directory = path.dirname(file_path)
+    name = path.splitext(path.basename(file_path))[0]
+    name = name if name != '' else 'untitled'
+    extension = path.splitext(file_path)[1]
 
-    # Absolute directory, check and creation, if needed
-    return directory(collection.base_dir, output_dir, 'output_dir', check=check, create=create)
+    # Identify whether 'name' ends with a digit
+    i = name.split('-')[-1]
+    if i.isdigit():
+        name = name[:-(len(i) + 1)]
+
+    # Loops over Series in self
+    i = 1
+    while '{}-{}{}'.format(name, i, extension) in listdir(directory):
+        i += 1
+
+    return path.join(directory, '{}-{}{}'.format(name, i, extension))
 
 def log(message, *words, logs_path=None, level='info', display=False, logging=True):
     """
@@ -324,17 +369,16 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
     extension. Futhermore, if 'display' is True, the message is also printed onscreen.
     """
 
-    from time import strftime
     from logging import basicConfig, root, info, warning, INFO
 
-    # Check if logging is True
+    # Check if logging is a boolean
     stop(
         type(logging) != bool, 'TypeError',
         "'logging' must be a boolean ({} given).", type(logging)
     )
-    if logging:
 
-        # logs_path parameter
+    # logs_path parameter
+    if logging:
         logs_path = collection.logs_path if logs_path is None else logs_path
 
         # Checks and configuration skipped if logs have been configured already

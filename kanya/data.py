@@ -71,8 +71,26 @@ class Data(list):
         self.from_data = False
         self.from_CSV = True
 
+        # Data directory parameter
+        self.series.data_dir = self.series.config.data_dir.values
+
+        # Check if data_dir is present
+        self.series.stop(
+            self.series.data_dir is None, 'NameError',
+            "Required parameter 'data_dir' is missing in the configuration."
+        )
+
+        # Check if the data directory is a string, which must be done before the directory call
+        self.series.stop(
+            type(self.series.data_dir) != str, 'TypeError',
+            "'{}' must be a string ({} given).", self.series.data_dir, type(self.series.data_dir)
+        )
+
         # CSV file absolute path
-        self.data_path = directory(collection.base_dir, self.data.values, 'data_path')
+        self.data_path = directory(
+            join(collection.base_dir, self.series.data_dir),
+            self.data.values, 'data_path'
+        )
 
         # Check if the data file exists
         self.series.stop(
@@ -80,7 +98,7 @@ class Data(list):
             "No data file located at '{}'.", self.data_path
         )
 
-        # Check if the path links to a CSV file.
+        # Check if the path links to a CSV file
         self.series.stop(
             path.splitext(self.data_path)[1].lower() != '.csv', 'TypeError',
             "'{}' is not a CSV data file (with a .csv extension).", path.basename(self.data_path)

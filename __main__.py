@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-__main__.py: Main pipeline of the kanya package. It executes the following steps:
+__main__.py: Example pipeline of the kanya package. It executes the following steps:
 
-    1 - Series creation: arguments, parameters, data and configuration file import, format and
-        check, and conversions.
-    2 - Groups creation: traceback members' positions from data or a model, and age computation
+     -  Series creation: arguments, parameters, data and configuration file import, format and
+        checks, and unit conversions.
+
+      - Groups creation: Galactic orbit computation from data or a model, and age computation
         by minimizing association size metrics.
-    3 - Output creation: series and groups output.
+
+     -  Output creation: figures and tables generation for series and groups.
 """
 
 import kanya
@@ -21,8 +23,8 @@ kanya.collection.create()
 
 # Output creation
 for series in kanya.collection:
-    series.create_metrics_table(forced=True, show=True, save=False, machine=False)
-    series.create_metrics_table(show=False, save=True, forced=True, machine=True)
+    series.create_metrics_table(forced=True, show=True, save=True, machine=False)
+    series.create_metrics_table(show=False, save=True, forced=True, machine=False)
     series.create_covariances_xyz_plot(forced=True)
     series.create_covariances_ξηζ_plot(forced=True) # Valid
     series.create_mahalanobis_plot(forced=True)
@@ -39,7 +41,7 @@ for series in kanya.collection:
     series.create_xyz_mst_plot(forced=True)
     series.create_ξηζ_mst_plot(forced=True)
     series.create_covariances_mad_ξηζ_plot(forced=True)
-    # series.create_age_distribution(forced=True)
+    series.create_age_distribution(forced=True)
 
     # Group output
     for group in series:
@@ -50,12 +52,11 @@ for series in kanya.collection:
             group.trajectory_ξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
             group.trajectory_time_xyz('1x3', forced=True, metric='covariances_xyz')
             group.trajectory_time_ξηζ('1x3', forced=True, metric='covariances_ξηζ') # Valid
-            # group.create_map(forced=True, labels=False)
-            # group.create_2D_and_3D_scatter([0,  5,  10], forced=True)
-            # group.create_2D_and_3D_scatter([15, 20, 25], forced=True)
-            # group.create_cross_covariances_scatter('x', 'u', age=10, errors=True, forced=True)
-            # group.create_age_distribution(forced=True, metric='covariances_ξηζ', index=0)
-            # for star in group:
-            #     if star.name == 'HR 8799':
-            #         star.create_time_kinematics_table(show=False, save=True, machine=True)
-
+            group.create_map(forced=True, labels=False)
+            group.create_2D_and_3D_scatter([0,  5,  10], forced=True)
+            group.create_2D_and_3D_scatter([15, 20, 25], forced=True)
+            group.create_cross_covariances_scatter('x', 'u', age=10, errors=True, forced=True)
+            group.create_age_distribution(forced=True, metric='covariances_ξηζ', index=0)
+            for star in group:
+                if star.name == 'HR 8799':
+                    star.create_time_kinematics_table(show=False, save=True, machine=True)

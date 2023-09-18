@@ -2,55 +2,80 @@
 # -*- coding: utf-8 -*-
 
 """
-config.py: Configuration of a traceback from a simulated group of stars or data. A 'system'
-refers to a coordinate system (e.g., 'observables', 'spherical' or 'cartesian'), an 'axis' to
-the orientation of a coordinate system axes (e.g. 'equatorial' or 'galactic') and 'origin' to
-the origin of a coordinate system axes (e.g. 'sun' or 'galaxy'). 'units' must be a string
-convertible to a Astropy.Unit object. The default units are:
+config.py: Series configuration file. For every parameter, three components can be defined: 'value'
+or 'values', 'unit' or 'units', and 'system':
 
-    -  Time: Myr
-    -  Distance: pc
-    -  Velocity: pc/Myr
-    -  Angle: rad
-    -  Angular speed: rad/Myr
+     -  'value' or 'values': string, integer, float or tuple, list or dictionary, depending on the
+        given parameter.
 
-'value' or 'values' can a string, integer, float or tuple, list or dictionary, depending on the
-given parameter.
+     -  'unit' or 'units': string or a list or tuple of strings convertible to an Astropy.Unit
+        object. The default units are:
+
+         -  Time: Myr
+         -  Distance: pc
+         -  Velocity: pc/Myr
+         -  Angle: rad
+         -  Angular speed: rad/Myr
+
+     -  'system': string matching the name of a coordinate system (e.g., 'cartesian', 'cylindrical',
+        'spherical' or 'observables').
 """
 
-# Name of series of groups
+# Name of series of groups (str or None)
+# name.value = None
 # name.value = 'tucana'
 # name.value = 'carina'
 # name.value = 'columba'
 # name.value = 'ic2602'
 # name.value = 'platais8'
+# name.value = 'columba_carina'
 name.value = 'beta_pictoris'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
 
-# Path to the file or directory used as input or output relative the base directory (str). If the
-# is None or absent, by default, the  data is loaded or saved to a file in the output directory
-# named 'name.values'.series.
-file_path.value = None
+# Path to the file or directory used for pickle input relative to the current directory (str
+# or None). By default, if this is None of absent, pickles are loaded from a file named
+# 'name.value'.series in the current directory.
+load_path.value = ''
 
-# Association size metrics
+# Path to the file or directory used for pickle output relative to the current directory (str
+# or None). By default, if this is None of absent, pickles are saved to a file named
+# 'name.value'.series in the current directory.
+save_path.value = ''
+
+# Path to the directory used for loading data relative to the current directory (str or None).
+# By default, if this is None of absent, outputs are loaded from a 'Data' directory in the
+# current directory.
+data_dir.value = '../Data'
+
+# Path to the directory used for saving figures, tables and other output types relative to the
+# current directory (str or None). By default, if this is None of absent, outputs are saved to
+# an 'Output' directory in the current directory.
+output_dir.value = 'Output'
+
+# Path to the file or directory used for logging relative to the current directory (str or None).
+# By default, if this is None of absent, outputs are saved to a 'Logs' directory in the current
+# directory.
+logs_path.value = 'Logs'
+
+# Association size metrics (boolean) to be computed
 size_metrics.value = True
 cov_metrics.value = True
-cov_robust_metrics.value = True
-cov_sklearn_metrics.value = True
-mad_metrics.value = True
-mst_metrics.value = True
+cov_robust_metrics.value = False
+cov_sklearn_metrics.value = False
+mad_metrics.value = False
+mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 1
+number_of_groups.value = 3
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-# number_of_steps.value = 400
-number_of_steps.value = 250
+# number_of_steps.value = 1000
+number_of_steps.value = 240
 # number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
-number_of_iterations.value = 100
+number_of_iterations.value = 500
 
 # Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
 iteration_fraction.value = 0.5
@@ -62,8 +87,8 @@ number_of_stars.value = 25
 initial_time.value = 0.0
 
 # Final age of the traceback (float, ≠ initial_time, inclusive)
-final_time.value = -50.1951006
-# final_time.value = -40.0
+# final_time.value = -50.1951006
+final_time.value = -60
 
 # Age of simulated groups of stars (float, ≠ initial_time)
 age.value = -24.0
@@ -107,10 +132,13 @@ velocity_scatter.values = (1.0, 1.0, 1.0) # Core sample (modified)
 velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
-# data.value = '../Data/β Pictoris Moving Group - Gaia EDR3.csv'
-data.value = '../Data/β Pictoris Moving Group - Gaia DR3.csv'
-# data.value = '../Data/Database_THA_Gaia_DR3.csv'
+# data.value = 'β Pictoris Moving Group - Gaia EDR3.csv'
+data.value = 'β Pictoris Moving Group - Gaia DR3.csv'
+# data.value = 'IC2602 Sample.csv'
+# data.value = 'Database_THA_Gaia_DR3.csv'
+# data.value = 'CAR_COL_sample.csv'
 # data.value = '../THA/THA_corrected_rv.csv'
+# data.value = '../COL/COL_sample.csv'
 # data.value = '../CAR/CAR_corrected_rv.csv'
 # data.value = '../COL/COL_corrected_rv.csv'
 # data.value = '../IC 2602/IC206_corrected_rv.csv'
@@ -223,7 +251,7 @@ rv_shift.value = 0.0
 rv_shift.unit = 'km/s'
 
 # Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = True
+data_rv_shifts.value = False
 
 # Cutoff (σ of the star position) below which stars are excluded (float, > 0)
 cutoff.value = 3.0
