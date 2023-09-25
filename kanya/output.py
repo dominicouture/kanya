@@ -6,12 +6,10 @@ output.py: Defines functions to create data output such as plots of association 
 over time, 2D and 3D scatters at a given time, histograms, color mesh, etc.
 """
 
-import numpy as np
-from os import path
-from cycler import cycler
 from matplotlib import pyplot as plt, ticker as tkr
 from colorsys import hls_to_rgb
-from scipy.interpolate import griddata, interp1d
+from cycler import cycler
+from scipy.interpolate import interp1d
 from .collection import *
 from .coordinate import *
 
@@ -65,52 +63,64 @@ class Output_Series():
     """Output methods for a series of groups."""
 
     def save_figure(
-        self, name, file_path=None, extension='pdf', tight=True,
-        forced=False, default=False, cancel=False
+        self, name, extension='pdf', file_type=None, output_dir=None,
+        tight=True, forced=False, default=False, cancel=False
     ):
         """Saves figure with or without tight layout and some padding."""
 
-        # Check 'tight' argument
+        # Check if tight argument is a boolean
         self.stop(
-            type(forced) != bool, 'TypeError',
+            type(tight) != bool, 'TypeError',
             "'tight' must be a boolean ({} given).", type(tight)
         )
 
         # Save figure
-        def save(file_path, tight):
+        def save(output_path, tight):
             if tight:
-                plt.savefig(file_path, bbox_inches='tight', pad_inches=0.01)
+                plt.savefig(output_path, bbox_inches='tight', pad_inches=0.01)
             else:
-                plt.savefig(file_path)
+                plt.savefig(output_path)
 
         # Choose behavior
         self.choose(
-            name, extension, save, tight, file_path=file_path,
-            cancel=cancel, forced=forced, default=default
+            name, save, tight, extension=extension, file_type=file_type,
+            output_dir=output_dir, cancel=cancel, forced=forced, default=default
         )
 
     def save_table(
-        self, name, lines, header=None, file_path=None, extension='txt',
-        forced=False, default=False, cancel=False
+        self, name, lines, header=None, extension='txt', file_type=None,
+        output_dir=None, forced=False, default=False, cancel=False
     ):
         """Saves a table to a CSV file for a given header and data."""
 
+        # Check 'lines' argument
+        self.stop(
+            type(lines) not in (tuple, list), 'TypeError',
+            "'lines' must be a string of None ({} given).", type(lines)
+        )
+
+        # Check 'header' argument
+        self.stop(
+            type(header) not in (str, type(None)), 'TypeError',
+            "'header' must be a string of None ({} given).", type(header)
+        )
+
         # Save table
-        def save(file_path, lines, header):
-            with open(file_path, 'w') as output_file:
+        def save(output_path, lines, header):
+            with open(output_path, 'w') as output_file:
                 if header is not None:
                     output_file.write(header + '\n')
                 output_file.writelines([line + '\n' for line in lines])
 
         # Choose behavior
         self.choose(
-            name, extension, save, lines, header, file_path=file_path,
-            cancel=cancel, forced=forced, default=default
+            name, save, lines, header, extension=extension, file_type=file_type,
+            output_dir=output_dir, cancel=cancel, forced=forced, default=default
         )
 
     def choose(
-        self, name, extension, save, *save_args, file_path=None,
-        forced=False, default=False, cancel=False
+        self, name, save, *save_args, extension=None, file_type=None,
+        output_dir=None, forced=False, default=False, cancel=False
     ):
         """
         Checks whether a path already exists and asks for user input if it does. The base path
@@ -119,7 +129,7 @@ class Output_Series():
         """
 
         # Get file path
-        file_path = self.get_file_path(name, extension, file_path=file_path)
+        file_path = self.get_output_path(name, extension, file_type=file_type, output_dir=output_dir)
 
         # Check if a file already exists
         if path.exists(file_path):
@@ -163,8 +173,7 @@ class Output_Series():
 
                 # Set default name and save figure
                 if default or choice in ('k', 'keep'):
-                    from .tools import default_name
-                    file_path = default_name(file_path)
+                    file_path = get_default_filename(file_path)
                     save(file_path, *save_args)
 
                     # Logging
@@ -186,29 +195,32 @@ class Output_Series():
             # Logging
             self.log("'{}': file saved at '{}'.", name, file_path)
 
-    def get_file_path(self, name, extension, file_path=None):
-        """Returns a proper file path given a name, an extension and, optionnally, a filepath."""
+    def get_output_path(self, name, extension=None, file_type=None, output_dir=None):
+        """Returns a proper file path given a name, an extension and, optionnally, a file path
+            relative to the output directory.
+        """
 
-        # file_path parameter
-        file_path = file_path if file_path is not None else self.output(create=True) + '/'
-
-        # Check if file_path parameter is a string, which must be done before the directory call
+        # Check if output directory parameter is a string
         self.stop(
-            type(file_path) != str, 'TypeError',
-            "'file_path' must be a string ({} given).", type(file_path)
+            type(output_dir) not in (str, type(None)), 'TypeError',
+            "'output_dir' must be a string or None ({} given).", type(output_dir)
         )
 
-        # file_path redefined as the absolute path, default name and directory creation
-        file_path = path.join(
-            directory(self.output(), path.dirname(file_path), 'file_path', create=True),
-            path.basename(file_path) if path.basename(file_path) != '' else f'{name}.{extension}'
+        # Set output directory
+        if 'output_dir' not in vars(self).keys():
+            self.output_dir = self.set_path(
+                self.config.output_dir if output_dir is None else output_dir, 'output_dir',
+                check=False, create=False
+            )
+        output_dir = self.output_dir + '/' if output_dir is None else output_dir
+
+        # Set output path
+        output_path = self.set_path(
+            output_dir, 'output_path', name=name, extension=extension,
+            file_type=file_type, check=False, create=True
         )
 
-        # Check if there's an extension and add an extension, if needed
-        if path.splitext(file_path)[-1] != f'.{extension}':
-            file_path += f'.{extension}'
-
-        return file_path
+        return output_path
 
     def create_metrics_table(
         self, save=False, show=False, machine=False,
@@ -318,7 +330,7 @@ class Output_Series():
         # Save table
         if save:
             self.save_table(
-                self.name, lines, file_path=f'metrics_{self.name}',
+                f'metrics_{self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -526,7 +538,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'covariances_xyz_{self.name}'
+            f'covariances_xyz_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -581,7 +593,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'covariances_ξηζ_{self.name}'
+            f'covariances_ξηζ_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -635,7 +647,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'Cross_covariances_xyz_{self.name}'
+            f'Cross_covariances_xyz_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -690,7 +702,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'Cross_covariances_ξηζ_{self.name}'
+            f'Cross_covariances_ξηζ_{self.name}'
             f"{'_robust' if robust else '_sklearn' if sklearn else ''}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -719,7 +731,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'MAD_xyz_{self.name}.pdf',
+            f'MAD_xyz_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -747,7 +759,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'MAD_ξηζ_{self.name}.pdf',
+            f'MAD_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -774,7 +786,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'MST_xyz_{self.name}.pdf',
+            f'MST_xyz_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -801,7 +813,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'MST_ξηζ_{self.name}.pdf',
+            f'MST_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -827,7 +839,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'Mahalanobis_{self.name}.pdf',
+            f'Mahalanobis_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -870,7 +882,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'covariances_MAD_ξηζ_{self.name}.pdf',
+            f'covariances_MAD_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -944,7 +956,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'covariances_MAD_MST_Cross_covariannces_xyz_{self.name}_{other.name}.pdf',
+            f'covariances_MAD_MST_Cross_covariannces_xyz_{self.name}_{other.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -995,7 +1007,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            self.name, f'age_distribution_{self.name}.pdf',
+            f'age_distribution_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1100,7 +1112,7 @@ class Output_Group():
         # Save table
         if save:
             self.series.save_table(
-                self.name, lines, file_path=f'kinematics_time_{self.name}',
+                f'kinematics_time_{self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -1198,7 +1210,7 @@ class Output_Group():
         # Save table
         if save:
             self.series.save_table(
-                self.name, lines, file_path=f'kinematics_{self.name}_{age}Myr',
+                f'kinematics_{self.name}_{age}Myr', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -1436,7 +1448,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'trajectory_xyz_{self.name}.pdf',
+            f'trajectory_xyz_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
@@ -1579,7 +1591,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'trajectory_ξηζ_{self.name}.pdf',
+            f'trajectory_ξηζ_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1837,7 +1849,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f"trajectory_time_xyz_{style}_{self.name}.pdf",
+            f"trajectory_time_xyz_{style}_{self.name}.pdf",
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2104,7 +2116,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'trajectory_time_ξηζ_{style}_{self.name}.pdf',
+            f'trajectory_time_ξηζ_{style}_{self.name}.pdf',
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2184,7 +2196,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'Mollweide_{self.name}.pdf',
+            f'Mollweide_{self.name}.pdf',
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2342,7 +2354,6 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name,
             f'2D_Scatter_{self.name}_{keys[i].upper()}{keys[j].upper()}_at_{age:.1f}Myr.pdf',
             forced=forced, default=default, cancel=cancel
         )
@@ -2492,7 +2503,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'3D_Scatter_{self.name}_at_{age:.1f}Myr.pdf',
+            f'3D_Scatter_{self.name}_at_{age:.1f}Myr.pdf',
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2549,7 +2560,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, '2D_Scatter_{}_{}_{}_{}_Myr.pdf'.format(self.name, *ages),
+            '2D_Scatter_{}_{}_{}_{}_Myr.pdf'.format(self.name, *ages),
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2906,7 +2917,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'covariances_scatter_{self.name}_'
+            f'covariances_scatter_{self.name}_'
             f'{position_keys[i].upper()}-{velocity_keys[j].upper()}.pdf',
             forced=forced, default=default, cancel=cancel
         )
@@ -3079,7 +3090,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            self.name, f'age_distribution_jackknife_{self.name}_{metric_name}.pdf',
+            f'age_distribution_jackknife_{self.name}_{metric_name}.pdf',
             tight=False, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -3184,7 +3195,7 @@ class Output_Star():
         # Save table
         if save:
             self.group.series.save_table(
-                self.name, lines, file_path=f'kinematics_time_{self.name}',
+                f'kinematics_time_{self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )

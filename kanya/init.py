@@ -24,14 +24,29 @@ class Config():
 
         # Default components
         default_components = {
-            component: None for component in ('label', 'name', 'values', 'units', 'system')
+            component: None for component in (
+                'label', 'name', 'values', 'units', 'system', 'type'
+            )
+        }
+
+        # Component types
+        types = {
+            'none': type(None),
+            'boolean': bool,
+            'string': str,
+            'integer': int,
+            'float': float,
+            'tuple': tuple,
+            'list': list,
+            'dictionary': dict,
+            'array': np.ndarray
         }
 
         def __init__(self, **components):
             """Initializes a Parameter object with the given 'components'."""
 
             # Initialization
-            vars(self).update(deepcopy(self.default_components))
+            vars(self).update(self.default_components)
 
             # Update
             self.update(components.copy())
@@ -43,30 +58,28 @@ class Config():
             tuple or singular forms of default components.
             """
 
-            # Parameter conversion into a dictionary
+            # Parameter conversion into a dictionary and copy
             if type(parameter) == type(self):
                 parameter = vars(parameter)
-
-            # Check if the parameter is a dictionary here
-            stop(
-                type(parameter) != dict, 'TypeError',
-                "A parameter must be a Config.Parameter object or a dictionary ({} given).",
-                type(parameter)
-            )
-
-            # Component conversion from singular to plural form
-            for component in ('value', 'unit'):
-                components = component + 's'
-                if component in parameter.keys():
-                    parameter[components] = parameter[component]
-                    parameter.pop(component)
-
-            # Parameter update if present in self.default_components
+            parameter = deepcopy(parameter)
             if type(parameter) == dict:
-                vars(self).update({
-                    key: component for key, component in parameter.items()
-                    if key in self.default_components
-                })
+
+                # Component conversion from singular to plural form in parameter
+                for component in ('value', 'unit'):
+                    components = component + 's'
+                    if component in parameter.keys():
+                        parameter[components] = parameter[component]
+                        parameter.pop(component)
+
+                # Update self with parameter, only if the component already exists in the default
+                # component and is not None
+                if type(parameter) == dict:
+                    vars(self).update(
+                        {
+                            key: component for key, component in parameter.items()
+                            if key in self.default_components and component is not None
+                        }
+                    )
 
         def __repr__(self):
             """Returns a string with all the components of the parameter."""
@@ -83,7 +96,7 @@ class Config():
     speed_unit = System.default_units['speed'].label
     speed_units = tuple(variable.unit.label for variable in systems['cartesian'].velocity)
 
-    # Default parameters configuration
+    # Default parameters
     default_parameters_file = path.join(path.dirname(__file__), 'resources/default_parameters.csv')
     parameter_dataframe = pd.read_csv(default_parameters_file, delimiter=';')
     default_parameters = {}
@@ -98,34 +111,38 @@ class Config():
     position_parameters = ('position', 'position_error', 'position_scatter')
     velocity_parameters = ('velocity', 'velocity_error', 'velocity_scatter')
 
-    def __init__(self, parent=None, path=None, args=False, **parameters):
+    def __init__(self, parent=None, file_path=None, args=False, **parameters):
         """
         Configures a Config objects from, in order, 'parent', an existing Config object,
-        'path', a string representing a path to a configuration file, 'args' a boolean value
+        'file_path', a string representing a path to a configuration file, 'args' a boolean value
         that sets whether command line arguments are used, and '**parameters', a dictionary
         of dictionaries, where keys must match values in Parameter.default_components, or
         Config.Parameter objects. Only values that match a key in self.default_parameters are
         used. If no value are given the default parameter is used instead.
         """
 
-        # Default or parent's parameters import
-        if parent is None:
-            self.initialize_from_parameters(deepcopy(self.default_parameters))
-        elif type(parent) == Config:
-            self.initialize_from_parameters(deepcopy(vars(parent)))
-        else:
-            stop(
-                True, 'TypeError',
-                "'parent' can either be a Config object or None ({} given).", type(parent)
-            )
+        # Check if parent is a Config or None
+        stop(
+            type(parent) not in (Config, type(None)), 'TypeError',
+            "'parent' can either be a Config object or None ({} given).", type(parent)
+        )
 
-        # Parameters import
-        if path is not None:
-            self.initialize_from_path(path)
+        # Import default or parent's parameters
+        if parent is None:
+            self.initialize_from_parameters(self.default_parameters)
+        if type(parent) == Config:
+            self.initialize_from_parameters(vars(parent))
+
+        # Import parameters from file path, arguments and parameters dictionary
+        if file_path is not None:
+            self.initialize_from_path(file_path)
         if args:
             self.initialize_from_arguments(args)
         if len(parameters) > 0:
             self.initialize_from_parameters(parameters)
+
+        # Configure parameters
+        self.configure_parameters()
 
     def initialize_from_path(self, config_path):
         """
@@ -134,13 +151,13 @@ class Config():
         absolute path or relative to the current working directory.
         """
 
-        # Check if config_path is a string
+        # Check if configuration path is a string
         stop(
             type(config_path) != str, 'TypeError',
             "The path to the configuration file must be a string ('{}' given).", type(config_path)
         )
 
-        # Absolute path
+        # Redefine configuration path as the absolute path
         config_path = directory(collection.base_dir, config_path, 'config_path')
 
         # Check if the configuration file exists
@@ -162,7 +179,7 @@ class Config():
                 path.splitext(path.basename(config_path))[0], config_path
             )
             parameters = module_from_spec(spec)
-            vars(parameters).update(vars(self))
+            vars(parameters).update(deepcopy(vars(self)))
             spec.loader.exec_module(parameters)
 
         # Check if all names are valid
@@ -236,7 +253,17 @@ class Config():
         # Filter parameters that don't match a default parameter
         for key, parameter in filter(
                 lambda item: item[0] in self.default_parameters.keys(), parameters.items()
-            ):
+        ):
+
+            # Copy parameter
+            parameter = deepcopy(parameter)
+
+            # Check if the parameter is a dictionary or a Parameter object
+            stop(
+                type(parameter) not in (dict, self.Parameter), 'TypeError',
+                "A parameter must be a Config.Parameter object or a dictionary ({} given).",
+                type(parameter)
+            )
 
             # Parameter update from a Parameter object or dictionary
             if key in vars(self).keys() and type(vars(self)[key]) == Config.Parameter:
@@ -245,6 +272,77 @@ class Config():
             # Parameter object import from default parameters or parent configuration
             elif type(parameter) == Config.Parameter:
                 vars(self)[key] = parameter
+
+    def configure_parameters(self):
+        """
+        Checks if all parameters are present and are Parameter objects with all their components,
+        and checks for invalid parameters and components. The type of 'label', 'name' and 'system'
+        components is checked (str), and the 'system' component is converted to its corresponding
+        class if it is not None.
+        """
+
+        # Check if all parameters are present and are Config.Parameter objects
+        for parameter_label, parameter in self.default_parameters.items():
+            stop(
+                parameter_label not in vars(self), 'ValueError',
+                "Required parameter '{}' is missing in the configuration.", parameter_label
+            )
+            stop(
+                type(parameter) != self.Parameter, 'TypeError',
+                "'{}' must be a Config.Parameter object ({} given).", parameter_label,
+                type(parameter)
+            )
+
+            # Check if all components are present
+            for component_label, component in self.Parameter.default_components.items():
+                stop(
+                    component_label not in vars(parameter).keys(),
+                    'ValueError',
+                    "Required component '{}' is missing in '{}' parameter in the configuration.",
+                    component_label, parameter_label
+                )
+
+        # Check for invalid parameters and components
+        for parameter_label, parameter in vars(self).items():
+            stop(
+                parameter_label not in self.default_parameters.keys(), 'ValueError',
+                "Parameter '{}' is invalid in the configuration.", parameter_label
+            )
+            for component_label, component in vars(parameter).items():
+                stop(
+                    component_label not in self.Parameter.default_components.keys(),
+                    'ValueError',
+                    "Component '{}' is invalid in '{}' parameter in the configuration.",
+                    component_label, parameter_label
+                )
+
+                # Check whether all components, but values, units, are strings or None
+                if component_label not in ('values', 'units'):
+                    stop(
+                        component is not None and type(component) not in (str, System), 'TypeError',
+                        "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
+                        component_label, parameter_label, type(component)
+                    )
+
+            # Check if label and name were changed
+            default_parameter = self.default_parameters[parameter_label]
+            if parameter.label != parameter_label:
+                parameter.label = parameter_label
+            if parameter.name != default_parameter.name:
+                parameter.name = default_parameter.name
+
+            # Check if system is valid and converts it to a System object
+            if type(parameter.system) == System:
+                pass
+            elif parameter.system is not None:
+                stop(
+                    parameter.system.lower() not in systems.keys(), 'ValueError',
+                    "'system' component of '{}' is invalid ({} required, {} given).",
+                    parameter.label, list(systems.keys()), parameter.system
+                )
+                parameter.system = systems[parameter.system.lower()]
+            elif default_parameter.system is not None:
+                parameter.system = systems[default_parameter.system]
 
     def __repr__(self):
         """Returns a string of name of the configuration."""

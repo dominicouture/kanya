@@ -8,11 +8,9 @@ an input for a Group object, and all related methods to check and convert this d
 identified and converted to default units.
 """
 
-import numpy as np
 import pandas as pd
 from csv import reader, Sniffer
 from re import split
-from os.path import join
 from .collection import *
 from .coordinate import *
 
@@ -22,7 +20,7 @@ class Data(list):
     Data is converted into a Quantity object and units are converted to default units.
     """
 
-    def __init__(self, series):
+    def __init__(self, series, data=None, data_dir=None):
         """
         Initializes a Data object from a CSV file or a Python dictionary, list, tuple or
         np.ndarray. The first row must be a header and the second row may be a units row.
@@ -32,23 +30,21 @@ class Data(list):
 
         # Initialization
         self.series = series
-        self.data = self.series.config.data
+
+        # Set data parameter
+        self.data = self.series.set_parameter(
+            self.series.config.data if data is None else data,
+            'string', 'dictionary', 'tuple', 'list', 'array',
+            mode=True if self.series.from_data else False, all=True
+        )
 
         # Initialize self from a CSV file
         if type(self.data.values) == str:
-            self.initialize_from_CSV()
+            self.initialize_from_CSV(data_dir=data_dir)
 
         # Initialize self from a Python object
-        elif type(self.data.values) in (dict, list, tuple, np.ndarray):
+        if type(self.data.values) in (dict, list, tuple, np.ndarray):
             self.initialize_from_data()
-
-        # Non-valid 'data.values' types
-        else:
-            self.series.stop(
-                True, 'TypeError',
-                "'data.values' component must be a string, dictionary, "
-                "list, tuple or np.ndarray. ({} given).", type(self.data.values)
-            )
 
         # Data configuration
         self.configure_data()
@@ -60,7 +56,7 @@ class Data(list):
         self.create_columns()
         self.create_rows()
 
-    def initialize_from_CSV(self):
+    def initialize_from_CSV(self, data_dir=None):
         """
         Initializes a Data object from the data self.series.name in a CSV file. If the the
         CSV file doesn't specify a series or group column, all data is used. The file name
@@ -71,51 +67,31 @@ class Data(list):
         self.from_data = False
         self.from_CSV = True
 
-        # Data directory parameter
-        self.series.data_dir = self.series.config.data_dir.values
-
-        # Check if data_dir is present
-        self.series.stop(
-            self.series.data_dir is None, 'NameError',
-            "Required parameter 'data_dir' is missing in the configuration."
+        # Set data directory parameter
+        self.data_dir = self.series.set_string(
+            self.series.config.data_dir if data_dir is None else data_dir,
+            mode=True if self.series.from_data else False
         )
 
-        # Check if the data directory is a string, which must be done before the directory call
-        self.series.stop(
-            type(self.series.data_dir) != str, 'TypeError',
-            "'{}' must be a string ({} given).", self.series.data_dir, type(self.series.data_dir)
+        # Set data path parameter
+        self.data_path = self.series.set_path(
+            path.join(self.data_dir, self.data.values), 'data_path',
+            extension='csv', file_type='CSV', check=True, create=False,
+            mode=True if self.series.from_data else False
         )
 
-        # CSV file absolute path
-        self.data_path = directory(
-            join(collection.base_dir, self.series.data_dir),
-            self.data.values, 'data_path'
-        )
-
-        # Check if the data file exists
-        self.series.stop(
-            not path.exists(self.data_path), 'FileNotFoundError',
-            "No data file located at '{}'.", self.data_path
-        )
-
-        # Check if the path links to a CSV file
-        self.series.stop(
-            path.splitext(self.data_path)[1].lower() != '.csv', 'TypeError',
-            "'{}' is not a CSV data file (with a .csv extension).", path.basename(self.data_path)
-        )
-
-        # Reading of CSV file
+        # Read CSV file
         data_csv = open(self.data_path, 'r', encoding='utf-8')
         data_csv_reader = data_csv.read()
         data_csv.seek(0)
 
-        # Data import into a table and CSV file closing
+        # Import data into a table and close CSV file
         self.table = np.array(
             [row for row in reader(data_csv, Sniffer().sniff(data_csv_reader))], dtype=object
         )
         data_csv.close()
 
-        # Check if self.table is a 2D array
+        # Check if the table is a 2D array
         self.series.stop(
             self.table.ndim != 2, 'ValueError',
             "'data' parameter must represent a 2D array ({} dimensions in the given CSV). "
@@ -253,8 +229,8 @@ class Data(list):
         elif type(self.data.units) == dict:
 
             # Check if all labels can be matched to a data.system variable
-            # !!! The match should also include units for mass, radius, rv_shift, !!!
-            # !!! grav_shift and conv_shift, and their error units !!!
+            # !!! The match should also include units for mass, radius, rv_shift,
+            # grav_shift and conv_shift, and their error units !!!
             self.data.units = {
                 self.Column.identify(self.Column, self, label):
                     self.data.units[label] for label in self.data.units.keys()
@@ -311,7 +287,7 @@ class Data(list):
         """
 
         # Stellar spectral parameters data
-        stellar_spectral_parameters_file = join(
+        stellar_spectral_parameters_file = path.join(
             path.dirname(__file__),
             'resources/stellar_spectral_parameters.csv'
         )

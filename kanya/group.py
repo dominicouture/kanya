@@ -8,14 +8,13 @@ its age by minimizing: the 3D scatter, median absolute deviation, position-veloc
 and minimum spanning tree mean branch length and median absolute deviation of branch length.
 """
 
-import numpy as np
 import galpy.util.coords as coords
 from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
-from .output import Output_Group, Output_Star
-from .coordinate import *
 from time import time as get_time
 from itertools import combinations
+from .output import Output_Group, Output_Star
+from .coordinate import *
 
 class Group(list, Output_Group):
     """
@@ -94,9 +93,9 @@ class Group(list, Output_Group):
             if self.series.mst_metrics:
                 self.get_minimum_spanning_tree()
 
-        # Show timers
+        # Final time
         if self.series.timer:
-            self.show_timer()
+            self.t8 = get_time()
 
     def stars_from_data(self):
         """
@@ -369,39 +368,39 @@ class Group(list, Output_Group):
         sample.
         """
 
-        # Filter outliers for the first group
+        # Iteratively validate stars coordinates in the first group
         if self.number == 0:
+            if self.series.cutoff is not None:
+                outliers = True
+                while outliers and len(self.sample) > int(0.8 * len(self)):
 
-            # Iteratively validate stars coordinates
-            outliers = False if self.series.cutoff is None else True
-            while outliers and len(self.sample) > int(0.8 * len(self)):
+                    # Remove stars beyond the σ cutoff of the average position or velocity
+                    outliers = False
+                    for star in self.sample:
+                        position_outlier = (
+                            np.abs(star.relative_position_ξηζ)
+                            > (self.scatter_position_ξηζ * self.series.cutoff)
+                        ).any()
+                        velocity_outlier = (
+                            np.abs(star.relative_velocity_ξηζ)
+                            > (self.scatter_velocity_ξηζ * self.series.cutoff)
+                        ).any()
+                        if position_outlier or velocity_outlier:
+                            star.set_outlier(position_outlier, velocity_outlier)
+                            outliers = True
 
-                # Remove stars beyond the σ cutoff of the average position or velocity
-                outliers = False
-                for star in self.sample:
-                    position_outlier = (
-                        np.abs(star.relative_position_ξηζ)
-                        > (self.scatter_position_ξηζ * self.series.cutoff)
-                    ).any()
-                    velocity_outlier = (
-                        np.abs(star.relative_velocity_ξηζ)
-                        > (self.scatter_velocity_ξηζ * self.series.cutoff)
-                    ).any()
-                    if position_outlier or velocity_outlier:
-                        star.set_outlier(position_outlier, velocity_outlier)
-                        outliers = True
+                    # Compute valid stars coordinates
+                    self.get_stars_coordinates()
 
-                # Compute valid stars coordinates
-                self.get_stars_coordinates()
-
-            # Display a message if outliers have been found
-            if self.number == 0:
+                # Create a message if a least one outlier have been found
                 if self.number_of_outliers > 0:
                     self.outliers_messages = [
                         f'{self.number_of_outliers:d} outlier'
                         f"{'s' if self.number_of_outliers > 1 else ''} "
                         f"found in '{self.series.name}' series during traceback:"
                     ]
+
+                    # Create a message for every outlier found
                     for star in self.outliers:
                         outlier_type = (
                             'Position' if star.position_outlier else
@@ -419,9 +418,13 @@ class Group(list, Output_Group):
                             f'{star.name}: {outlier_type} > {outlier_sigma:.1f}σ'
                         )
 
-                # Display message if no outliers are found
-                elif self.series.cutoff is not None:
-                    self.outliers_messages = [f"No outliers found in '{self.series.name}'."]
+                # Create message if no outliers have been found and cutoff is not None
+                else:
+                    self.outliers_messages = [f"No outliers found in '{self.series.name}' series."]
+
+            # Leave no message if cutoff is None
+            else:
+                self.outliers_messages = []
 
             # Robust covariances matrix and support fraction
             if False:
@@ -1099,6 +1102,7 @@ class Group(list, Output_Group):
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
             self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
+            # rθz positions and velocities
             position_rθz = np.array(
                 coords.XYZ_to_galcencyl(
                     *self.position_xyz.T,
@@ -1207,7 +1211,7 @@ class Group(list, Output_Group):
         if self.number == 0:
             if not self.series.size_metrics:
                 self.t2 = self.t3 = self.t4 = self.t5 = self.t6 = self.t7 = get_time()
-            self.t8 = get_time()
+
             self.tt = self.t8 - self.t0
 
             # Create the time string

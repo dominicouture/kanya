@@ -36,26 +36,31 @@ name.value = 'beta_pictoris'
 # Path to the file or directory used for pickle input relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are loaded from a file named
 # 'name.value'.series in the current directory.
+load_path.value = None
 load_path.value = ''
 
 # Path to the file or directory used for pickle output relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are saved to a file named
 # 'name.value'.series in the current directory.
+save_path.value = None
 save_path.value = ''
 
 # Path to the directory used for loading data relative to the current directory (str or None).
 # By default, if this is None of absent, outputs are loaded from a 'Data' directory in the
 # current directory.
+data_dir.value = None
 data_dir.value = '../Data'
 
 # Path to the directory used for saving figures, tables and other output types relative to the
 # current directory (str or None). By default, if this is None of absent, outputs are saved to
 # an 'Output' directory in the current directory.
+output_dir.value = None
 output_dir.value = 'Output'
 
 # Path to the file or directory used for logging relative to the current directory (str or None).
 # By default, if this is None of absent, outputs are saved to a 'Logs' directory in the current
 # directory.
+logs_path.value = None
 logs_path.value = 'Logs'
 
 # Association size metrics (boolean) to be computed
@@ -71,8 +76,8 @@ number_of_groups.value = 3
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 1000
-number_of_steps.value = 240
-# number_of_steps.value = 172
+# number_of_steps.value = 240
+number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
 number_of_iterations.value = 500
@@ -80,42 +85,42 @@ number_of_iterations.value = 500
 # Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
 iteration_fraction.value = 0.5
 
-# Number of stars in each simulated group of stars (integer, > 0)
-number_of_stars.value = 25
-
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
 
-# Final age of the traceback (float, ≠ initial_time, inclusive)
-# final_time.value = -50.1951006
-final_time.value = -60
+# Final age of the traceback (float, inclusive)
+final_time.value = -50.1951006
+# final_time.value = 1.0
 
 # Age of simulated groups of stars (float, ≠ initial_time)
 age.value = -24.0
 
-# Average position of the simulated sample of stars (tuple)
-position.value = (22.686, -4.304, -18.495) # Core sample
+# Number of stars in each simulated group of stars (integer, > 0)
+number_of_stars.value = 25
+
+# Average position of the simulated sample of stars (3 floats in tuple)
+# position.value = (22.686, -4.304, -18.495) # Core sample
 # position.values = (18.726, -4.500, -18.938) # Gaia DR3
 # position.values = (0.0, 0.0, 0.0)
 
-# Average position error of the simulated sample of stars (tuple)
+# Average position error of the simulated sample of stars (3 floats in tuple)
 # position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
 # position_error.values = (0.19846, 0.0, 0.0) # Gaia DR2
 position_error.values = (0.0, 0.0, 0.0)
 position_error.units = 'observables'
 position_error.system = 'observables'
 
-# Average position scatter of the simulated sample of stars (tuple)
+# Average position scatter of the simulated sample of stars (3 floats in tuple)
 position_scatter.values = (3.0, 3.0, 3.0) # Initial XYZ scatter
 # position_scatter.values = (29.3, 14.0, 9.0) # Current-day XYZ scatter
 
-# Average velocity of the simulated sample of stars (tuple)
+# Average velocity of the simulated sample of stars (3 floats in tuple)
 velocity.values = (-10.12, -15.67, -8.75) # Core sample
 # velocity.values = (-10.278, -15.726, -8.759) # Gaia DR3
 # velocity.values = (-11.15, -11.15, -11.15) # Core sample
 velocity.units = 'km/s'
 
-# Average velocity error of the simulated sample of stars (tuple)
+# Average velocity error of the simulated sample of stars (3 floats in tuple)
 # velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
 # velocity_error.values = (1.0112, 0.30754, 0.26432) # Gaia DR2
 velocity_error.values = (0.0, 0.0, 0.0)
@@ -123,7 +128,7 @@ velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
 # velocity_error.units = 'observables'
 velocity_error.system = 'observables'
 
-# Average velocity scatter of the simulated sample of stars (tuple)
+# Average velocity scatter of the simulated sample of stars (3 floats in tuple)
 # velocity_scatter.values = (1.66, 0.52, 0.73) # Core sample
 # velocity_scatter.values = (2.21753, 1.36009, 1.57355) # Gaia DR2
 # velocity_scatter.values = (0.86, 0.86, 0.86) # Core sample
@@ -244,22 +249,24 @@ data.system = 'observables'
 # Whether to use actual or simulated measurement errors (boolean)
 data_errors.value = True
 
+# Whether to use actual or simulated rv shifts (boolean)
+data_rv_shifts.value = False
+
 # Radial velocity shift added (from model) or substracted (from data) to all stars (float)
 # rv_shift.value = 0.5
 # rv_shift.value = 0.2
 rv_shift.value = 0.0
 rv_shift.unit = 'km/s'
 
-# Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = False
-
-# Cutoff (σ of the star position) below which stars are excluded (float, > 0)
+# Cutoff (σ of the star position) below which stars are excluded (float or None, > 0)
+# cutoff.value = None
 cutoff.value = 3.0
 
-# Whether to use the full (with outliers), standard sample or the subsample (str)
+# Whether to use the full (with outliers), standard sample or the subsample (str or None)
 sample.value = 'full'
 sample.value = 'sample'
 sample.value = 'subsample'
+sample.value = 'core'
 
 # Galactic potential used for orbit integration (str or None)
 # potential.value = None
@@ -270,4 +277,4 @@ potential.value = 'Irrgang13I'
 pca.value = False
 
 # Whether to show the timer
-# timer.value = True
+timer.value = False

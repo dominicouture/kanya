@@ -49,13 +49,13 @@ class Collection(list):
         directory is set to the working directory.
         """
 
-        # Check if base_dir parameter is a string
+        # Check if base directory is a string or None
         stop(
             base_dir is not None and type(base_dir) != str, 'TypeError',
             "'base_dir' must be a string or None ({} given).", type(base_dir)
         )
 
-        # Set the base directory
+        # Set base directory
         # self.base_dir = path.abspath(path.join(path.dirname(path.realpath(__file__)), '..'))
         self.base_dir = path.abspath(getcwd() if base_dir is None else base_dir)
 
@@ -65,13 +65,13 @@ class Collection(list):
         already exist. By default, the data directory is set to 'Data' in the base directory.
         """
 
-        # Check if base_dir parameter is a string, which must be done before the directory call
+        # Check if data directory parameter is a string or None
         stop(
             data_dir is not None and type(data_dir) != str, 'TypeError',
             "'data_dir' must be a string or None ({} given).", type(data_dir)
         )
 
-        # Define the base directory
+        # Set default data directory as the absolute directory
         self.data_dir = directory(
             self.base_dir, 'Data' if data_dir is None else data_dir, 'data_dir'
         )
@@ -83,13 +83,13 @@ class Collection(list):
         the base directory.
         """
 
-        # Check if output_dir parameter is a string, which must be done before the directory call
+        # Check if output directory parameter is a string or None
         stop(
             output_dir is not None and type(output_dir) != str, 'TypeError',
             "'output_dir' must be a string or None ({} given).", type(output_dir)
         )
 
-        # Define the default output directory
+        # Set default output directory as the absolute directory
         self.output_dir = directory(
             self.base_dir, 'Output' if output_dir is None else output_dir, 'output_dir'
         )
@@ -104,16 +104,19 @@ class Collection(list):
 
         from time import strftime
 
-        # Check if logs_path parameter is a string, which must be done before the directory call
+        # Check if logs path parameter is a string or None
         stop(
             logs_path is not None and type(logs_path) != str, 'TypeError',
             "'logs_path' must be a string or None ({} given).", type(logs_path)
         )
 
-        # Define the default logs path
+        # Set default logs path
         self.logs_path = (
             path.join(self.output_dir, 'Logs') + '/' if logs_path is None else logs_path
         )
+
+        # Redefine logs path as the absolute directory
+        # Create a default file name, if no file name is provided
         self.logs_path = path.join(
             directory(self.base_dir, path.dirname(self.logs_path), 'logs_path'),
             'kanya_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
@@ -130,7 +133,7 @@ class Collection(list):
         self.logs_configured = False
 
     def new(
-        self, parent=None, path=None, args=False, forced=False, default=False,
+        self, parent=None, file_path=None, args=False, forced=False, default=False,
         cancel=False, logging=True, **parameters
     ):
         """ Creates a new Series in the collection. Arguments are the same as those of
@@ -138,7 +141,7 @@ class Collection(list):
         """
 
         from .series import Series
-        Series(parent, path, args, forced, default, cancel, logging, **parameters)
+        Series(parent, file_path, args, forced, default, cancel, logging, **parameters)
 
     def add(self, *series, forced=False, default=False, cancel=False, logging=True):
         """
@@ -171,7 +174,7 @@ class Collection(list):
             series.reset(logging)
 
     def update(
-        self, *series, parent=None, path=None, args=False,
+        self, *series, parent=None, file_path=None, args=False,
         logging=True, traceback=True, **parameters
     ):
         """
@@ -181,10 +184,10 @@ class Collection(list):
         """
 
         for series in self.select(*series):
-            series.update(parent, path, args, logging, traceback, **parameters)
+            series.update(parent, file_path, args, logging, traceback, **parameters)
 
     def copy(
-        self, *series, parent=None, path=None, args=False,
+        self, *series, parent=None, file_path=None, args=False,
         logging=True, traceback=True, **parameters
     ):
         """
@@ -194,15 +197,15 @@ class Collection(list):
         """
 
         for series in self.select(*series):
-            series.copy(parent, path, args, logging, traceback, **parameters)
+            series.copy(parent, file_path, args, logging, traceback, **parameters)
 
-    def load_from_file(self, *series, file_path=None, forced=False):
+    def load_from_file(self, *series, load_path=None, forced=False):
         """ Loads one or multiple series from the binary file. If forced, existing groups are
             overwritten.
         """
 
         for series in self.select(*series):
-            series.load_from_file(file_path, forced)
+            series.load_from_file(load_path, forced)
 
     def traceback(self, *series, forced=False, mode=None):
         """
@@ -213,14 +216,14 @@ class Collection(list):
         for series in self.select(*series):
             series.traceback(forced, mode)
 
-    def save_to_file(self, *series, file_path=None, forced=False, default=False, cancel=False):
+    def save_to_file(self, *series, save_path=None, forced=False, default=False, cancel=False):
         """
         Saves one or multiple series to a binary file. If forced, existing files are
         overwritten.
         """
 
         for series in self.select(*series):
-            series.save_to_file(file_path, forced, default, cancel)
+            series.save_to_file(save_path, forced, default, cancel)
 
     def create(self, *series, forced=False, default=False, cancel=False):
         """
@@ -292,11 +295,7 @@ def directory(base, directory, parameter, check=False, create=False):
     or an absolute path.
     """
 
-    # Check the type of name, base and directory
-    stop(
-        type(parameter) != str, 'TypeError',
-        "'parameter' must be a string ({} given).", type(parameter)
-    )
+    # Check the type of base, directory and parameter
     stop(
         type(base) != str, 'TypeError',
         "The base of '{}' must be a string ({} given).", parameter, type(base)
@@ -305,8 +304,12 @@ def directory(base, directory, parameter, check=False, create=False):
         type(directory) != str, 'TypeError',
         "The base '{}' must be a string ({} given).", parameter, type(directory)
     )
+    stop(
+        type(parameter) != str, 'TypeError',
+        "'parameter' must be a string ({} given).", type(parameter)
+    )
 
-    # Output directory formatting
+    # Directory formatting
     working_dir = getcwd()
     chdir(path.abspath(base))
     directory = path.abspath(directory)
@@ -319,8 +322,8 @@ def directory(base, directory, parameter, check=False, create=False):
     )
     if check:
         stop(
-            not path.exists(directory), 'NameError',
-            "No existing directory located at '{}'.", directory
+            not path.exists(directory), 'FileNotFoundError',
+            "'{}' at '{}' does not exist.", parameter, directory
         )
 
     # Directory creation, if needed
@@ -377,20 +380,20 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
         "'logging' must be a boolean ({} given).", type(logging)
     )
 
-    # logs_path parameter
+    # logs path parameter
     if logging:
         logs_path = collection.logs_path if logs_path is None else logs_path
 
         # Checks and configuration skipped if logs have been configured already
         if not collection.logs_configured or collection.logs_path != logs_path:
 
-            # Check if logs_path parameter is a string, which must be done before the directory call
+            # Check if logs path is a string
             stop(
                 type(logs_path) != str, 'TypeError',
                 "'logs_path' must be a string ({} given).", type(logs_path)
             )
 
-            # logs_path redefined as the absolute path and directory creation
+            # Redine logs path as the absolute path
             logs_path = path.join(
                 directory(collection.base_dir, path.dirname(logs_path), 'logs_path', create=True),
                 path.basename(collection.logs_path) if path.basename(logs_path) == ''
@@ -485,7 +488,7 @@ def stop(condition, error, message, *words, name=None, extra=1):
         # If no exception is being handled, an exception is raised
         if exc_type is None and exc_value is None:
             try:
-                exec("raise {}".format(error))
+                exec(f'raise {error}')
             except:
                 stop(True, error, message, *words, name=name, extra=extra + 1)
 
@@ -496,8 +499,8 @@ def stop(condition, error, message, *words, name=None, extra=1):
             if len(words) > 0:
                 message = message.format(*words)
             tb_message = (
-                "{} in '{}': {}".format(error, name, message) if name is not None
-                else "{}: {}".format(error, message)
+                f"{error} in '{name}' series: {message}" if name is not None
+                else f'{error}: {message}'
             )
 
             # Traceback stack formatting

@@ -8,12 +8,11 @@ of all parameters, then creates or imports the file, if needed, handles unit, co
 checks for the presence of output and logs directories and creates them, if needed.
 """
 
-import numpy as np
-import pandas as pd
 from tqdm import tqdm
-from gc import collect
 from .init import *
+from .group import Group
 from .output import Output_Series
+from .tools import enumerate_strings
 
 class Series(list, Output_Series):
     """
@@ -25,200 +24,68 @@ class Series(list, Output_Series):
     """
 
     def __init__(
-            self, parent=None, path=None, args=False, forced=False, default=False,
+            self, parent=None, file_path=None, args=False, forced=False, default=False,
             cancel=False, logging=True, addition=True, **parameters
         ):
         """
-        Initializes a Series object by first configuring it with 'parent', 'path', 'args' and
-        '**parameter' and then adding it to the collection. 'forced', 'default', 'cancel' and
-        'logging' arguments are passed to self.add function.
+        Initializes a Series object by first configuring it with 'parent', 'file_path', 'args'
+        and '**parameter' and then adding it to the collection. 'forced', 'default', 'cancel'
+        and 'logging' arguments are passed to self.add function.
         """
 
         # Configuration
-        self.configure(parent, path, args, **parameters)
+        self.configure(parent, file_path, args, **parameters)
 
         # Series addition to the collection
         if addition:
             self.add(forced=forced, default=default, cancel=cancel, logging=logging)
 
-    def configure(self, parent=None, path=None, args=False, **parameters):
+    def configure(self, parent=None, file_path=None, args=False, **parameters):
         """
-        Configures a Series objects from 'parent', an existing Config object, 'path', a string
+        Configures a Series objects from 'parent', an existing Config object, 'file_path', a string
         representing a path to a configuration file, 'args' a boolean value that sets whether
         command line arguments are used, and '**parameters', a dictionary of dictionaries or
         Config.Parameter objects, in that order. If no value are given the default parameter is
         used instead. Only values that match a key in self.default_parameters are used. Then,
-        parameters are copied, checked for errors and converted, and the series is configured.
+        parameters are copied, and checked for errors and converted. Checks if self.name is a
+        string and creates a default value if needed. Checks the type and values of the modes
+        provided in the configuration. self.save is set to False if self.load is True. Moreover,
+        self.date is defined and self.metrics is configured.
         """
 
-        # Configuration inilialization
-        self.config = Config(parent, path, args, **parameters)
+        # Initialize configuration
+        self.config = Config(parent, file_path, args, **parameters)
 
-        # Parameters configuration
-        self.configure_parameters()
+        # Set name parameter
+        self.name = self.set_string(self.config.name, none=True)
 
-        # Series configuration
-        self.configure_series()
+        # Create default name, if needed
+        if self.name is None:
+            self.name = collection.get_default_name()
 
-    def configure_parameters(self):
-        """
-        Checks if all parameters are present and are Config.Parameter objects with all their
-        components, and checks for invalid parameters and components. The type of 'label',
-        'name' and 'system' components is checked (str), and the 'system' component is converted
-        to its corresponding class if it is not None.
-        """
-
-        # Check if all parameters are present and are Config.Parameter objects
-        for parameter in self.config.default_parameters.keys():
-            self.stop(
-                parameter not in vars(self.config), 'NameError',
-                "Required parameter '{}' is missing in the configuration.", parameter
-            )
-            self.stop(
-                type(vars(self.config)[parameter]) != self.config.Parameter, 'TypeError',
-                "'{}' must be a Config.Parameter object ({} given).", parameter,
-                type(vars(self.config)[parameter])
-            )
-
-            # Check if all components are present
-            for component in self.config.Parameter.default_components.keys():
-                self.stop(
-                    component not in vars(vars(self.config)[parameter]).keys(), 'NameError',
-                    "Required component '{}' is missing from the '{}' parameter "
-                    "in the configuration.", component, parameter
-                )
-
-        # Check for invalid parameters and components
-        for parameter_label, parameter in vars(self.config).items():
-            self.stop(
-                parameter_label not in self.config.default_parameters.keys(), 'NameError',
-                "Parameter '{}' in the configuration is invalid.", parameter_label
-            )
-            for component_label, component in vars(parameter).items():
-                self.stop(
-                    component_label not in self.config.Parameter.default_components.keys(),
-                    'NameError', "Parameter's component '{}' in '{}' is invalid.",
-                    component_label, parameter_label
-                )
-
-                # Check whether all components, but parameter.values and parameter.units, are
-                # strings or None
-                if component_label not in ('values', 'units'):
-                    self.stop(
-                        component is not None and type(component) not in (str, System), 'TypeError',
-                        "'{}' component in '{}' parameter must be a string or None ('{}' given.)",
-                        component_label, parameter_label, type(component)
-                    )
-
-            # Default parameter
-            default_parameter = self.config.default_parameters[parameter_label]
-
-            # Check if parameter.label and parameter.name were changed
-            if parameter.label != parameter_label:
-                parameter.label = parameter_label
-            if parameter.name != default_parameter.name:
-                parameter.name = default_parameter.name
-
-            # Check if parameter.system is valid and converts it to a System object
-            if type(parameter.system) == System:
-                pass
-            elif parameter.system is not None:
-                self.stop(
-                    parameter.system.lower() not in systems.keys(), 'ValueError',
-                    "'system' component of '{}' is invalid ({} required, {} given).",
-                    parameter.label, list(systems.keys()), parameter.system
-                )
-                parameter.system = systems[parameter.system.lower()]
-            elif default_parameter.system is not None:
-                parameter.system = systems[default_parameter.system]
-
-    def configure_series(self):
-        """
-        Checks basic series parameters. Checks if self.name is a string and creates a default
-        value if needed. Checks the type of the modes provided in the configuration and checks
-        if their values are valid. self.save is set to False if self.load is True.
-        Moreover, self.date is defined and self.metrics configured.
-        """
-
-        # Check if name is a string or None
-        if self.config.name.values is not None:
-            self.stop(
-                type(self.config.name.values) != str, 'TypeError',
-                "'name' must be a string or None ('{}' given).", type(self.config.name.values)
-            )
-
-        # Series name
-        self.name = (
-            collection.get_default_name() if self.config.name.values is None
-            else self.config.name.values
-        )
-
-        # Current date and time
+        # Set date parameter
         from time import strftime
         self.date = strftime('%Y-%m-%d %H:%M:%S')
 
-        # Check boolean parameters
-        for argument in (
-            'from_data', 'from_model', 'load', 'save',
+        # Set load and save parameters
+        self.load = self.set_boolean(self.config.load)
+        self.save = self.set_boolean(self.config.save)
+
+        # Set association size metric parameters
+        for parameter in (
             'size_metrics', 'cov_metrics', 'cov_robust_metrics',
-            'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics',
-            'pca', 'timer'
+            'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics'
         ):
-            vars(self)[argument] = vars(self.config)[argument].values
-            self.stop(
-                vars(self)[argument] is None, 'NameError',
-                "Required parameter '{}' is missing in the configuration.", argument
-            )
-            self.stop(
-                type(vars(self)[argument]) != bool, 'TypeError',
-                "'{}' must be a boolean ({} given).", argument, type(vars(self)[argument])
-            )
+            vars(self)[parameter] = self.set_boolean(vars(self.config)[parameter])
 
         # Import the association size metrics file and skip the header line
         metrics_file = path.join(path.dirname(__file__), 'resources/association_size_metrics.csv')
         metrics_dataframe = pd.read_csv(metrics_file, delimiter=';')
 
-        # Association size metric configuration
+        # Configure association size metric
         self.metrics = []
         for index, metric in metrics_dataframe.iterrows():
             self.Metric(self, metric)
-
-    def configure_file(self, file_path, parameter, check=False, create=False):
-        """
-        Configure files for loading of saving operations. Checks if the file directory and the
-        file itself exist and creates them if needed. file_path is redefined as the absolute path
-        to the file. Errors are handed based on whether loading or saving is required.
-        """
-
-        # Check if the file path is present
-        self.stop(
-            file_path is None, 'NameError',
-            "Required parameter '{}' is missing in the configuration.", parameter
-        )
-
-        # Check if the file path is a string, which must be done before the directory call
-        self.stop(
-            type(file_path) != str, 'TypeError',
-            "'{}' must be a string ({} given).", parameter, type(file_path)
-        )
-
-        # File path redefined as the absolute path and default file name, if no file name is provided
-        file_path = path.join(
-            directory(
-                collection.base_dir, path.dirname(file_path),
-                parameter, check=check, create=create
-            ), '{}.series'.format(self.name) if path.basename(file_path) == ''
-            else path.basename(file_path)
-        )
-
-        # Check if the file is a series file
-        self.stop(
-            path.splitext(file_path)[1].lower() != '.series', 'TypeError',
-            "'{}' is not a series file (with a .series extension).",
-            path.basename(file_path)
-        )
-
-        return file_path
 
     def configure_mode(self, mode=None):
         """
@@ -227,8 +94,11 @@ class Series(list, Output_Series):
         'from_data' and 'from_model' parameters.
         """
 
-        # Mode import
-        if mode is not None:
+        # Set mode from data or model
+        if mode is None:
+            self.from_data = self.set_boolean(self.config.from_data)
+            self.from_model = self.set_boolean(self.config.from_model)
+        else:
             self.stop(
                 type(mode) != str, 'TypeError', "'mode' must be a string or None ({} given).",
                 type(mode)
@@ -258,121 +128,104 @@ class Series(list, Output_Series):
     def configure_traceback(self):
         """Checks traceback configuration parameters for 'From data' and 'From model' modes."""
 
-        # number_of_groups parameter
-        self.number_of_groups = self.configure_integer(self.config.number_of_groups)
+        # Set number of groups parameter
+        self.number_of_groups = self.set_integer(self.config.number_of_groups)
 
-        # number_of_steps parameter with one more step to account for t = 0
-        self.number_of_steps = self.configure_integer(self.config.number_of_steps) + 1
+        # Set number of steps parameter with one more step to account for t = 0
+        self.number_of_steps = self.set_integer(self.config.number_of_steps) + 1
 
-        # initial_time parameter
-        self.initial_time = self.configure_quantity(self.config.initial_time)
+        # Set number of iterations parameter
+        self.number_of_iterations = self.set_integer(self.config.number_of_iterations)
 
-        # final_time parameter
-        self.final_time = self.configure_quantity(self.config.final_time)
+        # Check if number of iterations is greater than 0
         self.stop(
-            self.final_time.value == self.initial_time.value, 'ValueError',
-            "'final_time' cannot be equal to 'initial_time' ({} and {} given).",
-            self.final_time, self.initial_time
+            self.number_of_iterations <= 0, 'ValueError',
+            "'number_of_iterations' must be greater to 0 ({} given).", self.number_of_iterations
         )
 
-        # duration, timesteps and integration times parameters
+        # Set iteration fraction parameter
+        self.iteration_fraction = self.set_quantity(self.config.iteration_fraction).value
+
+        # Check if iteration fraction is between 0 and 1
+        self.stop(
+            self.iteration_fraction <= 0 or self.iteration_fraction > 1, 'ValueError',
+            "'iteration_fraction' must be between 0 and 1 ({} given).", self.iteration_fraction
+        )
+
+        # Set initial time parameter
+        self.initial_time = self.set_quantity(self.config.initial_time)
+
+        # Set final time parameter
+        self.final_time = self.set_quantity(self.config.final_time)
+
+        # Check if initial and final times are equal
+        if self.final_time.value == self.initial_time.value:
+            self.log(
+                "The initial and final times are equal ({} given).",
+                str(self.initial_time), level='warning', display=True
+            )
+
+        # Set duration, timesteps and integration times parameters
         self.duration = abs(self.final_time - self.initial_time)
         self.timestep = self.duration / (self.number_of_steps - 1)
         self.time = np.linspace(
             self.initial_time.value, self.final_time.value, self.number_of_steps
         )
 
-        # Direction of the orbit integration
-        self.forward = self.final_time.value > self.initial_time.value
+        # Set direction of the orbit integration parameters
+        self.forward = self.final_time.value >= self.initial_time.value
         self.backward = not self.forward
 
-        # rv_shift parameter
-        self.rv_shift = self.configure_quantity(self.config.rv_shift)
+        # Set data errors parameter
+        self.data_errors = self.set_boolean(self.config.data_errors)
 
-        # data_rv_shifts parameter
-        self.data_rv_shifts = self.config.data_rv_shifts.values
-        self.stop(
-            self.data_rv_shifts is None, 'NameError',
-            "Required traceback parameter 'data_rv_shifts' is missing in the configuration."
-        )
-        self.stop(
-            type(self.data_rv_shifts) != bool, 'TypeError',
-            "'data_rv_shifts' must be a boolean ({} given).", type(self.data_rv_shifts)
-        )
+        # Set data radial velocity shifts parameter
+        self.data_rv_shifts = self.set_boolean(self.config.data_rv_shifts)
 
-        # data_errors parameter
-        self.data_errors = self.config.data_errors.values
-        self.stop(
-            self.data_errors is None, 'NameError',
-            "Required traceback parameter 'data_errors' is missing in the configuration."
-        )
-        self.stop(
-            type(self.data_errors) != bool, 'TypeError',
-            "'data_errors' must be a boolean ({} given).", type(self.data_errors)
-        )
+        # Set radial velocity shift parameter
+        self.rv_shift = self.set_quantity(self.config.rv_shift)
 
-        # number_of_iterations parameter
-        self.number_of_iterations = self.configure_integer(self.config.number_of_iterations)
-        self.stop(
-            self.number_of_iterations <= 0, 'ValueError',
-            "'number_of_iterations' must be greater to 0 ({} given).", self.number_of_iterations
-        )
+        # Set cutoff parameter
+        self.cutoff = self.set_quantity(self.config.cutoff, none=True).value
 
-        # iteration_fraction parameter
-        self.iteration_fraction = self.configure_quantity(self.config.iteration_fraction).value
-        self.stop(
-            self.iteration_fraction <= 0 or self.iteration_fraction > 1, 'ValueError',
-            "'iteration_fraction' must be between 0 and 1 ({} given).", self.iteration_fraction
-        )
-
-        # cutoff parameter
+        # Check if cutoff is greater than 0
         if self.config.cutoff.values is not None:
             self.stop(
-                type(self.config.cutoff.values) not in (int, float), 'TypeError',
-                "'{}' must be an integer, float or None ({} given).",
-                self.config.cutoff.label, type(self.config.cutoff.values)
+                self.cutoff <= 0.0, 'ValueError',
+                "'cutoff' must be greater than 0 ({} given).", self.cutoff
             )
+
+        # Set sample parameter
+        self.sample = self.set_string(self.config.sample, none=True)
+
+        # Check if the sample is valid
+        if self.sample is not None:
+            self.sample = self.sample.lower()
+            valid_samples = ('input', 'core', 'extended', 'rejected')
             self.stop(
-                self.config.cutoff.values <= 0.0, 'ValueError',
-                "'cutoff' must be greater to 0.0 ({} given).", self.config.cutoff.values
+                self.sample not in valid_samples, 'ValueError',
+                "'sample' must be {} ({} given).", enumerate_strings(*valid_samples), self.sample
             )
-        self.cutoff = self.config.cutoff.values
 
-        # sample parameter
-        self.sample = self.config.sample.values
-        self.stop(
-            self.sample is None, 'NameError',
-            "Required traceback parameter 'sample' is missing in the configuration."
-        )
-        self.stop(
-            type(self.sample) != str, 'TypeError',
-            "'sample' must be a string ({} given).", type(self.sample)
-        )
-        self.sample = self.sample.lower()
-        self.stop(
-            self.sample not in ('outliers', 'sample', 'subsample'), 'ValueError',
-            "'sample' must be outliers, sample or subsample ({} given).", self.sample
-        )
+        # Set potential parameter
+        self.potential = self.set_string(self.config.potential, none=True)
 
-        # potential parameter
-        self.potential = self.config.potential.values
+        # Check if the potential is convertible to a galpy.potential object
         if self.potential is not None:
-            self.stop(
-                type(self.potential) != str, 'TypeError',
-                "'potential' must be a string or None ({} given).", type(self.potential)
-            )
-
-            # Converts the potential string to a galpy.potential object
             try:
                 exec(
                     f'from galpy.potential.mwpotentials import {self.potential} as potential',
                     globals()
                 )
             except:
-                self.stop(
-                    True, 'ValueError', "'potenial' is invalid ({} given).", self.potential
-                )
+                self.stop(True, 'ValueError', "'potenial' is invalid ({} given).", self.potential)
             self.potential = potential
+
+        # Set principal component analysis parameter
+        self.pca = self.set_boolean(self.config.pca)
+
+        # Set timer parameter
+        self.timer = self.set_boolean(self.config.timer)
 
         # Data configuration
         if self.from_data:
@@ -387,153 +240,272 @@ class Series(list, Output_Series):
 
     def configure_data(self):
         """
-        Checks if traceback and output from data is possible and creates a Data object from
-        a CSV file, or a Python dictionary, list, tuple or np.ndarray. Simulation parameters
-        are also set to None or False if the traceback is from data. This allows to use data
-        errors without resetting simulation parameters.
+        Checks if traceback and output from data is possible and creates a Data object from a
+        CSV file, or a Python dictionary, list, tuple or np.ndarray. Model parameters are also
+        set to None or False if the traceback is from data. This allows to use data errors
+        without resetting model parameters.
         """
 
         # Logging
         if self.from_data:
             self.log("Initializing '{}' series from data.", self.name)
 
-        # Check if data is present
-        self.stop(
-            self.config.data is None, 'NameError',
-            "Required traceback parameter 'data' is missing in the configuration."
-        )
-
-        # Stars creation from data
+        # Import data
         from .data import Data
         self.data = Data(self)
 
-        # number_of_stars parameter
+        # Set number_of_stars parameter
         if self.from_data:
             self.number_of_stars = len(self.data)
 
-            # Simulation parameters set to None or False if stars are imported from data
-            for parameter in (
-                    'age', *self.config.position_parameters, *self.config.velocity_parameters
-                ):
+            # Set age parameter
+            self.age = None
+
+            # Set model position and velocity parameters
+            for parameter in (*self.config.position_parameters, *self.config.velocity_parameters):
                 vars(self)[parameter] = None
 
-            # Simulated position and velocity errors parameters
+            # Set model position and velocity errors
             if not self.data_errors:
-                self.position_error = self.configure_coordinate(self.config.position_error)
-                self.velocity_error = self.configure_coordinate(self.config.velocity_error)
+                self.position_error = self.set_coordinate(self.config.position_error)
+                self.velocity_error = self.set_coordinate(self.config.velocity_error)
 
-            # Model stars integration times
+            # Set model stars integration times
             self.model_time = None
 
     def configure_model(self):
-        """ Checks if traceback and output from a model is possible. """
+        """Checks if traceback and output from a model is possible."""
 
         # Logging
         self.log("Initializing '{}' series from a model.", self.name)
 
-        # Check if all the necessary parameters are present
-        for parameter in (
-                'number_of_stars', 'age',
-                *self.config.position_parameters, *self.config.velocity_parameters
-            ):
-            self.stop(
-                vars(self.config)[parameter].values is None, 'NameError',
-                "Required simulation parameter '{}' is missing in the configuration.", parameter
-            )
+        # Set number of stars parameter
+        self.number_of_stars = self.set_integer(self.config.number_of_stars, mode=True)
 
-        # number_of_stars parameter
-        self.number_of_stars = self.configure_integer(self.config.number_of_stars)
+        # Set age parameter
+        self.age = self.set_quantity(self.config.age, mode=True)
 
-        # age parameter
-        self.age = self.configure_quantity(self.config.age)
+        # Check if age is equal to the initial time
         self.stop(
             self.age.value == self.initial_time.value, 'ValueError',
             "'age' cannot be equal to 'initial_time' ({} and {} given).",
             self.age, self.initial_time
         )
 
-        # position parameter
-        self.position = self.configure_coordinate(self.config.position)
+        # Set model position parameters
+        self.position = self.set_coordinate(self.config.position, mode=True)
+        self.position_error = self.set_coordinate(self.config.position_error, mode=True)
+        self.position_scatter = self.set_coordinate(self.config.position_scatter, mode=True)
 
-        # position_error parameter
-        self.position_error = self.configure_coordinate(self.config.position_error)
+        # Set model velocity parameters
+        self.velocity = self.set_coordinate(self.config.velocity, mode=True)
+        self.velocity_error = self.set_coordinate(self.config.velocity_error, mode=True)
+        self.velocity_scatter = self.set_coordinate(self.config.velocity_scatter, mode=True)
 
-        # position_scatter parameter
-        self.position_scatter = self.configure_coordinate(self.config.position_scatter)
-
-        # velocity parameter
-        self.velocity = self.configure_coordinate(self.config.velocity)
-
-        # velocity_error parameter
-        self.velocity_error = self.configure_coordinate(self.config.velocity_error)
-
-        # velocity_scatter parameter
-        self.velocity_scatter = self.configure_coordinate(self.config.velocity_scatter)
-
-        # Data configured to use actual error measurements or radial velocity shift
+        # Configure data to use actual error measurements or radial velocity shift
         if self.data_errors or self.data_rv_shifts:
             self.configure_data()
 
             # Check if the data length matches the number of stars
             self.stop(
                 len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_shift' "
-                "is True, the data length must be greater than 0."
-                )
+                "is True, the data length must be greater than 0 ({} given).", len(self.data)
+            )
 
-        # Data set to None since measurement errors and radial velocity shifts are simulated
+        # Set data to None since measurement errors and radial velocity shifts are modeled
         else:
             self.data = None
 
-        # Model stars integration times
+        # Set model stars integration times
         self.model_time = np.linspace(
             self.initial_time.value, self.age.value,
             int(abs(self.age.value - self.initial_time.value) / self.timestep.value) + 1
         )
 
-    def configure_integer(self, parameter):
+    def set_parameter(self, parameter, *type_labels, none=False, mode=False, all=False):
+        """
+        Checks if the parameter is None or missing in the configuration, and if the type of the
+        parameter is valid. The value of the parameter is returned if those checks are passed. If
+        'none' is True, the parameter can be None of missing in the configuration. If 'mode' is
+        True, the model is included in the error message, If 'all' is True, all the parameter and
+        all of its components is return, not just its value.
+        """
+
+        # Check if none, mode and all are boolean
+        self.stop(
+            type(none) != bool, 'TypeError',
+            "'none' must be a boolean ({} given).", type(none)
+        )
+        self.stop(
+            type(mode) != bool, 'TypeError',
+            "'mode' must be a boolean ({} given).", type(mode)
+        )
+        self.stop(
+            type(all) != bool, 'TypeError',
+            "'all' must be a boolean ({} given).", type(all)
+        )
+
+        # Check if parameter.values is None or missing
+        if not none:
+            self.stop(
+                parameter.values is None, 'ValueError',
+                "Required parameter '{}' cannot be None or missing in the configuration" + (
+                    (
+                        ' when tracing back from data.' if self.from_data else
+                        ' when tracing back from a model.' if self.from_model else ''
+                    ) if mode else '.'
+                ), parameter.label
+            )
+
+        # Valid types and labels
+        types = [self.config.Parameter.types[label] for label in type_labels]
+        if none:
+            types += (type(None),)
+            type_labels += ('None',)
+
+        # Check the type of parameter.values
+        self.stop(
+            type(parameter.values) not in types, 'TypeError',
+            "'{}' must be a {} ({} given).",
+            parameter.label, enumerate_strings(*type_labels), type(parameter.values)
+        )
+
+        return deepcopy(parameter if all else parameter.values)
+
+    def set_boolean(self, parameter, none=False, mode=False):
+        """
+        Checks if the boolean is None or missing in the configuration, and if the type of the
+        boolean is valid. The value of the boolean is returned if those checks are passed.
+        """
+
+        return self.set_parameter(parameter, 'boolean', none=none, mode=mode, all=False)
+
+    def set_string(self, parameter, none=False, mode=False):
+        """
+        Checks if the string is None or missing in the configuration, and if the type of the
+        string is valid. The value of the string is returned if those checks are passed.
+        """
+
+        return self.set_parameter(parameter, 'string', none=none, mode=mode, all=False)
+
+    def set_path(
+            self, file_path, parameter, name=None, extension=None, file_type=None,
+            check=False, create=False, none=False, mode=False
+    ):
+        """
+        Checks if the file path is None or missing in the configuration, and if the type of the
+        path is valid, or uses the provided file path. Redefines the directory path as the
+        absolute path. Checks if the directory exists or creates it if needed. Creates a name with,
+        an extension if needed. Checks if the file exists and its extension, if needed.
+        """
+
+        # Check if parameter is a string
+        self.stop(
+            type(parameter) != str, 'TypeError',
+            "'{}' must be a string ({} given).", parameter, type(parameter)
+        )
+
+        # Set file path parameter
+        if type(file_path) == self.config.Parameter:
+            file_path = self.set_string(file_path, none=none, mode=mode)
+            file_path = file_path.values if type(file_path) == self.config.Parameter else file_path
+
+        # Check if file path is a string
+        else:
+            self.stop(
+                type(file_path) != str, 'TypeError',
+                "'{}' must be a string ({} given).", parameter, type(file_path)
+            )
+
+        # Check if name, extension and file_type are a string or None
+        self.stop(
+            type(name) not in (str, type(None)), 'TypeError',
+            "'name' must be a string or None ({} given).", parameter, type(name)
+        )
+        self.stop(
+            type(extension) not in (str, type(None)), 'TypeError',
+            "'extension' must be a string or None ({} given).", parameter, type(extension)
+        )
+        self.stop(
+            type(file_type) not in (str, type(None)), 'TypeError',
+            "'file_type' must be a string or None ({} given).", parameter, type(file_type)
+        )
+
+        # Redefine directory path as the absolute path
+        dir_path = directory(
+            collection.base_dir, path.dirname(file_path), parameter,
+            check=check, create=create
+        )
+
+        # Add a default file name with an extension, if needed
+        if path.basename(file_path) == '':
+            if name is not None:
+                if path.splitext(name)[-1].lower() == '' and extension is not None:
+                    name = f'{name}.{extension}'
+                file_path = path.join(dir_path, name)
+
+        # Add the file name to the directory path
+        else:
+            file_path = path.join(dir_path, path.basename(file_path))
+
+        # Check if there's an extension and add an extension, if needed
+        if path.basename(file_path) != '':
+            if path.splitext(file_path)[-1] != '':
+                extension = path.splitext(file_path)[-1][1:]
+            if path.splitext(file_path)[-1] == '' and extension is not None:
+                file_path += f'.{extension}'
+
+            # Set file type, if needed
+            if file_type is None and extension is not None:
+                file_type = extension.upper()
+
+            # Check if the file exists
+            if check:
+                self.stop(
+                    not path.exists(file_path), 'FileNotFoundError',
+                    "No {} file located at '{}'.", file_type, file_path
+                )
+
+            # Check if the file has the right extension
+            if check and extension is not None:
+                self.stop(
+                    path.splitext(file_path)[-1].lower() != f'.{extension}', 'ValueError',
+                    "The file located at '{}' is not a {} file (with a .{} extension).",
+                    file_path, file_type, extension
+                )
+
+        return file_path
+
+    def set_integer(self, parameter, none=False, mode=False):
         """Checks if an integer value is valid and converts it if needed."""
 
-        # Check the presence and type of parameter.values
-        self.stop(
-            parameter.values is None, 'NameError',
-            "Required traceback parameter '{}' is missing in the configuration.", parameter.label
-            )
-        self.stop(
-            type(parameter.values) not in (int, float), 'TypeError',
-            "'{}' must be an integer or a float ({} given).",
-            parameter.label, type(parameter.values)
-            )
+        # Set integer parameter
+        parameter = self.set_parameter(
+            parameter, 'integer', 'float', none=none, mode=mode, all=True
+        )
 
-        # Check if parameter.values is convertible to an integer and greater than or equal to 1
+        # Check if the parameter is convertible to an integer and greater than or equal to 1
         self.stop(
             parameter.values % 1 != 0, 'ValueError',
             "'{}' must be convertible to an integer ({} given).",
             parameter.label, parameter.values
-            )
+        )
         self.stop(
-            parameter.values < 0, 'ValueError',
+            parameter.values < 1, 'ValueError',
             "'{}' must be greater than or equal to 1 ({} given).",
             parameter.label, parameter.values
-            )
+        )
 
         # Conversion to an integer
         return int(parameter.values)
 
-    def configure_quantity(self, parameter):
-        """
-        Checks if a value is valid and converts it to default units if needed.
-        """
+    def set_quantity(self, parameter, none=False, mode=False):
+        """Checks if a value is valid and converts it to default units if needed."""
 
-        # Check the presence and type of parameter.values component
-        self.stop(
-            parameter.values is None, 'NameError',
-            "Required traceback parameter '{}' is missing in the configuration.", parameter.label
-            )
-        self.stop(
-            type(parameter.values) not in (int, float), 'TypeError',
-            "'{}' must be an integer or a float ({} given).",
-            parameter.label, type(parameter.values)
-            )
+        # Set quantity parameter
+        parameter = self.set_parameter(
+            parameter, 'integer', 'float', none=none, mode=mode, all=True
+        )
 
         # Default units component
         if parameter.units is None:
@@ -544,7 +516,7 @@ class Series(list, Output_Series):
             type(parameter.units) != str, 'TypeError',
             "'units' component of '{}' must be a string ({} given).",
             parameter.label, type(parameter.units)
-            )
+        )
 
         # Check if parameter.units can be converted to Unit
         try:
@@ -553,7 +525,7 @@ class Series(list, Output_Series):
             self.stop(
                 True, 'ValueError',
                 "'units' component of '{}' must represent a unit.", parameter.label
-                )
+            )
 
         # Quantity object creation
         try:
@@ -562,7 +534,7 @@ class Series(list, Output_Series):
             self.stop(
                 True, 'ValueError',
                 "'{}' could not be converted to a Quantity object.", parameter.label
-                )
+            )
 
         # Check if the physical type is valid
         default_physical_type = Unit(
@@ -577,30 +549,16 @@ class Series(list, Output_Series):
         # Unit conversion to default units
         return quantity.to()
 
-    def configure_coordinate(self, parameter):
+    def set_coordinate(self, parameter, none=False, mode=False):
         """
         Converts a Parameter into a Quantity object and raises an error if an exception
         occurs in the process. Returns a vector converted to default units for the physical
         type defined by a Variable object.
         """
 
-        # Variables from label and check for invalid label
-        if parameter.label in self.config.position_parameters:
-            variables = parameter.system.position
-        elif parameter.label in self.config.velocity_parameters:
-            variables = parameter.system.velocity
-        else:
-            self.stop(True, 'NameError', "'{}' is not a supported name.", parameter.label)
-
-        # Check the presence and type of parameter.values
-        self.stop(
-            parameter.values is None, 'NameError',
-            "Required simulation parameter '{}' is missing in the configuration.", parameter.label
-        )
-        self.stop(
-            type(parameter.values) not in (tuple, list, np.ndarray), 'TypeError',
-            "'values' component of '{}' must be a tuple, list or np.ndarray ({} given).'",
-            parameter.label, type(parameter.values)
+        # Set coordinate parameter
+        parameter = self.set_parameter(
+            parameter, 'tuple', 'list', 'array', none=none, mode=mode, all=True
         )
 
         # Check if all elements in parameter.values are numerical
@@ -628,6 +586,14 @@ class Series(list, Output_Series):
             "'{}' first dimension ({} given) must have a size of 1 or equal to the "
             "number of stars ({} given).", parameter.label, shape[0], self.number_of_stars
         )
+
+        # Variables from label and check for invalid label
+        if parameter.label in self.config.position_parameters:
+            variables = parameter.system.position
+        elif parameter.label in self.config.velocity_parameters:
+            variables = parameter.system.velocity
+        else:
+            self.stop(True, 'ValueError', "'{}' is not a supported label.", parameter.label)
 
         # Default parameter.units component
         if parameter.units is None:
@@ -768,7 +734,7 @@ class Series(list, Output_Series):
                 self.min_error = np.std(self.minima, axis=(0, 1))
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
-                # Age shift based on simulation
+                # Age shift based on models
                 self.age_ajusted = self.age + self.age_shift
 
                 # Minimum change
@@ -822,7 +788,7 @@ class Series(list, Output_Series):
                 self.min_error = np.std(self.minima, axis=(0, 1))
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
-                # Age shift based on simulation
+                # Age shift based on models
                 self.age_shift = self.series.age.value - self.age
                 self.age_ajusted = self.series.age.value
 
@@ -873,7 +839,7 @@ class Series(list, Output_Series):
                 self.min_error = null_1d
                 self.min_error_quad = null_1d
 
-                # Age shift based on simulation
+                # Age shift based on models
                 self.age_shift = null_1d
                 self.age_ajusted = null_1d
 
@@ -1026,15 +992,15 @@ class Series(list, Output_Series):
         self.log("'{}' series reset.", self.name, logging=logging)
 
     def update(
-            self, parent=None, path=None, args=False, create=True,
+            self, parent=None, file_path=None, args=False, create=True,
             forced=False, default=False, cancel=False, logging=True, **parameters
-        ):
+    ):
         """
         Updates the series by modifying its self.config configuration, re-initializing itself
         and deleting existing groups. The groups are also recreated if they had been created
-        before the update, unless 'create' is set to False. 'parent', 'path', 'args' and
+        before the update, unless 'create' is set to False. 'parent', 'file_path', 'args' and
         '**parameters' are the same as in Series.__init__. If 'name' parameter is the only
-        one modified, existing groups are kept and also renamed.
+        one modified, existing groups are simply kept and renamed.
         """
 
         # Initialization
@@ -1046,7 +1012,7 @@ class Series(list, Output_Series):
         create = False if len(self) == 0 else create
 
         # New configuration
-        new_config = Config(parent, path, args, **parameters)
+        new_config = Config(parent, file_path, args, **parameters)
 
         # Check what parameters, if any, are modified
         new_parameters = [
@@ -1063,32 +1029,30 @@ class Series(list, Output_Series):
         # Only 'name' parameter is modified
         elif len(new_parameters) == 1 and 'name' in new_parameters:
 
-            # Check if name is a string
-            if new_config.name.values is not None:
-                self.stop(
-                    type(new_config.name.values) != str, 'TypeError',
-                    "'name' must be a string ('{}' given).", type(new_config.name.values)
-                )
+            # Change series name
+            old_name = deepcopy(self.name)
+            self.name = self.set_string(self.new_config.name, none=True)
+
+            # Create default name, if needed
+            if self.name is None:
+                self.name = collection.get_default_name()
+
+            # Change configuration name
+            self.config.name = new_config.name
+
+            # Change groups names
+            for group in self:
+                group.name = group.name.replace(old_name, self.name)
 
             # Series removal from the collection
-            if self.name in collection.series.keys():
+            if old_name in collection.series.keys():
                 self.remove(logging=False)
-
-            # Change groups and series names
-            name = deepcopy(self.name)
-            self.name = (
-                collection.get_default_name()
-                if new_config.name.values is None else new_config.name.values
-            )
-            self.config.name = new_config.name
-            for group in self:
-                group.name = group.name.replace(name, self.name)
 
             # Series re-addition to the collection
             self.add(forced=forced, default=default, cancel=cancel, logging=False)
 
             # Logging
-            self.log("'{}' series renamed '{}'.", name, self.name, logging=logging)
+            self.log("'{}' series renamed '{}'.", old_name, self.name, logging=logging)
 
         # Any other parameter is modified
         else:
@@ -1129,12 +1093,12 @@ class Series(list, Output_Series):
             # Updated series creation
             if forced:
                 updated_series = Series(
-                    parent=parent, path=path, args=args, addition=False, **parameters
+                    parent=parent, file_path=file_path, args=args, addition=False, **parameters
                 )
 
                 # Save current series name
                 if 'name' in new_parameters:
-                     name = deepcopy(self.name)
+                     old_name = deepcopy(self.name)
 
                 # Current series removal from the collection
                 if self.name in collection.series.keys():
@@ -1149,15 +1113,22 @@ class Series(list, Output_Series):
 
                 # Logging
                 if 'name' in new_parameters:
-                    self.log("'{}' series renamed '{}'.", name, self.name, logging=logging)
+                    self.log("'{}' series renamed to '{}'.", old_name, self.name, logging=logging)
                 self.log("'{}' series updated.", self.name, logging=logging)
+
+                # Create series, if needed
+                if create:
+                    self.create()
 
         return self
 
-    def copy(self, parent=None, path=None, args=False, logging=True, traceback=True, **parameters):
+    def copy(
+            self, parent=None, file_path=None, args=False,
+            logging=True, traceback=True, **parameters
+    ):
         """
-        Copies the series under a new name. If 'parent', 'path', 'args' or '**parameters' are
-        provided, the same as in Series.__init__, this new Series object is updated as well.
+        Copies the series under a new name. If 'parent', 'file_path', 'args' or '**parameters'
+        are provided, the same as in Series.__init__, this new Series object is updated as well.
         If no new 'name' is provided, a default name is used instead.
         """
 
@@ -1168,9 +1139,9 @@ class Series(list, Output_Series):
         clone.add(default=True)
 
         # Clone update, if needed
-        if parent is not None or path is not None or args == True or len(parameters) > 0:
+        if parent is not None or file_path is not None or args == True or len(parameters) > 0:
             clone.update(
-                parent=parent, path=path, args=args, logging=False,
+                parent=parent, file_path=file_path, args=args, logging=False,
                 traceback=traceback, **parameters
             )
 
@@ -1232,16 +1203,10 @@ class Series(list, Output_Series):
             # File configuration
             self.load = True
 
-            # load_path parameter
-            self.load_path = self.configure_file(
-                load_path if load_path is not None else self.config.load_path.values, 'load_path',
-                check=True, create=False
-            )
-
-            # Check if the series file exists
-            self.stop(
-                not path.exists(self.load_path), 'FileNotFoundError',
-                "No series file located at '{}'.", self.load_path
+            # Set load path parameter
+            self.load_path = self.set_path(
+                self.config.load_path if load_path is None else load_path, 'load_path',
+                name=self.name, extension='series', file_type='Series', check=True, create=False
             )
 
             # Series unpickling
@@ -1273,7 +1238,7 @@ class Series(list, Output_Series):
     def traceback(self, forced=False, logging=True, mode=None):
         """
         Traces back Group and embeded Star objects using either imported data or by modeling a
-        group based on simulation parameters.
+        group based on model parameters.
         """
 
         # Check if a traceback has already been done
@@ -1318,9 +1283,12 @@ class Series(list, Output_Series):
         if forced:
 
             # Traceback configuration
-            from .group import Group
-            self.configure_mode(mode)
+            self.configure_mode(mode=mode)
             self.configure_traceback()
+
+            # !!! Redinition of the number of stars when using the from data mode !!!
+            if self.from_data:
+                self.number_of_stars = len(self.data.core_sample)
 
             # Logging and progress bar
             self.log(
@@ -1362,6 +1330,10 @@ class Series(list, Output_Series):
                 for message in self[0].outliers_messages:
                     self.log(message, display=True, logging=logging)
 
+            # Show timer
+            if self.timer:
+                self[0].show_timer()
+
             # Compute average association size metrics
             for metric in self.metrics:
                 metric()
@@ -1392,11 +1364,11 @@ class Series(list, Output_Series):
             )
             file.close()
 
-        # save_path parameter
+        # Set save path parameter
         self.save = True
-        self.save_path = self.configure_file(
-            save_path if save_path is not None else self.config.save_path.values, 'save_path',
-            check=False, create=True
+        self.save_path = self.set_path(
+            self.config.save_path if save_path is None else save_path, 'save path',
+            name=self.name, extension='series', file_type='Series', check=False, create=True
         )
 
         # Check if a file already exists
@@ -1500,67 +1472,21 @@ class Series(list, Output_Series):
             "Impossible to create an output.", self.name
         )
 
-    def output(self, output_dir=None, check=False, create=True):
-        """
-        Returns the absolute path of the output directory and creates it if needed. 'output_dir'
-        is either relative to collection.base_dir or absolute (str). If blank (i.e. ''), output
-        files will be created in the base directory.
-        """
-
-        # Configuration output directory if None is provided
-        if output_dir is None:
-            self.output_dir = self.config.output_dir.values
-
-            # Check if the output_dir is present
-            self.stop(
-                self.output_dir is None, 'NameError',
-                "Required parameter 'output_dir' is missing in the configuration."
-            )
-
-        # Provided output directory
-        else:
-            self.output_dir = output_dir
-
-        # Check if the file path is a string, which must be done before the directory call
-        self.stop(
-            type(self.output_dir) != str, 'TypeError',
-            "'output_dir' must be a string ({} given).", type(output_dir)
-        )
-
-        # Absolute directory, check and creation, if needed
-        return directory(
-            collection.base_dir, self.output_dir, 'output_dir', check=check, create=create
-        )
-
     def log(self, message, *words, logs_path=None, level='info', display=False, logging=True):
         """
-        Logs the 'message' with the appropriate 'level', if logs have been configured. If logs have
-        not been configured, logs are configured by checking if the 'logs_path' already exists,
-        creating it if needed and configuring the logs file.  By default, logs files will
+        Logs the 'message' with the appropriate 'level', if logs have been configured. If logs
+        have not been configured, logs are configured by checking if the 'logs_path' already
+        exists, creating it if needed and configuring the logs file.  By default, logs files will
         created in the base directory with a default name. The file name must end with an '.log'
         extension. Futhermore, if 'display' is True, the message is also printed onscreen.
         """
 
-        # Configuration logs path if None is provided
-        if logs_path is None:
-            self.logs_path = self.config.logs_path.values
-
-            # Check if the logs_path is present
-            self.stop(
-                self.logs_path is None, 'NameError',
-                "Required parameter 'logs_path' is missing in the configuration."
-            )
-
-        # Provided logs path
-        else:
-            self.logs_path = logs_path
-
-        # Check if the file path is a string, which must be done before the directory call
-        self.stop(
-            type(self.logs_path) != str, 'TypeError',
-            "'logs_path' must be a string ({} given).", type(logs_path)
+        # Set logs path parameter
+        self.logs_path = self.set_string(
+            self.config.logs_path if logs_path is None else logs_path, none=True
         )
 
+        # Create logging message
         log(
             message, *words, logs_path=None,
             level=level, display=display, logging=logging

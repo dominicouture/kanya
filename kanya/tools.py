@@ -85,3 +85,22 @@ def default_name(file_path):
         i += 1
 
     return path.join(directory, '{}-{}{}'.format(name, i, extension))
+
+def enumerate_strings(*items):
+    """Creates a string enumerating the items. All items must be strings."""
+
+    # No items
+    if len(items) == 0:
+        return ''
+
+    # Only one item
+    elif len(items) == 1:
+        return items[0]
+
+    # Two items
+    elif len(items) == 2:
+        return f'{items[0]} or {items[1]}'
+
+    # Three of more items
+    else:
+        return ', '.join(items[:-1]) + f' or {items[-1]}'

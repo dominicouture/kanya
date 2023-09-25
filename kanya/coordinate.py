@@ -8,9 +8,6 @@ Axis and Origin subclasses are definied as well. Individual coordinates are defi
 Coordinate class which includes an initialization method and tranformation methods.
 """
 
-import numpy as np
-from math import cos, sin, asin, atan2, pi
-from astropy.constants import c, G, M_sun, R_sun
 from .quantity import *
 
 class System():
