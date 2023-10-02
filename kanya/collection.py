@@ -6,7 +6,9 @@ collection.py: Defines the Collection class and initializes global parameters. G
 used by the Series class and more, such as directory, output, log and stop are also defined.
 """
 
+import numpy as np
 from os import path, makedirs, getcwd, chdir
+from .tools import enumerate_strings
 
 class Collection(list):
     """
@@ -50,10 +52,7 @@ class Collection(list):
         """
 
         # Check if base directory is a string or None
-        stop(
-            base_dir is not None and type(base_dir) != str, 'TypeError',
-            "'base_dir' must be a string or None ({} given).", type(base_dir)
-        )
+        check_type(base_dir, 'base_dir', ('string', 'None'))
 
         # Set base directory
         # self.base_dir = path.abspath(path.join(path.dirname(path.realpath(__file__)), '..'))
@@ -65,15 +64,12 @@ class Collection(list):
         already exist. By default, the data directory is set to 'Data' in the base directory.
         """
 
-        # Check if data directory parameter is a string or None
-        stop(
-            data_dir is not None and type(data_dir) != str, 'TypeError',
-            "'data_dir' must be a string or None ({} given).", type(data_dir)
-        )
+        # Check the type of data_dir
+        check_type(data_dir, 'data_dir', ('string', 'None'))
 
         # Set default data directory as the absolute directory
-        self.data_dir = directory(
-            self.base_dir, 'Data' if data_dir is None else data_dir, 'data_dir'
+        self.data_dir = get_abspath(
+            self.base_dir, '' if data_dir is None else data_dir, 'data_dir'
         )
 
     def set_default_output(self, output_dir=None):
@@ -83,51 +79,48 @@ class Collection(list):
         the base directory.
         """
 
-        # Check if output directory parameter is a string or None
-        stop(
-            output_dir is not None and type(output_dir) != str, 'TypeError',
-            "'output_dir' must be a string or None ({} given).", type(output_dir)
-        )
+        # Check the type of output_dir
+        check_type(output_dir, 'output_dir', ('string', 'None'))
 
         # Set default output directory as the absolute directory
-        self.output_dir = directory(
-            self.base_dir, 'Output' if output_dir is None else output_dir, 'output_dir'
+        self.output_dir = get_abspath(
+            self.base_dir, '' if output_dir is None else output_dir, 'output_dir'
         )
 
     def set_default_logs(self, logs_path=None):
         """
         Sets the default logs path ('logs_path'). The log file and directory are only created if a
-        message is actually logged. The file name must end with an '.log' extension. By default,
-        a 'Logs' directory is created in the output directory and the name is based on the current
-        date and time.
+        message is actually logged. The file name must end with an '.log' extension. A default logs
+        name, based on the current date and time is created.
         """
 
-        from time import strftime
+        # Check the type of logs_path
+        check_type(logs_path, 'logs_path', ('string', 'None'))
 
-        # Check if logs path parameter is a string or None
-        stop(
-            logs_path is not None and type(logs_path) != str, 'TypeError',
-            "'logs_path' must be a string or None ({} given).", type(logs_path)
-        )
+        # Set the logs path
+        self.logs_path = '' if logs_path is None else logs_path
+        print(self.logs_path)
 
-        # Set default logs path
-        self.logs_path = (
-            path.join(self.output_dir, 'Logs') + '/' if logs_path is None else logs_path
-        )
+        # Add a name and an extension to the logs path, if needed
+        if path.basename(self.logs_path) == '':
+            from time import strftime
+            self.logs_path = path.join(
+                self.logs_path, 'kanya_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
+            )
+        if path.splitext(self.logs_path)[-1] == '':
+            self.logs_path += '.logs'
 
-        # Redefine logs path as the absolute directory
-        # Create a default file name, if no file name is provided
-        self.logs_path = path.join(
-            directory(self.base_dir, path.dirname(self.logs_path), 'logs_path'),
-            'kanya_{}.log'.format(strftime('%Y-%m-%d_%H-%M-%S'))
-            if path.basename(self.logs_path) == '' else path.basename(self.logs_path)
-        )
+        # Redefine the logs path as the absolute path
+        self.logs_path = get_abspath(self.base_dir, self.logs_path, 'logs_path')
 
         # Check if the file is a logs file
         stop(
-            path.splitext(self.logs_path)[1].lower() != '.log', 'TypeError',
+            path.splitext(self.logs_path)[-1].lower() != '.log', 'ValueError',
             "'{}' is not a log file (with a .log extension).", path.basename(self.logs_path)
         )
+
+        # Set the logs name
+        self.logs_name = path.basename(self.logs_path)
 
         # Set logs configuration as False
         self.logs_configured = False
@@ -255,10 +248,7 @@ class Collection(list):
 
                 # Selected series from a name, check if it exists
                 else:
-                    stop(
-                        type(name) != str, 'TypeError',
-                        "'series' must be a string ({} given).", type(name)
-                    )
+                    check_type(name, 'name', 'string')
                     stop(
                         name not in self.series.keys(), 'NameError',
                         "Series '{}' is not in the collection.", name
@@ -274,7 +264,7 @@ class Collection(list):
 
         # Initialization
         name = name if name is not None else 'untitled'
-        stop(type(name) != str, 'TypeError', "'name' must be a string ({} given).", type(name))
+        check_type(name, 'name', 'string')
 
         # Identify whether 'name' ends with a digit
         i = name.split('-')[-1]
@@ -288,53 +278,47 @@ class Collection(list):
 
         return '{}-{}'.format(name, i)
 
-def directory(base, directory, parameter, check=False, create=False):
+def get_abspath(base_path, file_path, parameter, check=False, create=False):
     """
-    Checks for type errors, checks if 'directory' already exists, creates it if needed and
-    returns the absolute directory path. The directory can either be relative path to 'base'
-    or an absolute path.
+    Returns the absolute path to the directory or file. 'file_path' can either be relative path
+    to 'base_path' or an absolute path. Checks if 'file_path' already exists, creates the
+    directory if needed.
     """
 
-    # Check the type of base, directory and parameter
+    # Check the type of paremeter, base_path, file_path, check and create
+    check_type(parameter, 'parameter', 'string')
+    check_type(base_path, 'base_path', 'string')
+    check_type(file_path, 'file_path', 'string')
+    check_type(check, 'check', 'boolean')
+    check_type(create, 'create', 'boolean')
+
+    # Check if base_path is a directory
     stop(
-        type(base) != str, 'TypeError',
-        "The base of '{}' must be a string ({} given).", parameter, type(base)
-    )
-    stop(
-        type(directory) != str, 'TypeError',
-        "The base '{}' must be a string ({} given).", parameter, type(directory)
-    )
-    stop(
-        type(parameter) != str, 'TypeError',
-        "'parameter' must be a string ({} given).", type(parameter)
+        not path.isdir(base_path), 'ValueError',
+        "'base_path' must be a directory ({} given).", base_path
     )
 
-    # Directory formatting
+    # Directory or file path formatting
     working_dir = getcwd()
-    chdir(path.abspath(base))
-    directory = path.abspath(directory)
+    chdir(path.abspath(base_path))
+    file_path = path.join(
+        path.abspath(path.dirname(file_path)),
+        path.basename(file_path)
+    )
     chdir(working_dir)
 
-    # Check if the directory exists
-    stop(
-        type(check) != bool, 'TypeError',
-        "'check' must be a boolean ({} given).", type(check)
-    )
+    # Check if the directory or file exists
     if check:
         stop(
-            not path.exists(directory), 'FileNotFoundError',
-            "'{}' at '{}' does not exist.", parameter, directory
+            not path.exists(file_path), 'FileNotFoundError',
+            "'{}' located at '{}' does not exist.", parameter, file_path
         )
 
     # Directory creation, if needed
-    stop(
-        type(create) != bool, 'TypeError',
-        "'create' must be a boolean ({} given).", type(create)
-    )
-    if create and not path.exists(directory):
-        makedirs(directory)
+    if create and not path.exists(path.dirname(file_path)):
+        makedirs(path.dirname(file_path))
 
-    return directory
+    return file_path
 
 def get_default_filename(file_path):
     """
@@ -349,7 +333,7 @@ def get_default_filename(file_path):
     directory = path.dirname(file_path)
     name = path.splitext(path.basename(file_path))[0]
     name = name if name != '' else 'untitled'
-    extension = path.splitext(file_path)[1]
+    extension = path.splitext(file_path)[-1]
 
     # Identify whether 'name' ends with a digit
     i = name.split('-')[-1]
@@ -372,39 +356,36 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
     extension. Futhermore, if 'display' is True, the message is also printed onscreen.
     """
 
-    from logging import basicConfig, root, info, warning, INFO
+    # Check the type of logging
+    check_type(logging, 'logging', 'boolean')
 
-    # Check if logging is a boolean
-    stop(
-        type(logging) != bool, 'TypeError',
-        "'logging' must be a boolean ({} given).", type(logging)
-    )
-
-    # logs path parameter
+    # Log the message, if needed
     if logging:
+
+        # Check the type of logs_path
+        check_type(logs_path, 'logs_path', ('string', 'None'))
+
+        # Set the logs path
         logs_path = collection.logs_path if logs_path is None else logs_path
 
-        # Checks and configuration skipped if logs have been configured already
+        # Add a name and an extension to the logs path, if needed
+        if path.basename(logs_path) == '':
+            logs_path = path.join(logs_path, collection.logs_name)
+        if path.splitext(logs_path)[-1] == '':
+            logs_path += '.logs'
+
+        # Redefine the logs path as the absolute path
+        logs_path = get_abspath(collection.base_dir, logs_path, 'logs_path', create=True)
+
+        # Check if the file is a logs file
+        stop(
+            path.splitext(logs_path)[-1].lower() != '.log', 'ValueError',
+            "'{}' is not a log file (with a .log extension).", path.basename(logs_path)
+        )
+
+        # Logs configuration, if needed
+        from logging import basicConfig, root, info, warning, INFO
         if not collection.logs_configured or collection.logs_path != logs_path:
-
-            # Check if logs path is a string
-            stop(
-                type(logs_path) != str, 'TypeError',
-                "'logs_path' must be a string ({} given).", type(logs_path)
-            )
-
-            # Redine logs path as the absolute path
-            logs_path = path.join(
-                directory(collection.base_dir, path.dirname(logs_path), 'logs_path', create=True),
-                path.basename(collection.logs_path) if path.basename(logs_path) == ''
-                else path.basename(logs_path)
-            )
-
-            # Check if the file is a logs file
-            stop(
-                path.splitext(logs_path)[1].lower() != '.log', 'TypeError',
-                "'{}' is not a log file (with a .log extension).", path.basename(logs_path)
-            )
 
             # Logs configuration, if logs_path matches collection.logs_path
             if logs_path == collection.logs_path:
@@ -428,13 +409,10 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
                     datefmt='%Y-%m-%d %H:%M:%S -', level=INFO
                 )
 
-        # Check if message is a string
-        stop(
-            type(message) != str, 'TypeError',
-            "'message' must be a string ({} given).", type(message)
-        )
+        # Check the type of message
+        check_type(message, 'message', 'string')
 
-        # Check if words are strings and message formatting
+        # Check the type of words, and format message
         if len(words) > 0:
             for word in words:
                 stop(
@@ -443,30 +421,50 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
                 )
             message = message.format(*words)
 
-        # Check if level is valid
-        stop(
-            type(level) != str, 'TypeError',
-            "'level' must be a string ({} given).", type(level)
-        )
+        # Check the type and value of level
+        check_type(level, 'level', 'string')
         level = level.lower()
         stop(
             level not in ('info', 'warning'), 'ValueError',
             "'level' must either be 'info' or 'warning' ({} given).", level
         )
 
-        # Message logging
+        # Log message
         if level == 'info':
             info(message)
         if level == 'warning':
             warning(message)
 
-        # Message display
-        stop(
-            type(display) != bool, 'TypeError',
-            "'display' must be a boolean ({} given).", type(display)
-        )
+        # Show message
+        check_type(display, 'display', 'boolean')
         if display:
             print(message)
+
+def check_type(value, label, type_labels):
+    """Checks if the type of the value if valid."""
+
+    # Set types
+    types = {
+        'None': type(None),
+        'boolean': bool,
+        'string': str,
+        'integer': int,
+        'float': float,
+        'tuple': tuple,
+        'list': list,
+        'dictionary': dict,
+        'array': np.ndarray
+    }
+
+    # Set type labels
+    type_labels = type_labels if type(type_labels) == tuple else (type_labels,)
+
+    # Check the type of value
+    stop(
+        type(value) not in [types[label] for label in type_labels],
+        'TypeError', "'{}' must be a {} ({} given).",
+        label, enumerate_strings(*type_labels), type(value)
+    )
 
 def stop(condition, error, message, *words, name=None, extra=1):
     """

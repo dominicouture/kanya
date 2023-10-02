@@ -7,9 +7,9 @@ over time, 2D and 3D scatters at a given time, histograms, color mesh, etc.
 """
 
 from matplotlib import pyplot as plt, ticker as tkr
+from scipy.interpolate import interp1d
 from colorsys import hls_to_rgb
 from cycler import cycler
-from scipy.interpolate import interp1d
 from .collection import *
 from .coordinate import *
 
@@ -62,48 +62,15 @@ class colors():
 class Output_Series():
     """Output methods for a series of groups."""
 
-    def save_figure(
-        self, name, extension='pdf', file_type=None, output_dir=None,
-        tight=True, forced=False, default=False, cancel=False
-    ):
-        """Saves figure with or without tight layout and some padding."""
-
-        # Check if tight argument is a boolean
-        self.stop(
-            type(tight) != bool, 'TypeError',
-            "'tight' must be a boolean ({} given).", type(tight)
-        )
-
-        # Save figure
-        def save(output_path, tight):
-            if tight:
-                plt.savefig(output_path, bbox_inches='tight', pad_inches=0.01)
-            else:
-                plt.savefig(output_path)
-
-        # Choose behavior
-        self.choose(
-            name, save, tight, extension=extension, file_type=file_type,
-            output_dir=output_dir, cancel=cancel, forced=forced, default=default
-        )
-
     def save_table(
         self, name, lines, header=None, extension='txt', file_type=None,
         output_dir=None, forced=False, default=False, cancel=False
     ):
         """Saves a table to a CSV file for a given header and data."""
 
-        # Check 'lines' argument
-        self.stop(
-            type(lines) not in (tuple, list), 'TypeError',
-            "'lines' must be a string of None ({} given).", type(lines)
-        )
-
-        # Check 'header' argument
-        self.stop(
-            type(header) not in (str, type(None)), 'TypeError',
-            "'header' must be a string of None ({} given).", type(header)
-        )
+        # Check the types of lines and header
+        self.check_type(lines, 'lines', ('tuple', 'list'))
+        self.check_type(header, 'header', ('string', 'None'))
 
         # Save table
         def save(output_path, lines, header):
@@ -115,6 +82,28 @@ class Output_Series():
         # Choose behavior
         self.choose(
             name, save, lines, header, extension=extension, file_type=file_type,
+            output_dir=output_dir, cancel=cancel, forced=forced, default=default
+        )
+
+    def save_figure(
+        self, name, extension='pdf', file_type=None, output_dir=None,
+        tight=True, forced=False, default=False, cancel=False
+    ):
+        """Saves figure with or without tight layout and some padding."""
+
+        # Check the type of tight
+        self.check_type(tight, 'tight', 'boolean')
+
+        # Save figure
+        def save(output_path, tight):
+            if tight:
+                plt.savefig(output_path, bbox_inches='tight', pad_inches=0.01)
+            else:
+                plt.savefig(output_path)
+
+        # Choose behavior
+        self.choose(
+            name, save, tight, extension=extension, file_type=file_type,
             output_dir=output_dir, cancel=cancel, forced=forced, default=default
         )
 
@@ -134,20 +123,11 @@ class Output_Series():
         # Check if a file already exists
         if path.exists(file_path):
             choice = None
-            self.stop(
-                type(forced) != bool, 'TypeError',
-                "'forced' must be a boolean ({} given).", type(forced)
-            )
+            self.check_type(forced, 'forced', 'boolean')
             if not forced:
-                self.stop(
-                    type(default) != bool, 'TypeError',
-                    "'default' must be a default ({} given).", type(default)
-                )
+                self.check_type(default, 'default', 'boolean')
                 if not default:
-                    self.stop(
-                        type(cancel) != bool, 'TypeError',
-                        "'cancel' must be a boolean ({} given).", type(cancel)
-                    )
+                    self.check_type(cancel, 'cancel', 'boolean')
                     if not cancel:
 
                         # User input
@@ -196,28 +176,26 @@ class Output_Series():
             self.log("'{}': file saved at '{}'.", name, file_path)
 
     def get_output_path(self, name, extension=None, file_type=None, output_dir=None):
-        """Returns a proper file path given a name, an extension and, optionnally, a file path
-            relative to the output directory.
+        """
+        Returns a proper file path given a name, an extension and, optionnally, a file path
+        relative to the output directory.
         """
 
-        # Check if output directory parameter is a string
-        self.stop(
-            type(output_dir) not in (str, type(None)), 'TypeError',
-            "'output_dir' must be a string or None ({} given).", type(output_dir)
-        )
+        # Check the type of output_dir
+        self.check_type(output_dir, 'output_dir', ('string', 'None'))
 
-        # Set output directory
+        # Set output_dir parameter, if needed
         if 'output_dir' not in vars(self).keys():
             self.output_dir = self.set_path(
-                self.config.output_dir if output_dir is None else output_dir, 'output_dir',
-                check=False, create=False
+                self.config.output_dir, 'output_dir',
+                dir_only=True, check=False, create=False
             )
-        output_dir = self.output_dir + '/' if output_dir is None else output_dir
 
-        # Set output path
+        # Set output_path
         output_path = self.set_path(
-            output_dir, 'output_path', name=name, extension=extension,
-            file_type=file_type, check=False, create=True
+            self.output_dir if output_dir is None else output_dir, 'output_path',
+            name=name, extension=extension, file_type=file_type,
+            full_path=True, check=False, create=True
         )
 
         return output_path
@@ -271,19 +249,10 @@ class Output_Series():
                     for i in filter(lambda i: valid[i], np.arange(valid.size))
                     ]
 
-        # Check save, show and machine
-        self.stop(
-            type(save) != bool, 'TypeError',
-            "'save' must be a boolean ({} given).", type(save)
-        )
-        self.stop(
-            type(show) != bool, 'TypeError',
-            "'show' must be a boolean ({} given).", type(show)
-        )
-        self.stop(
-            type(machine) != bool, 'TypeError',
-            "'machine' must be a boolean ({} given).", type(machine)
-        )
+        # Check the types of save, show and machine
+        self.check_type(save, 'save', 'boolean')
+        self.check_type(show, 'show', 'boolean')
+        self.check_type(machine, 'machine', 'boolean')
 
         # Set precision and order
         np.set_printoptions(precision=2)
@@ -334,161 +303,6 @@ class Output_Series():
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
-
-    def initialize_figure_metric(self):
-        """Initializes a figure and an axis to plot association size metrics."""
-
-        # Initialize figure
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
-        ax = fig.add_axes([0.103, 0.103, 0.895, 0.895])
-
-        return fig, ax
-
-    def check_robust_sklearn_metric(self, robust, sklearn):
-        """
-        Checks if 'robust' and 'sklearn' arguments are valid to select to proper association
-        size metrics.
-        """
-
-        # Check 'robust' and 'sklearn' arguments
-        self.stop(
-            type(robust) != bool, 'TypeError',
-            "'robust' must be a boolean ({} given).", type(robust)
-        )
-        self.stop(
-            type(sklearn) != bool, 'TypeError',
-            "'sklearn' must be a boolean ({} given).", type(sklearn)
-        )
-        self.stop(
-            robust and sklearn, 'ValueError',
-            "'robust' and 'sklearn' cannot both be True."
-        )
-
-    def plot_metric(self, ax, metric, index, color, linestyle, zorder=0.5, secondary=False):
-        """
-        Plots the association size metric's value over time on a given axis along with an
-        enveloppe to display the uncertainty. The display is further customized with the
-        'linestyle' and 'color' parameters. If 'secondary' is True, secondary lines are
-        displayed as well.
-        """
-
-        # Check metric status
-        if metric.status:
-
-            # Extrapolate one point in time, value and value error arrays
-            time = np.insert(self.time, 0, 1.0)
-            value = np.insert(
-                metric.value.T[index], 0,
-                interp1d(self.time, metric.value.T[index], fill_value='extrapolate')(1.0)
-            )
-            value_error = np.insert(
-                metric.value_error.T[index], 0,
-                interp1d(self.time, metric.value_error.T[index], fill_value='extrapolate')(1.0)
-            )
-
-            # Plot the value of the metric over time
-            ax.plot(
-                time, value, label=(
-                    f'{metric.latex_short[index]} : ({metric.age[index]:.1f}'
-                    f' ± {metric.age_error[index]:.1f}) Myr'
-                ),
-                color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
-                solid_capstyle='round', dash_capstyle='round', zorder=zorder
-            )
-
-            # Plot an enveloppe to display the uncertainty
-            ax.fill_between(
-                time, value - value_error, value + value_error,
-                color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5
-            )
-
-            # Plot secondary lines
-            self.stop(
-                type(secondary) != bool, 'TypeError',
-                "'secondary' must be a boolean ({} given).", type(secondary)
-            )
-            if secondary:
-                values = metric.values.reshape((
-                    metric.values.shape[0] * metric.values.shape[1],
-                    metric.values.shape[2], metric.values.shape[3])
-                )
-                for i in np.unique(
-                    np.round(np.linspace(0, self.number_of_groups * self.number_of_iterations - 1, 20))
-                ):
-                    ax.plot(
-                        self.time, values[int(i),:,index],
-                        color=color, alpha=0.6, linewidth=0.5,
-                        linestyle=linestyle, zorder=zorder - 0.25
-                    )
-        # Logging
-        else:
-            self.log(
-                "Could not plot '{}' metric for '{}' series. It was not computed.",
-                str(metric.name[index]), self.name, display=True
-            )
-
-    def set_title_metric(self, ax, title, metric):
-        """Sets a title for association size metrics plots if 'title' is True."""
-
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "{} of {}\n over {:.1f} Myr with a {:.1f} km/s radial "
-                    "velocity correction\n".format(
-                        metric, self.name, self.duration.value,
-                        self.rv_shift.to('km/s').value
-                    ), fontsize=8
-                )
-            elif self.from_model:
-                ax.set_title(
-                    "Average {} of {} simulated associations over {:.1f} Myr\n"
-                    "with kinematics similar to {} and a {:.1f} km/s radial velocity "
-                    "bias\n".format(
-                        metric, self.number_of_groups, self.duration.value,
-                        self.name, self.rv_shift.to('km/s').value
-                    ), fontsize=8
-                )
-
-    def set_axis_metric(self, ax, hide_x=False, hide_y=False):
-        """Sets the parameters of an axis and its figure to plot association size metrics."""
-
-        # Set legend
-        legend = ax.legend(loc=2, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
-        legend.get_frame().set_alpha(None)
-        legend.get_frame().set_facecolor(colors.white + (0.8,))
-        legend.get_frame().set_edgecolor(colors.black)
-        legend.get_frame().set_linewidth(0.5)
-
-        # Set labels
-        ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel('Association size (pc)', fontsize=8)
-
-        # Set limits
-        ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
-        # ax.set_xlim(self.final_time.value, self.initial_time.value + 1)
-        # ax.set_ylim(-1., 39.)
-
-        # Set ticks
-        # ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35., -40, -45, -50])
-        # ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
-        ax.tick_params(top=True, right=True, which='both', direction='in', width=0.5, labelsize=8)
-
-        # Set spines
-        for spine in ax.spines.values():
-            spine.set_linewidth(0.5)
-
-        # Hide labels and tick labels, if needed
-        if hide_x:
-            ax.set_xlabel('')
-            ax.set_xticklabels([])
-        if hide_y:
-            ax.set_ylabel('')
-            ax.set_yticklabels([])
 
     def create_covariances_xyz_plot(
         self, robust=False, sklearn=False, title=False,
@@ -643,7 +457,7 @@ class Output_Series():
         )
 
         # Set legend, limits, labels and axes
-        self.set_axis_metric(ax)
+        self.set_axis_metric(ax, units_y='pc$\:$Myr$^{-1/2}$')
 
         # Save figure
         self.save_figure(
@@ -670,9 +484,9 @@ class Output_Series():
 
         # Select empirical, robust or sklearn association size metrics
         if sklearn:
-            cross_covariances_xyz_matrix_det = self.cross_covariances_xyz_matrix_det
-            cross_covariances_xyz_matrix_trace = self.cross_covariances_xyz_matrix_trace
-            cross_covariances_xyz = self.cross_covariances_xyz
+            cross_covariances_ξηζ_matrix_det = self.cross_covariances_ξηζ_matrix_det
+            cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace
+            cross_covariances_ξηζ = self.cross_covariances_ξηζ
         elif robust:
             cross_covariances_ξηζ_matrix_det = self.cross_covariances_ξηζ_matrix_det_robust
             cross_covariances_ξηζ_matrix_trace = self.cross_covariances_ξηζ_matrix_trace_robust
@@ -698,7 +512,7 @@ class Output_Series():
         )
 
         # Set legend, limits, labels and axes
-        self.set_axis_metric(ax)
+        self.set_axis_metric(ax, units_y='pc$\:$Myr$^{-1/2}$')
 
         # Save figure
         self.save_figure(
@@ -896,7 +710,7 @@ class Output_Series():
         cross covariances.
         """
 
-        # Check if 'other' is valid
+        # Check the type of other
         self.stop(
             type(other) != type(self), 'TypeError',
             "'other' must be a Series object ({} given).", type(other)
@@ -926,11 +740,10 @@ class Output_Series():
         other.plot_metric(ax1, other.cross_covariances_xyz, 1, colors.metric[1], '--', 0.7)
         other.plot_metric(ax1, other.cross_covariances_xyz, 2, colors.metric[2], ':', 0.6)
 
-        # Set title
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
+        # Check the type of title
+        self.check_type(title, 'title', 'boolean')
+
+        # Title from data
         if title:
             if self.from_data:
                 fig.suptitle(
@@ -940,6 +753,8 @@ class Output_Series():
                         self.rv_shift.to('km/s').value
                     ), fontsize=8
                 )
+
+            # Title from a model
             elif self.from_model:
                 fig.suptitle(
                     'Average $XYZ$ covariances, MAD, MST and cross covariances of {}'
@@ -960,6 +775,156 @@ class Output_Series():
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
+
+    def initialize_figure_metric(self):
+        """Initializes a figure and an axis to plot association size metrics."""
+
+        # Initialize figure
+        self.check_traceback()
+        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
+        ax = fig.add_axes([0.103, 0.103, 0.895, 0.895])
+
+        return fig, ax
+
+    def check_robust_sklearn_metric(self, robust, sklearn):
+        """
+        Checks if 'robust' and 'sklearn' arguments are valid to select to proper association
+        size metrics.
+        """
+
+        # Check the types of robust and sklearn
+        self.check_type(robust, 'robust', 'boolean')
+        self.check_type(sklearn, 'sklearn', 'boolean')
+        self.stop(
+            robust and sklearn, 'ValueError',
+            "'robust' and 'sklearn' cannot both be True."
+        )
+
+    def plot_metric(self, ax, metric, index, color, linestyle, zorder=0.5, secondary=False):
+        """
+        Plots the association size metric's value over time on a given axis along with an
+        enveloppe to display the uncertainty. The display is further customized with the
+        'linestyle' and 'color' parameters. If 'secondary' is True, secondary lines are
+        displayed as well.
+        """
+
+        # Check metric status
+        if metric.status:
+
+            # Extrapolate one point in time, value and value error arrays
+            time = np.insert(self.time, 0, 1.0)
+            value = np.insert(
+                metric.value.T[index], 0,
+                interp1d(self.time, metric.value.T[index], fill_value='extrapolate')(1.0)
+            )
+            value_error = np.insert(
+                metric.value_error.T[index], 0,
+                interp1d(self.time, metric.value_error.T[index], fill_value='extrapolate')(1.0)
+            )
+
+            # Plot the value of the metric over time
+            ax.plot(
+                time, value, label=(
+                    f'{metric.latex_short[index]} : {metric.age[index]:.1f}'
+                    f' ± {metric.age_error[index]:.1f}  Myr'
+                ).replace('-', '–'),
+                color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
+                solid_capstyle='round', dash_capstyle='round', zorder=zorder
+            )
+
+            # Plot an enveloppe to display the uncertainty
+            ax.fill_between(
+                time, value - value_error, value + value_error,
+                color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5
+            )
+
+            # Check the type of secondary
+            self.check_type(secondary, 'secondary', 'boolean')
+
+            # Plot secondary lines
+            if secondary:
+                values = metric.values.reshape((
+                    metric.values.shape[0] * metric.values.shape[1],
+                    metric.values.shape[2], metric.values.shape[3])
+                )
+                for i in np.unique(
+                    np.round(np.linspace(0, self.number_of_groups * self.number_of_iterations - 1, 20))
+                ):
+                    ax.plot(
+                        self.time, values[int(i),:,index],
+                        color=color, alpha=0.6, linewidth=0.5,
+                        linestyle=linestyle, zorder=zorder - 0.25
+                    )
+        # Logging
+        else:
+            self.log(
+                "Could not plot '{}' metric for '{}' series. It was not computed.",
+                str(metric.name[index]), self.name, display=True
+            )
+
+    def set_title_metric(self, ax, title, metric):
+        """Sets a title for association size metrics plots if 'title' is True."""
+
+        # Check the type of title
+        self.check_type(title, 'title', 'boolean')
+
+        # Title from data
+        if title:
+            if self.from_data:
+                ax.set_title(
+                    "{} of {}\n over {:.1f} Myr with a {:.1f} km/s radial "
+                    "velocity correction\n".format(
+                        metric, self.name, self.duration.value,
+                        self.rv_shift.to('km/s').value
+                    ), fontsize=8
+                )
+
+            # Title from a model
+            elif self.from_model:
+                ax.set_title(
+                    "Average {} of {} simulated associations over {:.1f} Myr\n"
+                    "with kinematics similar to {} and a {:.1f} km/s radial velocity "
+                    "bias\n".format(
+                        metric, self.number_of_groups, self.duration.value,
+                        self.name, self.rv_shift.to('km/s').value
+                    ), fontsize=8
+                )
+
+    def set_axis_metric(self, ax, hide_x=False, hide_y=False, units_y='pc'):
+        """Sets the parameters of an axis and its figure to plot association size metrics."""
+
+        # Set legend
+        legend = ax.legend(loc=2, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor(colors.white + (0.8,))
+        legend.get_frame().set_edgecolor(colors.black)
+        legend.get_frame().set_linewidth(0.5)
+
+        # Set labels
+        ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        ax.set_ylabel(f'Association size ({units_y})', fontsize=8)
+
+        # Set limits
+        ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
+        # ax.set_xlim(self.final_time.value, self.initial_time.value + 1)
+        # ax.set_ylim(-1., 39.)
+
+        # Set ticks
+        # ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35., -40, -45, -50])
+        # ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
+        ax.tick_params(top=True, right=True, which='both', direction='in', width=0.5, labelsize=8)
+
+        # Set spines
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.5)
+
+        # Hide labels and tick labels, if needed
+        if hide_x:
+            ax.set_xlabel('')
+            ax.set_xticklabels([])
+        if hide_y:
+            ax.set_ylabel('')
+            ax.set_yticklabels([])
 
     def create_age_distribution(
         self, title=False, forced=False, default=False, cancel=False
@@ -982,11 +947,10 @@ class Output_Series():
         )
         # bins=np.arange(21.975, 26.025, 0.05)
 
+        # Check the type of title
+        self.check_type(title, 'title', 'boolean')
+
         # Set title
-        self.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             ax.set_title(
                 f'Distribution of {self.number_of_groups} moving groups age,\n'
@@ -1015,7 +979,96 @@ class Output_Series():
 class Output_Group():
     """Output methods for a group of stars."""
 
-    def create_time_kinematics_table(
+    def create_kinematics_table(
+        self, save=False, show=False, machine=False, age=None,
+        forced=False, default=False, cancel=False
+    ):
+        """
+        Creates a table of the 6D kinematics (XYZ Galactic positions and UVW space velocities)
+        at the given age of all members in the group. If 'save' if True, the table is
+        saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
+        machine-readable table, with separate columns for values and errors, no units in the
+        header and '.csv' extension instead of a '.txt', is created.
+        """
+
+        # Retrieve the epoch index
+        epoch_index = self.get_epoch(age=age)[0]
+
+        # Retrieve xyz positions and uvw velocities and convert units
+        def get_position_velocity_xyz(star):
+            position_xyz = Quantity(
+                star.position_xyz[epoch_index], 'pc', star.position_xyz_error
+            )
+            velocity_xyz = Quantity(
+                star.velocity_xyz[epoch_index], 'pc/Myr', star.velocity_xyz_error
+            ).to('km/s')
+
+            return position_xyz, velocity_xyz
+
+        # Check the types of save, show and machine
+        self.series.check_type(save, 'save', 'boolean')
+        self.series.check_type(show, 'show', 'boolean')
+        self.series.check_type(machine, 'machine', 'boolean')
+
+        # Create header
+        if machine:
+            lines = ['Designation,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW']
+
+            # Create lines
+            for star in self:
+                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
+                lines.append(
+                    ','.join(
+                        [star.name] + [
+                            str(float(i)) for i in [
+                                position_xyz.values[0], position_xyz.errors[0],
+                                position_xyz.values[1], position_xyz.errors[1],
+                                position_xyz.values[2], position_xyz.errors[2],
+                                velocity_xyz.values[0], velocity_xyz.errors[0],
+                                velocity_xyz.values[1], velocity_xyz.errors[1],
+                                velocity_xyz.values[2], velocity_xyz.errors[2]
+                            ]
+                        ]
+                    )
+                )
+
+        # Create header
+        else:
+            lines = [
+                f"{'':-<155}",
+                f"{'Designation':<35}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}",
+                f"{'[pc]':>55}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}{'[km/s]':>20}{'[km/s]':>20}",
+                f"{'':-<155}"
+            ]
+
+            # Create lines
+            for star in self:
+                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
+                x = f'{position_xyz.values[0]:.2f} ± {position_xyz.errors[0]:.2f}'
+                y = f'{position_xyz.values[1]:.2f} ± {position_xyz.errors[1]:.2f}'
+                z = f'{position_xyz.values[2]:.2f} ± {position_xyz.errors[2]:.2f}'
+                u = f'{velocity_xyz.values[0]:.2f} ± {velocity_xyz.errors[0]:.2f}'
+                v = f'{velocity_xyz.values[1]:.2f} ± {velocity_xyz.errors[1]:.2f}'
+                w = f'{velocity_xyz.values[2]:.2f} ± {velocity_xyz.errors[2]:.2f}'
+                lines.append(f'{star.name:<35}{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}')
+
+            # Creater footer
+            lines.append(f"{'':-<155}")
+
+        # Show table
+        if show:
+            for line in lines:
+                print(line)
+
+        # Save table
+        if save:
+            self.series.save_table(
+                f'kinematics_{self.name}_{age}Myr', lines,
+                extension='csv' if machine else 'txt',
+                forced=forced, default=default, cancel=cancel
+            )
+
+    def create_kinematics_time_table(
         self, save=False, show=False, machine=False,
         forced=False, default=False, cancel=False
     ):
@@ -1028,19 +1081,10 @@ class Output_Group():
         table uses side heads.
         """
 
-        # Check save, show and machine
-        self.series.stop(
-            type(save) != bool, 'TypeError',
-            "'save' must be a boolean ({} given).", type(save)
-        )
-        self.series.stop(
-            type(show) != bool, 'TypeError',
-            "'show' must be a boolean ({} given).", type(show)
-        )
-        self.series.stop(
-            type(machine) != bool, 'TypeError',
-            "'machine' must be a boolean ({} given).", type(machine)
-        )
+        # Check the types of save, show and machine
+        self.series.check_type(save, 'save', 'boolean')
+        self.series.check_type(show, 'show', 'boolean')
+        self.series.check_type(machine, 'machine', 'boolean')
 
         # Create header
         if machine:
@@ -1117,180 +1161,7 @@ class Output_Group():
                 forced=forced, default=default, cancel=cancel
             )
 
-    def create_kinematics_table(
-        self, save=False, show=False, machine=False, age=None,
-        forced=False, default=False, cancel=False
-    ):
-        """
-        Creates a table of the 6D kinematics (XYZ Galactic positions and UVW space velocities)
-        at the given age of all members in the group. If 'save' if True, the table is
-        saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
-        machine-readable table, with separate columns for values and errors, no units in the
-        header and '.csv' extension instead of a '.txt', is created.
-        """
-
-        # Retrieve the epoch index
-        epoch_index = self.get_epoch(age=age)[0]
-
-        # Retrieve xyz positions and uvw velocities and convert units
-        def get_position_velocity_xyz(star):
-            position_xyz = Quantity(
-                star.position_xyz[epoch_index], 'pc', star.position_xyz_error
-            )
-            velocity_xyz = Quantity(
-                star.velocity_xyz[epoch_index], 'pc/Myr', star.velocity_xyz_error
-            ).to('km/s')
-
-            return position_xyz, velocity_xyz
-
-        # Check save, show and machine
-        self.series.stop(
-            type(save) != bool, 'TypeError',
-            "'save' must be a boolean ({} given).", type(save)
-        )
-        self.series.stop(
-            type(show) != bool, 'TypeError',
-            "'show' must be a boolean ({} given).", type(show)
-        )
-        self.series.stop(
-            type(machine) != bool, 'TypeError',
-            "'machine' must be a boolean ({} given).", type(machine)
-        )
-
-        # Create header
-        if machine:
-            lines = ['Designation,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW']
-
-            # Create lines
-            for star in self:
-                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
-                lines.append(
-                    ','.join(
-                        [star.name] + [
-                            str(float(i)) for i in [
-                                position_xyz.values[0], position_xyz.errors[0],
-                                position_xyz.values[1], position_xyz.errors[1],
-                                position_xyz.values[2], position_xyz.errors[2],
-                                velocity_xyz.values[0], velocity_xyz.errors[0],
-                                velocity_xyz.values[1], velocity_xyz.errors[1],
-                                velocity_xyz.values[2], velocity_xyz.errors[2]
-                            ]
-                        ]
-                    )
-                )
-
-        # Create header
-        else:
-            lines = [
-                f"{'':-<155}",
-                f"{'Designation':<35}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}",
-                f"{'[pc]':>55}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}{'[km/s]':>20}{'[km/s]':>20}",
-                f"{'':-<155}"
-            ]
-
-            # Create lines
-            for star in self:
-                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
-                x = f'{position_xyz.values[0]:.2f} ± {position_xyz.errors[0]:.2f}'
-                y = f'{position_xyz.values[1]:.2f} ± {position_xyz.errors[1]:.2f}'
-                z = f'{position_xyz.values[2]:.2f} ± {position_xyz.errors[2]:.2f}'
-                u = f'{velocity_xyz.values[0]:.2f} ± {velocity_xyz.errors[0]:.2f}'
-                v = f'{velocity_xyz.values[1]:.2f} ± {velocity_xyz.errors[1]:.2f}'
-                w = f'{velocity_xyz.values[2]:.2f} ± {velocity_xyz.errors[2]:.2f}'
-                lines.append(f'{star.name:<35}{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}')
-
-            # Creater footer
-            lines.append(f"{'':-<155}")
-
-        # Show table
-        if show:
-            for line in lines:
-                print(line)
-
-        # Save table
-        if save:
-            self.series.save_table(
-                f'kinematics_{self.name}_{age}Myr', lines,
-                extension='csv' if machine else 'txt',
-                forced=forced, default=default, cancel=cancel
-            )
-
-    def get_epoch(self, age=None, metric=None, index=None):
-        """
-        Computes the time index of the epoch for a given association age or, association size
-        metric and dimensional index. Return the birth index, age and age error.
-        """
-
-        # Index from age
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer, float or None ({} given).", type(age)
-            )
-            self.series.stop(
-                age < np.min(self.series.time), 'ValueError',
-                "'age' must be younger the oldest time ({} Myr given, earliest time: {} Myr).",
-                age, np.min(self.series.time)
-            )
-            self.series.stop(
-                age > np.max(self.series.time), 'ValueError',
-                "'age' must be older the latest time ({} Myr given, latest time: {} Myr).",
-                age, np.max(self.series.time)
-            )
-            return np.argmin(np.abs(age - self.series.time)), age, None
-
-        # Index from the epoch of minimum of an association size metric
-        elif metric is not None:
-            metric, index = self.get_metric(metric, index)
-            if metric.status:
-                age = metric.age[index]
-                return np.argmin(np.abs(age - self.series.time)), age, metric.age_error[index]
-
-            else:
-                self.series.log(
-                    "Could not use '{}' metric for '{}' group. It was not computed.",
-                    str(metric.name[index]), self.name, display=True
-                )
-                return None, None, None
-
-        # No birth index, age or age error
-        else:
-            return (None, None, None)
-
-    def get_metric(self, metric, index=None):
-        """Retrieves the proprer Series.Metric instance from a string and index."""
-
-        # Metric instance
-        self.series.stop(
-            type(metric) != str, 'TypeError',
-            "'metric' must be a string or None ({} given).", type(metric)
-        )
-        self.series.stop(
-            metric not in [metric.label for metric in self.series.metrics],
-            'ValueError', "'metric' must be a valid metric key ({} given).", metric
-        )
-        metric = vars(self.series)[metric]
-
-        # Metric index
-        if index is not None:
-            self.series.stop(
-                type(index) != int, 'TypeError',
-                "'index' must be an integer or None ({} given).", type(index)
-            )
-            self.series.stop(
-                index > metric.value.size - 1, 'ValueError',
-                "'index' is too large for this metric ({} given, {} in size).",
-                index, metric.value.size
-            )
-        else:
-            self.series.stop(
-                metric.value.size > 1, 'ValueError',
-                "No 'index' is provided (metric is {} in size).", metric.value.size
-            )
-
-        return metric, index if metric.value.size > 1 else 0
-
-    def trajectory_xyz(
+    def create_trajectory_xyz(
         self, title=False, labels=False, age=None, metric=None, index=None,
         forced=False, default=False, cancel=False
     ):
@@ -1306,11 +1177,8 @@ class Output_Group():
         ax2 = fig.add_axes([left + long1 + inside1, bottom + inside2 + short2, short1, long2])
         ax3 = fig.add_axes([left, bottom, long1, short2])
 
-        # Check labels
-        self.series.stop(
-            type(labels) != bool, 'TypeError',
-            "'labels' must be a boolean ({} given).", type(labels)
-        )
+        # Check the type of labels
+        self.series.check_type(labels, 'labels', 'boolean')
 
         # Birth index, age and age error
         birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
@@ -1406,11 +1274,10 @@ class Output_Group():
                 )
             )
 
+        # Check the type of title
+        self.series.check_type(title, 'title', 'boolean')
+
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             fig.suptitle(f"$XYZ$ trajectories of stars in {self.name}", y=1.05, fontsize=8)
 
@@ -1452,7 +1319,7 @@ class Output_Group():
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
-    def trajectory_ξηζ(
+    def create_trajectory_ξηζ(
         self, title=False, labels=False, age=None, metric=None, index=None,
         forced=False, default=False, cancel=False
     ):
@@ -1468,11 +1335,8 @@ class Output_Group():
         ax2 = fig.add_axes([left + long1 + inside1, bottom + inside2 + short2, short1, long2])
         ax3 = fig.add_axes([left, bottom, long1, short2])
 
-        # Check labels
-        self.series.stop(
-            type(labels) != bool, 'TypeError',
-            "'labels' must be a boolean ({} given).", type(labels)
-        )
+        # Check the type of labels
+        self.series.check_type(labels, 'labels', 'boolean')
 
         # Birth index, age and age error
         birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
@@ -1550,11 +1414,10 @@ class Output_Group():
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
                         )
 
+        # Check the type of title
+        self.series.check_type(title, 'title', 'boolean')
+
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             fig.suptitle(
                 f'$ξ^\prime η^\prime ζ^\prime$ trajectories of stars in {self.name}',
@@ -1596,17 +1459,14 @@ class Output_Group():
         )
         # plt.show()
 
-    def trajectory_time_xyz(
+    def create_trajectory_time_xyz(
         self, style, title=False, age=None, metric=None,
         forced=False, default=False, cancel=False
     ):
         """Draws the xyz trajectories as a function of time of stars."""
 
-        # Check style
-        self.series.stop(
-            type(style) != str, 'TypeError',
-            "'style' must be a string ({} given).", type(style)
-        )
+        # Check the type and value of style
+        self.series.check_type(style, 'style', 'string')
         self.series.stop(
             style not in ('2x2', '1x3'), 'ValueError',
             "'style' must be either '2x2' or '1x3' ({} given).", style
@@ -1787,11 +1647,10 @@ class Output_Group():
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
                         )
 
+        # Check the type of title
+        self.series.check_type(title, 'title', 'boolean')
+
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             if style == '2x2':
                 fig.suptitle(
@@ -1854,17 +1713,14 @@ class Output_Group():
         )
         # plt.show()
 
-    def trajectory_time_ξηζ(
+    def create_trajectory_time_ξηζ(
         self, style, title=False, age=None, metric=None,
         forced=False, default=False, cancel=False
     ):
         """Draws the ξηζ trajectories as a function of time of stars."""
 
-        # Check style
-        self.series.stop(
-            type(style) != str, 'TypeError',
-            "'style' must be a string ({} given).", type(style)
-        )
+        # Check the type and value of style
+        self.series.check_type(style, 'style', 'string')
         self.series.stop(
             style not in ('2x2', '1x3'), 'ValueError',
             "'style' must be either '2x2' or '1x3' ({} given).", style
@@ -2053,11 +1909,10 @@ class Output_Group():
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
                         )
 
+        # Check the type of title
+        self.series.check_type(title, 'title', 'boolean')
+
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             if style == '2x2':
                 fig.suptitle(
@@ -2131,6 +1986,10 @@ class Output_Group():
         fig = plt.figure(figsize=(6.66, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111, projection="mollweide")
 
+        # Check the types of labels and title
+        self.series.check_type(labels, 'labels', 'boolean')
+        self.series.check_type(title, 'title', 'boolean')
+
         # Compute coordinates
         from .coordinate import galactic_xyz_equatorial_rδα
         positions = np.array(
@@ -2184,10 +2043,6 @@ class Output_Group():
             )
 
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             ax.set_title('Mollweide projection of tracebacks', fontsize=8)
 
@@ -2212,74 +2067,38 @@ class Output_Group():
         spanning tree branches.
         """
 
-        # Initialize axis
-        axis = {'x': 0, 'y': 1, 'z': 2}
-        keys = tuple(axis.keys())
-
-        # Check if X and Y axes are valid, and initialize axis
-        self.series.stop(
-            type(i) != str, 'TypeError',
-            "X axis 'i' must be a string ({} given).", type(i)
-        )
-        self.series.stop(
-            i.lower() not in keys, 'ValueError',
-            "X axis 'i' must be an axis key ('x', 'y' or 'z', {} given).", i
-        )
-        i = axis[i.lower()]
-        self.series.stop(
-            type(j) != str, 'TypeError',
-            "Y axis 'j' must be a string ({} given).", type(j)
-        )
-        self.series.stop(
-            j.lower() not in keys, 'ValueError',
-            "Y axis 'j' must be an axis key ('x', 'y' or 'z', {} given).", j
-        )
-        j = axis[j.lower()]
-
-        # Check if step and age are valid
-        if step is not None:
-            self.series.stop(
-                type(step) not in (int, float), 'TypeError',
-                "'step' must an integer or float ({} given).", type(step)
-            )
-            self.series.stop(
-                step % 1 != 0, 'ValueError',
-                "'step' must be convertible to an integer ({} given).", step
-            )
-            self.series.stop(
-                step < 0, 'ValueError',
-                "'step' must be greater than or equal to 0.0 ({} given).", step
-            )
-            self.series.stop(
-                step >= self.series.number_of_steps, 'ValueError',
-                "'step' must be lower than the number of steps ({}, {} given).",
-                self.series.number_of_steps, step
-            )
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer or float ({} given).", type(age)
-            )
-            self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", age
-            )
-            self.series.stop(
-                age > self.series.final_time.value, 'ValueError',
-                "'age' must be younger than the final time ({} Myr, {} Myr given).",
-                self.series.final_time.value, age
-            )
-
-        # Compute step or age
-        if age is not None:
-            step = int(round(age / self.series.timestep.value))
-            age = round(self.series.time[step], 2)
-        else:
-            age = round(step * self.series.timestep, 2)
-
         # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111)
+
+        # Initialize axes
+        axes = {'x': 0, 'y': 1, 'z': 2}
+        keys = tuple(axes.keys())
+
+        # Check the type and value of i axis, and initialize axis
+        self.series.check_type(i, 'i', 'string')
+        self.series.stop(
+            i.lower() not in keys, 'ValueError',
+            "'i' must be an axis key ('x', 'y' or 'z', {} given).", i
+        )
+        i = axes[i.lower()]
+
+        # Check the type and value of j axis, and initialize axis
+        self.series.check_type(j, 'j', 'string')
+        self.series.stop(
+            j.lower() not in keys, 'ValueError',
+            "'j' must be an axis key ('x', 'y' or 'z', {} given).", j
+        )
+        j = axes[j.lower()]
+
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
+
+        # Check the types of errors, labels, mst and title
+        self.series.check_type(errors, 'errors', 'boolean')
+        self.series.check_type(labels, 'labels', 'boolean')
+        self.series.check_type(mst, 'mst', 'boolean')
+        self.series.check_type(title, 'title', 'boolean')
 
         # Plot xyz positions
         ax.scatter(
@@ -2289,10 +2108,6 @@ class Output_Group():
         )
 
         # Plot error bars
-        self.series.stop(
-            type(errors) != bool, 'TypeError',
-            "'error' must be a boolean ({} given).", type(errors)
-        )
         if errors:
             for star in self.sample:
                 position = star.position_xyz[step]
@@ -2313,10 +2128,6 @@ class Output_Group():
                 )
 
         # Show star labels
-        self.series.stop(
-            type(labels) != bool, 'TypeError',
-            "'labels' must be a boolean ({} given).", type(labels)
-        )
         if labels:
             for star in self.sample:
                 ax.text(
@@ -2325,23 +2136,21 @@ class Output_Group():
                 )
 
         # Create branches
-        self.series.stop(
-            type(mst) != bool, 'TypeError',
-            "'mst' must be a boolean ({} given).", type(mst)
-        )
         if mst:
-            for branch in self.mst[step]:
-                ax.plot(
-                    (branch.start.position[step, i], branch.end.position[step, i]),
-                    (branch.start.position[step, j], branch.end.position[step, j]),
-                    color=colors.blue[6]
+            if self.series.mst_metrics:
+                for branch in self.mst_xyz[step]:
+                    ax.plot(
+                        (branch.start.position[step, i], branch.end.position[step, i]),
+                        (branch.start.position[step, j], branch.end.position[step, j]),
+                        color=colors.blue[6]
+                    )
+            else:
+                self.series.log(
+                    "Could not display the minimum spanning tree because it was not computed.",
+                    level='info', display=True
                 )
 
-        # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
+        # Check the type of title
         if title:
             ax.set_title(
                 "{} and {} positions of stars in β Pictoris at {} Myr "
@@ -2370,68 +2179,32 @@ class Output_Group():
         minimum spanning tree branches.
         """
 
-        # Check if step and age are valid
-        if step is not None:
-            self.series.stop(
-                type(step) not in (int, float), 'TypeError',
-                "'step' must an integer or float ({} given).", type(step)
-            )
-            self.series.stop(
-                step % 1 != 0, 'ValueError',
-                "'step' must be convertible to an integer ({} given).", step
-            )
-            self.series.stop(
-                step < 0, 'ValueError',
-                "'step' must be greater than or equal to 0.0 ({} given).", step
-            )
-            self.series.stop(
-                step >= self.series.number_of_steps, 'ValueError',
-                "'step' must be lower than the number of steps ({}, {} given).",
-                self.series.number_of_steps, step
-            )
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer or float ({} given).", type(age)
-            )
-            self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", age
-            )
-            self.series.stop(
-                age > self.series.final_time.value, 'ValueError',
-                "'age' must be younger than the final time ({} Myr, {} Myr given).",
-                self.series.final_time.value, age
-            )
-
-        # Compute step or age
-        if age is not None:
-            step = int(round(age / self.series.timestep.value))
-            age = round(self.series.time[step], 2)
-        else:
-            step = int(step)
-            age = round(step * self.series.timestep.value, 2)
-
         # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111, projection='3d')
+
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
+
+        # Check the types of errors, labels, mst and title
+        self.series.check_type(errors, 'errors', 'boolean')
+        self.series.check_type(labels, 'labels', 'boolean')
+        self.series.check_type(mst, 'mst', 'boolean')
+        self.series.check_type(title, 'title', 'boolean')
 
         # Plot xyz relative positions
         ax.scatter(
             [star.relative_position_xyz[step, 0] for star in self.sample],
             [star.relative_position_xyz[step, 1] for star in self.sample],
             [star.relative_position_xyz[step, 2] for star in self.sample],
-            marker='o', color=colors.black)
+            marker='o', color=colors.black
+        )
 
         # Plot error bars
-        self.series.stop(
-            type(errors) != bool, 'TypeError',
-            "'error' must be a boolean ({} given).", type(errors)
-        )
         if errors:
             for star in self.sample:
                 position = star.relative_position_xyz[step]
-                error = star.relative_position_xyz_error[step]
+                error = star.position_xyz_error[step]
 
                 # X axis error bars
                 ax.plot(
@@ -2455,10 +2228,6 @@ class Output_Group():
                 )
 
         # Show star labels
-        self.series.stop(
-            type(labels) != bool, 'TypeError',
-            "'labels' must be a boolean ({} given).", type(labels)
-        )
         if labels:
             for star in self.sample:
                 ax.text(
@@ -2468,33 +2237,32 @@ class Output_Group():
                 )
 
         # Create branches
-        self.series.stop(
-            type(mst) != bool, 'TypeError',
-            "'mst' must be a boolean ({} given).", type(mst)
-        )
         if mst:
-            for branch in self.mst[step]:
-                ax.plot(
-                    (
-                        branch.start.relative_position_xyz[step, 0],
-                        branch.end.relative_position_xyz[step, 0]
-                    ), (
-                        branch.start.relative_position_xyz[step, 1],
-                        branch.end.relative_position_xyz[step, 1]
-                    ), (
-                        branch.start.relative_position_xyz[step, 2],
-                        branch.end.relative_position_xyz[step, 2]
-                    ), color=colors.blue[6]
+            if self.series.mst_metrics:
+                for branch in self.mst_xyz[step]:
+                    ax.plot(
+                        (
+                            branch.start.relative_position_xyz[step, 0],
+                            branch.end.relative_position_xyz[step, 0]
+                        ), (
+                            branch.start.relative_position_xyz[step, 1],
+                            branch.end.relative_position_xyz[step, 1]
+                        ), (
+                            branch.start.relative_position_xyz[step, 2],
+                            branch.end.relative_position_xyz[step, 2]
+                        ), color=colors.blue[6]
+                    )
+            else:
+                self.series.log(
+                    "Could not display the minimum spanning tree because it was not computed.",
+                    level='info', display=True
                 )
 
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             ax.set_title(
-                f'Minimum spanning tree of stars in β Pictoris at {age:.1f} Myr\n', fontsize=8)
+                f'Minimum spanning tree of stars in β Pictoris at {age:.1f} Myr\n', fontsize=8
+            )
 
         # Set labels
         ax.set_xlabel('\n $x$ (pc)')
@@ -2509,22 +2277,29 @@ class Output_Group():
         # plt.show()
 
     def create_2D_and_3D_scatter(
-        self, ages, title=False, forced=False, default=False, cancel=False
+        self, ages, errors=False, labels=False, mst=False,
+        title=False, forced=False, default=False, cancel=False
     ):
         """
         Creates a three 4-axis columns of xy, xz and yz 2D scatters, and a 3D scatter at three
         ages definied by a list or tuple.
         """
 
-        # Check if ages is valid
-        self.series.stop(
-            type(ages) not in (tuple, list), 'TypeError',
-            "'ages' must a tuple or a list ({} given).", type(ages))
-        self.series.stop(
-            len(ages) != 3, 'ValueError', "'ages' must be have a length of 3 ({} given).", ages)
-
         # Initialize figure
         self.fig = plt.figure(figsize=(9, 11.15), facecolor=colors.white, dpi=300)
+
+        # Check the type and value of ages
+        self.series.check_type(ages, 'ages', ('tuple', 'list'))
+        self.series.stop(
+            len(ages) != 3, 'ValueError',
+            "'ages' must be have a length of 3 ({} given).", ages
+        )
+
+        # Check the types of errors, labels, mst and title
+        self.series.check_type(errors, 'errors', 'boolean')
+        self.series.check_type(labels, 'labels', 'boolean')
+        self.series.check_type(mst, 'mst', 'boolean')
+        self.series.check_type(title, 'title', 'boolean')
 
         # Create axes
         row1 = 0.795
@@ -2534,24 +2309,20 @@ class Output_Group():
         col1 = 0.070
         col2 = 0.398
         col3 = 0.730
-        self.create_2D_axis('x', 'y', age=ages[0], index=1, left=col1, bottom=row1)
-        self.create_2D_axis('x', 'y', age=ages[1], index=2, left=col2, bottom=row1)
-        self.create_2D_axis('x', 'y', age=ages[2], index=3, left=col3, bottom=row1)
-        self.create_2D_axis('x', 'z', age=ages[0], index=4, left=col1, bottom=row2)
-        self.create_2D_axis('x', 'z', age=ages[1], index=5, left=col2, bottom=row2)
-        self.create_2D_axis('x', 'z', age=ages[2], index=6, left=col3, bottom=row2)
-        self.create_2D_axis('y', 'z', age=ages[0], index=7, left=col1, bottom=row3)
-        self.create_2D_axis('y', 'z', age=ages[1], index=8, left=col2, bottom=row3)
-        self.create_2D_axis('y', 'z', age=ages[2], index=9, left=col3, bottom=row3)
-        self.create_3D_axis(age=ages[0], index=10, left=0.0535, bottom=row4)
-        self.create_3D_axis(age=ages[1], index=11, left=0.381, bottom=row4)
-        self.create_3D_axis(age=ages[2], index=12, left=0.712, bottom=row4)
+        self.create_2D_axis('x', 'y', age=ages[0], errors=errors, index=1, left=col1, bottom=row1)
+        self.create_2D_axis('x', 'y', age=ages[1], errors=errors, index=2, left=col2, bottom=row1)
+        self.create_2D_axis('x', 'y', age=ages[2], errors=errors, index=3, left=col3, bottom=row1)
+        self.create_2D_axis('x', 'z', age=ages[0], errors=errors, index=4, left=col1, bottom=row2)
+        self.create_2D_axis('x', 'z', age=ages[1], errors=errors, index=5, left=col2, bottom=row2)
+        self.create_2D_axis('x', 'z', age=ages[2], errors=errors, index=6, left=col3, bottom=row2)
+        self.create_2D_axis('y', 'z', age=ages[0], errors=errors, index=7, left=col1, bottom=row3)
+        self.create_2D_axis('y', 'z', age=ages[1], errors=errors, index=8, left=col2, bottom=row3)
+        self.create_2D_axis('y', 'z', age=ages[2], errors=errors, index=9, left=col3, bottom=row3)
+        self.create_3D_axis(age=ages[0], mst=mst, index=10, left=0.0535, bottom=row4)
+        self.create_3D_axis(age=ages[1], mst=mst, index=11, left=0.381, bottom=row4)
+        self.create_3D_axis(age=ages[2], mst=mst, index=12, left=0.712, bottom=row4)
 
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             self.fig.suptitle(
                 '$X-Y$, $X-Z$, $Y-Z$ and 3D scatters at '
@@ -2565,76 +2336,34 @@ class Output_Group():
         )
         # plt.show()
 
-    def create_2D_axis(self, i, j, step=None, age=None, index=1, left=0, bottom=0):
+    def create_2D_axis(self, i, j, step=None, errors=False, age=None, index=1, left=0, bottom=0):
         """Creates a 2D axis."""
 
         # Initialize axis
-        axis = {'x': 0, 'y': 1, 'z': 2}
-        keys = tuple(axis.keys())
+        ax = self.fig.add_subplot(4, 3, index, position=[left, bottom, 0.255, 0.20])
 
-        # Check if X and Y axes are valid, and initialize axis
-        self.series.stop(
-            type(i) != str, 'TypeError',
-            "X axis 'i' must be a string ({} given).", type(i)
-        )
+        # Initialize axes
+        axes = {'x': 0, 'y': 1, 'z': 2}
+        keys = tuple(axes.keys())
+
+        # Check the type and value of i axis, and initialize axis
+        self.series.check_type(i, 'i', 'string')
         self.series.stop(
             i.lower() not in keys, 'ValueError',
-            "X axis 'i' must be an axis key ('x', 'y' or 'z', {} given).", i
+            "'i' must be an axis key ('x', 'y' or 'z', {} given).", i
         )
-        i = axis[i.lower()]
-        self.series.stop(
-            type(j) != str, 'TypeError',
-            "Y axis 'j' must be a string ({} given).", type(j)
-        )
+        i = axes[i.lower()]
+
+        # Check the type and value of j axis, and initialize axis
+        self.series.check_type(j, 'j', 'string')
         self.series.stop(
             j.lower() not in keys, 'ValueError',
-            "Y axis 'j' must be an axis key ('x', 'y' or 'z', {} given).", j
+            "'j' must be an axis key ('x', 'y' or 'z', {} given).", j
         )
-        j = axis[j.lower()]
+        j = axes[j.lower()]
 
-        # Check if step and age are valid
-        if step is not None:
-            self.series.stop(
-                type(step) not in (int, float), 'TypeError',
-                "'step' must an integer or float ({} given).", type(step)
-            )
-            self.series.stop(
-                step % 1 != 0, 'ValueError',
-                "'step' must be convertible to an integer ({} given).", step
-            )
-            self.series.stop(
-                step < 0, 'ValueError',
-                "'step' must be greater than or equal to 0.0 ({} given).", step
-            )
-            self.series.stop(
-                step >= self.series.number_of_steps, 'ValueError',
-                "'step' must be lower than the number of steps ({}, {} given).",
-                self.series.number_of_steps, step
-            )
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer or float ({} given).", type(age)
-            )
-            self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", age
-            )
-            self.series.stop(
-                age > self.series.final_time.value, 'ValueError',
-                "'age' must be younger than the final time ({} Myr, {} Myr given).",
-                self.series.final_time.value, age
-            )
-
-        # Compute step or age
-        if age is not None:
-            step = int(round(age / self.series.timestep.value))
-            age = round(self.series.time[step], 2)
-        else:
-            age = round(step * self.series.timestep, 2)
-
-        # Initialize axis
-        ax = self.fig.add_subplot(4, 3, index, position=[left, bottom, 0.255, 0.20])
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
 
         # Plot stars' xyz relative positions
         ax.scatter(
@@ -2651,24 +2380,25 @@ class Output_Group():
         )
 
         # Error bars
-        for star in self:
-            position = star.relative_position_xyz[step]
-            error = star.position_xyz_error[step]
-            color = colors.black if not star.outlier else colors.red[6]
+        if errors:
+            for star in self:
+                position = star.relative_position_xyz[step]
+                error = star.position_xyz_error[step]
+                color = colors.black if not star.outlier else colors.red[6]
 
-            # Horizontal error bars
-            ax.plot(
-                (position[i] - error[i], position[i] + error[i]),
-                (position[j], position[j]),
-                color=color, linewidth=0.5
-            )
+                # Horizontal error bars
+                ax.plot(
+                    (position[i] - error[i], position[i] + error[i]),
+                    (position[j], position[j]),
+                    color=color, linewidth=0.5
+                )
 
-            # Vertical error bars
-            ax.plot(
-                (position[i], position[i]),
-                (position[j] - error[j], position[j] + error[j]),
-                color=color, linewidth=0.5
-            )
+                # Vertical error bars
+                ax.plot(
+                    (position[i], position[i]),
+                    (position[j] - error[j], position[j] + error[j]),
+                    color=color, linewidth=0.5
+                )
 
         # Set labels
         ax.set_xlabel(f'${keys[i].upper()}$ (pc)')
@@ -2678,55 +2408,16 @@ class Output_Group():
         ax.set_xlim(-100, 100)
         ax.set_ylim(-100, 100)
 
-    def create_3D_axis(self, step=None, age=None, index=1, left=0, bottom=0):
+    def create_3D_axis(self, step=None, age=None, mst=False, index=1, left=0, bottom=0):
         """Creates a 3D axis."""
 
-        # Check if step and age are valid
-        if step is not None:
-            self.series.stop(
-                type(step) not in (int, float), 'TypeError',
-                "'step' must an integer or float ({} given).", type(step)
-            )
-            self.series.stop(
-                step % 1 != 0, 'ValueError',
-                "'step' must be convertible to an integer ({} given).", step
-            )
-            self.series.stop(
-                step < 0, 'ValueError',
-                "'step' must be greater than or equal to 0.0 ({} given).", step
-            )
-            self.series.stop(
-                step >= self.series.number_of_steps, 'ValueError',
-                "'step' must be lower than the number of steps ({}, {} given).",
-                self.series.number_of_steps, step
-            )
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer or float ({} given).", type(age)
-            )
-            self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", age
-            )
-            self.series.stop(
-                age > self.series.final_time.value, 'ValueError',
-                "'age' must be younger than the final time ({} Myr, {} Myr given).",
-                self.series.final_time.value, age
-            )
-
-        # Compute step or age
-        if age is not None:
-            step = int(round(age / self.series.timestep.value))
-            age = round(self.series.time[step], 2)
-        else:
-            step = int(step)
-            age = round(step * self.series.timestep.value, 2)
-
-        # Initialize figure
+        # Initialize axis
         ax = self.fig.add_subplot(
             4, 3, index, projection='3d', position=[left, bottom, 0.29, 0.215]
         )
+
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
 
         # Plot stars' xyz relative positions
         ax.scatter(
@@ -2745,19 +2436,26 @@ class Output_Group():
         )
 
         # Create branches
-        for branch in self.mst[step]:
-            ax.plot(
-                (
-                    branch.start.relative_position_xyz[step, 0],
-                    branch.end.relative_position_xyz[step, 0]
-                ), (
-                    branch.start.relative_position_xyz[step, 1],
-                    branch.end.relative_position_xyz[step, 1]
-                ), (
-                    branch.start.relative_position_xyz[step, 2],
-                    branch.end.relative_position_xyz[step, 2]
-                ), colors.blue[6]
-            )
+        if mst:
+            if self.series.mst_metrics:
+                for branch in self.mst_xyz[step]:
+                    ax.plot(
+                        (
+                            branch.start.relative_position_xyz[step, 0],
+                            branch.end.relative_position_xyz[step, 0]
+                        ), (
+                            branch.start.relative_position_xyz[step, 1],
+                            branch.end.relative_position_xyz[step, 1]
+                        ), (
+                            branch.start.relative_position_xyz[step, 2],
+                            branch.end.relative_position_xyz[step, 2]
+                        ), colors.blue[6]
+                    )
+            else:
+                self.series.log(
+                    "Could not display the minimum spanning tree because it was not computed.",
+                    level='info', display=True
+                )
 
         # Set labels
         ax.set_xlabel('$X$ (pc)')
@@ -2783,76 +2481,39 @@ class Output_Group():
         and 'mst' adds the minimum spanning tree branches.
         """
 
-        # Initialize axis
-        position_axis = {'x': 0, 'y': 1, 'z': 2}
-        velocity_axis = {'u': 0, 'v': 1, 'w': 2}
-        position_keys = tuple(position_axis.keys())
-        velocity_keys = tuple(velocity_axis.keys())
-
-        # Check if position and velocity axes are valid, and initialization
-        self.series.stop(
-            type(i) != str, 'TypeError',
-            "Position axis 'i' must be a string ({} given).", type(i)
-        )
-        self.series.stop(
-            i.lower() not in position_keys, 'ValueError',
-            "Position axis 'i' must be an postion axis key ('x', 'y' or 'z', {} given).", i
-        )
-        i = position_axis[i.lower()]
-        self.series.stop(
-            type(j) != str, 'TypeError',
-            "Velocity axis 'j' must be a string ({} given).", type(j)
-        )
-        self.series.stop(
-            j.lower() not in velocity_keys, 'ValueError',
-            "Velocity axis 'j' must be an postion axis key ('u', 'v' or 'w', {} given).", j
-        )
-        j = velocity_axis[j.lower()]
-
-        # Check if step and age are valid
-        if step is not None:
-            self.series.stop(
-                type(step) not in (int, float), 'TypeError',
-                "'step' must an integer or float ({} given).", type(step)
-            )
-            self.series.stop(
-                step % 1 != 0, 'ValueError',
-                "'step' must be convertible to an integer ({} given).", step
-            )
-            self.series.stop(
-                step < 0, 'ValueError',
-                "'step' must be greater than or equal to 0.0 ({} given).", step
-            )
-            self.series.stop(
-                step >= self.series.number_of_steps, 'ValueError',
-                "'step' must be lower than the number of steps ({}, {} given).",
-                self.series.number_of_steps, step
-            )
-        if age is not None:
-            self.series.stop(
-                type(age) not in (int, float), 'TypeError',
-                "'age' must be an integer or float ({} given).", type(age)
-            )
-            self.series.stop(
-                age < 0, 'ValueError',
-                "'age' must be greater than or equal to 0.0 ({} given).", age
-            )
-            self.series.stop(
-                age > self.series.final_time.value, 'ValueError',
-                "'age' must be younger than the final time ({} Myr, {} Myr given).",
-                self.series.final_time.value, age
-            )
-
-        # Compute step or age
-        if age is not None:
-            step = int(round(age / self.series.timestep.value))
-            age = round(self.series.time[step], 2)
-        else:
-            age = round(step * self.series.timestep, 2)
-
         # Initialize figure
         fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
         ax = fig.add_subplot(111)
+
+        # Initialize axes
+        position_axes = {'x': 0, 'y': 1, 'z': 2}
+        velocity_axes = {'u': 0, 'v': 1, 'w': 2}
+        position_keys = tuple(position_axes.keys())
+        velocity_keys = tuple(velocity_axes.keys())
+
+        # Check the type and value of i axis, and initialize axis
+        self.series.check_type(i, 'i', 'string')
+        self.series.stop(
+            i.lower() not in position_keys, 'ValueError',
+            "'i' must be an postion axis key ('x', 'y' or 'z', {} given).", i
+        )
+        i = position_axes[i.lower()]
+
+        # Check the type and value of j axis, and initialize axis
+        self.series.check_type(j, 'j', 'string')
+        self.series.stop(
+            j.lower() not in velocity_keys, 'ValueError',
+            "'j' must be an postion axis key ('u', 'v' or 'w', {} given).", j
+        )
+        j = velocity_axes[j.lower()]
+
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
+
+        # Check the types of errors, labels, mst and title
+        self.series.check_type(errors, 'errors', 'boolean')
+        self.series.check_type(labels, 'labels', 'boolean')
+        self.series.check_type(title, 'title', 'boolean')
 
         # Plot xyz positions
         ax.scatter(
@@ -2862,10 +2523,6 @@ class Output_Group():
         )
 
         # Plot error bars
-        self.series.stop(
-            type(errors) != bool, 'TypeError',
-            "'error' must be a boolean ({} given).", type(errors)
-        )
         if errors:
             for star in self.sample:
                 position = star.position_xyz[step]
@@ -2888,10 +2545,6 @@ class Output_Group():
                 )
 
         # Show star labels
-        self.series.stop(
-            type(labels) != bool, 'TypeError',
-            "'labels' must be a boolean ({} given).", type(labels)
-        )
         if labels:
             for star in self.sample:
                 ax.text(
@@ -2900,10 +2553,6 @@ class Output_Group():
                 )
 
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             ax.set_title(
                 "{} and {} covariance of stars in β Pictoris at {} Myr wihtout "
@@ -2922,6 +2571,125 @@ class Output_Group():
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
+
+    def get_epoch(self, age=None, metric=None, index=None):
+        """
+        Computes the time index of the epoch for a given association age or, association size
+        metric and dimensional index. Return the birth index, age and age error.
+        """
+
+        # Index from age
+        if age is not None:
+            self.series.check_type(age, 'age', ('integer', 'float', 'None'))
+            self.series.stop(
+                age < np.min(self.series.time), 'ValueError',
+                "'age' must be younger the oldest time ({} Myr given, earliest time: {} Myr).",
+                age, np.min(self.series.time)
+            )
+            self.series.stop(
+                age > np.max(self.series.time), 'ValueError',
+                "'age' must be older the latest time ({} Myr given, latest time: {} Myr).",
+                age, np.max(self.series.time)
+            )
+            return np.argmin(np.abs(age - self.series.time)), age, None
+
+        # Index from the epoch of minimum of an association size metric
+        elif metric is not None:
+            metric, index = self.get_metric(metric, index)
+            if metric.status:
+                age = metric.age[index]
+                return np.argmin(np.abs(age - self.series.time)), age, metric.age_error[index]
+
+            else:
+                self.series.log(
+                    "Could not use '{}' metric for '{}' group. It was not computed.",
+                    str(metric.name[index]), self.name, display=True
+                )
+                return None, None, None
+
+        # No birth index, age or age error
+        else:
+            return (None, None, None)
+
+    def get_metric(self, metric, index=None):
+        """Retrieves the proprer Series.Metric instance from a string and index."""
+
+        # Metric instance
+        self.series.check_type(metric, 'metric', ('string', 'None'))
+        self.series.stop(
+            metric not in [metric.label for metric in self.series.metrics], 'ValueError',
+            "'metric' must be a valid metric key ({} given).", metric
+        )
+        metric = vars(self.series)[metric]
+
+        # Metric index
+        if index is not None:
+            self.series.check_type(index, 'index', ('integer', 'None'))
+            self.series.stop(
+                index > metric.value.size - 1, 'ValueError',
+                "'index' is too large for this metric ({} given, {} in size).",
+                index, metric.value.size
+            )
+        else:
+            self.series.stop(
+                metric.value.size > 1, 'ValueError',
+                "No 'index' is provided (metric is {} in size).", metric.value.size
+            )
+
+        return metric, index if metric.value.size > 1 else 0
+
+    def get_step_age(self, step, age):
+        """
+        Checks the types and values of step and step, and computes the appropriate values of
+        step and age. If both are not None, the priority is given the age.
+        """
+
+        # Check the type and value of step
+        if step is not None:
+            self.series.check_type(step, 'step', ('integer', 'float'))
+            self.series.stop(
+                step % 1 != 0, 'ValueError',
+                "'step' must be convertible to an integer ({} given).", step
+            )
+            self.series.stop(
+                step < 0, 'ValueError',
+                "'step' must be greater than or equal to 0 ({} given).", step
+            )
+            self.series.stop(
+                step >= self.series.number_of_steps, 'ValueError',
+                "'step' must be lower than the number of steps ({} and {} given).",
+                self.series.number_of_steps, step
+            )
+
+        # Check the type and value of age
+        if age is not None:
+            self.series.check_type(age, 'age', ('integer', 'float'))
+            self.series.stop(
+                age > self.series.initial_time.value, 'ValueError',
+                "'age' must older than the initial time  ({:.1f} Myr and {:.1f} Myr given).",
+                age, self.series.initial_time.value
+            )
+            self.series.stop(
+                age < self.series.final_time.value, 'ValueError',
+                "'age' must be younger than the final time ({:.1f} Myr and {:.1f} Myr given).",
+                age, self.series.final_time.value
+            )
+
+        # Check if both step and age are None
+        self.series.stop(
+            step is None and age is None, 'ValueError',
+            "'step' and 'age' cannot both be None."
+        )
+
+        # Compute step and age
+        if age is not None:
+            step = int(round((self.series.initial_time.value - age) / self.series.timestep.value))
+            age = round(self.series.time[step], 2)
+        else:
+            step = int(step)
+            age = round(self.series.initial_time.value - step * self.series.timestep.value, 2)
+
+        return step, age
 
     def create_age_distribution(
         self, title=False, metric=None, index=None,
@@ -3049,11 +2817,10 @@ class Output_Group():
             color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1
         )
 
+        # Check the type of title
+        self.series.check_type(title, 'title', 'boolean')
+
         # Set title
-        self.series.stop(
-            type(title) != bool, 'TypeError',
-            "'title' must be a boolean ({} given).", type(title)
-        )
         if title:
             ax.set_title(
                 f'Distribution of {self.series.number_of_iterations} jackknife Monte Carlo' + (
@@ -3098,7 +2865,7 @@ class Output_Group():
 class Output_Star():
     """Ouput methods for a star."""
 
-    def create_time_kinematics_table(
+    def create_kinematics_time_table(
         self, save=False, show=False, machine=False,
         forced=False, default=False, cancel=False
     ):
@@ -3111,19 +2878,10 @@ class Output_Star():
         table uses side heads.
         """
 
-        # Check save, show and machine
-        self.group.series.stop(
-            type(save) != bool, 'TypeError',
-            "'save' must be a boolean ({} given).", type(save)
-        )
-        self.group.series.stop(
-            type(show) != bool, 'TypeError',
-            "'show' must be a boolean ({} given).", type(show)
-        )
-        self.group.series.stop(
-            type(machine) != bool, 'TypeError',
-            "'machine' must be a boolean ({} given).", type(machine)
-        )
+        # Check the types of save, show and machine
+        self.group.series.check_type(save, 'save', 'boolean')
+        self.group.series.check_type(show, 'show', 'boolean')
+        self.group.series.check_type(machine, 'machine', 'boolean')
 
         # Create header
         if machine:

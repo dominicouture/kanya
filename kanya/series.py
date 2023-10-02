@@ -12,7 +12,6 @@ from tqdm import tqdm
 from .init import *
 from .group import Group
 from .output import Output_Series
-from .tools import enumerate_strings
 
 class Series(list, Output_Series):
     """
@@ -98,11 +97,12 @@ class Series(list, Output_Series):
         if mode is None:
             self.from_data = self.set_boolean(self.config.from_data)
             self.from_model = self.set_boolean(self.config.from_model)
+
+        # Check the type of mode
         else:
-            self.stop(
-                type(mode) != str, 'TypeError', "'mode' must be a string or None ({} given).",
-                type(mode)
-            )
+            self.check_type(mode, 'mode', ('string', 'None'))
+
+            # Set mode from data or model
             if mode.lower() == 'from_data':
                 self.from_data = True
                 self.from_model = False
@@ -201,10 +201,11 @@ class Series(list, Output_Series):
         # Check if the sample is valid
         if self.sample is not None:
             self.sample = self.sample.lower()
-            valid_samples = ('input', 'core', 'extended', 'rejected')
+            valid_samples = ('full', 'rejected', 'input', 'extended', 'core')
             self.stop(
                 self.sample not in valid_samples, 'ValueError',
-                "'sample' must be {} ({} given).", enumerate_strings(*valid_samples), self.sample
+                "'sample' must be {} ({} given).", enumerate_strings(*valid_samples, 'None'),
+                self.sample
             )
 
         # Set potential parameter
@@ -256,7 +257,14 @@ class Series(list, Output_Series):
 
         # Set number_of_stars parameter
         if self.from_data:
-            self.number_of_stars = len(self.data)
+            self.number_of_stars = len(self.data.sample)
+
+            # Check if the number of stars is greater than or equal to 1
+            self.stop(
+                self.number_of_stars < 1, 'ValueError',
+                "The sample size must be greater than or equal to 1 ({} star in the {} sample).",
+                self.number_of_stars, self.sample
+            )
 
             # Set age parameter
             self.age = None
@@ -306,10 +314,11 @@ class Series(list, Output_Series):
         if self.data_errors or self.data_rv_shifts:
             self.configure_data()
 
-            # Check if the data length matches the number of stars
+            # Check if the sample size is greater than or equal to 1
             self.stop(
-                len(self.data) == 0, 'ValueError', "If 'data_errors' or 'data_rv_shift' "
-                "is True, the data length must be greater than 0 ({} given).", len(self.data)
+                len(self.data.sample) < 1, 'ValueError', "If 'data_errors' or 'data_rv_shift' "
+                "are True, the sample size must be greater than 0 ({} star in the {} sample).",
+                len(self.data.sample), self.sample
             )
 
         # Set data to None since measurement errors and radial velocity shifts are modeled
@@ -331,19 +340,10 @@ class Series(list, Output_Series):
         all of its components is return, not just its value.
         """
 
-        # Check if none, mode and all are boolean
-        self.stop(
-            type(none) != bool, 'TypeError',
-            "'none' must be a boolean ({} given).", type(none)
-        )
-        self.stop(
-            type(mode) != bool, 'TypeError',
-            "'mode' must be a boolean ({} given).", type(mode)
-        )
-        self.stop(
-            type(all) != bool, 'TypeError',
-            "'all' must be a boolean ({} given).", type(all)
-        )
+        # Check the types of none, mode and all
+        self.check_type(none, 'none', 'boolean')
+        self.check_type(mode, 'mode', 'boolean')
+        self.check_type(all, 'all', 'boolean')
 
         # Check if parameter.values is None or missing
         if not none:
@@ -357,18 +357,10 @@ class Series(list, Output_Series):
                 ), parameter.label
             )
 
-        # Valid types and labels
-        types = [self.config.Parameter.types[label] for label in type_labels]
-        if none:
-            types += (type(None),)
-            type_labels += ('None',)
-
         # Check the type of parameter.values
-        self.stop(
-            type(parameter.values) not in types, 'TypeError',
-            "'{}' must be a {} ({} given).",
-            parameter.label, enumerate_strings(*type_labels), type(parameter.values)
-        )
+        else:
+            type_labels += ('None',)
+        self.check_type(parameter.values, parameter.label, type_labels)
 
         return deepcopy(parameter if all else parameter.values)
 
@@ -390,7 +382,7 @@ class Series(list, Output_Series):
 
     def set_path(
             self, file_path, parameter, name=None, extension=None, file_type=None,
-            check=False, create=False, none=False, mode=False
+            dir_only=False, full_path=False, check=False, create=False, none=False, mode=False
     ):
         """
         Checks if the file path is None or missing in the configuration, and if the type of the
@@ -399,80 +391,48 @@ class Series(list, Output_Series):
         an extension if needed. Checks if the file exists and its extension, if needed.
         """
 
-        # Check if parameter is a string
-        self.stop(
-            type(parameter) != str, 'TypeError',
-            "'{}' must be a string ({} given).", parameter, type(parameter)
-        )
-
-        # Set file path parameter
+        # Set file_path parameter
         if type(file_path) == self.config.Parameter:
             file_path = self.set_string(file_path, none=none, mode=mode)
-            file_path = file_path.values if type(file_path) == self.config.Parameter else file_path
-
-        # Check if file path is a string
         else:
-            self.stop(
-                type(file_path) != str, 'TypeError',
-                "'{}' must be a string ({} given).", parameter, type(file_path)
-            )
+            self.check_type(file_path, parameter, 'string')
 
-        # Check if name, extension and file_type are a string or None
-        self.stop(
-            type(name) not in (str, type(None)), 'TypeError',
-            "'name' must be a string or None ({} given).", parameter, type(name)
-        )
-        self.stop(
-            type(extension) not in (str, type(None)), 'TypeError',
-            "'extension' must be a string or None ({} given).", parameter, type(extension)
-        )
-        self.stop(
-            type(file_type) not in (str, type(None)), 'TypeError',
-            "'file_type' must be a string or None ({} given).", parameter, type(file_type)
-        )
+        # Check the types of name, extension, file_type, dir_only and full_path
+        self.check_type(name, 'name', ('string', 'None'))
+        self.check_type(extension, 'extension', ('string', 'None'))
+        self.check_type(file_type, 'file_type', ('string', 'None'))
+        self.check_type(dir_only, 'dir_only', 'boolean')
+        self.check_type(full_path, 'full_path', 'boolean')
 
-        # Redefine directory path as the absolute path
-        dir_path = directory(
-            collection.base_dir, path.dirname(file_path), parameter,
+        # Add a name and an extension to the file path, if needed
+        if path.basename(file_path) == '' and name is not None:
+            file_path = path.join(file_path, name)
+        if path.splitext(file_path)[-1] == '' and extension is not None:
+            file_path += f'.{extension}'
+
+        # Redefine the file path as the absolute path
+        file_path = get_abspath(
+            collection.base_dir, file_path, parameter,
             check=check, create=create
         )
 
-        # Add a default file name with an extension, if needed
-        if path.basename(file_path) == '':
-            if name is not None:
-                if path.splitext(name)[-1].lower() == '' and extension is not None:
-                    name = f'{name}.{extension}'
-                file_path = path.join(dir_path, name)
+        # Check if the file path is a directory only or a full path, if needed
+        self.stop(
+            dir_only and path.basename(file_path) != '', 'ValueError',
+            "'{}' must be a path to directory, not a file ({} given).", parameter, file_path
+        )
+        self.stop(
+            full_path and path.basename(file_path) == '', 'ValueError',
+            "'{}' must be a path to file, not a directory ({} given).", parameter, file_path
+        )
 
-        # Add the file name to the directory path
-        else:
-            file_path = path.join(dir_path, path.basename(file_path))
-
-        # Check if there's an extension and add an extension, if needed
-        if path.basename(file_path) != '':
-            if path.splitext(file_path)[-1] != '':
-                extension = path.splitext(file_path)[-1][1:]
-            if path.splitext(file_path)[-1] == '' and extension is not None:
-                file_path += f'.{extension}'
-
-            # Set file type, if needed
-            if file_type is None and extension is not None:
-                file_type = extension.upper()
-
-            # Check if the file exists
-            if check:
-                self.stop(
-                    not path.exists(file_path), 'FileNotFoundError',
-                    "No {} file located at '{}'.", file_type, file_path
-                )
-
-            # Check if the file has the right extension
-            if check and extension is not None:
-                self.stop(
-                    path.splitext(file_path)[-1].lower() != f'.{extension}', 'ValueError',
-                    "The file located at '{}' is not a {} file (with a .{} extension).",
-                    file_path, file_type, extension
-                )
+        # Check if the file has the right extension
+        if path.basename(file_path) != '' and extension is not None:
+            self.stop(
+                path.splitext(file_path)[-1].lower() != f'.{extension}', 'ValueError',
+                "The file located at '{}' is not a {} file (with a .{} extension).",
+                file_path, file_type if file_type is not None else extension.upper(), extension
+            )
 
         return file_path
 
@@ -484,12 +444,14 @@ class Series(list, Output_Series):
             parameter, 'integer', 'float', none=none, mode=mode, all=True
         )
 
-        # Check if the parameter is convertible to an integer and greater than or equal to 1
+        # Check if the parameter is convertible to an integer
         self.stop(
             parameter.values % 1 != 0, 'ValueError',
             "'{}' must be convertible to an integer ({} given).",
             parameter.label, parameter.values
         )
+
+        # Check if the parameter is greater than or equal to 1
         self.stop(
             parameter.values < 1, 'ValueError',
             "'{}' must be greater than or equal to 1 ({} given).",
@@ -511,12 +473,8 @@ class Series(list, Output_Series):
         if parameter.units is None:
             parameter.units = self.config.default_parameters[parameter.label].units
 
-        # Check if parameter.units is a string
-        self.stop(
-            type(parameter.units) != str, 'TypeError',
-            "'units' component of '{}' must be a string ({} given).",
-            parameter.label, type(parameter.units)
-        )
+        # Check the type of parameter.units
+        self.check_type(parameter.units, f'{parameter.label}.units', 'string')
 
         # Check if parameter.units can be converted to Unit
         try:
@@ -615,11 +573,9 @@ class Series(list, Output_Series):
             else:
                 parameter.units = (parameter.units,)
 
-        # Check the type of parameter.units component
-        self.stop(
-            type(parameter.units) not in (tuple, list, np.ndarray), 'TypeError',
-            "'units' component of '{}' must be a string, tuple, list or np.ndarray ({} given).",
-            parameter.label, type(parameter.values)
+        # Check the type of parameter.units
+        self.check_type(
+            parameter.units, f'{parameter.label}.units', ('string', 'tuple', 'list', 'array')
         )
 
         # Check if all elements in parameter.units component can be converted to Unit
@@ -660,14 +616,14 @@ class Series(list, Output_Series):
         """
 
         def __init__(self, series, metric):
-            """ Initializes an average association size metric. """
+            """Initializes an average association size metric."""
 
             # Initialization
             self.series = series
             self.label = eval(metric['label'])
             self.name = np.array(eval(metric['name']))
-            self.latex_short = np.array(eval( metric['latex_short']))
-            self.latex_long = np.array(eval( metric['latex_long']))
+            self.latex_short = np.array(eval(metric['latex_short']))
+            self.latex_long = np.array(eval(metric['latex_long']))
             self.valid = np.array(eval(metric['valid']))
             self.order = int(metric['order'])
             self.age_shift = np.array(eval(metric['age_shift']))
@@ -879,20 +835,11 @@ class Series(list, Output_Series):
         # Check if a series already exists
         if self.name in collection.series.keys():
             choice = None
-            self.stop(
-                type(forced) != bool, 'TypeError',
-                "'forced' must be a boolean ({} given).", type(forced)
-            )
+            self.check_type(forced, 'forced', 'boolean')
             if not forced:
-                self.stop(
-                    type(default) != bool, 'TypeError',
-                    "'default' must be a default ({} given).", type(default)
-                )
+                self.check_type(default, 'default', 'boolean')
                 if not default:
-                    self.stop(
-                        type(cancel) != bool, 'TypeError',
-                        "'cancel' must be a boolean ({} given).", type(cancel)
-                    )
+                    self.check_type(cancel, 'cancel', 'boolean')
                     if not cancel:
 
                         # User input
@@ -1003,12 +950,11 @@ class Series(list, Output_Series):
         one modified, existing groups are simply kept and renamed.
         """
 
-        # Initialization
+        # Set parent parameter
         parent = self.config if parent is None else parent
-        self.stop(
-            type(create) != bool, 'TypeError',
-            "'create' must be a boolean ({} given).", type(create)
-        )
+
+        # Set create parameter
+        self.check_type(create, 'create', 'boolean')
         create = False if len(self) == 0 else create
 
         # New configuration
@@ -1058,10 +1004,7 @@ class Series(list, Output_Series):
         else:
 
             # Check if a traceback has already been done
-            self.stop(
-                type(forced) != bool, 'TypeError',
-                "'forced' must be a boolean ({} given).", type(forced)
-            )
+            self.check_type(forced, 'forced', 'boolean')
             if len(self) > 0:
 
                 # User input
@@ -1158,10 +1101,7 @@ class Series(list, Output_Series):
         """
 
         # Check if a traceback has already been done
-        self.stop(
-            type(forced) != bool, 'TypeError',
-            "'forced' must be a boolean ({} given).", type(forced)
-        )
+        self.check_type(forced, 'forced', 'boolean')
 
         # User input
         if len(self) > 0:
@@ -1206,7 +1146,8 @@ class Series(list, Output_Series):
             # Set load path parameter
             self.load_path = self.set_path(
                 self.config.load_path if load_path is None else load_path, 'load_path',
-                name=self.name, extension='series', file_type='Series', check=True, create=False
+                name=self.name, extension='series', file_type='Series',
+                full_path=True, check=True, create=False
             )
 
             # Series unpickling
@@ -1221,7 +1162,7 @@ class Series(list, Output_Series):
                     parameter for parameter in vars(self).keys()
                     if parameter not in (
                         'load', 'save', 'load_path', 'save_path',
-                        'data_dir', 'output_dir', 'logs_dir'
+                        'data_dir', 'output_dir', 'logs_path'
                     )
                 ]:
                 del vars(self)[parameter]
@@ -1242,10 +1183,7 @@ class Series(list, Output_Series):
         """
 
         # Check if a traceback has already been done
-        self.stop(
-            type(forced) != bool, 'TypeError',
-            "'forced' must be a boolean ({} given).", type(forced)
-        )
+        self.check_type(forced, 'forced', 'boolean')
         if len(self) > 0:
 
             # User input
@@ -1286,10 +1224,6 @@ class Series(list, Output_Series):
             self.configure_mode(mode=mode)
             self.configure_traceback()
 
-            # !!! Redinition of the number of stars when using the from data mode !!!
-            if self.from_data:
-                self.number_of_stars = len(self.data.core_sample)
-
             # Logging and progress bar
             self.log(
                 "Tracing back '{}' series from {}.",
@@ -1304,7 +1238,7 @@ class Series(list, Output_Series):
                 )
             )
 
-            # Traceback
+            # Traceback groups
             for number in range(self.number_of_groups):
 
                 # Group name and message
@@ -1315,7 +1249,7 @@ class Series(list, Output_Series):
                 self.log(f'{message}.', display=False, logging=logging)
                 self.progress_bar.set_description(desc=message, refresh=True)
 
-                # Group traceback
+                # Traceback
                 self.append(Group(self, number, name))
 
             # Traceback logging and progress bar
@@ -1357,7 +1291,7 @@ class Series(list, Output_Series):
                         parameter: vars(self)[parameter] for parameter in vars(self).keys()
                         if parameter not in (
                             'load', 'save', 'load_path', 'save_path',
-                            'data_dir', 'output_dir', 'logs_dir'
+                            'data_dir', 'output_dir', 'logs_path'
                         )
                     }, tuple(group for group in self)
                 ), file
@@ -1368,26 +1302,18 @@ class Series(list, Output_Series):
         self.save = True
         self.save_path = self.set_path(
             self.config.save_path if save_path is None else save_path, 'save path',
-            name=self.name, extension='series', file_type='Series', check=False, create=True
+            name=self.name, extension='series', file_type='Series',
+            full_path=True, check=False, create=True
         )
 
         # Check if a file already exists
         if path.exists(self.save_path):
             choice = None
-            self.stop(
-                type(forced) != bool, 'TypeError',
-                "'forced' must be a boolean ({} given).", type(forced)
-            )
+            self.check_type(forced, 'forced', 'boolean')
             if not forced:
-                self.stop(
-                    type(default) != bool, 'TypeError',
-                    "'default' must be a default ({} given).", type(default)
-                )
+                self.check_type(default, 'default', 'boolean')
                 if not default:
-                    self.stop(
-                        type(cancel) != bool, 'TypeError',
-                        "'cancel' must be a boolean ({} given).", type(cancel)
-                    )
+                    self.check_type(cancel, 'cancel', 'boolean')
                     if not cancel:
 
                         # User input
@@ -1423,7 +1349,8 @@ class Series(list, Output_Series):
                     # Logging
                     self.log(
                         "File name changed and series saved at '{}'.", self.save_path,
-                        logging=logging)
+                        logging=logging
+                    )
 
             # Existing file deletion and saving
             if forced or choice in ('y', 'yes'):
@@ -1472,6 +1399,32 @@ class Series(list, Output_Series):
             "Impossible to create an output.", self.name
         )
 
+    def check_type(self, value, label, type_labels):
+        """Checks if the type of the value if valid."""
+
+        # Set types
+        types = {
+            'None': type(None),
+            'boolean': bool,
+            'string': str,
+            'integer': int,
+            'float': float,
+            'tuple': tuple,
+            'list': list,
+            'dictionary': dict,
+            'array': np.ndarray
+        }
+
+        # Set type labels
+        type_labels = type_labels if type(type_labels) == tuple else (type_labels,)
+
+        # Check the type of value
+        self.stop(
+            type(value) not in [types[label] for label in type_labels],
+            'TypeError', "'{}' must be a {} ({} given).",
+            label, enumerate_strings(*type_labels), type(value)
+        )
+
     def log(self, message, *words, logs_path=None, level='info', display=False, logging=True):
         """
         Logs the 'message' with the appropriate 'level', if logs have been configured. If logs
@@ -1482,13 +1435,14 @@ class Series(list, Output_Series):
         """
 
         # Set logs path parameter
-        self.logs_path = self.set_string(
-            self.config.logs_path if logs_path is None else logs_path, none=True
-        )
+        if 'logs_path' not in vars(self).keys():
+            self.logs_path = self.set_path(
+                self.config.logs_path, 'logs_path', create=True, none=True
+            )
 
         # Create logging message
         log(
-            message, *words, logs_path=None,
+            message, *words, logs_path=self.logs_path if logs_path is None else logs_path,
             level=level, display=display, logging=logging
         )
 

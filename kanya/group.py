@@ -25,7 +25,7 @@ class Group(list, Output_Group):
 
     def __init__(self, series, number, name):
         """
-        Initializes a Group object and embedded Star objects from a simulated sample of stars
+        Initializes a Group object and embedded Star objects from a modeled sample of stars
         in a moving group or raw data in the form a Data object. This dataset is then moved
         backwards in time from the initial time to the final time, and its age is estimated
         by minimizing various association size metrics.
@@ -108,7 +108,7 @@ class Group(list, Output_Group):
 
         # Create stars from data
         index = 0
-        for star in self.series.data.core_sample:
+        for star in self.series.data.sample:
 
             # Position and velocity errors based on data
             if self.series.data_errors:
@@ -257,10 +257,10 @@ class Group(list, Output_Group):
             # Scramble position and velocity based on data
             if self.series.data_errors:
                 errors = star - (
-                    star // len(self.series.data.core_sample)
-                ) * len(self.series.data.core_sample)
-                position_obs_error = self.series.data.core_sample[errors].position.errors
-                velocity_obs_error = self.series.data.core_sample[errors].velocity.errors
+                    star // len(self.series.data.sample)
+                ) * len(self.series.data.sample)
+                position_obs_error = self.series.data.sample[errors].position.errors
+                velocity_obs_error = self.series.data.sample[errors].velocity.errors
 
             # Scramble position and velocity based on models
             else:
@@ -277,10 +277,10 @@ class Group(list, Output_Group):
             # Radial velocity shift based on data
             if self.series.data_rv_shifts:
                 rv_shift = star - (
-                    star // len(self.series.data.core_sample)
-                ) * len(self.series.data.core_sample)
-                rv_shift_value = self.series.data.core_sample[rv_shift].rv_shift.value
-                rv_shift_error = self.series.data.core_sample[rv_shift].rv_shift.error
+                    star // len(self.series.data.sample)
+                ) * len(self.series.data.sample)
+                rv_shift_value = self.series.data.sample[rv_shift].rv_shift.value
+                rv_shift_error = self.series.data.sample[rv_shift].rv_shift.error
 
             # Radial velocity shift based on models
             else:
@@ -323,13 +323,13 @@ class Group(list, Output_Group):
         """
 
         # Create sample, subsample and outliers lists
-        self.subsample = list(filter(lambda star: star.subsample, self))
         self.sample = list(filter(lambda star: not star.outlier, self))
+        self.subsample = list(filter(lambda star: star.subsample, self))
         self.outliers =list(filter(lambda star: star.outlier, self))
 
         # Number of remaining stars
-        self.subsample_size = len(self.subsample)
         self.sample_size = len(self.sample)
+        self.subsample_size = len(self.subsample)
         self.number_of_outliers = len(self.outliers)
 
         # Average xyz positions and velocities, excluding outliers
@@ -363,7 +363,7 @@ class Group(list, Output_Group):
     def filter_outliers(self):
         """
         Filters outliers from the sample based on ξηζ position and velocity scatter over time.
-        A core sample is created based on a robust covariances matrix estimator using the
+        A subsample is created based on a robust covariances matrix estimator using the
         scikit-learn (sklearn) Python package, leaving other stars as part of the extended
         sample.
         """
@@ -446,7 +446,7 @@ class Group(list, Output_Group):
                     np.sum(support_fraction, axis=0) / self.series.number_of_steps > 0.7
                 )
 
-                # Core creation
+                # Subsample creation
                 for i in range(self.sample_size):
                     if support_fraction_all[i]:
                         self.sample[i].subsample = True
@@ -1081,6 +1081,14 @@ class Group(list, Output_Group):
                 self.get_orbit()
             if self.group.series.timer:
                 self.group.time_integrate += get_time() - t0
+
+            # !!! Temporary xyz position and velocity errors setting !!!
+            self.position_xyz_error = np.repeat(
+                self.position_xyz_error[None], self.group.series.number_of_steps, axis=0
+            )
+            self.velocity_xyz_error = np.repeat(
+                self.velocity_xyz_error[None], self.group.series.number_of_steps, axis=0
+            )
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """Sets the star as an outlier."""

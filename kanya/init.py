@@ -29,19 +29,6 @@ class Config():
             )
         }
 
-        # Component types
-        types = {
-            'none': type(None),
-            'boolean': bool,
-            'string': str,
-            'integer': int,
-            'float': float,
-            'tuple': tuple,
-            'list': list,
-            'dictionary': dict,
-            'array': np.ndarray
-        }
-
         def __init__(self, **components):
             """Initializes a Parameter object with the given 'components'."""
 
@@ -147,29 +134,23 @@ class Config():
     def initialize_from_path(self, config_path):
         """
         Initializes a Config object from a configuration file located at 'config_path', and
-        checks for NameError, TypeError and ValueError exceptions. 'config_path' can be an
-        absolute path or relative to the current working directory.
+        checks for errors. 'config_path' can be an absolute path or relative to the current
+        working directory.
         """
 
-        # Check if configuration path is a string
+        # Redefine the configuration path as the absolute path
+        config_path = get_abspath(collection.base_dir, config_path, 'config_path', check=True)
+
+        # Check if the configuration path is a full path
         stop(
-            type(config_path) != str, 'TypeError',
-            "The path to the configuration file must be a string ('{}' given).", type(config_path)
+            path.basename(config_path) == '', 'ValueError',
+            "'config_path' must be a path to file, not a directory ({} given).", config_path
         )
 
-        # Redefine configuration path as the absolute path
-        config_path = directory(collection.base_dir, config_path, 'config_path')
-
-        # Check if the configuration file exists
+        # Check if the configuration file is a Python file
         stop(
-            not path.exists(config_path), 'FileNotFoundError',
-            "No configuration file located at '{}'.", config_path
-        )
-
-        # Check if the configuration is a Python file
-        stop(
-            path.splitext(config_path)[1] != '.py', 'TypeError',
-            "'{}' is not a Python file. (with a .py extension)", path.basename(config_path)
+            path.splitext(config_path)[-1].lower() != '.py', 'ValueError',
+            "The file located at '{}' is not a Python file. (with a .py extension)", config_path
         )
 
         # Configuration file import
@@ -199,13 +180,10 @@ class Config():
         values given in a configuration file.
         """
 
-        # Check if 'args' is a boolean value
-        stop(
-            type(args) != bool, 'TypeError',
-            "'args' must be a boolean value ({} given).", type(args)
-        )
+        # Check the type of args
+        check_type(args, 'args', 'boolean')
 
-        # Arguments parsing
+        # Parse arguments
         from argparse import ArgumentParser
         parser = ArgumentParser(
             prog='kanya',

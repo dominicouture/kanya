@@ -68,15 +68,18 @@ class Data(list):
         self.from_CSV = True
 
         # Set data directory parameter
-        self.data_dir = self.series.set_string(
-            self.series.config.data_dir if data_dir is None else data_dir,
-            mode=True if self.series.from_data else False
-        )
+        if 'data_dir' not in vars(self).keys():
+            self.data_dir = self.series.set_path(
+                self.series.config.data_dir, 'data_dir',
+                dir_only=True, check=False, create=False,
+                mode=True if self.series.from_data else False
+            )
 
-        # Set data path parameter
+        # Set data path
         self.data_path = self.series.set_path(
-            path.join(self.data_dir, self.data.values), 'data_path',
-            extension='csv', file_type='CSV', check=True, create=False,
+            self.data_dir if data_dir is None else data_dir, 'data_path',
+            name=self.data.values, extension='csv', file_type='CSV',
+            full_path=True, check=True, create=False,
             mode=True if self.series.from_data else False
         )
 
@@ -246,8 +249,8 @@ class Data(list):
             # Check if all values in self.data.units are strings
             self.series.stop(
                 not np.vectorize(lambda label: type(self.data.units[label]) == str)(
-                    tuple(self.data.units.keys())).all(), 'TypeError',
-                "All elements in 'data.units' component must be strings."
+                    tuple(self.data.units.keys())
+                ).all(), 'TypeError', "All elements in 'data.units' component must be strings."
             )
 
         # Units from an array mimicking a unit header
@@ -275,8 +278,7 @@ class Data(list):
         # Non-valid 'data.units' types
         else:
             self.series.stop(
-                True, 'TypeError',
-                "'data.units' component must be a string, "
+                True, 'TypeError', "'data.units' must be a string, "
                 "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units)
             )
 
@@ -691,38 +693,36 @@ class Data(list):
         for row in self.rows:
             self.append(self.Row(self, row))
 
-        # Create input sample
-        self.input_sample = list(
-            filter(
-                lambda row: row.valid and row.sample in ('core_sample', 'extended_sample'), self
-            )
-        )
+        # Create samples
+        self.samples = {
 
-        # Create rejected sample
-        self.rejected_sample = list(
-            filter(
-                lambda row: not row.valid or row.sample not in ('core_sample', 'extended_sample'),
-                self
-            )
-        )
+            # Full sample: only invalid stars are excluded
+            'full': tuple(filter(lambda row: row.valid, self)),
 
-        # Create core sample
-        self.core_sample = list(
-            filter(lambda row: row.sample == 'core_sample', self.input_sample)
-        )
+            # Rejected sample: stars not in the extended or core samples are excluded
+            'rejected': tuple(
+                filter(lambda row: not row.valid or row.sample not in ('core', 'extended'), self)
+            ),
 
-        # Create extended sample
-        self.extended_sample = list(
-            filter(lambda row: row.sample == 'extended_sample', self.input_sample)
-        )
+            # Input sample: stars in both the extended and core samples are included
+            'input': tuple(
+                filter(lambda row: row.valid and row.sample in ('core', 'extended'), self)
+            ),
 
-        # Uncomment this line to use the input sample
-        # self.core_sample = self.input_sample
+            # Extended sample: only stars in the extended are included
+            'extended': tuple(filter(lambda row: row.sample == 'extended', self)),
 
-        # Uncomment this line to limit radial velocity precision
-        # self.core_sample = list(
+            # Core sample: only stars in the core sample are included
+            'core': tuple(filter(lambda row: row.sample == 'core', self))
+        }
+
+        # Select sample
+        self.sample = self.samples['full' if self.series.sample is None else self.series.sample]
+
+        # Uncomment this line to limit radial velocity precision in the core sample
+        # self.sample = tuple(
         #     filter(
-        #         lambda row: row.sample == 'core_sample' and row.velocity.errors[0] < 2.5,
+        #         lambda row: row.sample == 'sample' and row.velocity.errors[0] < 2.5,
         #         self.input_sample
         #     )
         # )
@@ -802,11 +802,13 @@ class Data(list):
                 if 'id' in self.data.columns and self.values['id'].strip() != '' else str(self.row)
             )
 
-            # Final sample column
+            # Sample column
             self.sample = (
                 self.values['sample'].strip()
                 if 'sample' in self.data.columns and self.values['sample'].strip() != ''
-                else 'core_sample'
+
+                # Stars not in any sample are rejected
+                else 'rejected'
             )
 
             # Mass column

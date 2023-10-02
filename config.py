@@ -33,35 +33,30 @@ name.value = 'beta_pictoris'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
 
-# Path to the file or directory used for pickle input relative to the current directory (str
-# or None). By default, if this is None of absent, pickles are loaded from a file named
-# 'name.value'.series in the current directory.
-load_path.value = None
-load_path.value = ''
-
-# Path to the file or directory used for pickle output relative to the current directory (str
-# or None). By default, if this is None of absent, pickles are saved to a file named
-# 'name.value'.series in the current directory.
-save_path.value = None
-save_path.value = ''
-
 # Path to the directory used for loading data relative to the current directory (str or None).
-# By default, if this is None of absent, outputs are loaded from a 'Data' directory in the
-# current directory.
-data_dir.value = None
-data_dir.value = '../Data'
+# By default, if this is None of absent, data is loaded from the current directory. Directory
+# names end with '/'.
+data_dir.value = '../Data/'
 
 # Path to the directory used for saving figures, tables and other output types relative to the
 # current directory (str or None). By default, if this is None of absent, outputs are saved to
-# an 'Output' directory in the current directory.
-output_dir.value = None
-output_dir.value = 'Output'
+# the current directory. Directory names end with '/'.
+output_dir.value = '../Output/'
 
-# Path to the file or directory used for logging relative to the current directory (str or None).
-# By default, if this is None of absent, outputs are saved to a 'Logs' directory in the current
-# directory.
-logs_path.value = None
-logs_path.value = 'Logs'
+# Path to the directory of path used for logging relative to the current directory (str or None).
+# By default, if this is None of absent, logs are saved to a 'Logs' directory in the current
+# directory. Directory names end with '/'.
+logs_path.value = '../Logs/'
+
+# Path to the file or directory used for pickle input relative to the current directory (str
+# or None). By default, if this is None of absent, pickles are loaded from a file named
+# 'name.value'.series in the current directory. Directory names end with '/'.
+load_path.value = None
+
+# Path to the file or directory used for pickle output relative to the current directory (str
+# or None). By default, if this is None of absent, pickles are saved to a file named
+# 'name.value'.series in the current directory. Directory names end with '/'.
+save_path.value = None
 
 # Association size metrics (boolean) to be computed
 size_metrics.value = True
@@ -95,7 +90,7 @@ final_time.value = -50.1951006
 # Age of simulated groups of stars (float, ≠ initial_time)
 age.value = -24.0
 
-# Number of stars in each simulated group of stars (integer, > 0)
+# Number of stars in each simulated group of stars (integer, ≥ 1)
 number_of_stars.value = 25
 
 # Average position of the simulated sample of stars (3 floats in tuple)
@@ -250,7 +245,7 @@ data.system = 'observables'
 data_errors.value = True
 
 # Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = False
+data_rv_shifts.value = True
 
 # Radial velocity shift added (from model) or substracted (from data) to all stars (float)
 # rv_shift.value = 0.5
@@ -263,9 +258,10 @@ rv_shift.unit = 'km/s'
 cutoff.value = 3.0
 
 # Whether to use the full (with outliers), standard sample or the subsample (str or None)
-sample.value = 'full'
-sample.value = 'sample'
-sample.value = 'subsample'
+# sample.value = None
+# sample.value = 'rejected'
+# sample.value = 'input'
+# sample.value = 'extended'
 sample.value = 'core'
 
 # Galactic potential used for orbit integration (str or None)
