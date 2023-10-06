@@ -38,8 +38,8 @@ for series in kanya.collection:
     series.create_cross_covariances_ξηζ_plot(robust=True, forced=True)
     series.create_mad_xyz_plot(forced=True)
     series.create_mad_ξηζ_plot(forced=True) # Valid
-    series.create_xyz_mst_plot(forced=True)
-    series.create_ξηζ_mst_plot(forced=True)
+    series.create_mst_xyz_plot(forced=True)
+    series.create_mst_ξηζ_plot(forced=True)
     series.create_covariances_mad_ξηζ_plot(forced=True)
     series.create_age_distribution(forced=True)
 
@@ -48,16 +48,20 @@ for series in kanya.collection:
         if group.number == 0:
             group.create_kinematics_table(forced=True, save=True, machine=True, age=-30.0)
             group.create_kinematics_time_table(forced=True, save=True, machine=True)
-            group.create_trajectory_xyz(forced=True, metric='covariances_xyz', index=0)
-            group.create_trajectory_ξηζ(forced=True, metric='covariances_ξηζ', index=0) # Valid
-            group.create_trajectory_time_xyz('1x3', forced=True, metric='covariances_xyz')
-            group.create_trajectory_time_ξηζ('1x3', forced=True, metric='covariances_ξηζ') # Valid
-            group.create_map(forced=True, labels=False)
-            group.create_2D_scatter('x', 'y', age=-10, errors=True, forced=True)
-            group.create_3D_scatter(age=-10, errors=True, forced=True)
-            group.create_2D_and_3D_scatter([0,  -10,  -20], errors=True, forced=True)
+            group.create_trajectory_xyz(metric='covariances_xyz', index=0, forced=True)
+            group.create_trajectory_ξηζ(metric='covariances_ξηζ', index=0, forced=True) # Valid
+            group.create_position_xyz_plot('2x2', metric='covariances_xyz', forced=True)
+            group.create_position_ξηζ_plot('2x2', metric='covariances_ξηζ', forced=True) # Valid
+            group.create_position_xyz_scatter('1x3', age=-5, errors=True, forced=True)
+            group.create_position_xyz_scatter('2x2', age=-5, errors=True, forced=True)
+            group.create_position_ξηζ_scatter('1x3', age=-5, errors=True, forced=True)
+            group.create_position_ξηζ_scatter('2x2', age=-5, errors=True, forced=True)
+            group.create_2d_3d_scatters_xyz([0,  -10,  -20], errors=True, forced=True)
             group.create_cross_covariances_scatter('x', 'u', age=-10, errors=True, forced=True)
-            group.create_age_distribution(forced=True, metric='covariances_ξηζ', index=0)
+            group.create_age_distribution(metric='covariances_ξηζ', index=0, forced=True)
+            group.create_map(labels=False, forced=True)
+
+            # Star output
             for star in group:
                 if star.name == 'HR 8799':
                     star.create_kinematics_time_table(show=False, save=True, machine=True)

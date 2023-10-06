@@ -138,6 +138,9 @@ class Config():
         working directory.
         """
 
+        # Check the type of config_path
+        check_type(config_path, 'config_path', 'string')
+
         # Redefine the configuration path as the absolute path
         config_path = get_abspath(collection.base_dir, config_path, 'config_path', check=True)
 

@@ -70,18 +70,11 @@ class Series(list, Output_Series):
         self.load = self.set_boolean(self.config.load)
         self.save = self.set_boolean(self.config.save)
 
-        # Set association size metric parameters
-        for parameter in (
-            'size_metrics', 'cov_metrics', 'cov_robust_metrics',
-            'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics'
-        ):
-            vars(self)[parameter] = self.set_boolean(vars(self.config)[parameter])
-
         # Import the association size metrics file and skip the header line
         metrics_file = path.join(path.dirname(__file__), 'resources/association_size_metrics.csv')
         metrics_dataframe = pd.read_csv(metrics_file, delimiter=';')
 
-        # Configure association size metric
+        # Initialize association size metrics
         self.metrics = []
         for index, metric in metrics_dataframe.iterrows():
             self.Metric(self, metric)
@@ -134,24 +127,6 @@ class Series(list, Output_Series):
         # Set number of steps parameter with one more step to account for t = 0
         self.number_of_steps = self.set_integer(self.config.number_of_steps) + 1
 
-        # Set number of iterations parameter
-        self.number_of_iterations = self.set_integer(self.config.number_of_iterations)
-
-        # Check if number of iterations is greater than 0
-        self.stop(
-            self.number_of_iterations <= 0, 'ValueError',
-            "'number_of_iterations' must be greater to 0 ({} given).", self.number_of_iterations
-        )
-
-        # Set iteration fraction parameter
-        self.iteration_fraction = self.set_quantity(self.config.iteration_fraction).value
-
-        # Check if iteration fraction is between 0 and 1
-        self.stop(
-            self.iteration_fraction <= 0 or self.iteration_fraction > 1, 'ValueError',
-            "'iteration_fraction' must be between 0 and 1 ({} given).", self.iteration_fraction
-        )
-
         # Set initial time parameter
         self.initial_time = self.set_quantity(self.config.initial_time)
 
@@ -189,7 +164,7 @@ class Series(list, Output_Series):
         self.cutoff = self.set_quantity(self.config.cutoff, none=True).value
 
         # Check if cutoff is greater than 0
-        if self.config.cutoff.values is not None:
+        if self.cutoff is not None:
             self.stop(
                 self.cutoff <= 0.0, 'ValueError',
                 "'cutoff' must be greater than 0 ({} given).", self.cutoff
@@ -222,11 +197,9 @@ class Series(list, Output_Series):
                 self.stop(True, 'ValueError', "'potenial' is invalid ({} given).", self.potential)
             self.potential = potential
 
-        # Set principal component analysis parameter
-        self.pca = self.set_boolean(self.config.pca)
-
         # Set timer parameter
         self.timer = self.set_boolean(self.config.timer)
+        self.timers = {} if self.timer else None
 
         # Data configuration
         if self.from_data:
@@ -1176,10 +1149,10 @@ class Series(list, Output_Series):
             # Logging
             self.log("'{}' series loaded from '{}'.", self.name, self.load_path, logging=logging)
 
-    def traceback(self, forced=False, logging=True, mode=None):
+    def traceback(self, mode=None, forced=False, logging=True):
         """
-        Traces back Group and embeded Star objects using either imported data or by modeling a
-        group based on model parameters.
+        Traces back the Galactic orbit of every star, in every group in the Series, either using
+        imported data or by modeling groups from parameters.
         """
 
         # Check if a traceback has already been done
@@ -1208,8 +1181,8 @@ class Series(list, Output_Series):
 
             # Traceback cancellation
             else:
-                self.from_data = self.config.from_data.values
-                self.from_model = self.config.from_model.values
+                self.from_data = self.set_boolean(self.config.from_data)
+                self.from_model = self.set_boolean(self.config.from_model)
                 self.log(
                     "'{}' series was not created because it has already been traced back.",
                     self.name, logging=logging
@@ -1224,7 +1197,7 @@ class Series(list, Output_Series):
             self.configure_mode(mode=mode)
             self.configure_traceback()
 
-            # Logging and progress bar
+            # Traceback logging and progress bar
             self.log(
                 "Tracing back '{}' series from {}.",
                 self.name, 'data' if self.from_data else 'a model',
@@ -1238,10 +1211,8 @@ class Series(list, Output_Series):
                 )
             )
 
-            # Traceback groups
+            # Set group name and logging message
             for number in range(self.number_of_groups):
-
-                # Group name and message
                 name = f'{self.name}-{number}'
                 message = f"Tracing back '{name}' group"
 
@@ -1249,8 +1220,9 @@ class Series(list, Output_Series):
                 self.log(f'{message}.', display=False, logging=logging)
                 self.progress_bar.set_description(desc=message, refresh=True)
 
-                # Traceback
-                self.append(Group(self, number, name))
+                # Compute galactic orbits
+                group = Group(self, number, name)
+                group.traceback()
 
             # Traceback logging and progress bar
             message = f"'{self.name}' series succesfully traced back"
@@ -1264,13 +1236,102 @@ class Series(list, Output_Series):
                 for message in self[0].outliers_messages:
                     self.log(message, display=True, logging=logging)
 
-            # Show timer
-            if self.timer:
-                self[0].show_timer()
+            # Compute covariance matrices for the first group
+            self[0].get_covariance_errors()
 
-            # Compute average association size metrics
-            for metric in self.metrics:
-                metric()
+    def chronologize(
+        self, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
+        cov_sklearn_metrics=None, mad_metrics=None, mst_metrics=None, logging=True
+    ):
+        """
+        Computes the kinematic age of the series by finding the epoch of minimal association size
+        using several association size metrics.
+        """
+
+        # Set association size metric parameters
+        if len(self) > 0:
+            for parameter in (
+                'size_metrics', 'cov_metrics', 'cov_robust_metrics',
+                'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics'
+            ):
+                if locals()[parameter] is None:
+                    vars(self)[parameter] = self.set_boolean(vars(self.config)[parameter])
+                else:
+                    vars(self)[parameter] = parameter
+                    self.check_type(vars(self)[parameter], parameter, 'boolean')
+
+            # Set number of iterations parameter
+            self.number_of_iterations = self.set_integer(self.config.number_of_iterations)
+
+            # Check if number of iterations is greater than 0
+            self.stop(
+                self.number_of_iterations <= 0, 'ValueError',
+                "'number_of_iterations' must be greater to 0 ({} given).", self.number_of_iterations
+            )
+
+            # Set iteration fraction parameter
+            self.iteration_fraction = self.set_quantity(self.config.iteration_fraction).value
+
+            # Check if iteration fraction is between 0 and 1
+            self.stop(
+                self.iteration_fraction <= 0 or self.iteration_fraction > 1, 'ValueError',
+                "'iteration_fraction' must be between 0 and 1 ({} given).", self.iteration_fraction
+            )
+
+            # Set principal component analysis parameter
+            self.pca = self.set_boolean(self.config.pca)
+
+            # Association size metrics logging and progress bar
+            if self.size_metrics:
+                self.log(
+                    "Computing size metrics of '{}' series.",
+                    self.name, display=True, logging=logging
+                )
+                self.progress_bar = tqdm(
+                    total=self.number_of_groups * (
+                        sum(
+                            [
+                                self.cov_metrics, self.cov_robust_metrics,
+                                self.cov_sklearn_metrics, self.mad_metrics,
+                                self.mst_metrics
+                            ]
+                        ) + ((self.number_of_steps // 5 + 1) * 2 if self.mst_metrics else 0.0) +
+                        ((self.number_of_steps // 5 + 1) * 2 if self.cov_sklearn_metrics else 0.0) +
+                        (4 if self.cov_sklearn_metrics else 0.0)
+                    ) , unit=' size metric', bar_format=(
+                        '{desc}{percentage:3.0f}% |{bar}| '
+                        '{n_fmt}/{total_fmt} {elapsed} {remaining} '
+                    )
+                )
+
+                # Set logging message
+                for group in self:
+                    message = f"Computing size metrics of '{group.name}' group"
+
+                    # Association size metrics computation logging and progress bar
+                    self.log(f'{message}.', display=False, logging=logging)
+                    self.progress_bar.set_description(desc=message, refresh=True)
+
+                    # Compute association size metrics
+                    group.chronologize()
+
+                # Association size metrics logging and progress bar
+                message = f"Size metrics of '{self.name}' series succesfully computed"
+                self.log(f'{message}.', display=False, logging=logging)
+                self.progress_bar.set_description(message, refresh=True)
+                self.progress_bar.close()
+                del self.progress_bar
+
+                # Compute average association size metrics
+                for metric in self.metrics:
+                    metric()
+
+        # Logging
+        else:
+            self.log(
+                "Kinematic age could not be computed because '{}' series has not been traced back.",
+                self.name, level='info', display=True, logging=logging
+            )
 
     def save_to_file(self, save_path=None, forced=False, default=False, cancel=False, logging=True):
         """
@@ -1330,8 +1391,8 @@ class Series(list, Output_Series):
 
                     # Saving cancellation
                     if cancel or choice in ('n', 'no'):
-                        self.load = self.config.load.values
-                        self.save = self.config.save.values
+                        self.load = self.set_boolean(self.config.load)
+                        self.save = self.set_boolean(self.config.save)
 
                         # Logging
                         self.log(
@@ -1371,7 +1432,11 @@ class Series(list, Output_Series):
             # Logging
             self.log("'{}' series saved at '{}'.", self.name, self.save_path, logging=logging)
 
-    def create(self, forced=False, default=False, cancel=False, logging=True, mode=None):
+    def create(
+        self, load_path=None, save_path=None, mode=None, size_metrics=None, cov_metrics=None,
+        cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None, mst_metrics=None,
+        forced=False, default=False, cancel=False, logging=True
+    ):
         """
         Either loads a series from a file, or traces a series back from data or a model. If
         needed, the series is also saved. If both self.load, and self.from_data or self.from_model
@@ -1381,15 +1446,68 @@ class Series(list, Output_Series):
 
         # Load from a file
         if self.load:
-            self.load_from_file(forced=forced, logging=logging)
+            self.load_from_file(load_path=load_path, forced=forced, logging=logging)
 
         # Traceback from data or a model
         else:
-            self.traceback(forced=forced, logging=logging, mode=mode)
+            self.traceback(mode=mode, forced=forced, logging=logging)
+            self.chronologize(
+                size_metrics=size_metrics, cov_metrics=cov_metrics,
+                cov_robust_metrics=cov_robust_metrics, cov_sklearn_metrics=cov_sklearn_metrics,
+                mad_metrics=mad_metrics, mst_metrics=mst_metrics, logging=logging
+            )
+
+            # Show timer
+            self.show_timer()
 
         # Save to a file
         if self.save:
-            self.save_to_file(forced=forced, default=default, cancel=cancel, logging=logging)
+            self.save_to_file(
+                save_path=save_path, forced=forced,
+                default=default, cancel=cancel, logging=logging
+            )
+
+    def show_timer(self):
+        """Displays the time required to perform various steps in the group's creation."""
+
+        # Compute the total time
+        if self.timer:
+            total_time = sum([time for operation, time in self.timers.items()])
+
+            # Create the time string
+            def create_time_str(name, delay):
+                print('{}: {:.3f} s, {:.2f}%'.format(name, delay, delay / total_time * 100))
+
+            # Show time for galactic orbit integration
+            create_time_str('Galactic orbits', self.timers['orbits'])
+
+            # Show times for association size metrics computation
+            if self.size_metrics:
+                if self.cov_metrics:
+                    create_time_str(
+                        'Covariances (empirical)',
+                        self.timers['cov_metrics']
+                    )
+                if self.cov_robust_metrics:
+                    create_time_str(
+                        'Covariances (robust)',
+                        self.timers['cov_robust_metrics']
+                    )
+                if self.cov_sklearn_metrics:
+                    create_time_str(
+                        'Covariances (sklearn)',
+                        self.timers['cov_sklearn_metrics']
+                    )
+                if self.mad_metrics:
+                    create_time_str(
+                        'Median absolute deviation',
+                        self.timers['mad_metrics']
+                    )
+                if self.mst_metrics:
+                    create_time_str(
+                        'Minimum spanning tree',
+                        self.timers['mst_metrics']
+                    )
 
     def check_traceback(self):
         """Checks whether a traceback has been computed in the series."""

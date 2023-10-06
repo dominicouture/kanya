@@ -67,7 +67,7 @@ mad_metrics.value = False
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 3
+number_of_groups.value = 5
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 1000
@@ -273,4 +273,4 @@ potential.value = 'Irrgang13I'
 pca.value = False
 
 # Whether to show the timer
-timer.value = False
+timer.value = True

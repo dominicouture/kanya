@@ -126,15 +126,19 @@ class Collection(list):
         self.logs_configured = False
 
     def new(
-        self, parent=None, file_path=None, args=False, forced=False, default=False,
-        cancel=False, logging=True, **parameters
+        self, parent=None, file_path=None, args=False, forced=False,
+        default=False, cancel=False, logging=True, **parameters
     ):
         """ Creates a new Series in the collection. Arguments are the same as those of
             Series.__init__.
         """
 
         from .series import Series
-        Series(parent, file_path, args, forced, default, cancel, logging, **parameters)
+
+        Series(
+            parent=parent, file_path=file_path, args=args, forced=forced,
+            default=default, cancel=cancel, logging=logging, **parameters
+        )
 
     def add(self, *series, forced=False, default=False, cancel=False, logging=True):
         """
@@ -150,21 +154,21 @@ class Collection(list):
                 str(type(series)) != "<class 'series.Series'>", 'TypeError',
                 "'series' must be Series object ({} given).", type(series)
             )
-            series.add(forced, default, cancel, logging)
+            series.add(forced=forced, default=default, cancel=cancel, logging=logging)
 
     def remove(self, *series, logging=True):
         """ Removes one or multiple series from the collection from series.name. """
 
         # Series deletion from collection
         for series in self.select(*series):
-            series.remove(logging)
+            series.remove(logging=logging)
 
     def reset(self, *series, logging=True):
         """ Resets one or multiple series from the collection from series.name. """
 
         # Series deletion from collection
         for series in self.select(*series):
-            series.reset(logging)
+            series.reset(logging=logging)
 
     def update(
         self, *series, parent=None, file_path=None, args=False,
@@ -177,7 +181,10 @@ class Collection(list):
         """
 
         for series in self.select(*series):
-            series.update(parent, file_path, args, logging, traceback, **parameters)
+            series.update(
+                parent=parent, file_path=file_path, args=args,
+                logging=logging, traceback=traceback, **parameters
+            )
 
     def copy(
         self, *series, parent=None, file_path=None, args=False,
@@ -190,42 +197,75 @@ class Collection(list):
         """
 
         for series in self.select(*series):
-            series.copy(parent, file_path, args, logging, traceback, **parameters)
+            series.copy(
+                parent=parent, file_path=file_path, args=args,
+                logging=logging, traceback=traceback, **parameters
+            )
 
-    def load_from_file(self, *series, load_path=None, forced=False):
+    def load_from_file(self, *series, load_path=None, forced=False, logging=True):
         """ Loads one or multiple series from the binary file. If forced, existing groups are
             overwritten.
         """
 
         for series in self.select(*series):
-            series.load_from_file(load_path, forced)
+            series.load_from_file(load_path=load_path, forced=forced, logging=logging)
 
-    def traceback(self, *series, forced=False, mode=None):
+    def traceback(self, *series, mode=None, forced=False, logging=True):
         """
         Traces back all series in self if no series name is given or selected series given
         given in argument by name. If forced, existing groups are overwritten.
         """
 
         for series in self.select(*series):
-            series.traceback(forced, mode)
+            series.traceback(mode=mode, forced=forced, logging=logging)
 
-    def save_to_file(self, *series, save_path=None, forced=False, default=False, cancel=False):
+    def chronologize(
+            self, *series, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
+            cov_sklearn_metrics=None, mad_metrics=None, mst_metrics=None, logging=True
+        ):
+        """
+        Computes the kinematic age of all series in self if no series name is given or selected
+        series given given in argument by name.
+        """
+
+        for series in self.select(*series):
+            series.chronologize(
+                size_metrics=size_metrics, cov_metrics=cov_metrics,
+                cov_robust_metrics=cov_robust_metrics, cov_sklearn_metrics=cov_sklearn_metrics,
+                mad_metrics=mad_metrics, mst_metrics=mst_metrics, logging=logging
+            )
+
+    def save_to_file(
+        self, *series, save_path=None, forced=False, default=False, cancel=False, logging=True
+    ):
         """
         Saves one or multiple series to a binary file. If forced, existing files are
         overwritten.
         """
 
         for series in self.select(*series):
-            series.save_to_file(save_path, forced, default, cancel)
+            series.save_to_file(
+                save_path=save_path, forced=forced, default=default, cancel=cancel, logging=logging
+            )
 
-    def create(self, *series, forced=False, default=False, cancel=False):
+    def create(
+        self, *series, load_path=None, save_path=None, mode=None, size_metrics=None,
+        cov_metrics=None, cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None,
+        mst_metrics=None, forced=False, default=False, cancel=False, logging=True
+    ):
         """
         Either load one or multiple series from a file, or traces back one or multiple
         series from data or a model. If needed, the series is also saved.
         """
 
         for series in self.select(*series):
-            series.create(forced, default, cancel)
+            series.create(
+                load_path=load_path, save_path=save_path, mode=mode, size_metrics=size_metrics,
+                cov_metrics=cov_metrics, cov_robust_metrics=cov_robust_metrics,
+                cov_sklearn_metrics=cov_sklearn_metrics, mad_metrics=mad_metrics,
+                mst_metrics=mst_metrics, forced=forced, default=default, cancel=cancel,
+                logging=logging
+            )
 
     def select(self, *series):
         """

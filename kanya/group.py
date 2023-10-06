@@ -18,17 +18,13 @@ from .coordinate import *
 
 class Group(list, Output_Group):
     """
-    Contains the values and related methods of a moving group and a list of Star objets that
-    are part of it. Stars are can be imported from a raw data file or modeled base on simulation
-    parameters.
+    Contains the values and related methods of an association and a list of Star objets that are
+    part of it. Stars are can be imported from data or modeled from parameters.
     """
 
     def __init__(self, series, number, name):
         """
-        Initializes a Group object and embedded Star objects from a modeled sample of stars
-        in a moving group or raw data in the form a Data object. This dataset is then moved
-        backwards in time from the initial time to the final time, and its age is estimated
-        by minimizing various association size metrics.
+        Initializes a Group in a series with a name and number, along with association size metrics.
         """
 
         # Initialization
@@ -36,68 +32,38 @@ class Group(list, Output_Group):
         self.number = number
         self.name = name
 
-        # Set timers
-        if self.series.timer:
-            self.time_integrate = 0.0
-            self.t0 = get_time()
+        # Initialize association size metrics
+        self.metrics = []
+        for metric in self.series.metrics:
+            self.Metric(self, metric)
+
+        # Add the group to the series
+        self.series.append(self)
+
+    def traceback(self):
+        """
+        Traces back the Galactic orbits of every star in the group, either using imported data
+        or by modeling stars from parameters. Outliers are also removed from the data sample.
+        """
 
         # Stars from data
+        self.set_timer('orbits')
         if self.series.from_data:
-            self.stars_from_data()
+            self.get_stars_from_data()
 
         # Stars from model
         elif self.series.from_model:
-            self.stars_from_model()
+            self.get_stars_from_model()
 
-        # Set association size metrics
-        if self.series.timer:
-            self.t1 = get_time()
-        self.set_metrics()
+        # Compute stars' coordinates
+        self.get_stars_coordinates()
 
-        # Principal component analysis
-        if self.series.timer:
-            self.t2 = get_time()
-        if self.series.pca:
-            self.principal_component_analysis(version=1)
+        # Filter outliers
+        if self.series.from_data:
+            self.filter_outliers()
+        self.set_timer()
 
-        # Compute association size metrics
-        if self.series.size_metrics:
-
-            # Compute empirical covariances metrics
-            if self.series.timer:
-                self.t3 = get_time()
-            if self.series.cov_metrics:
-                self.get_covariances()
-
-            # Compute robust covariances metrics
-            if self.series.timer:
-                self.t4 = get_time()
-            if self.series.cov_robust_metrics:
-                self.get_covariances_robust()
-
-            # Compute sklearn covariances metrics
-            if self.series.timer:
-                self.t5 = get_time()
-            if self.series.cov_sklearn_metrics:
-                self.get_covariances_sklearn()
-
-            # Compute median absolute deviation metrics
-            if self.series.timer:
-                self.t6 = get_time()
-            if self.series.mad_metrics:
-                self.get_median_absolute_deviation()
-
-            # Compute minimum spanning tree metrics
-            if self.series.timer:
-                self.t7 = get_time()
-            if self.series.mst_metrics:
-                self.get_minimum_spanning_tree()
-
-        # Final time
-        if self.series.timer:
-            self.t8 = get_time()
-
-    def stars_from_data(self):
+    def get_stars_from_data(self):
         """
         Creates a list of Star objects from a Python dictionary or CSV files containing the
         parameters including the name of the stars, their xyz positions and uvw velocities,
@@ -198,13 +164,7 @@ class Group(list, Output_Group):
             # Update progress bar
             self.series.progress_bar.update(1)
 
-        # Compute stars' coordinates
-        self.get_stars_coordinates()
-
-        # Filter outliers
-        self.filter_outliers()
-
-    def stars_from_model(self):
+    def get_stars_from_model(self):
         """
         Creates an artificial model of star for a given number of stars and age based on the
         the initial average xyz position and uvw velocity, and their respective errors and
@@ -310,9 +270,6 @@ class Group(list, Output_Group):
 
             # Update progress bar
             self.series.progress_bar.update(1)
-
-        # Compute stars coordinates
-        self.get_stars_coordinates()
 
     def get_stars_coordinates(self):
         """
@@ -467,64 +424,188 @@ class Group(list, Output_Group):
                 # Compute stars coordinates
                 self.get_stars_coordinates()
 
-    def set_metrics(self):
+    def get_covariance_errors(self):
         """
-        Sets the parameters to compute association size metrics, including weights based on
-        Mahalanobis distances computed with empirical covariances matrices, and jackknife
-        Monte Carlo itrations.
+        Computes the covariance matrices on the positions and velocities of every star, in
+        every group, as a function of time, and add this value every star in the group.
+        """
+
+        # xyz position covariance matrices
+        self.positions_xyz = np.array(
+            [[star.position_xyz for star in group.sample] for group in self.series[1:]]
+        )
+        position_xyz_cov_matrices = self.get_covariances_matrix('positions_xyz')
+        for star in range(len(self.sample)):
+            self.sample[star].position_xyz_error = position_xyz_cov_matrices[star]
+
+        # xyz velocity covariance matrices
+        self.velocities_xyz = np.array(
+            [[star.velocity_xyz for star in group.sample] for group in self.series[1:]]
+        )
+        velocity_xyz_cov_matrices = self.get_covariances_matrix('velocities_xyz')
+        for star in range(len(self.sample)):
+            self.sample[star].velocity_xyz_error = velocity_xyz_cov_matrices[star]
+
+        # ξηζ position covariance matrices
+        self.positions_ξηζ = np.array(
+            [[star.position_ξηζ for star in group.sample] for group in self.series[1:]]
+        )
+        position_ξηζ_cov_matrices = self.get_covariances_matrix('positions_ξηζ')
+        for star in range(len(self.sample)):
+            self.sample[star].position_ξηζ_error = position_ξηζ_cov_matrices[star]
+
+        # ξηζ velocity covariance matrices
+        self.velocities_ξηζ = np.array(
+            [[star.velocity_ξηζ for star in group.sample] for group in self.series[1:]]
+        )
+        velocity_ξηζ_cov_matrices = self.get_covariances_matrix('velocities_ξηζ')
+        for star in range(len(self.sample)):
+            self.sample[star].velocity_ξηζ_error = velocity_ξηζ_cov_matrices[star]
+
+    class Metric():
+        """
+        Association size metric including its values, age at minimum and minimum. Computes
+        errors on values, age and minium using a jackknife Monte Carlo method.
+        """
+
+        def __init__(self, group, metric):
+            """Initializes the association size metric."""
+
+            # Initialization
+            self.group = group
+            self.metric = metric
+
+            # Add the metric to the group
+            vars(self.group)[self.metric.label] = self
+            self.group.metrics.append(self)
+
+        def __call__(self, values):
+            """Computes errors on values, age and minium using a jackknife Monte Carlo method."""
+
+            # Average values and errors
+            self.values = np.atleast_3d(values)
+            self.value = np.mean(self.values, axis=0)
+            self.value_int_error = np.std(self.values, axis=0)
+
+            # Average age at the minimal value and error
+            self.ages = self.group.series.time[np.argmin(self.values, axis=1)]
+            self.age = self.group.series.time[np.argmin(self.value, axis=0)]
+            self.age_int_error = np.std(self.ages, axis=0)
+
+            # Average minimal value and error
+            self.minima = np.min(self.values, axis=1)
+            self.min = np.min(self.value, axis=0)
+            self.min_int_error = np.std(self.minima, axis=0)
+
+            # Set status
+            self.metric.status = True
+
+        def __repr__(self):
+            """"""
+            return '{}: {} ± {} Myr'.format(
+                self.metric.name,
+                self.age,
+                self.age_int_error
+            )
+
+    def chronologize(self):
+        """
+        Computes the kinematic age of the group by finding the epoch of minimal association size
+        using several size metrics. Parameters used to compute association size metrics, including
+        weights based on Mahalanobis distances computed with empirical covariances matrices, and
+        jackknife Monte Carlo itrations.
         """
 
         # Compute Mahalanobis distance
-        self.positions_xyz = np.array([star.position_xyz for star in self.sample])[:,None]
-        self.number_of_stars_iteration = 1
-        self.Mahalanobis_xyz = self.get_Mahalanobis_distance('positions_xyz')
+        if len(self) > 0:
+            self.positions_xyz = np.array([star.position_xyz for star in self.sample])[:,None]
+            self.number_of_stars_iteration = 1
+            self.Mahalanobis_xyz = self.get_Mahalanobis_distance('positions_xyz')
 
-        # Compute weights
-        self.weights = np.exp(-1 * self.Mahalanobis_xyz)
-        for i in range(len(self.sample)):
-            self.sample[i].weight = self.weights[i]
+            # Compute weights
+            self.weights = np.exp(-1 * self.Mahalanobis_xyz)
+            for i in range(len(self.sample)):
+                self.sample[i].weight = self.weights[i]
 
-        # Initialize association size metrics
-        self.metrics = []
-        for metric in self.series.metrics:
-            self.Metric(self, metric)
+            # !!! For the first group, randomly select stars for the jackknife Monte Carlo !!!
+            if True:
+                self.number_of_stars_iteration = int(
+                    self.sample_size * self.series.iteration_fraction
+                )
+                self.stars_monte_carlo = np.array(
+                    [
+                        np.random.choice(
+                            self.sample_size, self.number_of_stars_iteration, replace=False
+                        ) for i in range(self.series.number_of_iterations)
+                    ]
+                ).T
 
-        # For the first group, randomly select stars for the jackknife Monte Carlo
-        if True:
-            self.number_of_stars_iteration = int(self.sample_size * self.series.iteration_fraction)
-            self.stars_monte_carlo = np.array(
-                [
-                    np.random.choice(self.sample_size, self.number_of_stars_iteration, replace=False)
-                    for i in range(self.series.number_of_iterations)
-                ]
-            ).T
+            # For other groups, use the same stars for the jackknife Monte Carlo as the first group
+            else:
+                self.number_of_stars_iteration = self.series[0].number_of_stars_iteration
+                self.stars_monte_carlo = self.series[0].stars_monte_carlo
 
-        # For other groups, use the same stars for the jackknife Monte Carlo as the first group
-        else:
-            self.number_of_stars_iteration = self.series[0].number_of_stars_iteration
-            self.stars_monte_carlo = self.series[0].stars_monte_carlo
+            # Create selected stars xyz and ξηζ positions and velocities arrays
+            self.positions_xyz = np.array(
+                [star.position_xyz for star in self.sample]
+            )[self.stars_monte_carlo]
+            self.positions_ξηζ = np.array(
+                [star.position_ξηζ for star in self.sample]
+            )[self.stars_monte_carlo]
+            self.velocities_xyz = np.array(
+                [star.velocity_xyz for star in self.sample]
+            )[self.stars_monte_carlo]
+            self.velocities_ξηζ = np.array(
+                [star.velocity_ξηζ for star in self.sample]
+            )[self.stars_monte_carlo]
 
-        # Create selected stars xyz and ξηζ positions and velocities arrays
-        self.positions_xyz = np.array(
-            [star.position_xyz for star in self.sample]
-        )[self.stars_monte_carlo]
-        self.positions_ξηζ = np.array(
-            [star.position_ξηζ for star in self.sample]
-        )[self.stars_monte_carlo]
-        self.velocities_xyz = np.array(
-            [star.velocity_xyz for star in self.sample]
-        )[self.stars_monte_carlo]
-        self.velocities_ξηζ = np.array(
-            [star.velocity_ξηζ for star in self.sample]
-        )[self.stars_monte_carlo]
+            # Set principal component analysis
+            if self.series.pca:
+                self.set_principal_component_analysis(version=1)
 
-    def principal_component_analysis(self, version):
-        """Rotate the axes of the positions and velocities along the principal components."""
+            # Compute empirical covariances metrics
+            if self.series.cov_metrics:
+                self.set_timer('cov_metrics')
+                self.get_covariances()
+                self.series.progress_bar.update(1)
+
+            # Compute robust covariances metrics
+            if self.series.cov_robust_metrics:
+                self.set_timer('cov_robust_metrics')
+                self.get_covariances_robust()
+                self.series.progress_bar.update(1)
+
+            # Compute sklearn covariances metrics
+            if self.series.cov_sklearn_metrics:
+                self.set_timer('cov_sklearn_metrics')
+                self.get_covariances_sklearn()
+                self.series.progress_bar.update(1)
+
+            # Compute median absolute deviation metrics
+            if self.series.mad_metrics:
+                self.set_timer('mad_metrics')
+                self.get_median_absolute_deviation()
+                self.series.progress_bar.update(1)
+
+            # Compute minimum spanning tree metrics
+            if self.series.mst_metrics:
+                self.set_timer('mst_metrics')
+                self.get_minimum_spanning_tree()
+                self.series.progress_bar.update(1)
+            self.set_timer()
+
+    def set_principal_component_analysis(self, version):
+        """
+        Redefines the components of XYZ and ξηζ positions and velocities as the first, second and
+        third principal components by rotating the positions and velocities axes.
+        """
 
         # Principal component analysis (First version)
         if version==1:
             def rotate(positions, velocities):
-                """Rotate positions and velocities along the main components of the positions."""
+                """
+                Rotates positions and velocities axes along the main components of the positions.
+                """
 
                 # Rotation matrix computation
                 a = positions - np.mean(positions, axis=0)
@@ -581,52 +662,6 @@ class Group(list, Output_Group):
                 self.series.number_of_iterations, axis=0
             )
         )
-
-    class Metric():
-        """
-        Association size metric including its values, age at minimum and minimum. Computes
-        errors on values, age and minium using a jackknife Monte Carlo method.
-        """
-
-        def __init__(self, group, metric):
-            """Initializes the association size metric."""
-
-            # Initialization
-            self.group = group
-            self.metric = metric
-
-            # Add the metric to the group
-            vars(self.group)[self.metric.label] = self
-            self.group.metrics.append(self)
-
-        def __call__(self, values):
-            """Computes errors on values, age and minium using a jackknife Monte Carlo method."""
-
-            # Average values and errors
-            self.values = np.atleast_3d(values)
-            self.value = np.mean(self.values, axis=0)
-            self.value_int_error = np.std(self.values, axis=0)
-
-            # Average age at the minimal value and error
-            self.ages = self.group.series.time[np.argmin(self.values, axis=1)]
-            self.age = self.group.series.time[np.argmin(self.value, axis=0)]
-            self.age_int_error = np.std(self.ages, axis=0)
-
-            # Average minimal value and error
-            self.minima = np.min(self.values, axis=1)
-            self.min = np.min(self.value, axis=0)
-            self.min_int_error = np.std(self.minima, axis=0)
-
-            # Set status
-            self.metric.status = True
-
-        def __repr__(self):
-            """"""
-            return '{}: {} ± {} Myr'.format(
-                self.metric.name,
-                self.age,
-                self.age_int_error
-            )
 
     def get_covariances(self):
         """
@@ -689,6 +724,9 @@ class Group(list, Output_Group):
             self.covariances_xyz_matrix_det_robust, self.covariances_xyz_matrix_trace_robust
         )
 
+        # Update progress bar
+        self.series.progress_bar.update(1)
+
         # xyz position and velocity robust cross covariances matrix and determinant ages
         self.Mahalanobis_cross_xyz = self.get_Mahalanobis_distance(
             'positions_xyz', 'velocities_xyz',
@@ -705,6 +743,9 @@ class Group(list, Output_Group):
             self.cross_covariances_xyz_matrix_trace_robust
         )
 
+        # Update progress bar
+        self.series.progress_bar.update(1)
+
         # ξηζ position robust covariances matrix, determinant and trace ages
         self.Mahalanobis_ξηζ = self.get_Mahalanobis_distance(
             'positions_ξηζ', covariances_matrix=self.covariances_ξηζ_matrix
@@ -716,6 +757,9 @@ class Group(list, Output_Group):
             self.covariances_ξηζ_matrix_robust, self.covariances_ξηζ_robust,
             self.covariances_ξηζ_matrix_det_robust, self.covariances_ξηζ_matrix_trace_robust
         )
+
+        # Update progress bar
+        self.series.progress_bar.update(1)
 
         # ξηζ position and velocity robust cross covariances matrix and determinant ages
         self.Mahalanobis_cross_ξηζ = self.get_Mahalanobis_distance(
@@ -732,6 +776,9 @@ class Group(list, Output_Group):
             self.cross_covariances_ξηζ_matrix_det_robust,
             self.cross_covariances_ξηζ_matrix_trace_robust
         )
+
+        # Update progress bar
+        self.series.progress_bar.update(1)
 
         # xyz Mahalanobis distance mean and median
         self.mahalanobis_xyz_mean(np.mean(self.Mahalanobis_xyz, axis=0))
@@ -786,6 +833,10 @@ class Group(list, Output_Group):
                 MCD = MinCovDet(assume_centered=False).fit(a[step])
                 covariances_matrix.append(MCD.covariance_)
                 support_fraction.append(MCD.support_)
+
+                # Update progress bar
+                if step % 5 == 0:
+                    self.series.progress_bar.update(1)
 
             return np.repeat(
                 np.array(covariances_matrix)[None],
@@ -984,8 +1035,8 @@ class Group(list, Output_Group):
         branches_sorted = self.branches[branches_order]
 
         # Find the branches for every jackknife Monte Carlo iteration and timestep
-        for iteration in range(self.series.number_of_iterations):
-            for step in range(self.series.number_of_steps):
+        for step in range(self.series.number_of_steps):
+            for iteration in range(self.series.number_of_iterations):
                 branches = branches_sorted[step, branches_monte_carlo_sorted[iteration, step]]
 
                 # Nodes, tree and branch number initialization
@@ -1010,6 +1061,11 @@ class Group(list, Output_Group):
                         mst_lengths[iteration, step, valid_index] = vars(branch)[length][step]
                         mst_weights[iteration, step, valid_index] = branch.weight[step]
                         valid_index += 1
+
+            # Update progress bar
+            if step % 5 == 0:
+                self.series.progress_bar.update(1)
+
 
         return mst, mst_lengths.T.swapaxes(1, 2), mst_weights.T.swapaxes(1, 2)
 
@@ -1073,22 +1129,18 @@ class Group(list, Output_Group):
             vars(self).update(values)
 
             # Trajectory integration
-            if self.group.series.timer:
-                t0 = get_time()
             if self.group.series.potential is None:
                 self.get_linear()
             else:
                 self.get_orbit()
-            if self.group.series.timer:
-                self.group.time_integrate += get_time() - t0
 
             # !!! Temporary xyz position and velocity errors setting !!!
-            self.position_xyz_error = np.repeat(
-                self.position_xyz_error[None], self.group.series.number_of_steps, axis=0
-            )
-            self.velocity_xyz_error = np.repeat(
-                self.velocity_xyz_error[None], self.group.series.number_of_steps, axis=0
-            )
+            # self.position_xyz_error = np.repeat(
+            #     self.position_xyz_error[None], self.group.series.number_of_steps, axis=0
+            # )
+            # self.velocity_xyz_error = np.repeat(
+            #     self.velocity_xyz_error[None], self.group.series.number_of_steps, axis=0
+            # )
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """Sets the star as an outlier."""
@@ -1212,27 +1264,21 @@ class Group(list, Output_Group):
 
             return self.name
 
-    def show_timer(self):
-        """Displays the time required to perform various steps in the group's creation."""
+    def set_timer(self, operation=None):
+        """Records the operation time."""
 
-        # Set missing timers
-        if self.number == 0:
-            if not self.series.size_metrics:
-                self.t2 = self.t3 = self.t4 = self.t5 = self.t6 = self.t7 = get_time()
+        # Add the timer of the previous operation
+        if self.series.timer:
+            if 'previous_operation' in vars(self):
+                if self.previous_operation is not None:
 
-            self.tt = self.t8 - self.t0
+                    # Compute operation time
+                    operation_time = get_time() - self.previous_time
+                    if self.previous_operation in self.series.timers.keys():
+                        self.series.timers[self.previous_operation] += operation_time
+                    else:
+                        self.series.timers[self.previous_operation] = operation_time
 
-            # Create the time string
-            def create_time_str(name, delay, total):
-                print('{}: {:.2f} ms, {:.2f}%'.format(name, delay * 1000, delay / total * 100))
-
-            # Show times
-            create_time_str('stars', (self.t1 - self.t0), self.tt)
-            create_time_str('set_metrics', (self.t2 - self.t1), self.tt)
-            create_time_str('pca', (self.t3 - self.t2), self.tt)
-            create_time_str('cov', (self.t4 - self.t3), self.tt)
-            create_time_str('cov_robust', (self.t5 - self.t4), self.tt)
-            create_time_str('cov_sklearn', (self.t6 - self.t5), self.tt)
-            create_time_str('mad', (self.t7 - self.t6), self.tt)
-            create_time_str('mst', (self.t8 - self.t7), self.tt)
-            create_time_str('orbit integration', self.time_integrate, self.tt)
+            # Save preivous operation and time
+            self.previous_operation = operation
+            self.previous_time = get_time()
