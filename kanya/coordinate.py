@@ -9,6 +9,61 @@ Coordinate class which includes an initialization method and tranformation metho
 """
 
 from .quantity import *
+from copy import deepcopy
+
+class Variable():
+    """Defines a Variable object and required variables from all systems."""
+
+    def __init__(
+        self, label, name, latex, physical_type, unit=None,
+        usual_unit=None, unit_error=None, usual_unit_error=None
+    ):
+        """Initializes a Variable from a name, label and Unit object."""
+
+        # Initialization
+        self.label = label
+        self.name = name
+        self.latex = latex
+
+        # Set units
+        self.unit = default_units[physical_type] if unit is None else unit
+        self.usual_unit = usual_units[physical_type] if usual_unit is None else usual_unit
+
+        # Set error units
+        self.unit_error = self.unit if unit_error is None else unit_error
+        self.usual_unit_error = self.usual_unit if usual_unit_error is None else usual_unit_error
+
+        # Set physical type
+        self.physical_type = self.unit.physical_type
+
+    def __eq__(self, other):
+        """Tests whether self is not the equal to other."""
+
+        return vars(self) == vars(other)
+
+class Axis():
+    """Defines a Coordinate system axis."""
+
+    def __init__(self, name):
+        """Initializes an Axis object."""
+
+        # Initialization
+        self.name = name
+
+    def __eq__(self, other):
+        """Tests whether self is not the equal to other."""
+
+        return self.name == other.name
+
+    def __repr__(self):
+        """Returns a string of name of the axis."""
+
+        return self.name
+
+class Origin(Axis):
+    """Defines a Coordinate system origin."""
+
+    pass
 
 class System():
     """
@@ -23,16 +78,23 @@ class System():
         self.name = name
 
         # Values
-        self.position = [self.variables[label] for label in position]
-        self.velocity = [self.variables[label] for label in velocity]
+        self.position = [variables[label] for label in position]
+        self.velocity = [variables[label] for label in velocity]
 
         # Errors
-        self.position_error = [self.variables['Δ' + label] for label in position]
-        self.velocity_error = [self.variables['Δ' + label] for label in velocity]
+        self.position_error = [variables['Δ' + label] for label in position]
+        self.velocity_error = [variables['Δ' + label] for label in velocity]
 
         # Axis and origin
-        self.axis = System.axes[axis]
-        self.origin = System.origins[origin]
+        self.axis = axes[axis]
+        self.origin = origins[origin]
+
+        # Set label and latex label
+        self.label = ''.join([variable.label for variable in self.position])
+        self.latex = {
+            'position': ''.join([variable.latex for variable in self.position]),
+            'velocity': ''.join([variable.latex for variable in self.velocity])
+        }
 
     def __eq__(self, other):
         """Tests whether self is not the equal to other."""
@@ -44,137 +106,97 @@ class System():
 
         return self.name
 
-    # Default units per physical type
-    default_units = {
-        'time': Unit('Myr', 'megayear'),
-        'length': Unit('pc', 'parsec'),
-        'speed': Unit('pc/Myr', 'parsec per megayear'),
-        'angle': Unit('rad', 'radian'),
-        'angular speed': Unit('rad/Myr', 'radian per megayear'),
-        'mass': Unit('solMass', 'solar mass')
-    }
+# Default units per physical type
+default_units = {
+    'time': Unit('Myr', 'megayear'),
+    'length': Unit('pc', 'parsec'),
+    'speed': Unit('pc/Myr', 'parsec per megayear'),
+    'angle': Unit('rad', 'radian'),
+    'angular speed': Unit('rad/Myr', 'radian per megayear'),
+    'mass': Unit('solMass', 'solar mass')
+}
 
-    # Usual units used for observables per physical type and magnitude
-    usual_units = {
-        'speed': Unit('km/s', 'kilometer per second'),
-        'angle': Unit('deg', 'degree'),
-        'small angle': Unit('mas', 'milliarcsecond'),
-        'angular speed': Unit('mas/yr', 'milliarcsecond per year')
-    }
+# Usual units used for observables per physical type and magnitude
+usual_units = {
+    'time': Unit('Myr', 'megayear'),
+    'length': Unit('pc', 'parsec'),
+    'speed': Unit('km/s', 'kilometer per second'),
+    'angle': Unit('deg', 'degree'),
+    'small angle': Unit('mas', 'milliarcsecond'),
+    'angular speed': Unit('mas/yr', 'milliarcsecond per year'),
+    'mass': Unit('solMass', 'solar mass')
+}
 
-    class Axis():
-        """Defines a Coordinate system axis."""
+# Variables
+variables = {
+    variable.label: variable for variable in (
 
-        def __init__(self, name):
-            """Initializes an Axis object."""
+        # Castesian coordinate system variables
+        Variable('x', 'y position', 'X', 'length'),
+        Variable('y', 'y position', 'Y', 'length'),
+        Variable('z', 'z position', 'Z', 'length'),
+        Variable('u', 'u velocity', 'U', 'speed'),
+        Variable('v', 'v velocity', 'V', 'speed'),
+        Variable('w', 'w velocity', 'W', 'speed'),
 
-            # Initialization
-            self.name = name
+        # Cylindrical coordinate system variable
+        Variable('r', 'galactic radius', 'r', 'length'),
+        Variable('μρ', 'galactic radial velocity', 'μρ', 'speed'),
+        Variable('θ', 'galactic angle', 'θ', 'angle'),
+        Variable('μθ', 'galactic angular velocity', 'μθ', 'angular speed'),
+        Variable('zh', 'z height', 'z', 'length'),
+        Variable('vzh', 'z height velocity', '\dot{z}', 'speed'),
 
-        def __eq__(self, other):
-            """Tests whether self is not the equal to other."""
+        # Spherical coordinate system variables
+        Variable('ρ', 'distance', 'ρ', 'length'),
+        Variable('δ', 'declination', 'δ', 'angle'),
+        Variable('α', 'right ascension', 'α', 'angle'),
+        Variable('rv', 'radial velocity', 'RV', 'speed'),
+        Variable('μδ', 'declination proper motion', 'μδ', 'angular speed'),
+        Variable('μα', 'right ascension proper motion', 'μα', 'angular speed'),
 
-            return self.name == other.name
+        # Observables coordinate system variables
+        Variable('π', 'parallax', 'π', 'angle', usual_unit=usual_units['small angle']),
+        Variable(
+            'μαcosδ', 'right ascension proper motion * cos(declination)',
+            'μαcosδ', 'angular speed'
+        ),
 
-        def __repr__(self):
-            """Returns a string of name of the axis."""
+        # Curvilinear coordiinate system variables
+        Variable('ξ', 'ξ radius', 'ξ^\prime', 'length'),
+        Variable('η', 'η length', 'η^\prime', 'length'),
+        Variable('ζ', 'ζ height', 'ζ^\prime', 'length'),
+        Variable('vξ', 'ξ velocity', '\dot{ξ}^\prime', 'speed'),
+        Variable('vη', 'η velocity', '\dot{η}^\prime', 'speed'),
+        Variable('vζ', 'ζ velocity', '\dot{ζ}^\prime', 'speed')
+    )
+}
 
-            return self.name
+# Error variables
+for label, variable in variables.copy().items():
+    variables['Δ' + label] = Variable(
+        'Δ' + label, variable.name + ' error', 'Δ' + variable.latex,
+        variable.physical_type, unit=variable.unit, usual_unit=variable.usual_unit
+    )
 
-    # Coordinate system axes
-    axes = {axis.name: axis for axis in (Axis('galactic'), Axis('equatorial'))}
+# Coordinate system axes
+axes = {axis.name: axis for axis in (Axis('equatorial'), Axis('galactic'), Axis('galactic_sun'))}
 
-    class Origin(Axis):
-        """Defines a Coordinate system origin."""
-
-        pass
-
-    # Coordinate system origins
-    origins = {origin.name: origin for origin in (Origin('sun'), Axis('galaxy'))}
-
-    class Variable():
-        """Defines a Variable object and required variables from all systems."""
-
-        def __init__(
-                self, label, name, unit, usual_unit=None,
-                unit_error=None, usual_unit_error=None):
-            """Initializes a Variable from a name, label and Unit object."""
-
-            # Initialization
-            self.label = label
-            self.name = name
-            self.unit = unit
-            self.unit_error = self.unit if unit_error is None else unit_error
-            self.usual_unit = self.unit if usual_unit is None else usual_unit
-            self.usual_unit_error = self.usual_unit if usual_unit_error is None else usual_unit_error
-
-            # Set physical type
-            self.physical_type = unit.physical_type
-
-        def __eq__(self, other):
-            """Tests whether self is not the equal to other."""
-
-            return vars(self) == vars(other)
-
-    # Variables
-    variables = {
-        variable.label: variable for variable in (
-
-            # Castesian coordinate system variables
-            Variable('x', 'y position', default_units['length']),
-            Variable('y', 'y position', default_units['length']),
-            Variable('z', 'z position', default_units['length']),
-            Variable('u', 'u velocity', default_units['speed'], usual_units['speed']),
-            Variable('v', 'v velocity', default_units['speed'], usual_units['speed']),
-            Variable('w', 'w velocity', default_units['speed'], usual_units['speed']),
-
-            # Cylindrical coordinate system variable
-            Variable('r', 'galactic radius', default_units['length']),
-            Variable('μρ', 'galactic radial velocity', default_units['speed']),
-            Variable('θ', 'galactic angle', default_units['angle'], usual_units['angle']),
-            Variable(
-                'μθ', 'galactic angular velocity',
-                default_units['angular speed'], usual_units['angular speed']
-            ),
-
-            # Spherical coordinate system variables
-            Variable('ρ', 'distance', default_units['length']),
-            Variable('δ', 'declination', default_units['angle'], usual_units['angle']),
-            Variable('α', 'right ascension', default_units['angle'], usual_units['angle']),
-            Variable('rv', 'radial velocity', default_units['speed'], usual_units['speed']),
-            Variable(
-                'μδ', 'declination proper motion',
-                default_units['angular speed'], usual_units['angular speed']
-            ),
-            Variable(
-                'μα', 'right ascension proper motion',
-                default_units['angular speed'], usual_units['angular speed']
-            ),
-
-            # Observables coordinate system variables
-            Variable('π', 'parallax', default_units['angle'], usual_units['small angle']),
-            Variable(
-                'μαcosδ', 'right ascension proper motion * cos(declination)',
-                default_units['angular speed'], usual_units['angular speed']
-            )
-        )
-    }
-
-    # Error variables
-    for label, variable in variables.copy().items():
-        variables['Δ' + label] = Variable(
-            'Δ' + label, variable.name + ' error', variable.unit, variable.usual_unit
-        )
+# Coordinate system origins
+origins = {origin.name: origin for origin in (Origin('sun'), Axis('galaxy'))}
 
 # Coordinate systems
 systems = {
     system.name: system for system in (
-        System('cartesian', ('x', 'y', 'z'), ('u', 'v', 'w'), 'equatorial', 'sun'),
-        System('cylindrical', ('r', 'θ', 'z'), ('μρ', 'μθ', 'w'), 'galactic', 'galaxy'),
-        System('spherical', ('ρ', 'δ', 'α'), ('rv', 'μδ', 'μα'), 'equatorial', 'sun'),
-        System('observables', ('π', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ'), 'equatorial', 'sun')
+        System('cartesian',   ('x', 'y', 'z'), ('u', 'v', 'w'), 'equatorial', 'sun'),
+        System('cylindrical', ('r', 'θ', 'zh'), ('μρ', 'μθ', 'vzh'), 'galactic', 'galaxy'),
+        System('spherical',   ('ρ', 'δ', 'α'), ('rv', 'μδ', 'μα'), 'equatorial', 'sun'),
+        System('observables', ('π', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ'), 'equatorial', 'sun'),
+        System('curvilinear', ('ξ', 'η', 'ζ'), ('vξ', 'vη', 'vζ'), 'galactic_sun', 'sun')
     )
 }
+for label, system in deepcopy(systems).items():
+    systems[system.label] = system
 
 class Coordinate:
     """

@@ -524,11 +524,11 @@ class Quantity:
 
         # Default units per physical types if 'units' is None.
         if units is None:
-            from .coordinate import System
+            from .coordinate import default_units
             units = Unit(
                 np.vectorize(
-                    lambda unit: System.default_units[unit.physical_type].unit
-                    if unit.physical_type in System.default_units.keys() else unit
+                    lambda unit: default_units[unit.physical_type].unit
+                    if unit.physical_type in default_units.keys() else unit
                 )(self.units.units)
             )
 

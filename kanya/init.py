@@ -7,7 +7,6 @@ into a Config. This script must be run first to configure a Series.
 """
 
 import pandas as pd
-from copy import deepcopy
 from .collection import *
 from .coordinate import *
 
@@ -77,10 +76,10 @@ class Config():
 
     # Default units
     unitless = ''
-    time_unit = System.default_units['time'].label
-    length_unit = System.default_units['length'].label
+    time_unit = default_units['time'].label
+    length_unit = default_units['length'].label
     length_units = tuple(variable.unit.label for variable in systems['cartesian'].position)
-    speed_unit = System.default_units['speed'].label
+    speed_unit = default_units['speed'].label
     speed_units = tuple(variable.unit.label for variable in systems['cartesian'].velocity)
 
     # Default parameters

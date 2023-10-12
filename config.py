@@ -62,12 +62,12 @@ save_path.value = None
 size_metrics.value = True
 cov_metrics.value = True
 cov_robust_metrics.value = False
-cov_sklearn_metrics.value = False
-mad_metrics.value = False
+cov_sklearn_metrics.value = True
+mad_metrics.value = True
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 5
+number_of_groups.value = 3
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 1000
@@ -75,7 +75,7 @@ number_of_groups.value = 5
 number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
-number_of_iterations.value = 500
+number_of_iterations.value = 250
 
 # Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
 iteration_fraction.value = 0.5
@@ -273,4 +273,4 @@ potential.value = 'Irrgang13I'
 pca.value = False
 
 # Whether to show the timer
-timer.value = True
+timer.value = False

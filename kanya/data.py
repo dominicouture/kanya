@@ -511,7 +511,7 @@ class Data(list):
 
                 # Value unit set as the default unit per physical type (if self.data.data.units is None)
                 else:
-                    self.unit = self.data.data.system.default_units[self.variable.physical_type]
+                    self.unit = default_units[self.variable.physical_type]
 
                 # Conversion into Unit object
                 if self.unit is not None:

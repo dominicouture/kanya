@@ -86,7 +86,7 @@ def default_name(file_path):
 
     return path.join(directory, '{}-{}{}'.format(name, i, extension))
 
-def enumerate_strings(*items):
+def enumerate_strings(*items, conjunction='or'):
     """Creates a string enumerating the items. All items must be strings."""
 
     # No items
@@ -99,8 +99,8 @@ def enumerate_strings(*items):
 
     # Two items
     elif len(items) == 2:
-        return f'{items[0]} or {items[1]}'
+        return f'{items[0]} {conjunction} {items[1]}'
 
     # Three of more items
     else:
-        return ', '.join(items[:-1]) + f' or {items[-1]}'
+        return ', '.join(items[:-1]) + f' {conjunction} {items[-1]}'
