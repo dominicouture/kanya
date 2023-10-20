@@ -6,7 +6,6 @@ init.py: Imports information from the configuration file, command line arguments
 into a Config. This script must be run first to configure a Series.
 """
 
-import pandas as pd
 from .collection import *
 from .coordinate import *
 
@@ -84,14 +83,17 @@ class Config():
 
     # Default parameters
     default_parameters_file = path.join(path.dirname(__file__), 'resources/default_parameters.csv')
-    parameter_dataframe = pd.read_csv(default_parameters_file, delimiter=';')
+    default_parameters_dataframe = pd.read_csv(
+        default_parameters_file, delimiter=';', na_filter=False
+    )
     default_parameters = {}
-    for index, row in parameter_dataframe.iterrows():
+    for index, row in default_parameters_dataframe.iterrows():
         components = {}
         for column in row.index:
             components[column] = eval(row[column])
         parameter = Parameter(**components)
         default_parameters[parameter.label] = parameter
+    del default_parameters_file, default_parameters_dataframe
 
     # Position and velocity paramaters
     position_parameters = ('position', 'position_error', 'position_scatter')
@@ -327,4 +329,4 @@ class Config():
     def __repr__(self):
         """Returns a string of name of the configuration."""
 
-        return '{} Configuration'.format(self.name.values)
+        return f'{self.name.values} Ccnfiguration'

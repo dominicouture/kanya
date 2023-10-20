@@ -12,7 +12,6 @@ from colorsys import hls_to_rgb
 from cycler import cycler
 from .collection import *
 from .coordinate import *
-from copy import deepcopy
 
 # Set pyplot rc parameters
 plt.rc('font', serif='Latin Modern Math', family='serif', size='8')
@@ -63,11 +62,103 @@ class colors():
 class Output_Series():
     """Output methods of a series of groups."""
 
+    def save_output(
+        self, file_name, save, *save_args, extension=None, file_type=None,
+        output_dir=None, forced=False, default=False, cancel=False
+    ):
+        """
+        Creates a proper output path given a file name, an extension and, optionnally, a file path
+        relative to the output directory.Checks whether a path already exists and asks for user
+        input if it does. The base path is assumed to be the current directory. Also, if the path
+        does not have an extension, a an extension is added. The output is saved to the output
+        path using the save function.
+        """
+
+        # Check the type of output_dir
+        self.check_type(output_dir, 'output_dir', ('string', 'None'))
+
+        # Set output_dir parameter, if needed
+        if 'output_dir' not in vars(self).keys():
+            self.output_dir = self.set_path(
+                self.config.output_dir, 'output_dir',
+                dir_only=True, check=False, create=False
+            )
+
+        # Set output_path
+        output_path = self.set_path(
+            self.output_dir if output_dir is None else output_dir, 'output_path',
+            name=file_name, extension=extension, file_type=file_type,
+            full_path=True, check=False, create=True
+        )
+
+        # Check if a file already exists
+        if path.exists(output_path):
+            choice = None
+            self.check_type(forced, 'forced', 'boolean')
+            if not forced:
+                self.check_type(default, 'default', 'boolean')
+                if not default:
+                    self.check_type(cancel, 'cancel', 'boolean')
+                    if not cancel:
+
+                        # User input
+                        while choice == None:
+                            choice = input(
+                                "A file already exists at '{}'. Do you wish to overwrite (Y), "
+                                "keep both (K) or cancel (N)? ".format(output_path)
+                            ).lower()
+
+                            # Loop over question if input could not be interpreted
+                            if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
+                                print("Could not understand '{}'.".format(choice))
+                                choice = None
+
+                    # Cancel save
+                    if cancel or choice in ('n', 'no'):
+
+                        # Logging
+                        self.log(
+                            "'{}': file not saved because a file already exists at '{}'.",
+                            file_name, output_path
+                        )
+
+                # Set default file name and save figure
+                if default or choice in ('k', 'keep'):
+                    output_path = get_default_filename(output_path)
+                    save(output_path, *save_args)
+
+                    # Logging
+                    self.log(
+                        "'{}': file name changed and file saved at '{}'.", file_name, output_path
+                    )
+
+            # Delete existing file and save figure
+            if forced or choice in ('y', 'yes'):
+                from os import remove
+                remove(output_path)
+                save(output_path, *save_args)
+
+                # Logging
+                self.log(
+                    "'{}': existing file located at '{}' deleted and replaced.",
+                    file_name, output_path
+                )
+
+        # Save figure
+        else:
+            save(output_path, *save_args)
+
+            # Logging
+            self.log("'{}': saved at '{}'.", file_name, output_path)
+
     def save_figure(
-        self, name, extension='pdf', file_type=None, output_dir=None,
+        self, file_name, fig, extension='pdf', file_type=None, output_dir=None,
         tight=False, forced=False, default=False, cancel=False
     ):
         """Saves figure with or without tight layout and some padding."""
+
+        # Logging
+        self.log('{} figure created.', fig.line_log, display=True)
 
         # Check the type of tight
         self.check_type(tight, 'tight', 'boolean')
@@ -79,14 +170,14 @@ class Output_Series():
             else:
                 plt.savefig(output_path)
 
-        # Choose behavior
-        self.choose(
-            name, save, tight, extension=extension, file_type=file_type,
+        # Save output
+        self.save_output(
+            file_name, save, tight, extension=extension, file_type=file_type,
             output_dir=output_dir, cancel=cancel, forced=forced, default=default
         )
 
     def save_table(
-        self, name, lines, header=None, extension='txt', file_type=None,
+        self, file_name, lines, header=None, extension='txt', file_type=None,
         output_dir=None, forced=False, default=False, cancel=False
     ):
         """Saves a table to a CSV file for a given header and data."""
@@ -103,107 +194,14 @@ class Output_Series():
                 output_file.writelines([line + '\n' for line in lines])
 
         # Choose behavior
-        self.choose(
-            name, save, lines, header, extension=extension, file_type=file_type,
+        self.save_output(
+            file_name, save, lines, header, extension=extension, file_type=file_type,
             output_dir=output_dir, cancel=cancel, forced=forced, default=default
         )
 
-    def choose(
-        self, name, save, *save_args, extension=None, file_type=None,
-        output_dir=None, forced=False, default=False, cancel=False
-    ):
-        """
-        Checks whether a path already exists and asks for user input if it does. The base path
-        is assumed to be the output directory. Also, if the path does not have an extension, a
-        an extension is added.
-        """
-
-        # Get file path
-        file_path = self.get_output_path(name, extension, file_type=file_type, output_dir=output_dir)
-
-        # Check if a file already exists
-        if path.exists(file_path):
-            choice = None
-            self.check_type(forced, 'forced', 'boolean')
-            if not forced:
-                self.check_type(default, 'default', 'boolean')
-                if not default:
-                    self.check_type(cancel, 'cancel', 'boolean')
-                    if not cancel:
-
-                        # User input
-                        while choice == None:
-                            choice = input(
-                                "A file already exists at '{}'. Do you wish to overwrite (Y), "
-                                "keep both (K) or cancel (N)? ".format(file_path)
-                            ).lower()
-
-                            # Loop over question if input could not be interpreted
-                            if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
-                                print("Could not understand '{}'.".format(choice))
-                                choice = None
-
-                    # Cancel save
-                    if cancel or choice in ('n', 'no'):
-
-                        # Logging
-                        self.log(
-                            "'{}': file not saved because a file already exists at '{}'.",
-                            name, file_path
-                        )
-
-                # Set default name and save figure
-                if default or choice in ('k', 'keep'):
-                    file_path = get_default_filename(file_path)
-                    save(file_path, *save_args)
-
-                    # Logging
-                    self.log("'{}': file name changed and file saved at '{}'.", name, file_path)
-
-            # Delete existing file and save figure
-            if forced or choice in ('y', 'yes'):
-                from os import remove
-                remove(file_path)
-                save(file_path, *save_args)
-
-                # Logging
-                self.log("'{}': existing file located at '{}' deleted and replaced.", name, file_path)
-
-        # Save figure
-        else:
-            save(file_path, *save_args)
-
-            # Logging
-            self.log("'{}': file saved at '{}'.", name, file_path)
-
-    def get_output_path(self, name, extension=None, file_type=None, output_dir=None):
-        """
-        Returns a proper file path given a name, an extension and, optionnally, a file path
-        relative to the output directory.
-        """
-
-        # Check the type of output_dir
-        self.check_type(output_dir, 'output_dir', ('string', 'None'))
-
-        # Set output_dir parameter, if needed
-        if 'output_dir' not in vars(self).keys():
-            self.output_dir = self.set_path(
-                self.config.output_dir, 'output_dir',
-                dir_only=True, check=False, create=False
-            )
-
-        # Set output_path
-        output_path = self.set_path(
-            self.output_dir if output_dir is None else output_dir, 'output_path',
-            name=name, extension=extension, file_type=file_type,
-            full_path=True, check=False, create=True
-        )
-
-        return output_path
-
     def set_figure(
-        self, style, *options, width=None, height=None,
-        left=None, bottom=None, right=None, top=None, styles=None
+        self, style, *options, width=None, height=None, left=None, bottom=None,
+        right=None, top=None, adjust=None, v_align=None, h_align=None, styles=None
     ):
         """
         Initializes a figure with multiple axes. The axes are created with at correct position
@@ -346,7 +344,7 @@ class Output_Series():
 
         # Check the type and value of style
         styles = styles if styles is not None else (
-            '2+1',
+            '2+1', '6x6',
             '1x1', '1x2', '1x3',
             '2x1', '2x2', '2x3',
             '3x1', '3x2', '3x3',
@@ -410,8 +408,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 3.3115 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -423,8 +421,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 3.3115 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -436,8 +434,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 2.3330 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -449,8 +447,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 6.5720 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad,nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -462,8 +460,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 6.317 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -486,8 +484,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 4.4450 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -500,8 +498,9 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 9.1340 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='ax_width', h_align='center'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='ax_width' if adjust is not None else adjust,
+                h_align='center' if adjust is not None else h_align
             )
 
             # Create figure and axes
@@ -514,8 +513,9 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='ax_width', h_align='center'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='ax_width' if adjust is not None else adjust,
+                h_align='center' if adjust is not None else h_align
             )
 
             # Create figure and axes
@@ -539,8 +539,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -553,8 +553,9 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 9.1340 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='ax_width', h_align='center'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='ax_width' if adjust is not None else adjust,
+                h_align='center' if adjust is not None else h_align
             )
 
             # Create figure and axes
@@ -574,8 +575,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 9.0994 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -599,8 +600,8 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 9.0994 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,
-                nrow, ncol, adjust='fig_height'
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
             )
 
             # Create figure and axes
@@ -615,20 +616,44 @@ class Output_Series():
                 for ax in axes[3]:
                     set_axis(ax, '3d')
 
+        # Initialize a 3x3 figure
+        if style == '6x6':
+            width, height, axes_params = get_dimensions(
+                7.0900 if width is None else width,
+                7.5023 if height is None else height,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                adjust='fig_height' if adjust is None else adjust
+            )
+
+            # Create figure and axes
+            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
+            axes = np.empty((axes_params.shape[:2]), dtype=object)
+            for x, y in filter(lambda i: i[0] <= i[1], [(x, y) for y in range(6) for x in range(6)]):
+                axes[y, x] = get_axes(fig, axes_params[y, x])
+
         # Hide axis and tick labels, if needed
         if 'hide_x' in options and nrow > 1:
-            for ax in axes[:nrow - 1 - (1 if '3d' in options else 0)].flatten():
+            for ax in filter(
+                lambda ax: ax is not None,
+                axes[:nrow - 1 - (1 if '3d' in options else 0)].flatten()
+            ):
                 ax.set_xlabel('', visible=False)
                 ax.tick_params(labelbottom=False)
         if 'hide_y' in options and ncol > 1:
             if not (ncol == 2 and 'label_right' in options):
-                for ax in axes[:nrow - (1 if style == '2x2' and '3d' in options else 0),1:].flatten():
+                for ax in filter(
+                    lambda ax: ax is not None,
+                    axes[:nrow - (1 if style == '2x2' and '3d' in options else 0),1:].flatten()
+                ):
                     ax.set_ylabel('', visible=False)
                     ax.tick_params(labelleft=False)
 
         # Move axes and tick labels to the right of the rightmost axes
         if 'label_right' in options and ncol == 2:
-            for ax in axes[:nrow - (1 if '3d' in options else 0),1].flatten():
+            for ax in filter(
+                ax is not None,
+                axes[:nrow - (1 if '3d' in options else 0),1].flatten()
+            ):
                 ax.yaxis.set_label_position('right')
                 ax.yaxis.tick_right()
 
@@ -660,20 +685,40 @@ class Output_Series():
         legend.get_frame().set_edgecolor(colors.black)
         legend.get_frame().set_linewidth(0.5)
 
-    def set_title(self, fig, title, line_1, line_2=''):
+    def set_title(self, title, fig, get_title, *args, **kwargs):
         """Sets a title for the figure, if 'title' is True."""
 
         # Check the type of title
         self.check_type(title, 'title', 'boolean')
-        print(line_1, line_2)
+
+        # Create title for figure and logging
+        fig.line_title, fig.line_log = get_title(fig, *args, **kwargs)
 
         # Set title
         if title:
-            fig.suptitle(
-                f'{line_1} of stars in {self.name}'
-                f"{fig.joint if line_2 != '' else ''}{line_2}",
-                y=fig.offset, fontsize=8
-            )
+            fig.suptitle(fig.line_title, y=fig.offset, fontsize=8)
+
+    def check_system(self, system):
+        """
+        Check the type and value of system. Returns the value of the short label if the long
+        label is provided.
+        """
+
+        # Check the type and value of system
+        self.check_type(system, 'system', 'string')
+        systems = ('cartesian', 'xyz', 'curvilinear', 'ξηζ')
+        self.stop(
+            system not in systems, 'ValueError',
+            "'system' can only take as value {} ({} given).", enumerate_strings(*systems), system
+        )
+
+        # Select the value of the short label if the long label is provided
+        if system == 'cartesian':
+            system = 'xyz'
+        if system == 'curvilinear':
+            system = 'ξηζ'
+
+        return system
 
     def select_metric(self, metric, system, robust=False, sklearn=False):
         """
@@ -682,11 +727,7 @@ class Output_Series():
         """
 
         # Check the type and value of system
-        self.check_type(system, 'system', 'string')
-        self.stop(
-            system not in ('xyz', 'ξηζ'), 'ValueError',
-            "'system' can only take as value 'xyz' or 'ξηζ' ({} given).", system
-        )
+        system = self.check_system(system)
 
         # Check the types of robust and sklearn
         self.check_type(robust, 'robust', 'boolean')
@@ -768,15 +809,11 @@ class Output_Series():
         self.set_legend(ax, 2)
 
         # Select units
-        units_y = ' (pc)'
-        if metric.label[:5] == 'cross':
-            units_y = ' (pc/Myr$^{1/2}$)'
-        if metric.label[:11] == 'mahalanobis':
-            units_y = ''
+        units = f' ({metric.units[index]})' if metric.units[index] != '' else ''
 
         # Set labels
         ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        ax.set_ylabel(f'Association size{units_y}', fontsize=8)
+        ax.set_ylabel(f'Association size{units}', fontsize=8)
 
         # Set limits
         ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
@@ -785,34 +822,35 @@ class Output_Series():
         # ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35., -40, -45, -50])
         # ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
 
-    def set_title_metric(self, ax, title, metric):
+    def get_title_metric(self, fig, line_1, system):
         """Sets a title for association size metrics plots if 'title' is True."""
 
-        # Check the type of title
-        self.check_type(title, 'title', 'boolean')
-        print(f'{metric} of {self.name}')
+        # Set line 1
+        line_1_title = line_1.format(
+            system=f"${systems[system].latex['position']}$",
+            position=f"${systems[system].latex['position']}$",
+            velocity=f"${systems[system].latex['velocity']}$",
+        )
+        line_1_log = line_1.format(
+            system=f"{systems[system].labels['position']}",
+            position=f"{systems[system].labels['position']}",
+            velocity=f"{systems[system].labels['velocity']}",
+        )
 
-        # Title from data
-        if title:
-            if self.from_data:
-                ax.set_title(
-                    "{} of {}\n over {:.1f} Myr with a {:.1f} km/s radial "
-                    "velocity correction\n".format(
-                        metric, self.name, self.duration.value,
-                        self.rv_shift.to('km/s').value
-                    ), fontsize=8
-                )
+        # Create title from data
+        if self.from_data:
+            line_2 = f'of {self.name} over {self.duration.value:.1f} Myr'
 
-            # Title from a model
-            elif self.from_model:
-                ax.set_title(
-                    "Average {} of {} modeled associations over {:.1f} Myr\n"
-                    "with kinematics similar to {} and a {:.1f} km/s radial velocity "
-                    "bias\n".format(
-                        metric, self.number_of_groups, self.duration.value,
-                        self.name, self.rv_shift.to('km/s').value
-                    ), fontsize=8
-                )
+            return f'{line_1_title}\n{line_2}', f'{line_1_log} {line_2}'
+
+        # Create title from a model
+        if self.from_model:
+            line_2 = (
+                f"of {self.number_of_groups} association{'s' if self.number_of_groups > 1 else ''} "
+                f'modeled after {self.name} over {self.duration.value:.1f} Myr'
+            )
+
+            return f'Average {line_1_title}\n{line_2}', f'Average {line_1_log} {line_2}'
 
     def draw_covariances(
         self, system, robust=False, sklearn=False, title=False,
@@ -846,14 +884,14 @@ class Output_Series():
         self.plot_metric(ax, covariances, 2, colors.metric[7], ':', 0.5)
 
         # Set title
-        self.set_title_metric(
-            ax, title,
-            f"${systems[system].latex['position']}${selection.replace('_', ' ')} covariances"
+        self.set_title(
+            title, fig, self.get_title_metric,
+            '{system}'f"{selection.replace('_', ' ')} covariances", system
         )
 
         # Save figure
         self.save_figure(
-            f'covariances_{system}_{self.name}{selection}.pdf',
+            f'covariances_{system}_{self.name}{selection}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -891,15 +929,14 @@ class Output_Series():
         self.plot_metric(ax, cross_covariances, 2, colors.metric[7], ':', 0.5)
 
         # Set title
-        self.set_title_metric(
-            ax, title,
-            f"${systems[system].latex['position']}$ and "
-            f"${systems[system].latex['velocity']}${selection.replace('_', ' ')} covariances"
+        self.set_title(
+            title, fig, self.get_title_metric,
+            '{position} and {velocity}'f"{selection.replace('_', ' ')} cross covariances", system
         )
 
         # Save figure
         self.save_figure(
-            f'cross_covariances_{system}_{self.name}{selection}.pdf',
+            f'cross_covariances_{system}_{self.name}{selection}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -925,11 +962,13 @@ class Output_Series():
         self.plot_metric(ax, mad, 2, colors.metric[7], ':', 0.5)
 
         # Set title
-        self.set_title_metric(ax, title, f"${systems[system].latex['position']}$ MAD")
+        self.set_title(
+            title, fig, self.get_title_metric, '{system} median absolute deviation', system
+        )
 
         # Save figure
         self.save_figure(
-            f'mad_{system}_{self.name}.pdf',
+            f'mad_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -953,11 +992,13 @@ class Output_Series():
         self.plot_metric(ax, vars(self)[f'{mst}_mad'], 0, colors.metric[7], ':', 0.5)
 
         # Set title
-        self.set_title_metric(ax, title, f"${systems[system].latex['position']}$ MST")
+        self.set_title(
+            title, fig, self.get_title_metric, '{system} minimum spanning tree', system
+        )
 
         # Save figure
         self.save_figure(
-            f'mst_{system}_{self.name}.pdf',
+            f'mst_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -976,18 +1017,18 @@ class Output_Series():
         self.plot_metric(ax, vars(self)[f'{mahalanobis}_mean'], 0, colors.metric[5], '-', 0.9)
         self.plot_metric(ax, vars(self)[f'{mahalanobis}_median'], 0, colors.metric[6], '--', 0.7)
 
-        # Set title
-        self.set_title_metric(
-            ax, title, f"${systems[system].latex['position']}$ Mahalanobis distance"
-        )
-
         # Set labels and limits
         ax.set_ylabel(ax.get_ylabel(), labelpad=3)
         ax.set_ylim(-0.1, 2.9)
 
+        # Set title
+        self.set_title(
+            title, fig, self.get_title_metric, '{system} Mahalanobis distance', system
+        )
+
         # Save figure
         self.save_figure(
-            f'mahalanobis_{system}_{self.name}.pdf',
+            f'mahalanobis_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1034,13 +1075,15 @@ class Output_Series():
         self.plot_metric(ax2, mad, 2, colors.metric[7], ':', 0.5)
 
         # Set title
-        self.set_title_metric(
-            ax1, title, f"${systems[system].latex['position']}$ covariances and MAD"
+        self.set_title(
+            title, fig, self.get_title_metric,
+            '{system}'f"{selection.replace('_', ' ')} covariances and median absolution deviation",
+            system
         )
 
         # Save figure
         self.save_figure(
-            f'covariances_mad_{system}_{self.name}.pdf',
+            f'covariances_mad_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1131,7 +1174,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            f'covariances_mad_mst_cross_covariannces_xyz_{self.name}_{other.name}.pdf',
+            f'covariances_mad_mst_cross_covariannces_xyz_{self.name}_{other.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1178,7 +1221,7 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            f'age_distribution_{self.name}.pdf',
+            f'age_distribution_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1363,7 +1406,8 @@ class Output_Group():
     def get_step_age(self, step, age):
         """
         Checks the types and values of step and step, and computes the appropriate values of
-        step and age. If both are not None, the priority is given the age.
+        step and age. If 'age' doesn't match a step, the closest step is used instead. 'age'
+        overrules 'steps' if both are given.
         """
 
         # Check the type and value of step
@@ -1413,34 +1457,58 @@ class Output_Group():
 
         return step, age
 
+    def check_coord(self, coord):
+        """Checks the type and value of a coordinate."""
+
+        self.series.check_type(coord, 'coord', 'string')
+        coords = ('position', 'velocity')
+        self.series.stop(
+            coord not in coords,
+            'ValueError', "'coord' must be {} ({} given).", enumerate_strings(*coords), coord
+        )
+
+    def check_axis(self, axis, label):
+        """Checks the type and value of an axis."""
+
+        self.series.check_type(axis, label, 'integer')
+        self.series.stop(
+            axis < 0 or axis > 2, 'ValueError',
+            "'{}' must be 0, 1, or 2 ({} given).", label, axis
+        )
+
+    def get_title_coord(self, fig, coord, system, line_1, line_2=''):
+        """Creates a title for position or velocity coordinates."""
+
+        # Create title for figure
+        return (
+            (line_1 + ' of stars in {name}{joint}' + line_2).format(
+                system=f'${systems[system].latex[coord]}$', coord=coord,
+                position=f"${systems[system].latex['position']}$",
+                velocity=f"${systems[system].latex['velocity']}$",
+                name=self.name, joint=fig.joint if line_2 != '' else ''
+            ).replace('ys ', 'ies '),
+
+            # Create title for logging
+            (line_1 + ' of stars in {name}{joint}' + line_2).format(
+                system=systems[system].labels[coord], coord=coord,
+                position=f"{systems[system].labels['position']}",
+                velocity=f"{systems[system].labels['velocity']}",
+                name=self.name, joint=' ' if line_2 != '' else ''
+            ).replace('ys ', 'ies ')
+        )
+
     def plot_trajectory(self, ax, x, y, coord, system, age, metric, index, labels):
         """Draws the trajectory of stars in the group."""
 
         # Check the type and value of x and y
-        self.series.check_type(x, 'x', 'integer')
-        self.series.stop(
-            x < 0 or x > 2, 'ValueError',
-            "'x' must be 0, 1, or 2 ({} given).", x
-        )
-        self.series.check_type(y, 'y', 'integer')
-        self.series.stop(
-            y < 0 or y > 2, 'ValueError',
-            "'y' must be 0, 1, or 2 ({} given).", y
-        )
+        self.check_axis(x, 'x')
+        self.check_axis(y, 'y')
 
         # Check the type and value of coord
-        self.series.check_type(coord, 'coord', 'string')
-        self.series.stop(
-            coord not in ('position', 'velocity'),
-            'ValueError', "'coord' must be 'position' or 'velocity' ({} given).", coord
-        )
+        self.check_coord(coord)
 
         # Check the type and value of system
-        self.series.check_type(system, 'system', 'string')
-        self.series.stop(
-            system not in ('xyz', 'ξηζ'), 'ValueError',
-            "'system' can only take as value 'xyz' or 'ξηζ' ({} given).", system
-        )
+        system = self.series.check_system(system)
 
         # Check the type of labels
         self.series.check_type(labels, 'labels', 'boolean')
@@ -1545,7 +1613,7 @@ class Output_Group():
         self, coord, system, age=None, metric=None, index=None, labels=False,
         title=False, forced=False, default=False, cancel=False
     ):
-        """Draws the trajectories of stars in the group."""
+        """Draws the trajectories in position or velocity of stars."""
 
         # Initialize figure
         fig, axes = self.series.set_figure('2+1')
@@ -1557,9 +1625,6 @@ class Output_Group():
             i, j = zip(*((0, 1), (2, 1), (0, 2)))
         for ax, x, y in zip(axes.flatten(), i, j):
             self.plot_trajectory(ax, x, y, coord, system, age, metric, index, labels)
-
-        # Set title
-        self.series.set_title(fig, title, (f'${systems[system].latex[coord]}$ trajectories'))
 
         # Draw vertical and horizontal lines through the Sun's position at the current epoch
         if coord == 'position' and system == 'xyz':
@@ -1604,9 +1669,16 @@ class Output_Group():
         #     axes[1,0].set_xlim(-225, 60)
         #     axes[1,0].set_ylim(-40, 49)
 
+        # Set title
+        self.series.set_title(
+            title, fig, self.get_title_coord,
+            coord, system, '{system} trajectories'
+        )
+
+
         # Save figure
         self.series.save_figure(
-            f'trajectory_{coord}_{system}_{self.name}.pdf',
+            f'trajectory_{coord}_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1615,26 +1687,14 @@ class Output_Group():
         """Draws the y coordinate of stars in the group over time."""
 
         # Check the type and value of y
-        self.series.check_type(y, 'y', ('integer', 'None'))
         if y is not None:
-            self.series.stop(
-                y < 0 or y > 2, 'ValueError',
-                "'y' must be 0, 1, 2 or None ({} given).", y
-            )
+            self.check_axis(y, 'y')
 
         # Check the type and value of coord
-        self.series.check_type(coord, 'coord', 'string')
-        self.series.stop(
-            coord not in ('position', 'velocity'),
-            'ValueError', "'coord' must be 'position' or 'velocity' ({} given).", coord
-        )
+        self.check_coord(coord)
 
         # Check the type and value of system
-        self.series.check_type(system, 'system', 'string')
-        self.series.stop(
-            system not in ('xyz', 'ξηζ'), 'ValueError',
-            "'system' can only take as value 'xyz' or 'ξηζ' ({} given).", system
-        )
+        system = self.series.check_system(system)
 
         # Birth index, age and age error
         birth_index, age, age_error  = tuple(
@@ -1835,7 +1895,11 @@ class Output_Group():
         """Draws the positions or velocities of stars over time."""
 
         # Initialize figure
-        fig, axes = self.series.set_figure(style, 'hide_x', 'label_right', styles=('1x3', '2x2', '3x1'))
+        fig, axes = self.series.set_figure(
+            style, 'hide_x', 'label_right',
+            h_align='right' if style == '3x1' else None,
+            styles=('1x3', '2x2', '3x1')
+        )
 
         # Plot xyz position
         for y in range(3):
@@ -1845,15 +1909,15 @@ class Output_Group():
         if style == '2x2':
             self.plot_time(axes[1,1], None, coord, system, age, metric)
 
+        # Set title
         self.series.set_title(
-            fig, title, (
-                f'${systems[system].latex[coord]}$ {coord}s'.replace('citys', 'cities')
-            ), 'over time'
+            title, fig, self.get_title_coord, coord, system,
+            '{system} {coord}s', line_2=f'over time'
         )
 
         # Save figure
         self.series.save_figure(
-            f"{coord}_{system}_{style}_{self.name}_time.pdf",
+            f"{coord}_{system}_{style}_{self.name}_time.pdf", fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -1862,20 +1926,20 @@ class Output_Group():
         self, ax, axes, coords, system, step, errors=False,
         labels=False, mst=False, relative=False
     ):
-        """Creates a 2d or 3d scatter of positions or velocities, at a given step."""
+        """
+        Creates a 2d or 3d scatter of positions or velocities, at a given step. 'errors', adds
+        error  bars, 'labels' adds the stars' names and 'mst' adds the minimun spanning tree
+        branches.
+        """
 
-        # Check the type and value of axes
+        # Check the types and values of axes
         self.series.check_type(axes, 'axes', 'tuple')
         self.series.stop(
             len(axes) not in (2, 3), 'ValueError',
             "'axes' must have a length of 2 or 3 ({} given).", len(axes)
         )
         for i in axes:
-            self.series.check_type(i, 'i value in axes', 'integer')
-            self.series.stop(
-                i < 0 or i > 2, 'ValueError',
-                "All values in axes must 0, 1 or 2 ({} given).", i
-            )
+            self.check_axis(i, 'i')
 
         # Select projection
         if len(axes) == 2:
@@ -1883,7 +1947,7 @@ class Output_Group():
         if len(axes) == 3:
             projection = '3d'
 
-        # Check the type and value of coords
+        # Check the types and values of coords
         self.series.check_type(coords, 'coords', ('tuple', 'list', 'string'))
         coords = [coords] if type(coords) not in (tuple, list) else coords
         self.series.stop(
@@ -1891,12 +1955,7 @@ class Output_Group():
             "'coords' must have a length of 1 or 2 ({} given).", len(coords)
         )
         for coord in coords:
-            self.series.check_type(coord, 'coord', 'string')
-            self.series.stop(
-                coord not in ('position', 'velocity'),
-                'ValueError', "'coord' must be 'position' or 'velocity' ({} given).",
-                coord
-            )
+            self.check_coord(coord)
 
         # Adjust the length of coords, if needed
         if len(coords) == 1 and projection == '2d':
@@ -1909,11 +1968,7 @@ class Output_Group():
             coords *= 3
 
         # Check the type and value of system
-        self.series.check_type(system, 'system', 'string')
-        self.series.stop(
-            system not in ('xyz', 'ξηζ'), 'ValueError',
-            "'system' can only take as value 'xyz' or 'ξηζ' ({} given).", system
-        )
+        system = self.series.check_system(system)
 
         # Check the types of errors, labels, mst, relative and view
         self.series.check_type(errors, 'errors', 'boolean')
@@ -2057,15 +2112,106 @@ class Output_Group():
                 fontsize=8, #labelpad=20
             )
 
+    def plot_distribution(self, axes, coord, system, step, relative=False):
+        """Creates three 1d distributions in positions or velocities, at a given step."""
+
+        # Check the type and value of coord
+        self.check_coord(coord)
+
+        # Check the type and value of system
+        system = self.series.check_system(system)
+
+        # Check the type and value of relative
+        self.series.check_type(relative, 'relative', 'boolean')
+
+        # Select coordinates
+        values = np.array(
+            [
+                [
+                    vars(star)[('relative_' if relative else '') + f'{coord}_{system}'][step]
+                    for star in group.sample
+                ] for group in self.series
+            ]
+        ).reshape((-1, 3)).T
+
+        # Set limits, increased by 10%
+        scale_factor = 1.25
+        values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
+        limits = (
+            np.array([-values_range, values_range]) * scale_factor +
+            np.max(values, axis=1) + np.min(values, axis=1)
+        )  / 2
+
+        # Set bins
+        number_of_bins = 20
+        bins = np.linspace(limits[0], limits[1], number_of_bins + 1).T
+
+        from scipy.stats import skewnorm
+        from scipy.special import erf
+
+        # Plot histograms
+        for i in range(3):
+            axes[i].hist(
+                values[i], bins=bins[i], density=True,
+                color=colors.azure[9], alpha=0.6, zorder=0.6
+            )
+
+            # Compute the skew normal fit
+            α, ξ, ω = skewnorm.fit(values[i])
+            x = np.linspace(limits[0,i], limits[1,i], 500)
+            pdf = skewnorm.pdf(x, α, ξ, ω)
+            cdf = skewnorm.cdf(x, α, ξ, ω)
+
+            # Plot the skew normal fit
+            axes[i].plot(
+                x, pdf, color=colors.azure[6], alpha=1.0,
+                linewidth=1.0, solid_capstyle='round', zorder=0.9
+            )
+
+            # Compute the mode of the skew normal distribution
+            δ = α / np.sqrt(1 + α**2)
+            γ_1 = (4 - np.pi) / 2 * (δ * np.sqrt(2/np.pi)**3) / (1 - 2 * δ**2 / np.pi)**1.5
+            m_0 = (
+                np.sqrt(2 / np.pi) * δ - γ_1 * np.sqrt(1 - 2 / np.pi * δ**2) / 2 -
+                np.sign(α) / 2 * np.exp(-2 * np.pi / np.abs(α))
+            )
+            mode = ξ + m_0 * ω
+
+            # Compute the location of the uncertainties
+            mode_cdf = cdf[np.argmin(np.abs(mode - x))]
+            scale = np.array([mode_cdf / 0.5, (1 - mode_cdf) / 0.5])
+            prob = np.repeat(mode_cdf, 2) + np.array([-1, 1]) * erf(1 / np.sqrt(2)) / 2 * scale
+            error = np.abs(
+                x[np.argmin(np.abs(np.repeat(cdf[None], 2, axis=0).T - prob), axis=0)] - mode
+            )
+
+            # Show value with errors
+            print(f'{coord}_{system}_{i}: {mode:.3f} -{error[0]:.3f} +{error[1]:.3f}')
+
+            # Draw errors
+            axes[i].axvline(
+                mode - error[0], color=colors.black,
+                alpha=0.8, linewidth=0.5, linestyle=':', zorder=0.9
+            )
+            axes[i].axvline(
+                mode + error[1], color=colors.black,
+                alpha=0.8, linewidth=0.5, linestyle=':', zorder=0.9
+            )
+
+            # Set limits
+            axes[i].set_xlim(*limits[:,i])
+
+            # Compute the average value
+            axes[i].average_value = np.mean(np.mean(values[i]))
+            axes[i].mode_value = mode
+            axes[i].error_value = error
+
     def draw_scatter(
         self, coord, system, style, step=None, age=None, errors=False, labels=False,
         mst=False, title=False, forced=False, default=False, cancel=False
     ):
         """
         Draws scatter plots of positions or velocities of stars at a given 'step' or 'age' in Myr.
-        If 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'steps'
-        if both are given. 'errors', adds error bars, 'labels' adds the stars' names and 'mst' adds
-        the minimun spanning tree branches.
         """
 
         # Initialize figure
@@ -2093,12 +2239,6 @@ class Output_Group():
                 errors=errors, labels=labels, mst=mst
             )
 
-        # Set title
-        self.series.set_title(
-            fig, title, f'${systems[system].latex[coord]}$ {coord}s'.replace('citys', 'cities'),
-            f'at {age:.1f} Myr'
-        )
-
         # Set limits
         if coord == 'position' and system == 'xyz':
             xlim = (30, 180)
@@ -2121,9 +2261,15 @@ class Output_Group():
         #         ax.set_aspect('equal')
         #         ax.set_adjustable('datalim')
 
+        # Set title
+        self.series.set_title(
+            title, fig, self.get_title_coord, coord, system,
+            '{system} {coord}s', line_2=f'at {age:.1f} Myr'
+        )
+
         # Save figure
         self.series.save_figure(
-            f'{coord}_{system}_{style}_{self.name}_{age:.1f}Myr.pdf',
+            f'{coord}_{system}_{style}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2133,9 +2279,8 @@ class Output_Group():
         title=False, forced=False, default=False, cancel=False
     ):
         """
-        Draws cross scatter plots of positions and velocities, at a given 'step' or 'age' in Myr.
-        If 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'steps'
-        if both are given. 'errors', adds error bars and 'labels' adds the stars' names.
+        Draws cross scatter plots of positions and velocities of stars, at a given 'step' or 'age'
+        in Myr.
         """
 
         # Initialize figure
@@ -2144,24 +2289,22 @@ class Output_Group():
         # Compute the values of step and age
         step, age = self.get_step_age(step, age)
 
-        # Plot ξηζ position and ξηζ velocity
+        # Plot positions and velocities
         for x, y in [(x, y) for y in range(3) for x in range(3)]:
             self.plot_scatter(
-                axes[x, y], (x, y), ('position', 'velocity'), system,
+                axes[y, x], (x, y), ('position', 'velocity'), system,
                 step, errors=errors, labels=labels
             )
 
         # Set title
         self.series.set_title(
-            fig, title, (
-                f"${systems[system].latex['position']}$ positions and "
-                f"${systems[system].latex['velocity']}$ velocities"
-            ), f'at {age:.1f} Myr'
+            title, fig, self.get_title_coord, 'position', system,
+            '{position} positions and {velocity} velocities', line_2=f'at {age:.1f} Myr'
         )
 
         # Save figure
         self.series.save_figure(
-            f'position_velocity_{system}_{self.name}_{age:.1f}Myr.pdf',
+            f'position_velocity_cross_{system}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2171,10 +2314,7 @@ class Output_Group():
         mst=False, title=False, forced=False, default=False, cancel=False
     ):
         """
-        Draws scatter plots of positions or velocities of stars for 3 'step' or 'age' in Myr. If
-        an 'age' doesn't match a step, the closest step is used instead. 'age' overrules 'steps'
-        if both are given. 'errors', adds error bars, 'labels' adds the stars' names and 'mst'
-        adds the minimun spanning tree branches.
+        Draws scatter plots of positions or velocities of stars, for 2 or 3 'step' or 'age' in Myr.
         """
 
         # Initialize figure
@@ -2227,12 +2367,6 @@ class Output_Group():
                     errors=errors, labels=labels, mst=mst, relative=True
                 )
 
-        # Set title
-        self.series.set_title(
-            fig, title, f'${systems[system].latex[coord]}$ {coord}s at'.replace('citys', 'cities'),
-            f"{enumerate_strings(*ages_str, conjunction='and')} Myr"
-        )
-
         # Set limits
         limits = (-100, 100) if coord == 'position' else (-6, 6) if coord == 'velocity' else None
         for ax in axes.flatten():
@@ -2243,13 +2377,74 @@ class Output_Group():
         if style in ('4x2', '4x3'):
             for ax in axes[3]:
                 ax.set_zlim(*limits)
-            # for ax in axes[3,1:]:
-            #     ax.set_ylabel('', visible=False)
-            #     ax.tick_params(labelleft=False)
+
+        # Set title
+        self.series.set_title(
+            title, fig, self.get_title_coord, coord, system, '{system} {coord}s',
+            line_2=f"at {enumerate_strings(*ages_str, conjunction='and')} Myr"
+        )
 
         # Save figure
         self.series.save_figure(
-            f"{coord}_{system}_{style}_{self.name}_{'_'.join(ages_str)}Myr.pdf",
+            f"{coord}_{system}_{style}_{self.name}_{'_'.join(ages_str)}Myr.pdf", fig,
+            forced=forced, default=default, cancel=cancel
+        )
+        # plt.show()
+
+    def draw_corner_scatter(
+        self, system, step=None, age=None, errors=False, labels=False,
+        title=False, forced=False, default=False, cancel=False
+    ):
+        """
+        Draws corner scatter plots of positions and velocities, at a given 'step' or 'age' in Myr.
+        """
+
+        # Initialize figure
+        fig, axes = self.series.set_figure('6x6', 'hide_x', 'hide_y')
+
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
+
+        # Plot positions and velocities (2d)
+        for x, y in filter(lambda i: i[0] < i[1], [(x, y) for y in range(6) for x in range(6)]):
+            self.plot_scatter(
+                axes[y, x], (x - (0 if x < 3 else 3), y - (0 if y < 3 else 3)),
+                ('position' if x < 3 else 'velocity', 'position' if y < 3 else 'velocity'),
+                system, step, errors=errors, labels=labels
+            )
+
+        # Plot positions and velocities (1d)
+        self.plot_distribution([axes[i, i] for i in range(3)], 'position', system, step)
+        self.plot_distribution([axes[i, i] for i in range(3, 6)], 'velocity', system, step)
+
+        # Draw dashed lines and set limits
+        for i in range(6):
+            for ax in filter(lambda ax: ax is not None, axes[:,i].flatten()):
+                ax.axvline(
+                    axes[i,i].mode_value, color=colors.black, alpha=0.8,
+                    linewidth=0.5, linestyle='--', zorder=0.9
+                )
+                ax.set_xlim(*axes[i, i].get_xlim())
+            for ax in filter(lambda ax: ax is not None, axes[i,:i].flatten()):
+                ax.axhline(
+                    axes[i,i].mode_value, color=colors.black, alpha=0.8,
+                    linewidth=0.5, linestyle='--', zorder=0.9
+                )
+                ax.set_ylim(*axes[i, i].get_xlim())
+
+        # Set labels
+        axes[-1, -1].set_xlabel(axes[-1, -2].get_ylabel())
+        axes[0, 0].tick_params(labelleft=False)
+
+        # Set title
+        self.series.set_title(
+            title, fig, self.get_title_coord, 'position', system,
+            '{position} positions and {velocity} velocities', line_2=f'at {age:.1f} Myr'
+        )
+
+        # Save figure
+        self.series.save_figure(
+            f'position_velocity_corner_{system}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2329,7 +2524,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            f'Mollweide_{self.name}.pdf',
+            f'Mollweide_{self.name}.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
         # plt.show()
@@ -2499,7 +2694,7 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            f'age_distribution_jackknife_{self.name}_{metric_name}.pdf',
+            f'age_distribution_jackknife_{self.name}_{metric_name}.pdf', fig,
             tight=False, forced=forced, default=default, cancel=cancel
         )
         # plt.show()

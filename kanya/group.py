@@ -567,31 +567,26 @@ class Group(list, Output_Group):
             if self.series.cov_metrics:
                 self.set_timer('cov_metrics')
                 self.get_covariances()
-                self.series.progress_bar.update(1)
 
             # Compute robust covariances metrics
             if self.series.cov_robust_metrics:
                 self.set_timer('cov_robust_metrics')
                 self.get_covariances_robust()
-                self.series.progress_bar.update(1)
 
             # Compute sklearn covariances metrics
             if self.series.cov_sklearn_metrics:
                 self.set_timer('cov_sklearn_metrics')
                 self.get_covariances_sklearn()
-                self.series.progress_bar.update(1)
 
             # Compute median absolute deviation metrics
             if self.series.mad_metrics:
                 self.set_timer('mad_metrics')
                 self.get_median_absolute_deviation()
-                self.series.progress_bar.update(1)
 
             # Compute minimum spanning tree metrics
             if self.series.mst_metrics:
                 self.set_timer('mst_metrics')
                 self.get_minimum_spanning_tree()
-                self.series.progress_bar.update(1)
             self.set_timer()
 
     def set_principal_component_analysis(self, version):
@@ -687,6 +682,9 @@ class Group(list, Output_Group):
             self.cross_covariances_xyz_matrix_det, self.cross_covariances_xyz_matrix_trace
         )
 
+        # Update progress bar
+        self.series.progress_bar.update(1)
+
         # ξηζ position covariances matrix, determinant and trace ages
         self.covariances_ξηζ_matrix = self.get_covariances_matrix('positions_ξηζ')
         self.get_covariances_metrics(
@@ -702,6 +700,9 @@ class Group(list, Output_Group):
             self.cross_covariances_ξηζ_matrix, self.cross_covariances_ξηζ,
             self.cross_covariances_ξηζ_matrix_det, self.cross_covariances_ξηζ_matrix_trace
         )
+
+        # Update progress bar
+        self.series.progress_bar.update(1)
 
     def get_covariances_robust(self):
         """
@@ -725,7 +726,7 @@ class Group(list, Output_Group):
         )
 
         # Update progress bar
-        self.series.progress_bar.update(1)
+        self.series.progress_bar.update(2)
 
         # xyz position and velocity robust cross covariances matrix and determinant ages
         self.Mahalanobis_cross_xyz = self.get_Mahalanobis_distance(
@@ -744,7 +745,7 @@ class Group(list, Output_Group):
         )
 
         # Update progress bar
-        self.series.progress_bar.update(1)
+        self.series.progress_bar.update(2)
 
         # ξηζ position robust covariances matrix, determinant and trace ages
         self.Mahalanobis_ξηζ = self.get_Mahalanobis_distance(
@@ -759,7 +760,7 @@ class Group(list, Output_Group):
         )
 
         # Update progress bar
-        self.series.progress_bar.update(1)
+        self.series.progress_bar.update(2)
 
         # ξηζ position and velocity robust cross covariances matrix and determinant ages
         self.Mahalanobis_cross_ξηζ = self.get_Mahalanobis_distance(
@@ -778,7 +779,7 @@ class Group(list, Output_Group):
         )
 
         # Update progress bar
-        self.series.progress_bar.update(1)
+        self.series.progress_bar.update(2)
 
         # xyz Mahalanobis distance mean and median
         self.mahalanobis_xyz_mean(np.mean(self.Mahalanobis_xyz, axis=0))
@@ -787,6 +788,9 @@ class Group(list, Output_Group):
         # ξηζ Mahalanobis distance mean and median
         self.mahalanobis_ξηζ_mean(np.mean(self.Mahalanobis_ξηζ, axis=0))
         self.mahalanobis_ξηζ_median(np.median(self.Mahalanobis_ξηζ, axis=0))
+
+        # Update progress bar
+        self.series.progress_bar.update(1)
 
     def get_covariances_sklearn(self):
         """
@@ -944,6 +948,9 @@ class Group(list, Output_Group):
         )
         self.mad_ξηζ_total(np.sum(self.mad_ξηζ.values**2, axis=2)**0.5)
 
+        # Update progress bar
+        self.series.progress_bar.update(1)
+
     def get_minimum_spanning_tree(self):
         """
         Builds the minimum spanning trees (MST) of a group for all timesteps using a Kruskal
@@ -1063,7 +1070,7 @@ class Group(list, Output_Group):
                         valid_index += 1
 
             # Update progress bar
-            if step % 5 == 0:
+            if step % 6 == 0:
                 self.series.progress_bar.update(1)
 
 

@@ -72,7 +72,7 @@ class Series(list, Output_Series):
 
         # Import the association size metrics file and skip the header line
         metrics_file = path.join(path.dirname(__file__), 'resources/association_size_metrics.csv')
-        metrics_dataframe = pd.read_csv(metrics_file, delimiter=';')
+        metrics_dataframe = pd.read_csv(metrics_file, delimiter=';', na_filter=False)
 
         # Initialize association size metrics
         self.metrics = []
@@ -597,8 +597,9 @@ class Series(list, Output_Series):
             self.name = np.array(eval(metric['name']))
             self.latex_short = np.array(eval(metric['latex_short']))
             self.latex_long = np.array(eval(metric['latex_long']))
-            self.valid = np.array(eval(metric['valid']))
+            self.units = np.array(eval(metric['units']))
             self.order = int(metric['order'])
+            self.valid = np.array(eval(metric['valid']))
             self.age_shift = np.array(eval(metric['age_shift']))
             self.status = False
             self.ndim = self.valid.size
@@ -1288,19 +1289,17 @@ class Series(list, Output_Series):
                     self.name, display=True, logging=logging
                 )
                 self.progress_bar = tqdm(
-                    total=self.number_of_groups * (
-                        sum(
-                            [
-                                self.cov_metrics, self.cov_robust_metrics,
-                                self.cov_sklearn_metrics, self.mad_metrics,
-                                self.mst_metrics
-                            ]
-                        ) + ((self.number_of_steps // 5 + 1) * 2 if self.mst_metrics else 0.0) +
-                        ((self.number_of_steps // 5 + 1) * 2 if self.cov_sklearn_metrics else 0.0) +
-                        (4 if self.cov_sklearn_metrics else 0.0)
-                    ) , unit=' size metric', bar_format=(
+                    total=self.number_of_groups * sum(
+                        [
+                            2 * self.cov_metrics,
+                            9 if self.cov_robust_metrics else 0,
+                            (self.number_of_steps // 5 + 1) * 2 if self.cov_sklearn_metrics else 0,
+                            self.mad_metrics,
+                            (self.number_of_steps // 6 + 1) * 2 if self.mst_metrics else 0
+                        ]
+                    ), unit=' size metric', bar_format=(
                         '{desc}{percentage:3.0f}% |{bar}| '
-                        '{n_fmt}/{total_fmt} {elapsed} {remaining} '
+                        ' {elapsed} {remaining} '
                     )
                 )
 

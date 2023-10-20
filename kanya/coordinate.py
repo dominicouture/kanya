@@ -8,17 +8,23 @@ Axis and Origin subclasses are definied as well. Individual coordinates are defi
 Coordinate class which includes an initialization method and tranformation methods.
 """
 
-from .quantity import *
+import pandas as pd
+from os import path
 from copy import deepcopy
+from .quantity import *
 
 class Variable():
-    """Defines a Variable object and required variables from all systems."""
+    """
+    Defines a Variable object and required variables from all systems. 'physical_type', 'unit',
+    'usual_unit', 'unit_error' and 'usual_unit_error' must be keys in default_units and usual_units
+    or a Unit object.
+    """
 
     def __init__(
         self, label, name, latex, physical_type, unit=None,
         usual_unit=None, unit_error=None, usual_unit_error=None
     ):
-        """Initializes a Variable from a name, label and Unit object."""
+        """Initializes a Variable from a label, name, physical type and Unit objects or strings."""
 
         # Initialization
         self.label = label
@@ -26,12 +32,26 @@ class Variable():
         self.latex = latex
 
         # Set units
-        self.unit = default_units[physical_type] if unit is None else unit
-        self.usual_unit = usual_units[physical_type] if usual_unit is None else usual_unit
+        self.unit = (
+            unit if type(unit) == Unit
+            else default_units[physical_type if unit in (None, '') else unit]
+        )
+        self.usual_unit = (
+            usual_unit if type(usual_unit) == Unit
+            else usual_units[physical_type if usual_unit in (None, '') else usual_unit]
+        )
 
         # Set error units
-        self.unit_error = self.unit if unit_error is None else unit_error
-        self.usual_unit_error = self.usual_unit if usual_unit_error is None else usual_unit_error
+        self.unit_error = (
+            unit_error if type(unit_error) == Unit
+            else self.unit if unit_error in (None, '')
+            else default_units[unit_error]
+        )
+        self.usual_unit_error = (
+            usual_unit_error if type(usual_unit_error) == Unit
+            else self.usual_unit if usual_unit_error in (None, '')
+            else usual_units[usual_unit_error]
+        )
 
         # Set physical type
         self.physical_type = self.unit.physical_type
@@ -41,8 +61,13 @@ class Variable():
 
         return vars(self) == vars(other)
 
+    def __repr__(self):
+        """Returns a string of name of the variable."""
+
+        return f'{self.name} variable'
+
 class Axis():
-    """Defines a Coordinate system axis."""
+    """Defines an Axis system axis."""
 
     def __init__(self, name):
         """Initializes an Axis object."""
@@ -58,12 +83,26 @@ class Axis():
     def __repr__(self):
         """Returns a string of name of the axis."""
 
-        return self.name
+        return f'{self.name.capitalize()} axis'
 
 class Origin(Axis):
-    """Defines a Coordinate system origin."""
+    """Defines a Origin system origin."""
 
-    pass
+    def __init__(self, name):
+        """Initializes an Origin object."""
+
+        # Initialization
+        self.name = name
+
+    def __eq__(self, other):
+        """Tests whether self is not the equal to other."""
+
+        return self.name == other.name
+
+    def __repr__(self):
+        """Returns a string of name of the axis."""
+
+        return f'{self.name.capitalize()} origin'
 
 class System():
     """
@@ -71,7 +110,7 @@ class System():
     origins, and Variable, Axis and Origin classes.
     """
 
-    def __init__(self, name: str, position: tuple, velocity: tuple, axis: str, origin: str):
+    def __init__(self, name, position, velocity, axis, origin):
         """Initializes a System from position and velocity tuples with 3 Variables objects."""
 
         # Name
@@ -89,8 +128,12 @@ class System():
         self.axis = axes[axis]
         self.origin = origins[origin]
 
-        # Set label and latex label
+        # Set labels latex labels
         self.label = ''.join([variable.label for variable in self.position])
+        self.labels = {
+            'position': ''.join([variable.label for variable in self.position]),
+            'velocity': ''.join([variable.label for variable in self.velocity])
+        }
         self.latex = {
             'position': ''.join([variable.latex for variable in self.position]),
             'velocity': ''.join([variable.latex for variable in self.velocity])
@@ -104,73 +147,26 @@ class System():
     def __repr__(self):
         """Returns a string of name of the system."""
 
-        return self.name
+        return f'{self.name.capitalize()} coordinate system'
 
-# Default units per physical type
-default_units = {
-    'time': Unit('Myr', 'megayear'),
-    'length': Unit('pc', 'parsec'),
-    'speed': Unit('pc/Myr', 'parsec per megayear'),
-    'angle': Unit('rad', 'radian'),
-    'angular speed': Unit('rad/Myr', 'radian per megayear'),
-    'mass': Unit('solMass', 'solar mass')
-}
-
-# Usual units used for observables per physical type and magnitude
-usual_units = {
-    'time': Unit('Myr', 'megayear'),
-    'length': Unit('pc', 'parsec'),
-    'speed': Unit('km/s', 'kilometer per second'),
-    'angle': Unit('deg', 'degree'),
-    'small angle': Unit('mas', 'milliarcsecond'),
-    'angular speed': Unit('mas/yr', 'milliarcsecond per year'),
-    'mass': Unit('solMass', 'solar mass')
-}
+# Default and usual units
+units_file = path.join(path.dirname(__file__), 'resources/units.csv')
+units_dataframe = pd.read_csv(units_file, delimiter=';', na_filter=False)
+default_units = {}
+usual_units = {}
+for index, row in units_dataframe.iterrows():
+    default_units[row['physical_type']] = Unit(row['default_unit_label'], row['default_unit_name'])
+    usual_units[row['physical_type']] = Unit(row['usual_unit_label'], row['usual_unit_name'])
+del units_file, units_dataframe
 
 # Variables
-variables = {
-    variable.label: variable for variable in (
-
-        # Castesian coordinate system variables
-        Variable('x', 'y position', 'X', 'length'),
-        Variable('y', 'y position', 'Y', 'length'),
-        Variable('z', 'z position', 'Z', 'length'),
-        Variable('u', 'u velocity', 'U', 'speed'),
-        Variable('v', 'v velocity', 'V', 'speed'),
-        Variable('w', 'w velocity', 'W', 'speed'),
-
-        # Cylindrical coordinate system variable
-        Variable('r', 'galactic radius', 'r', 'length'),
-        Variable('μρ', 'galactic radial velocity', 'μρ', 'speed'),
-        Variable('θ', 'galactic angle', 'θ', 'angle'),
-        Variable('μθ', 'galactic angular velocity', 'μθ', 'angular speed'),
-        Variable('zh', 'z height', 'z', 'length'),
-        Variable('vzh', 'z height velocity', '\dot{z}', 'speed'),
-
-        # Spherical coordinate system variables
-        Variable('ρ', 'distance', 'ρ', 'length'),
-        Variable('δ', 'declination', 'δ', 'angle'),
-        Variable('α', 'right ascension', 'α', 'angle'),
-        Variable('rv', 'radial velocity', 'RV', 'speed'),
-        Variable('μδ', 'declination proper motion', 'μδ', 'angular speed'),
-        Variable('μα', 'right ascension proper motion', 'μα', 'angular speed'),
-
-        # Observables coordinate system variables
-        Variable('π', 'parallax', 'π', 'angle', usual_unit=usual_units['small angle']),
-        Variable(
-            'μαcosδ', 'right ascension proper motion * cos(declination)',
-            'μαcosδ', 'angular speed'
-        ),
-
-        # Curvilinear coordiinate system variables
-        Variable('ξ', 'ξ radius', 'ξ^\prime', 'length'),
-        Variable('η', 'η length', 'η^\prime', 'length'),
-        Variable('ζ', 'ζ height', 'ζ^\prime', 'length'),
-        Variable('vξ', 'ξ velocity', '\dot{ξ}^\prime', 'speed'),
-        Variable('vη', 'η velocity', '\dot{η}^\prime', 'speed'),
-        Variable('vζ', 'ζ velocity', '\dot{ζ}^\prime', 'speed')
-    )
-}
+variables_file = path.join(path.dirname(__file__), 'resources/variables.csv')
+variables_dataframe = pd.read_csv(variables_file, delimiter=';', na_filter=False)
+variables = {}
+for index, row in variables_dataframe.iterrows():
+    variable = Variable(*[row[column] for column in row.index])
+    variables[variable.label] = variable
+del variables_file, variables_dataframe
 
 # Error variables
 for label, variable in variables.copy().items():
@@ -186,15 +182,17 @@ axes = {axis.name: axis for axis in (Axis('equatorial'), Axis('galactic'), Axis(
 origins = {origin.name: origin for origin in (Origin('sun'), Axis('galaxy'))}
 
 # Coordinate systems
-systems = {
-    system.name: system for system in (
-        System('cartesian',   ('x', 'y', 'z'), ('u', 'v', 'w'), 'equatorial', 'sun'),
-        System('cylindrical', ('r', 'θ', 'zh'), ('μρ', 'μθ', 'vzh'), 'galactic', 'galaxy'),
-        System('spherical',   ('ρ', 'δ', 'α'), ('rv', 'μδ', 'μα'), 'equatorial', 'sun'),
-        System('observables', ('π', 'δ', 'α'), ('rv', 'μδ', 'μαcosδ'), 'equatorial', 'sun'),
-        System('curvilinear', ('ξ', 'η', 'ζ'), ('vξ', 'vη', 'vζ'), 'galactic_sun', 'sun')
+systems_file = path.join(path.dirname(__file__), 'resources/systems.csv')
+systems_dataframe = pd.read_csv(systems_file, delimiter=';', na_filter=False)
+systems = {}
+for index, row in systems_dataframe.iterrows():
+    system = System(
+        row['name'], eval(row['position']), eval(row['velocity']), row['axis'], row['origin']
     )
-}
+    systems[system.name] = system
+del systems_file, systems_dataframe
+
+# Coordinate systems with shorter labels
 for label, system in deepcopy(systems).items():
     systems[system.label] = system
 

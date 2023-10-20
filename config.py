@@ -62,12 +62,12 @@ save_path.value = None
 size_metrics.value = True
 cov_metrics.value = True
 cov_robust_metrics.value = False
-cov_sklearn_metrics.value = True
-mad_metrics.value = True
+cov_sklearn_metrics.value = False
+mad_metrics.value = False
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 3
+number_of_groups.value = 10
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 1000

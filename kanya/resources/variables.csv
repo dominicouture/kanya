@@ -1,0 +1,27 @@
+label;name;latex;physical_type;default_unit;usual_unit;default_unit_error;usual_unit_error
+x;x position;X;length;;;;
+y;y position;Y;length;;;;
+z;z position;Z;length;;;;
+u;u velocity;U;speed;;;;
+v;v velocity;V;speed;;;;
+w;w velocity;W;speed;;;;
+r;galactic radius;r;length;;;;
+μρ;galactic radial velocity;μρ;speed;;;;
+θ;galactic angle;θ;angle;;;;
+μθ;galactic angular velocity;μθ;angular speed;;;;
+zh;z height;z;length;;;;
+vzh;z height velocity;\dot{z};speed;;;;
+ρ;distance;ρ;length;;;;
+δ;declination;δ;angle;;;;
+α;right ascension;α;angle;;;;
+rv;radial velocity;RV;speed;;;;
+μδ;declination proper motion;μδ;angular speed;;;;
+μα;right ascension proper motion;μα;angular speed;;;;
+π;parallax;π;angle;;small angle;;
+μαcosδ;right ascension proper motion * cos(declination);μαcosδ;angular speed;;;;
+ξ;ξ radius;ξ^\prime;length;;;;
+η;η length;η^\prime;length;;;;
+ζ;ζ height;ζ^\prime;length;;;;
+vξ;ξ velocity;\dot{ξ}^\prime;speed;;;;
+vη;η velocity;\dot{η}^\prime;speed;;;;
+vζ;ζ velocity;\dot{ζ}^\prime;speed;;;;

@@ -1,0 +1,8 @@
+physical_type;default_unit_label;default_unit_name;usual_unit_label;usual_unit_name
+time;Myr;megayear;Myr;megayear
+length;pc;parsec;pc;parsec
+speed;pc/Myr;parsec per megayear;km/s;kilometer per second
+angle;rad;radian;deg;degree
+small angle;rad;radian;mas;milliarcsecond
+angular speed;rad/Myr;radian per megayear;mas/yr;milliarcsecond per year
+mass;solMass;solar mass;solMass;solar mass
