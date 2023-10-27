@@ -51,7 +51,7 @@ logs_path.value = '../Logs/'
 # Path to the file or directory used for pickle input relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are loaded from a file named
 # 'name.value'.series in the current directory. Directory names end with '/'.
-load_path.value = None
+load_path.value = 'beta_pictoris.series'
 
 # Path to the file or directory used for pickle output relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are saved to a file named
@@ -63,11 +63,11 @@ size_metrics.value = True
 cov_metrics.value = True
 cov_robust_metrics.value = False
 cov_sklearn_metrics.value = False
-mad_metrics.value = False
+mad_metrics.value = True
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 10
+number_of_groups.value = 21
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 1000
@@ -75,7 +75,7 @@ number_of_groups.value = 10
 number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
-number_of_iterations.value = 250
+number_of_iterations.value = 200
 
 # Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
 iteration_fraction.value = 0.5

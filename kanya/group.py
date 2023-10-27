@@ -959,7 +959,7 @@ class Group(list, Output_Group):
         finding the epoch when these values are minimal.
         """
 
-        # Compute the number of minimum spanning tree branches
+        # Set the number of minimum spanning tree branches
         self.number_of_branches = self.sample_size - 1
         self.number_of_branches_monte_carlo = (
             int(self.sample_size * self.series.iteration_fraction) - 1
@@ -967,114 +967,165 @@ class Group(list, Output_Group):
 
         # Create branches for all possible pairs of stars
         self.branches = []
-        branch_indexes = []
+        branch_indices = []
         for start, end in combinations(range(self.sample_size), 2):
             self.branches.append(self.Branch(self.sample[start], self.sample[end]))
-            branch_indexes.append((start, end))
+            branch_indices.append((start, end))
         self.branches = np.array(self.branches, dtype=object)
-        branch_indexes = np.array(branch_indexes, dtype=int)
+        branch_indices = np.array(branch_indices, dtype=int)
 
         # Find the corresponding branches for every jackknife Monte Carlo iteration
         self.branches_monte_carlo = (
             np.all(
                 np.any(
-                    branch_indexes[:,None,:,None] == self.stars_monte_carlo.T[None,:,None,:],
-                axis=3),
-            axis=2)
+                    branch_indices[:,None,:,None] == self.stars_monte_carlo.T[None,:,None,:],
+                    axis=3
+                ), axis=2
+            )
         )
 
-        # Create minimum spanning trees
-        self.mst_xyz, self.mst_xyz_lengths, self.mst_xyz_weights = self.get_branches('xyz')
-        self.mst_ξηζ, self.mst_ξηζ_lengths, self.mst_ξηζ_weights = self.get_branches('ξηζ')
+        # Find xyz position and velocity minimum spanning tree branches
+        self.get_branches('position', 'xyz')
+        self.get_branches('velocity', 'xyz')
 
         # xyz minimum spanning tree average branch length and median absolute deviation ages
-        self.mst_xyz_mean(np.mean(self.mst_xyz_lengths, axis=0))
-        self.mst_xyz_mean_robust(
-            np.average(self.mst_xyz_lengths, weights=self.mst_xyz_weights, axis=0)
-        )
-        self.mst_xyz_mad(
-            np.median(
-                np.abs(self.mst_xyz_lengths - np.median(self.mst_xyz_lengths, axis=0)), axis=0
+        if self.series.mst_metrics:
+            self.mst_xyz_mean(np.mean(self.mst_position_xyz_values, axis=0))
+            self.mst_xyz_mean_robust(
+                np.average(
+                    self.mst_position_xyz_values, weights=self.mst_position_xyz_weights, axis=0
+                )
             )
-        )
+            self.mst_xyz_mad(
+                np.median(
+                    np.abs(
+                        self.mst_position_xyz_values -
+                        np.median(self.mst_position_xyz_values, axis=0)
+                    ), axis=0
+                )
+            )
+
+        # Find ξηζ position and velocity minimum spanning tree branches
+        self.get_branches('position', 'ξηζ')
+        self.get_branches('velocity', 'ξηζ')
 
         # ξηζ minimum spanning tree average branch length and median absolute deviation ages
-        self.mst_ξηζ_mean(np.mean(self.mst_ξηζ_lengths, axis=0))
-        self.mst_ξηζ_mean_robust(
-            np.average(self.mst_ξηζ_lengths, weights=self.mst_ξηζ_weights, axis=0)
-        )
-        self.mst_ξηζ_mad(
-            np.median(
-                np.abs(self.mst_ξηζ_lengths - np.median(self.mst_ξηζ_lengths, axis=0)), axis=0
+        if self.series.mst_metrics:
+            self.mst_ξηζ_mean(np.mean(self.mst_position_ξηζ_values, axis=0))
+            self.mst_ξηζ_mean_robust(
+                np.average(
+                    self.mst_position_ξηζ_values, weights=self.mst_position_ξηζ_weights, axis=0
+                )
             )
-        )
+            self.mst_ξηζ_mad(
+                np.median(
+                    np.abs(
+                        self.mst_position_ξηζ_values -
+                        np.median(self.mst_position_ξηζ_values, axis=0)
+                    ), axis=0
+                )
+            )
 
-        # xyz minimum spanning tree 90 percentile
-        mst_xyz_lengths_sorted = np.sort(self.mst_xyz_lengths, axis=0)
-        mst_xyz_lengths_sorted90 = mst_xyz_lengths_sorted[
-            int(self.number_of_branches * 0.2):int(self.number_of_branches * 0.80) - 1,:
-        ]
-        self.mst_xyz_90(np.mean(mst_xyz_lengths_sorted90, axis=0))
+            # xyz minimum spanning tree 90 percentile
+            mst_position_xyz_values_sorted = np.sort(self.mst_position_xyz_values, axis=0)
+            mst_position_xyz_values_sorted90 = mst_position_xyz_values_sorted[
+                int(self.number_of_branches * 0.2):int(self.number_of_branches * 0.80) - 1,:
+            ]
+            self.mst_xyz_90(np.mean(mst_position_xyz_values_sorted90, axis=0))
 
-    def get_branches(self, system):
-        """Computes the branches, lengths and weights of a minimum spanning tree."""
+    def get_branches(self, coord, system):
+        """
+        Computes the branches, values and weights of a minimum spanning tree for every timestep
+        and jackknife Monte Carlo iteration. The full minimum spanning tree is also computed for
+        every timestep.
+        """
 
-        # Initialization
-        mst = np.empty(
-            (
-                self.series.number_of_iterations,
-                self.series.number_of_steps,
-                self.number_of_branches_monte_carlo
-            ), dtype=object
-        )
-        mst_lengths = np.zeros(mst.shape)
-        mst_weights = np.zeros(mst.shape)
-        length = 'length_{}'.format(system)
-
-        # Sort branches by length for every timestep with respect to branch length
+        # Sort branches by coordinate for every timestep
+        branch_coord = {'position': 'length', 'velocity': 'speed'}
+        value = f'{branch_coord[coord]}_{system}'
         branches_order = np.argsort(
-            np.array(
-                [vars(branch)[length] for branch in self.branches],
-                dtype=float
-            ), axis=0
+            np.array([vars(branch)[value] for branch in self.branches], dtype=float), axis=0
         ).T
-        branches_monte_carlo_sorted = np.moveaxis(self.branches_monte_carlo[branches_order], -1, 0)
         branches_sorted = self.branches[branches_order]
+        branches_monte_carlo_sorted = np.moveaxis(
+            self.branches_monte_carlo[branches_order], -1, 0
+        )
 
-        # Find the branches for every jackknife Monte Carlo iteration and timestep
+        # Initialize minimum spanning trees, values and weights
+        mst = np.empty((self.series.number_of_steps, self.number_of_branches), dtype=object)
+        if self.series.mst_metrics and coord == 'position':
+            mst_monte_carlo = np.empty(
+                (
+                    self.series.number_of_iterations,
+                    self.series.number_of_steps,
+                    self.number_of_branches_monte_carlo
+                ), dtype=object
+            )
+            mst_values = np.zeros(mst_monte_carlo.shape)
+            mst_weights = np.zeros(mst_monte_carlo.shape)
+
+        # Validate branches for every timestep
         for step in range(self.series.number_of_steps):
-            for iteration in range(self.series.number_of_iterations):
-                branches = branches_sorted[step, branches_monte_carlo_sorted[iteration, step]]
+            mst[step] = self.validate_branches(branches_sorted[step], self.number_of_branches)
 
-                # Nodes, tree and branch number initialization
-                for star in self.sample:
-                    star.node = self.Node()
-                test_index = 0
-                valid_index = 0
+            # Validate branches for every jackknife Monte Carlo iteration
+            if self.series.mst_metrics and coord == 'position':
+                for iteration in range(self.series.number_of_iterations):
+                    mst_monte_carlo[iteration, step] = self.validate_branches(
+                        branches_sorted[step, branches_monte_carlo_sorted[iteration, step]],
+                        self.number_of_branches_monte_carlo
+                    )
+                    mst_values[iteration, step] = np.array(
+                        [vars(branch)[value][step] for branch in mst_monte_carlo[iteration, step]]
+                    )
+                    mst_weights[iteration, step] = np.array(
+                        [branch.weight[step] for branch in mst_monte_carlo[iteration, step]]
+                    )
 
-                # Branches verification and addition to tree
-                while valid_index < self.number_of_branches_monte_carlo:
-                    branch = branches[test_index]
-                    test_index += 1
+                # Update progress bar
+                if step % 6 == 0:
+                    self.series.progress_bar.update(1)
 
-                    # Replace branch start and end stars' current nodes with their largest parent node
-                    while branch.start.node.parent != None: branch.start.node = branch.start.node.parent
-                    while branch.end.node.parent != None: branch.end.node = branch.end.node.parent
+        # Set minimum spanning tree, values and weights
+        vars(self)[f'mst_{coord}_{system}'] = mst
+        if self.series.mst_metrics and coord == 'position':
+            vars(self)[f'mst_monte_carlo_{coord}_{system}'] = mst_monte_carlo
+            vars(self)[f'mst_{coord}_{system}_values'] = mst_values.T.swapaxes(1, 2)
+            vars(self)[f'mst_{coord}_{system}_weights'] = mst_weights.T.swapaxes(1, 2)
 
-                    # Branch validation if both stars have different parent nodes
-                    if branch.start.node != branch.end.node:
-                        branch.start.node.parent = branch.end.node.parent = self.Node()
-                        mst[iteration, step, valid_index] = branch
-                        mst_lengths[iteration, step, valid_index] = vars(branch)[length][step]
-                        mst_weights[iteration, step, valid_index] = branch.weight[step]
-                        valid_index += 1
+    def validate_branches(self, branches, number_of_branches):
+        """
+        Validate a list sorted branches using a Kruskal algorithm up to a given number of branches.
+        Returns a list of validated branches.
+        """
 
-            # Update progress bar
-            if step % 6 == 0:
-                self.series.progress_bar.update(1)
+        # Set stars nodes
+        for star in self.sample:
+            star.node = self.Node()
 
+        # Initialize minimum spanning tree, and test and valid indices
+        mst = np.empty(number_of_branches, dtype=object)
+        test_index = 0
+        valid_index = 0
 
-        return mst, mst_lengths.T.swapaxes(1, 2), mst_weights.T.swapaxes(1, 2)
+        # Branches verification and addition to tree
+        while valid_index < number_of_branches:
+            branch = branches[test_index]
+            test_index += 1
+
+            # Find branch start and end stars largest parent node
+            while branch.start.node.parent != None:
+                branch.start.node = branch.start.node.parent
+            while branch.end.node.parent != None:
+                branch.end.node = branch.end.node.parent
+
+            # Validate branch if both stars have different parent nodes
+            if branch.start.node != branch.end.node:
+                branch.start.node.parent = branch.end.node.parent = self.Node()
+                mst[valid_index] = branch
+                valid_index += 1
+
+        return mst
 
     class Branch:
         """Line connecting two stars used for the calculation of the minimum spanning tree."""
@@ -1089,12 +1140,18 @@ class Group(list, Output_Group):
             self.start = start
             self.end = end
 
-            # Compute branch lengths and weigth
+            # Compute branch lengths, speeds and weigth
             self.length_xyz = np.sum(
                 (self.start.position_xyz - self.end.position_xyz)**2, axis=1
             )**0.5
             self.length_ξηζ = np.sum(
                 (self.start.position_ξηζ - self.end.position_ξηζ)**2, axis=1
+            )**0.5
+            self.speed_xyz = np.sum(
+                (self.start.velocity_xyz - self.end.velocity_xyz)**2, axis=1
+            )**0.5
+            self.speed_ξηζ = np.sum(
+                (self.start.velocity_ξηζ - self.end.velocity_ξηζ)**2, axis=1
             )**0.5
             self.weight = np.mean(np.vstack((self.start.weight, self.end.weight)), axis=0)
 

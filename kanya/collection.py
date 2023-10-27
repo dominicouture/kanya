@@ -7,7 +7,7 @@ used by the Series class and more, such as directory, output, log and stop are a
 """
 
 import numpy as np
-from os import path, makedirs, getcwd, chdir
+from os import path, makedirs, getcwd, chdir, listdir, remove
 from .tools import enumerate_strings
 
 class Collection(list):
@@ -126,8 +126,8 @@ class Collection(list):
         self.logs_configured = False
 
     def new(
-        self, parent=None, file_path=None, args=False, forced=False,
-        default=False, cancel=False, logging=True, **parameters
+        self, parent=None, file_path=None, args=False, forced=None,
+        default=None, cancel=None, logging=True, **parameters
     ):
         """ Creates a new Series in the collection. Arguments are the same as those of
             Series.__init__.
@@ -140,7 +140,7 @@ class Collection(list):
             default=default, cancel=cancel, logging=logging, **parameters
         )
 
-    def add(self, *series, forced=False, default=False, cancel=False, logging=True):
+    def add(self, *series, forced=None, default=None, cancel=None, logging=True):
         """
         Adds one or multiple new series to the collection. If forced is True, any existing
         series with the same name is overwritten, otherwise user input is required to proceed
@@ -202,15 +202,15 @@ class Collection(list):
                 logging=logging, traceback=traceback, **parameters
             )
 
-    def load_from_file(self, *series, load_path=None, forced=False, logging=True):
+    def load_series(self, *series, load_path=None, forced=None, logging=True):
         """ Loads one or multiple series from the binary file. If forced, existing groups are
             overwritten.
         """
 
         for series in self.select(*series):
-            series.load_from_file(load_path=load_path, forced=forced, logging=logging)
+            series.load_series(load_path=load_path, forced=forced, logging=logging)
 
-    def traceback(self, *series, mode=None, forced=False, logging=True):
+    def traceback(self, *series, mode=None, forced=None, logging=True):
         """
         Traces back all series in self if no series name is given or selected series given
         given in argument by name. If forced, existing groups are overwritten.
@@ -235,8 +235,8 @@ class Collection(list):
                 mad_metrics=mad_metrics, mst_metrics=mst_metrics, logging=logging
             )
 
-    def save_to_file(
-        self, *series, save_path=None, forced=False, default=False, cancel=False, logging=True
+    def save_series(
+        self, *series, save_path=None, forced=None, default=None, cancel=None, logging=True
     ):
         """
         Saves one or multiple series to a binary file. If forced, existing files are
@@ -244,14 +244,14 @@ class Collection(list):
         """
 
         for series in self.select(*series):
-            series.save_to_file(
+            series.save_series(
                 save_path=save_path, forced=forced, default=default, cancel=cancel, logging=logging
             )
 
     def create(
         self, *series, load_path=None, save_path=None, mode=None, size_metrics=None,
         cov_metrics=None, cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None,
-        mst_metrics=None, forced=False, default=False, cancel=False, logging=True
+        mst_metrics=None, forced=None, default=None, cancel=None, logging=True
     ):
         """
         Either load one or multiple series from a file, or traces back one or multiple
@@ -366,8 +366,6 @@ def get_default_filename(file_path):
     default 'path/name-i.extension' path where i is the lowest possible number for a file
     titled 'name'.
     """
-
-    from os import path, listdir
 
     # Initialization
     directory = path.dirname(file_path)

@@ -19,7 +19,7 @@ import kanya
 kanya.Series(file_path='config.py', args=True)
 
 # Groups creation
-kanya.collection.create()
+kanya.collection.create(forced=False)
 
 # Output creation
 for series in kanya.collection:
@@ -28,12 +28,14 @@ for series in kanya.collection:
     series.draw_cross_covariances('ξηζ', forced=True) # Valid
     series.draw_cross_covariances('xyz', robust=True, forced=True)
     series.draw_mad('ξηζ', forced=True) # Valid
+    series.draw_mad('xyz', forced=True)
+    series.draw_mst('ξηζ', forced=True)
     series.draw_mst('xyz', forced=True)
-    series.draw_mahalanobis('ξηζ', forced=True)
-    series.draw_covariances_mad('ξηζ', forced=True)
-    series.draw_covariances_mad('xyz', robust=True, forced=True)
-    series.draw_det_mad_mst_cross_covariances_xyz(forced=True)
-    series.draw_age_distribution(forced=True)
+    series.draw_covariances_mad('ξηζ', '2x1', forced=True)
+    series.draw_covariances_mad('xyz', '1x2', forced=True)
+    series.draw_covariances_cross_mad_mst('ξηζ', forced=True)
+    series.draw_covariances_cross_mad_mst('xyz', forced=True)
+    series.draw_age_distribution('covariances_ξηζ', index=0, forced=True)
     series.create_metrics_table(forced=True, show=True, save=True, machine=False)
     series.create_metrics_table(show=False, save=True, forced=True, machine=False)
 
@@ -44,8 +46,12 @@ for series in kanya.collection:
             group.draw_trajectory('position', 'ξηζ', metric='covariances_ξηζ', index=0, forced=True) # Valid
             group.draw_time('position', 'xyz', '3x1', metric='covariances_xyz', forced=True) # Valid
             group.draw_time('velocity', 'xyz', '1x3', metric='covariances_xyz', forced=True) # Valid
-            group.draw_time('velocity', 'ξηζ', '2x2', metric='covariances_ξηζ', forced=True) # Valid
-            group.draw_scatter('position', 'xyz', '2x2', age=-5, errors=True, forced=True) # Valid
+            group.draw_time('position', 'ξηζ', '2x2', metric='covariances_ξηζ', forced=True) # Valid
+            group.draw_scatter('velocity', 'xyz', '2x2', age=-5, errors=True, mst=True, forced=True) # Valid
+            group.draw_scatter('velocity', 'xyz', '1x3', age=-5, errors=True, mst=True, forced=True) # Valid
+            group.draw_scatter('velocity', 'xyz', '3x1', age=-5, errors=True, mst=True, forced=True) # Valid
+            group.draw_scatter('velocity', 'xyz', '4x1', age=-5, errors=True, mst=True, forced=True) # Valid
+            group.draw_scatter('position', 'ξηζ', '2x2', age=-5, errors=True, mst=True, forced=True) # Valid
             group.draw_scatter('velocity', 'xyz', '4x1', age=-5, errors=True, forced=True) # Valid
             group.draw_cross_scatter('xyz', age=-5, errors=True, forced=True)
             group.draw_cross_scatter('ξηζ', age=-5, errors=True, forced=True)
@@ -54,7 +60,7 @@ for series in kanya.collection:
             group.draw_corner_scatter('xyz', age=-5, errors=True, forced=True)
             group.draw_corner_scatter('ξηζ', age=-5, errors=True, forced=True)
             group.draw_map(labels=False, forced=True)
-            group.draw_age_distribution(metric='covariances_ξηζ', index=0, forced=True)
+            group.draw_age_distribution('covariances_ξηζ', index=0, forced=True)
             group.create_kinematics_table(forced=True, save=True, machine=True, age=-30.0)
             group.create_kinematics_time_table(forced=True, save=True, machine=True)
 

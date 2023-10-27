@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-tools.py: Defines various useful functions to handle array manipulation and to wrap functions
-around a Monte Carlo algorithm.
+tools.py: Defines various useful functions to manipulate np.ndarrays, wrap functions in a Monte
+Monte Carlo algorithm, or enumerate a sequence of strings.
 """
 
 import numpy as np
@@ -58,33 +58,6 @@ def montecarlo(function, values, errors, n=10000):
     )
 
     return (outputs, output_errors)
-
-def default_name(file_path):
-    """
-    Loops over all files and sub-directories in the directory of 'file_path' and returns a
-    default 'path/name-i.extension' path where i is the lowest possible number for a file
-    titled 'name'.
-    """
-
-    from os import path, listdir
-
-    # Initialization
-    directory = path.dirname(file_path)
-    name = path.splitext(path.basename(file_path))[0]
-    name = name if name != '' else 'untitled'
-    extension = path.splitext(file_path)[1]
-
-    # Identify whether 'name' ends with a digit
-    i = name.split('-')[-1]
-    if i.isdigit():
-        name = name[:-(len(i) + 1)]
-
-    # Loops over Series in self
-    i = 1
-    while '{}-{}{}'.format(name, i, extension) in listdir(directory):
-        i += 1
-
-    return path.join(directory, '{}-{}{}'.format(name, i, extension))
 
 def enumerate_strings(*items, conjunction='or'):
     """Creates a string enumerating the items. All items must be strings."""

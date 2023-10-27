@@ -64,7 +64,7 @@ class Output_Series():
 
     def save_output(
         self, file_name, save, *save_args, extension=None, file_type=None,
-        output_dir=None, forced=False, default=False, cancel=False
+        output_dir=None, forced=None, default=None, cancel=None
     ):
         """
         Creates a proper output path given a file name, an extension and, optionnally, a file path
@@ -91,69 +91,51 @@ class Output_Series():
             full_path=True, check=False, create=True
         )
 
-        # Check if a file already exists
+        # Choose behaviour if a file already exists
         if path.exists(output_path):
-            choice = None
-            self.check_type(forced, 'forced', 'boolean')
-            if not forced:
-                self.check_type(default, 'default', 'boolean')
-                if not default:
-                    self.check_type(cancel, 'cancel', 'boolean')
-                    if not cancel:
+            forced, default, cancel = self.choose(
+                f"An output file already exists at '{output_path}'.", 3, forced, default, cancel
+            )
 
-                        # User input
-                        while choice == None:
-                            choice = input(
-                                "A file already exists at '{}'. Do you wish to overwrite (Y), "
-                                "keep both (K) or cancel (N)? ".format(output_path)
-                            ).lower()
-
-                            # Loop over question if input could not be interpreted
-                            if choice not in ('y', 'yes', 'k', 'keep', 'n', 'no'):
-                                print("Could not understand '{}'.".format(choice))
-                                choice = None
-
-                    # Cancel save
-                    if cancel or choice in ('n', 'no'):
-
-                        # Logging
-                        self.log(
-                            "'{}': file not saved because a file already exists at '{}'.",
-                            file_name, output_path
-                        )
-
-                # Set default file name and save figure
-                if default or choice in ('k', 'keep'):
-                    output_path = get_default_filename(output_path)
-                    save(output_path, *save_args)
-
-                    # Logging
-                    self.log(
-                        "'{}': file name changed and file saved at '{}'.", file_name, output_path
-                    )
-
-            # Delete existing file and save figure
-            if forced or choice in ('y', 'yes'):
-                from os import remove
+            # Delete existing file and save output
+            if forced:
                 remove(output_path)
                 save(output_path, *save_args)
 
                 # Logging
                 self.log(
-                    "'{}': existing file located at '{}' deleted and replaced.",
-                    file_name, output_path
+                    "Existing output file located at '{}' deleted and replaced.", output_path
                 )
 
-        # Save figure
+            # Set default file name and save output
+            if default:
+                old_filename = path.basename(output_path)
+                output_path = get_default_filename(output_path)
+                save(output_path, *save_args)
+
+                # Logging
+                self.log(
+                    "Output file renamed from '{}' to '{}', and output saved at '{}'.",
+                    old_filename, path.basename(output_path), output_path
+                )
+
+            # Cancel save
+            if cancel:
+                self.log(
+                    "Output was not saved because an output file already exists at '{}'.",
+                    output_path
+                )
+
+        # Save output
         else:
             save(output_path, *save_args)
 
             # Logging
-            self.log("'{}': saved at '{}'.", file_name, output_path)
+            self.log("Output saved at '{}'.", output_path)
 
     def save_figure(
         self, file_name, fig, extension='pdf', file_type=None, output_dir=None,
-        tight=False, forced=False, default=False, cancel=False
+        tight=False, forced=None, default=None, cancel=None
     ):
         """Saves figure with or without tight layout and some padding."""
 
@@ -178,7 +160,7 @@ class Output_Series():
 
     def save_table(
         self, file_name, lines, header=None, extension='txt', file_type=None,
-        output_dir=None, forced=False, default=False, cancel=False
+        output_dir=None, forced=None, default=None, cancel=None
     ):
         """Saves a table to a CSV file for a given header and data."""
 
@@ -200,8 +182,8 @@ class Output_Series():
         )
 
     def set_figure(
-        self, style, *options, width=None, height=None, left=None, bottom=None,
-        right=None, top=None, adjust=None, v_align=None, h_align=None, styles=None
+        self, style, *options, width=None, height=None, left=None, bottom=None, right=None,
+        top=None, colpad=None, rowpad=None, adjust=None, v_align=None, h_align=None, styles=None
     ):
         """
         Initializes a figure with multiple axes. The axes are created with at correct position
@@ -309,8 +291,8 @@ class Output_Series():
             # Set ticks
             if projection == '2d':
                 ax.tick_params(
-                    top=True, right=True, which='both',
-                    direction='in', width=0.5, labelsize=8
+                    top=True, right=True, bottom=True, left=True,
+                    which='both', direction='in', width=0.5, labelsize=8
                 )
 
                 # Set spines
@@ -365,8 +347,8 @@ class Output_Series():
         bottom = 0.335 if bottom is None else bottom
         right = 0.005 if right is None else right
         top = 0.0815 if top is None else top
-        colpad = 0.100 if 'hide_y' in options else 0.5400
-        rowpad = 0.100 if 'hide_x' in options else 0.3654
+        colpad = 0.100 if 'hide_y' in options else colpad if colpad is not None else 0.5400
+        rowpad = 0.100 if 'hide_x' in options else rowpad if rowpad is not None else 0.3654
 
         # Set margins if the axes and tick labels are moved to the right of the rightmost axes
         if 'label_right' in options and ncol == 2:
@@ -464,19 +446,23 @@ class Output_Series():
                 adjust='fig_height' if adjust is None else adjust
             )
 
+            # Add padding for 3d axis
+            if '3d' in options:
+                axes_params[0,1,1] += 1.5 * rowpad / height
+
             # Create figure and axes
             fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
             axes = np.empty((axes_params.shape[:2]), dtype=object)
-            axes[0,:] = get_axes(fig, axes_params[0,:], zorder=0.5)
-            axes[1,0] = get_axes(fig, axes_params[1,0], zorder=0.5)
-            axes[1,1] = get_axes(
-                fig, axes_params[1,1], projection='3d' if '3d' in options else None, zorder=0.4
+            axes[:,0] = get_axes(fig, axes_params[:,0], zorder=0.5)
+            axes[1,1] = get_axes(fig, axes_params[1,1], zorder=0.5)
+            axes[0,1] = get_axes(
+                fig, axes_params[0,1], projection='3d' if '3d' in options else None, zorder=0.4
             )
 
             if '3d' in options:
-                set_axis(axes[1,1], '3d')
+                set_axis(axes[0,1], '3d')
                 if 'label_right' in options or 'hide_y' in options:
-                    axes[1,1].view_init(azim=-45)
+                    axes[0,1].view_init(azim=-45)
 
         # Initialize a 2x3 figure
         if style == '2x3':
@@ -499,8 +485,8 @@ class Output_Series():
                 3.3450 if width is None else width,
                 9.1340 if height is None else height,
                 left, bottom, right, top, colpad, rowpad, nrow, ncol,
-                adjust='ax_width' if adjust is not None else adjust,
-                h_align='center' if adjust is not None else h_align
+                adjust='ax_width' if adjust is None else adjust,
+                h_align='center' if adjust is None else h_align
             )
 
             # Create figure and axes
@@ -514,8 +500,8 @@ class Output_Series():
                 7.0900 if width is None else width,
                 7.5023 if height is None else height,
                 left, bottom, right, top, colpad, rowpad, nrow, ncol,
-                adjust='ax_width' if adjust is not None else adjust,
-                h_align='center' if adjust is not None else h_align
+                adjust='ax_width' if adjust is None else adjust,
+                h_align='center' if adjust is None else h_align
             )
 
             # Create figure and axes
@@ -554,8 +540,8 @@ class Output_Series():
                 3.3450 if width is None else width,
                 9.1340 if height is None else height,
                 left, bottom, right, top, colpad, rowpad, nrow, ncol,
-                adjust='ax_width' if adjust is not None else adjust,
-                h_align='center' if adjust is not None else h_align
+                adjust='ax_width' if adjust is None else adjust,
+                h_align='center' if adjust is None else h_align
             )
 
             # Create figure and axes
@@ -650,10 +636,11 @@ class Output_Series():
 
         # Move axes and tick labels to the right of the rightmost axes
         if 'label_right' in options and ncol == 2:
-            for ax in filter(
-                ax is not None,
-                axes[:nrow - (1 if '3d' in options else 0),1].flatten()
-            ):
+            if style == '2x2' and '3d' in options:
+                right_axes = [axes[1,1]]
+            else:
+                right_axes = axes[:nrow - (1 if '3d' in options else 0),1].flatten()
+            for ax in filter(lambda ax: ax is not None, right_axes):
                 ax.yaxis.set_label_position('right')
                 ax.yaxis.tick_right()
 
@@ -822,6 +809,36 @@ class Output_Series():
         # ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35., -40, -45, -50])
         # ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
 
+    def get_metric(self, metric, index=None):
+        """Retrieves the proprer Metric instance from a string and index."""
+
+        # Metric instance
+        self.check_type(metric, 'metric', ('string', 'None'))
+        self.stop(
+            metric not in [metric.label for metric in self.metrics], 'ValueError',
+            "'metric' must be a valid metric key ({} given).", metric
+        )
+        metric = vars(self)[metric]
+
+        # If the metric has a size of 1, index is ignored
+        if metric.value.shape[-1] == 1:
+            index = 0
+
+        # Metric index
+        else:
+            self.check_type(index, 'index', ('integer', 'None'))
+            self.stop(
+                metric.value.shape[-1] > 1 and index is None, 'ValueError',
+                "No 'index' is provided (metric is {} in size).", metric.value.shape[-1]
+            )
+            self.stop(
+                index > metric.value.shape[-1] - 1 and metric.value.shape[-1] > 1, 'ValueError',
+                "'index' is too large for this metric ({} given, {} in size).",
+                index, metric.value.shape[-1]
+            )
+
+        return metric, index
+
     def get_title_metric(self, fig, line_1, system):
         """Sets a title for association size metrics plots if 'title' is True."""
 
@@ -852,25 +869,12 @@ class Output_Series():
 
             return f'Average {line_1_title}\n{line_2}', f'Average {line_1_log} {line_2}'
 
-    def draw_covariances(
-        self, system, robust=False, sklearn=False, title=False,
-        forced=False, default=False, cancel=False
-    ):
-        """
-        Creates a plot of the covariances, and the determinant and the trace of the covariances
-        matrix. If either 'robust' or 'sklearn' is True, the robust or sklearn covariances matrix
-        is used. Otherwise, the empirical covariances matrix is used.
-        """
-
-        # Initialize figure
-        fig, axes = self.set_figure('1x1', left=0.3430)
-        ax = axes[0,0]
+    def plot_covariances(self, ax, system, robust, sklearn):
+        """Plots the determinant, the trace and the diagonal terms of the covariances matrix."""
 
         # Select association size metrics
         covariances, selection = (
-            self.select_metric(
-                'covariances', system, robust=robust, sklearn=sklearn
-            )
+            self.select_metric('covariances', system, robust=robust, sklearn=sklearn)
         )
         covariances_matrix_det = vars(self)[f'{covariances}_matrix_det{selection}']
         covariances_matrix_trace = vars(self)[f'{covariances}_matrix_trace{selection}']
@@ -882,6 +886,24 @@ class Output_Series():
         self.plot_metric(ax, covariances, 0, colors.metric[5], '-', 0.9)
         self.plot_metric(ax, covariances, 1, colors.metric[6], '--', 0.7)
         self.plot_metric(ax, covariances, 2, colors.metric[7], ':', 0.5)
+
+        return selection
+
+    def draw_covariances(
+        self, system, robust=False, sklearn=False,
+        title=False, forced=None, default=None, cancel=None
+    ):
+        """
+        Creates a plot of the determinant, the trace and the diagonal terms of the covariances
+        matrix. If either 'robust' or 'sklearn' is True, the robust or sklearn covariances matrix
+        is used. Otherwise, the empirical covariances matrix is used.
+        """
+
+        # Initialize figure
+        fig, axes = self.set_figure('1x1', left=0.3430)
+
+        # Plot covariance matrix determinant and trace, and covariances
+        selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
 
         # Set title
         self.set_title(
@@ -896,26 +918,15 @@ class Output_Series():
         )
         # plt.show()
 
-    def draw_cross_covariances(
-        self, system, robust=False, sklearn=False, title=False,
-        forced=False, default=False, cancel=False
-    ):
+    def plot_cross_covariances(self, ax, system, robust, sklearn):
         """
-        Creates a plot the cross covariances between positions and velocities, and the determinant
-        and the trace of the cross covariances matrix between positions and velocities. If either
-        'robust' or 'sklearn' is True, the robust or sklearn covariances matrix is used. Otherwise,
-        the empirical covariances matrix is used.
+        Plots the determinant, the trace and the diagonal terms of the cross covariances matrix
+        between positions and velocities.
         """
-
-        # Initialize figure
-        fig, axes = self.set_figure('1x1', left=0.3430)
-        ax = axes[0,0]
 
         # Select association size metrics
         cross_covariances, selection = (
-            self.select_metric(
-                'cross_covariances', system, robust=robust, sklearn=sklearn
-            )
+            self.select_metric('cross_covariances', system, robust=robust, sklearn=sklearn)
         )
         cross_covariances_matrix_det = vars(self)[f'{cross_covariances}_matrix_det{selection}']
         cross_covariances_matrix_trace = vars(self)[f'{cross_covariances}_matrix_trace{selection}']
@@ -927,6 +938,24 @@ class Output_Series():
         self.plot_metric(ax, cross_covariances, 0, colors.metric[5], '-', 0.9)
         self.plot_metric(ax, cross_covariances, 1, colors.metric[6], '--', 0.7)
         self.plot_metric(ax, cross_covariances, 2, colors.metric[7], ':', 0.5)
+
+        return selection
+
+    def draw_cross_covariances(
+        self, system, robust=False, sklearn=False,
+        title=False, forced=None, default=None, cancel=None
+    ):
+        """
+        Creates a plot the determinant, the trace and the diagonal terms of the cross covariances
+        matrix between positions and velocities. If either 'robust' or 'sklearn' is True, the robust
+        or sklearn covariances matrix is used. Otherwise, the empirical covariances matrix is used.
+        """
+
+        # Initialize figure
+        fig, axes = self.set_figure('1x1', left=0.3430)
+
+        # Plot the cross covariance matrix determinant and trace, and cross covariances
+        selection = self.plot_cross_covariances(axes[0,0], system, robust, sklearn)
 
         # Set title
         self.set_title(
@@ -941,14 +970,8 @@ class Output_Series():
         )
         # plt.show()
 
-    def draw_mad(self, system, title=False, forced=False, default=False, cancel=False):
-        """
-        Creates a plot of the total median absolute deviation (MAD), the components of the MAD.
-        """
-
-        # Initialize figure
-        fig, axes = self.set_figure('1x1', left=0.3430)
-        ax = axes[0,0]
+    def plot_mad(self, ax, system):
+        """Plots the total median absolute deviation (MAD), and the components of the MAD."""
 
         # Select association size metrics
         mad = self.select_metric('mad', system)[0]
@@ -960,6 +983,17 @@ class Output_Series():
         self.plot_metric(ax, mad, 0, colors.metric[5], '-', 0.9)
         self.plot_metric(ax, mad, 1, colors.metric[6], '--', 0.7)
         self.plot_metric(ax, mad, 2, colors.metric[7], ':', 0.5)
+
+    def draw_mad(self, system, title=False, forced=None, default=None, cancel=None):
+        """
+        Creates a plot of the total median absolute deviation (MAD), the components of the MAD.
+        """
+
+        # Initialize figure
+        fig, axes = self.set_figure('1x1', left=0.3430)
+
+        # Plot the total median aboslute deviation (MAD), and the components of the MAD
+        self.plot_mad(axes[0,0], system)
 
         # Set title
         self.set_title(
@@ -973,15 +1007,11 @@ class Output_Series():
         )
         # plt.show()
 
-    def draw_mst(self, system, title=False, forced=False, default=False, cancel=False):
+    def plot_mst(self, ax, system):
         """
-        Creates a plot of the mean branch length (both empirical and robust) and median absolute
-        deviation of the minimum spanning tree (MST).
+        Plots the mean branch length (both empirical and robust) and median absolute deviation
+        of the minimum spanning tree (MST).
         """
-
-        # Initialize figure
-        fig, axes = self.set_figure('1x1', left=0.3430)
-        ax = axes[0,0]
 
         # Select association size metrics
         mst = self.select_metric('mst', system)[0]
@@ -990,6 +1020,18 @@ class Output_Series():
         self.plot_metric(ax, vars(self)[f'{mst}_mean'], 0, colors.metric[5], '-', 0.9)
         self.plot_metric(ax, vars(self)[f'{mst}_mean_robust'], 0, colors.metric[6], '--', 0.7)
         self.plot_metric(ax, vars(self)[f'{mst}_mad'], 0, colors.metric[7], ':', 0.5)
+
+    def draw_mst(self, system, title=False, forced=None, default=None, cancel=None):
+        """
+        Creates a plot of the mean branch length (both empirical and robust) and median absolute
+        deviation of the minimum spanning tree (MST).
+        """
+
+        # Initialize figure
+        fig, axes = self.set_figure('1x1', left=0.3430)
+
+        # Plot the mean and median absolute deviation of the minimum spanning tree
+        self.plot_mst(axes[0,0], system)
 
         # Set title
         self.set_title(
@@ -1003,7 +1045,7 @@ class Output_Series():
         )
         # plt.show()
 
-    def draw_mahalanobis(self, system, title=False, forced=False, default=False, cancel=False):
+    def draw_mahalanobis(self, system, title=False, forced=None, default=None, cancel=None):
         """Creates a plot of the mean and median Mahalanobis distance."""
 
         # Initialize figure
@@ -1034,45 +1076,26 @@ class Output_Series():
         # plt.show()
 
     def draw_covariances_mad(
-        self, system, robust=False, sklearn=False, title=False,
-        forced=False, default=False, cancel=False
+        self, system, style, robust=False, sklearn=False,
+        title=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates a plot of the covariances, and the determinant and the trace of the covariances
-        matrix, the total median absolute deviation (MAD), and the components of the MAD.
+        Creates a plot of the determinant, the trace and the diagonal terms of the covariances
+        matrix, and the total median absolute deviation (MAD), the components of the MAD. If
+        either 'robust' or 'sklearn' is True, the robust or sklearn covariances matrix is used.
+        Otherwise, the empirical covariances matrix is used.
         """
 
         # Initialize figure
-        fig, axes = self.set_figure('2x1', 'hide_x', left=0.3430)
-        ax1, ax2 = (axes[0,0], axes[1,0])
-
-        # Select association size metrics (covariances)
-        covariances, selection = (
-            self.select_metric(
-                'covariances', system, robust=robust, sklearn=sklearn
-            )
+        fig, axes = self.set_figure(
+            style, 'hide_x', left=0.3430, colpad=0.4430, styles=('2x1', '1x2')
         )
-        covariances_matrix_det = vars(self)[f'{covariances}_matrix_det{selection}']
-        covariances_matrix_trace = vars(self)[f'{covariances}_matrix_trace{selection}']
-        covariances = vars(self)[f'{covariances}{selection}']
-
-        # Select association size metrics (covariances)
-        mad = self.select_metric('mad', system)[0]
-        mad_total = vars(self)[f'{mad}_total']
-        mad = vars(self)[mad]
 
         # Plot covariance matrix determinant and trace, and covariances
-        self.plot_metric(ax1, covariances_matrix_det, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax1, covariances_matrix_trace, 0, colors.metric[1], '--', 0.6)
-        self.plot_metric(ax1, covariances, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax1, covariances, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax1, covariances, 2, colors.metric[7], ':', 0.5)
+        selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
 
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
-        self.plot_metric(ax2, mad_total, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax2, mad, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax2, mad, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax2, mad, 2, colors.metric[7], ':', 0.5)
+        self.plot_mad(axes[1 if style == '2x1' else 0, 1 if style == '1x2' else 0], system)
 
         # Set title
         self.set_title(
@@ -1083,152 +1106,173 @@ class Output_Series():
 
         # Save figure
         self.save_figure(
-            f'covariances_mad_{system}_{self.name}.pdf', fig,
+            f'covariances_mad_{system}_{style}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
 
-    def draw_det_mad_mst_cross_covariances_xyz(
-        self, other, title=False, forced=False, default=False, cancel=False
+    def draw_covariances_cross_mad_mst(
+        self, system, robust=False, sklearn=False,
+        title=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates a plot of xyz determinant of the covariances matrix, xyz total median absolute
-        deviation, mean branch length of the xyz minimum spanning tree, and x-u, y-v and z-w
-        cross covariances.
+        Creates plots of the determinant, the trace and the diagonal terms of the covariances
+        matrix, the determinant, the trace and the diagonal terms of the cross covariances matrix
+        between positions and velocities, the total median absolute deviation (MAD), the components
+        of the MAD, and the mean branch length (both empirical and robust) and median absolute
+        deviation of the minimum spanning tree (MST).  If either 'robust' or 'sklearn' is True, the
+        robust or sklearn covariances and cross covariance matrices are used. Otherwise, the
+        empirical covariances and cross covariance matrices are used.
         """
 
-        # Check the type of other
-        self.stop(
-            type(other) != type(self), 'TypeError',
-            "'other' must be a Series object ({} given).", type(other)
-        )
-
         # Initialize figure
-        self.check_traceback()
-        other.check_traceback()
-        fig, (ax0, ax1) = plt.subplots(
-            ncols=2, constrained_layout=True, figsize=(6.66, 3.33), facecolor=colors.white, dpi=300
+        fig, axes = self.set_figure('2x2', 'hide_x', 'label_right')
+
+        # Plot covariance matrix determinant and trace, and covariances
+        selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
+
+        # Plot the cross covariance matrix determinant and trace, and cross covariances
+        selection = self.plot_cross_covariances(axes[0,1], system, robust, sklearn=False)
+
+        # Plot the total median aboslute deviation (MAD), and the components of the MAD
+        self.plot_mad(axes[1,0], system)
+
+        # Plot the mean and median absolute deviation of the minimum spanning tree
+        self.plot_mst(axes[1,1], system)
+
+        # Set title
+        self.set_title(
+            title, fig, self.get_title_metric,
+            '{system}'f"{selection.replace('_', ' ')} covariances, cross covariances, median "
+            "absolution deviation, and minimum spanning tree", system
         )
-
-        # Plot association size metrics (self)
-        self.plot_metric(ax0, self.covariances_xyz_matrix_det, 0, colors.metric[4], '-', 0.8)
-        self.plot_metric(ax0, self.mad_xyz_total, 0, colors.metric[5], '--', 0.7)
-        self.plot_metric(ax0, self.mst_xyz_mean, 0, colors.metric[6], '-.', 0.6)
-        self.plot_metric(ax0, self.mst_xyz_mad, 0, colors.metric[7], ':', 0.5)
-        self.plot_metric(ax1, self.cross_covariances_xyz, 0, colors.metric[4], '-', 0.8)
-        self.plot_metric(ax1, self.cross_covariances_xyz, 1, colors.metric[5], '--', 0.7)
-        self.plot_metric(ax1, self.cross_covariances_xyz, 2, colors.metric[6], ':', 0.6)
-
-        # Plot association size metrics (other)
-        other.plot_metric(ax0, other.covariances_xyz_matrix_det, 0, colors.metric[0], '-', 0.8)
-        other.plot_metric(ax0, other.mad_xyz_total, 0, colors.metric[1], '--', 0.7)
-        other.plot_metric(ax0, other.mst_xyz_mean, 0, colors.metric[2], '-.', 0.6)
-        other.plot_metric(ax0, other.mst_xyz_mad, 0, colors.metric[3], ':', 0.5)
-        other.plot_metric(ax1, other.cross_covariances_xyz, 0, colors.metric[0], '-', 0.8)
-        other.plot_metric(ax1, other.cross_covariances_xyz, 1, colors.metric[1], '--', 0.7)
-        other.plot_metric(ax1, other.cross_covariances_xyz, 2, colors.metric[2], ':', 0.6)
-
-        # Check the type of title
-        self.check_type(title, 'title', 'boolean')
-
-        # Title from data
-        if title:
-            if self.from_data:
-                fig.suptitle(
-                    '$XYZ$ covariances, MAD, MST and cross covariances of {}\n and {} over '
-                    '{:.1f} Myr with a {:.1f} km/s radial velocity correction\n'.format(
-                        self.name, other.name, self.duration.value,
-                        self.rv_shift.to('km/s').value
-                    ), fontsize=8
-                )
-
-            # Title from a model
-            elif self.from_model:
-                fig.suptitle(
-                    'Average $XYZ$ covariances, MAD, MST and cross covariances of {}'
-                    'simulated associations over {:.1f} Myr\n with kinematics similar to'
-                    "{} and {}, and a {:.1f} km/s radial velocity bias\n".format(
-                        self.number_of_groups, self.duration.value,
-                        self.name, other.name, self.rv_shift.to('km/s').value
-                    ), fontsize=8
-                )
-
-        # Set legend
-        for ax in (ax0, ax1):
-            self.set_legend(ax)
-
-            # Set labels
-            ax.set_xlabel('Epoch (Myr)', fontsize=8)
-            ax.set_ylabel(f'Association size ({units_y})', fontsize=8)
-
-            # Set limits
-            ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
-
-            # Set ticks
-            ax.tick_params(
-                top=True, right=True, which='both', direction='in', width=0.5, labelsize=8
-            )
-
-            # Set spines
-            ax.spines[:].set_linewidth(0.5)
 
         # Save figure
         self.save_figure(
-            f'covariances_mad_mst_cross_covariannces_xyz_{self.name}_{other.name}.pdf', fig,
+            f'covariances_cross_mad_mst_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
 
-    def draw_age_distribution(self, title=False, forced=False, default=False, cancel=False):
-        """
-        Creates a plot of the distribution of ages computed in a series, including the effects
-        of measurement errors and the jackknife Monte Carlo.
-        """
+        # Check the type of other
+        # self.stop(
+        #     type(other) != type(self), 'TypeError',
+        #     "'other' must be a Series object ({} given).", type(other)
+        # )
+        # other.check_traceback()
 
-        # Initialize figure
-        self.check_traceback()
-        fig = plt.figure(figsize=(3.33, 3.33), facecolor=colors.white, dpi=300)
-        ax = fig.add_subplot(111, frame_on=True)
+        # Plot association size metrics (self)
+        # self.plot_metric(ax0, self.covariances_xyz_matrix_det, 0, colors.metric[4], '-', 0.8)
+        # self.plot_metric(ax0, self.mad_xyz_total, 0, colors.metric[5], '--', 0.7)
+        # self.plot_metric(ax0, self.mst_xyz_mean, 0, colors.metric[6], '-.', 0.6)
+        # self.plot_metric(ax0, self.mst_xyz_mad, 0, colors.metric[7], ':', 0.5)
+        # self.plot_metric(ax1, self.cross_covariances_xyz, 0, colors.metric[4], '-', 0.8)
+        # self.plot_metric(ax1, self.cross_covariances_xyz, 1, colors.metric[5], '--', 0.7)
+        # self.plot_metric(ax1, self.cross_covariances_xyz, 2, colors.metric[6], ':', 0.6)
 
-        # Plot histogram
-        ages = [group.covariances_xyz_matrix_det.age[0] for group in self]
-        ax.hist(
-            ages, bins=np.linspace(16, 24, 33), density=True,
-            color=colors.azure[8], alpha=0.7, label='metric'
-        )
-        # bins=np.arange(21.975, 26.025, 0.05)
+        # Plot association size metrics (other)
+        # other.plot_metric(ax0, other.covariances_xyz_matrix_det, 0, colors.metric[0], '-', 0.8)
+        # other.plot_metric(ax0, other.mad_xyz_total, 0, colors.metric[1], '--', 0.7)
+        # other.plot_metric(ax0, other.mst_xyz_mean, 0, colors.metric[2], '-.', 0.6)
+        # other.plot_metric(ax0, other.mst_xyz_mad, 0, colors.metric[3], ':', 0.5)
+        # other.plot_metric(ax1, other.cross_covariances_xyz, 0, colors.metric[0], '-', 0.8)
+        # other.plot_metric(ax1, other.cross_covariances_xyz, 1, colors.metric[1], '--', 0.7)
+        # other.plot_metric(ax1, other.cross_covariances_xyz, 2, colors.metric[2], ':', 0.6)
 
         # Check the type of title
-        self.check_type(title, 'title', 'boolean')
+        # self.check_type(title, 'title', 'boolean')
 
-        # Set title
-        if title:
-            ax.set_title(
-                f'Distribution of {self.number_of_groups} moving groups age,\n'
-                f'Average age: ({self.covariances_xyz_matrix_det.age[0]:.2f} '
-                f'± {self.covariances_xyz_matrix_det.age_error[0]:.2f}) Myr\n', fontsize=8
+        # Title from data
+        # if title:
+        #     if self.from_data:
+        #         fig.suptitle(
+        #             '$XYZ$ covariances, MAD, MST and cross covariances of {}\n and {} over '
+        #             '{:.1f} Myr with a {:.1f} km/s radial velocity correction\n'.format(
+        #                 self.name, other.name, self.duration.value,
+        #                 self.rv_shift.to('km/s').value
+        #             ), fontsize=8
+        #         )
+
+            # Title from a model
+            # elif self.from_model:
+            #     fig.suptitle(
+            #         'Average $XYZ$ covariances, MAD, MST and cross covariances of {}'
+            #         'simulated associations over {:.1f} Myr\n with kinematics similar to'
+            #         "{} and {}, and a {:.1f} km/s radial velocity bias\n".format(
+            #             self.number_of_groups, self.duration.value,
+            #             self.name, other.name, self.rv_shift.to('km/s').value
+            #         ), fontsize=8
+            #     )
+
+        # # Set legend
+        # for ax in (ax0, ax1):
+        #     self.set_legend(ax)
+
+        #     # Set labels
+        #     ax.set_xlabel('Epoch (Myr)', fontsize=8)
+        #     ax.set_ylabel(f'Association size ({units_y})', fontsize=8)
+
+        #     # Set limits
+        #     ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
+
+        #     # Set ticks
+        #     ax.tick_params(
+        #         top=True, right=True, which='both', direction='in', width=0.5, labelsize=8
+        #     )
+
+        #     # Set spines
+        #     ax.spines[:].set_linewidth(0.5)
+
+    def draw_age_distribution(
+        self, metric, index=None, title=False,
+        forced=None, default=None, cancel=None
+    ):
+        """Draws a plot of the age distribution of a series for a given metric."""
+
+        # Initialize figure
+        fig, axes = self.set_figure('1x1')
+
+        # Retrieve the ages for the metric
+        metric, index = self.get_metric(metric, index)
+        if metric.status:
+            ages = vars(self)[metric.label].ages[:,:,index].flatten()
+
+            # Plot ages distribution
+            axes[0,0].hist(
+                ages, bins=np.linspace(np.min(ages), np.max(ages), 30),
+                density=True, color=colors.azure[8], alpha=0.7
             )
 
+        # Logging
+        else:
+            self.series.log(
+                f"Could not use '{metric.name[index]}' metric for '{self.name}' series. "
+                "It was not computed.", self.name, display=True
+            )
+
+        # Set title
+        self.set_title(
+            title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
+            f'Age distribution of {self.number_of_groups} groups of {self.name},\n'
+            f'using the {metric.name[index]} as association size metric'
+            # f'Average age: ({self.covariances_xyz_matrix_det.age[0]:.2f} '
+            # f'± {self.covariances_xyz_matrix_det.age_error[0]:.2f}) Myr'
+        )
+
         # Set labels
-        ax.set_xlabel('Age (Myr)', fontsize=8)
-        ax.set_ylabel('Density', fontsize=8)
-
-        # Set ticks
-        ax.tick_params(top=True, right=True, which='both', direction='in', width=0.5, labelsize=8)
-
-        # Set spines
-        ax.spines[:].set_linewidth(0.5)
+        axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
+        axes[0,0].set_ylabel('Density', fontsize=8)
 
         # Save figure
         self.save_figure(
-            f'age_distribution_{self.name}.pdf', fig,
+            f'age_distribution_{self.name}_{metric.label}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
 
     def create_metrics_table(
         self, save=False, show=False, machine=False,
-        forced=False, default=False, cancel=False
+        forced=None, default=None, cancel=None
     ):
         """
         Creates a table of the association size metrics. If 'save' if True, the table is
@@ -1356,7 +1400,7 @@ class Output_Group():
 
         # Index from the epoch of minimum of an association size metric
         elif metric is not None:
-            metric, index = self.get_metric(metric, index)
+            metric, index = self.series.get_metric(metric, index)
             if metric.status:
                 age = metric.age[index]
                 return np.argmin(np.abs(age - self.series.time)), age, metric.age_error[index]
@@ -1370,38 +1414,7 @@ class Output_Group():
 
         # No birth index, age or age error
         else:
-            return (None, None, None)
-
-    def get_metric(self, metric, index=None):
-        """Retrieves the proprer Series.Metric instance from a string and index."""
-
-        # Metric instance
-        self.series.check_type(metric, 'metric', ('string', 'None'))
-        self.series.stop(
-            metric not in [metric.label for metric in self.series.metrics], 'ValueError',
-            "'metric' must be a valid metric key ({} given).", metric
-        )
-        metric = vars(self.series)[metric]
-
-
-        # If the metric has a size of 1, index is ignored
-        if metric.value.shape[-1] == 1:
-            index = 0
-
-        # Metric index
-        else:
-            self.series.check_type(index, 'index', ('integer', 'None'))
-            self.series.stop(
-                metric.value.shape[-1] > 1 and index is None, 'ValueError',
-                "No 'index' is provided (metric is {} in size).", metric.value.shape[-1]
-            )
-            self.series.stop(
-                index > metric.value.shape[-1] - 1 and metric.value.shape[-1] > 1, 'ValueError',
-                "'index' is too large for this metric ({} given, {} in size).",
-                index, metric.value.shape[-1]
-            )
-
-        return metric, index
+            return None, None, None
 
     def get_step_age(self, step, age):
         """
@@ -1611,7 +1624,7 @@ class Output_Group():
 
     def draw_trajectory(
         self, coord, system, age=None, metric=None, index=None, labels=False,
-        title=False, forced=False, default=False, cancel=False
+        title=False, forced=None, default=None, cancel=None
     ):
         """Draws the trajectories in position or velocity of stars."""
 
@@ -1890,7 +1903,7 @@ class Output_Group():
 
     def draw_time(
         self, coord, system, style, age=None, metric=None, title=False,
-        forced=False, default=False, cancel=False
+        forced=None, default=None, cancel=None
     ):
         """Draws the positions or velocities of stars over time."""
 
@@ -1903,11 +1916,14 @@ class Output_Group():
 
         # Plot xyz position
         for y in range(3):
-            self.plot_time(axes.flatten()[y], y, coord, system, age, metric)
+            if style == '2x2':
+                self.plot_time((axes[0,0], axes[1,0], axes[1,1])[y], y, coord, system, age, metric)
+            else:
+                self.plot_time(axes.flatten()[y], y, coord, system, age, metric)
 
         # Plot the average xyz position
         if style == '2x2':
-            self.plot_time(axes[1,1], None, coord, system, age, metric)
+            self.plot_time(axes[0,1], None, coord, system, age, metric)
 
         # Set title
         self.series.set_title(
@@ -1976,16 +1992,6 @@ class Output_Group():
         self.series.check_type(mst, 'mst', 'boolean')
         self.series.check_type(relative, 'relative', 'boolean')
 
-        # Check if the minimum spanning tree can be displayed
-        self.series.stop(
-            mst and coords[0] != coords[1], 'ValueError', 'The minimum spanning tree cannot be '
-            'displayed is coordinates do not match ({} and {} given).', coords[0], coords[1]
-        )
-        self.series.stop(
-            mst and not self.series.mst_metrics, 'ValueError',
-            'The minimum spanning tree cannot be displayed if it was not computed.'
-        )
-
         # Value and error coordinates
         value_coords = [f'{coords[i]}_{system}' for i in range(len(coords))]
         error_coords = [f'{coords[i]}_{system}_error' for i in range(len(coords))]
@@ -2051,21 +2057,26 @@ class Output_Group():
             if labels:
                 if projection == '2d':
                     ax.text(
-                        value[0] + 1, value[1] + 1, star.name,
+                        value[0] + 2, value[1] + 3, star.name,
                         color=color, horizontalalignment='left',
-                        verticalaligment='top', fontsize=6, zorder=0.9
+                        verticalalignment='top', fontsize=4, zorder=0.9
                     )
                 if projection == '3d':
                     ax.text(
-                        value[0] + 2, value[1] + 2, value[2] + 2, star.name,
+                        value[0] + 2, value[1] + 3, value[2] + 2, star.name,
                         color=color, horizontalalignment='left',
-                        verticalaligment='top', fontsize=6, zorder=0.9
+                        verticalalignment='top', fontsize=4, zorder=0.9
                     )
 
+        # Find minimum spanning tree branches, if needed
+        if mst and len(set(coords)) == 1:
+            mst = f'mst_{coords[0]}_{system}'
+            if mst not in vars(self).keys():
+                self.get_minimum_spanning_tree()
+            mst = vars(self)[mst]
 
-        # Select branches
-        if mst:
-            for branch in self.mst_xyz[step]:
+            # Select branches
+            for branch in mst[step]:
                 value_start = [
                     vars(branch.start)[
                         ('relative_' if relative else '') + value_coords[i]
@@ -2083,7 +2094,7 @@ class Output_Group():
                         (value_start[0], value_end[0]),
                         (value_start[1], value_end[1]),
                         color=colors.blue[6], alpha=0.6, linestyle='-',
-                        linewidth=0.5, solid_capstyle='round', zorder=0.4
+                        linewidth=0.5, solid_capstyle='round', zorder=0.2
                     )
                 if projection == '3d':
                     ax.plot(
@@ -2091,7 +2102,7 @@ class Output_Group():
                         (value_start[1], value_end[1]),
                         (value_start[2], value_end[2]),
                         color=colors.blue[6], alpha=0.6, linestyle='-',
-                        linewidth=0.5, solid_capstyle='round', zorder=0.4
+                        linewidth=0.5, solid_capstyle='round', zorder=0.2
                     )
 
         # Set labels
@@ -2124,7 +2135,8 @@ class Output_Group():
         # Check the type and value of relative
         self.series.check_type(relative, 'relative', 'boolean')
 
-        # Select coordinates
+        # Find limits, increased by 25%
+        scale_factor = 1.25
         values = np.array(
             [
                 [
@@ -2133,9 +2145,6 @@ class Output_Group():
                 ] for group in self.series
             ]
         ).reshape((-1, 3)).T
-
-        # Set limits, increased by 10%
-        scale_factor = 1.25
         values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
         limits = (
             np.array([-values_range, values_range]) * scale_factor +
@@ -2208,7 +2217,7 @@ class Output_Group():
 
     def draw_scatter(
         self, coord, system, style, step=None, age=None, errors=False, labels=False,
-        mst=False, title=False, forced=False, default=False, cancel=False
+        mst=False, title=False, forced=None, default=None, cancel=None
     ):
         """
         Draws scatter plots of positions or velocities of stars at a given 'step' or 'age' in Myr.
@@ -2223,9 +2232,17 @@ class Output_Group():
         # Compute the values of step and age
         step, age = self.get_step_age(step, age)
 
+        # Set axes in accordance to style
+        if style in ('1x3', '3x1', '4x1'):
+            ax0, ax1, ax2 = axes.flatten()[:3]
+        if style in ('2x2'):
+            ax0, ax1, ax2, ax3 = axes[0,0], axes[1,0], axes[1,1], axes[0,1]
+        if style in ('4x1'):
+            ax3 = axes[3,0]
+
         # Plot positions or velocites (2d)
-        i, j = zip(*((0, 1), (2, 1), (0, 2)))
-        for ax, x, y in zip(axes.flatten()[:3], i, j):
+        i, j = zip(*((0, 1), (0, 2), (1, 2)))
+        for ax, x, y in zip((ax0, ax1, ax2), i, j):
             self.plot_scatter(
                 ax, (x, y), coord, system, step,
                 errors=errors, labels=labels, mst=mst
@@ -2233,33 +2250,36 @@ class Output_Group():
 
         # Plot positions or velocites (3d)
         if style in ('2x2', '4x1'):
-            i, j = (1,1) if style == '2x2' else (3,0)
             self.plot_scatter(
-                axes[i,j], (0, 1, 2), coord, system, step,
+                ax3, (0, 1, 2), coord, system, step,
                 errors=errors, labels=labels, mst=mst
             )
 
-        # Set limits
-        if coord == 'position' and system == 'xyz':
-            xlim = (30, 180)
-            ylim = (-1280, -1140)
-            zlim = (-85, 65)
-            if style == '2x2':
-                axes[0,0].set_xlim(*xlim)
-                axes[0,0].set_ylim(*ylim)
-                axes[0,1].set_xlim(*zlim)
-                axes[0,1].set_ylim(*ylim)
-                axes[1,0].set_xlim(*xlim)
-                axes[1,0].set_ylim(*zlim)
-                axes[1,1].set_xlim(*xlim)
-                axes[1,1].set_ylim(*ylim)
-                axes[1,1].set_zlim(*zlim)
+        # Find limits, increased by 25%
+        scale_factor = 1.25
+        values = np.array(
+            [
+                [vars(star)[f'{coord}_{system}'][step] for star in group.sample]
+                for group in self.series
+            ]
+        ).reshape((-1, 3)).T
+        values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
+        xlim, ylim, zlim = (
+            np.array([-values_range, values_range]) * scale_factor +
+            np.max(values, axis=1) + np.min(values, axis=1)
+        ).T  / 2
 
         # Set limits
-        # if style in ('3x1', '1x3', '4x1'):
-        #     for ax in axes.flatten():
-        #         ax.set_aspect('equal')
-        #         ax.set_adjustable('datalim')
+        ax0.set_xlim(*xlim)
+        ax0.set_ylim(*ylim)
+        ax1.set_xlim(*xlim)
+        ax1.set_ylim(*zlim)
+        ax2.set_xlim(*ylim)
+        ax2.set_ylim(*zlim)
+        if style in ('2x2', '4x1'):
+            ax3.set_xlim(*xlim)
+            ax3.set_ylim(*ylim)
+            ax3.set_zlim(*zlim)
 
         # Set title
         self.series.set_title(
@@ -2276,7 +2296,7 @@ class Output_Group():
 
     def draw_cross_scatter(
         self, system, step=None, age=None, errors=False, labels=False,
-        title=False, forced=False, default=False, cancel=False
+        title=False, forced=None, default=None, cancel=None
     ):
         """
         Draws cross scatter plots of positions and velocities of stars, at a given 'step' or 'age'
@@ -2311,7 +2331,7 @@ class Output_Group():
 
     def draw_time_scatter(
         self, coord, system, style, steps=None, ages=None, errors=False, labels=False,
-        mst=False, title=False, forced=False, default=False, cancel=False
+        mst=False, title=False, forced=None, default=None, cancel=None
     ):
         """
         Draws scatter plots of positions or velocities of stars, for 2 or 3 'step' or 'age' in Myr.
@@ -2393,7 +2413,7 @@ class Output_Group():
 
     def draw_corner_scatter(
         self, system, step=None, age=None, errors=False, labels=False,
-        title=False, forced=False, default=False, cancel=False
+        title=False, forced=None, default=None, cancel=None
     ):
         """
         Draws corner scatter plots of positions and velocities, at a given 'step' or 'age' in Myr.
@@ -2449,7 +2469,7 @@ class Output_Group():
         )
         # plt.show()
 
-    def draw_map(self, labels=False, title=False, forced=False, default=False, cancel=False):
+    def draw_map(self, labels=False, title=False, forced=None, default=None, cancel=None):
         """
         Creates a Mollweide projection of a traceback. For this function to work, uvw
         velocities must not compensated for the sun velocity and computing xyz positions.
@@ -2530,27 +2550,18 @@ class Output_Group():
         # plt.show()
 
     def draw_age_distribution(
-        self, metric=None, index=None, title=False,
-        forced=False, default=False, cancel=False
+        self, metric, index=None, title=False,
+        forced=None, default=None, cancel=None
     ):
-        """
-        Creates a plot of the distribution of jackknife Monte Carlo ages computed in a
-        group.
-        """
+        """Draws a plot of the age distribution of a group for a given metric."""
 
         # Initialize figure
-        fig = plt.figure(figsize=(3.345, 3.401), facecolor=colors.white, dpi=300)
-        ax = fig.add_axes([0.104, 0.096, 0.895, 0.880])
+        fig, axes = self.series.set_figure('1x1', left=0.3580)
 
-        # Retrieve ages
-        metric, index = self.get_metric(metric, index)
+        # Retrieve the ages for the metric
+        metric, index = self.series.get_metric(metric, index)
         if metric.status:
-            metric_name = metric.label
-            ages = metric.ages
-            if ages.ndim == 2:
-                ages = ages[self.number]
-            elif ages.ndim == 3:
-                ages = ages[self.number,:,index]
+            ages = metric.ages[self.number,:,index]
 
             # Plot uncorrected histogram and gaussian curve
             if False:
@@ -2559,15 +2570,15 @@ class Output_Group():
                 σ = metric.age_int_error[index]
                 gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
                 i, = (gauss > 0.001).nonzero()
-                ax.plot(
+                axes[0,0].plot(
                     x[i], gauss[i], label='$\\xi^\\prime$ variance',
                     color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8
                 )
-                ax.hist(
+                axes[0,0].hist(
                     ages, bins=np.linspace(12, 32, 81), density=True,
                     color=colors.cyan[6], alpha=0.15, zorder=0.8
                 )
-                ax.vlines(
+                axes[0,0].vlines(
                     μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
                     alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8
                 )
@@ -2579,20 +2590,20 @@ class Output_Group():
             σ = 2.5
             gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
             i, = (gauss > 0.001).nonzero()
-            ax.plot(
+            axes[0,0].plot(
                 x[i], gauss[i], label='Corrected $\\xi^\\prime$ variance',
                 color=colors.lime[5], alpha=1.0, linewidth=1.0, zorder=0.9
             )
             ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
-            ax.hist(
+            axes[0,0].hist(
                 ages, bins=np.linspace(12, 32, 81), density=True,
                 color=colors.lime[6], alpha=0.3, zorder=0.6
             )
-            # ax.fill_between(
+            # axes[0,0].fill_between(
             #     x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
             #     alpha=0.15, linewidth=0., zorder=0.6
             # )
-            ax.vlines(
+            axes[0,0].vlines(
                 μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
                 alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9
             )
@@ -2613,15 +2624,15 @@ class Output_Group():
         x = np.concatenate((x1, x2))
         gauss = np.concatenate((gauss1, gauss2))
         i, = (gauss > 0.001).nonzero()
-        ax.plot(
+        axes[0,0].plot(
             x[i], gauss[i], label='Miret-Roig et al. (2020)',
             color=colors.orange[6], alpha=1.0, linewidth=1.0, zorder=0.8
         )
-        ax.fill_between(
+        axes[0,0].fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=colors.orange[6],
             alpha=0.15, linewidth=0., zorder=0.5
         )
-        ax.vlines(
+        axes[0,0].vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.orange[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8
         )
@@ -2635,73 +2646,61 @@ class Output_Group():
         x = np.concatenate((x1, x2))
         gauss = np.concatenate((gauss1, gauss2))
         i, = (gauss > 0.001).nonzero()
-        ax.plot(
+        axes[0,0].plot(
             x[i], gauss[i], label='Crundall et al. (2019)',
             color=colors.azure[6], alpha=1.0, linewidth=1.0, zorder=0.7
         )
-        ax.fill_between(
+        axes[0,0].fill_between(
             x[i], np.zeros_like(x[i]), gauss[i], color=colors.azure[6],
             linewidth=0.0, alpha=0.15, zorder=0.4
         )
-        ax.vlines(
+        axes[0,0].vlines(
             μ, ymin=0.0, ymax=np.max(gauss), color=colors.azure[6],
             alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.7
         )
 
         # Show a shaded area for LDB and isochrone ages
         LDB_range = np.array([20, 26])
-        ax.fill_between(
-            LDB_range, 0, 1, transform=ax.get_xaxis_transform(),
+        axes[0,0].fill_between(
+            LDB_range, 0, 1, transform=axes[0,0].get_xaxis_transform(),
             color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1
         )
 
-        # Check the type of title
-        self.series.check_type(title, 'title', 'boolean')
-
         # Set title
-        if title:
-            ax.set_title(
-                f'Distribution of {self.series.number_of_iterations} jackknife Monte Carlo' + (
-                    f',\nAverage age: ({metric.age[0]:.1f} '
-                    f'± {metric.age_int_error[0]:.1F}) Myr\n'
-                ) if metric.status else '', fontsize=8
-            )
-
-        # Set legend
-        legend = ax.legend(loc=1, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
-        legend.get_frame().set_alpha(None)
-        legend.get_frame().set_facecolor(colors.white + (0.8,))
-        legend.get_frame().set_edgecolor(colors.black)
-        legend.get_frame().set_linewidth(0.5)
-
-        # Set labels
-        ax.set_xlabel('Age (Myr)', fontsize=8)
-        ax.set_ylabel('Density', fontsize=8)
-
-        # Set limits
-        ax.set_xlim(13, 27)
-        ax.set_ylim(0.0, 0.7)
-
-        # Set ticks
-        ax.set_xticks([14., 16., 18., 20., 22., 24., 26.])
-        ax.tick_params(
-            top=True, right=True, which='both',
-            direction='in', width=0.5, labelsize=8
+        self.series.set_title(
+            title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
+            f'Age distribution of {self.series.number_of_iterations} iterations of {self.name},\n'
+            f'using the {metric.name[index]} as association size metric'
+            # + (
+            #     f', Average age: ({metric.age[0]:.1f} ± {metric.age_int_error[0]:.1F}) Myr'
+            #     if metric.status else ''
+            # )
         )
 
-        # Set spines
-        ax.spines[:].set_linewidth(0.5)
+        # Set legend
+        self.series.set_legend(axes[0,0], 1)
+
+        # Set labels
+        axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
+        axes[0,0].set_ylabel('Density', fontsize=8)
+
+        # Set limits
+        axes[0,0].set_xlim(13, 27)
+        axes[0,0].set_ylim(0.0, 0.7)
+
+        # Set ticks
+        axes[0,0].set_xticks([14., 16., 18., 20., 22., 24., 26.])
 
         # Save figure
         self.series.save_figure(
-            f'age_distribution_jackknife_{self.name}_{metric_name}.pdf', fig,
+            f'age_distribution_{self.name}_{metric.label}.pdf', fig,
             tight=False, forced=forced, default=default, cancel=cancel
         )
         # plt.show()
 
     def create_kinematics_table(
         self, save=False, show=False, machine=False, age=None,
-        forced=False, default=False, cancel=False
+        forced=None, default=None, cancel=None
     ):
         """
         Creates a table of the 6D kinematics (xyz Galactic positions and uvw space velocities)
@@ -2790,7 +2789,7 @@ class Output_Group():
 
     def create_kinematics_time_table(
         self, save=False, show=False, machine=False,
-        forced=False, default=False, cancel=False
+        forced=None, default=None, cancel=None
     ):
         """
         Creates a table of the group average kinematics over time. If 'save' if True, the table
@@ -2886,7 +2885,7 @@ class Output_Star():
 
     def create_kinematics_time_table(
         self, save=False, show=False, machine=False,
-        forced=False, default=False, cancel=False
+        forced=None, default=None, cancel=None
     ):
         """
         Creates a table of the star 6D kinematics over time. If 'save' if True, the table is
