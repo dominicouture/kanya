@@ -64,7 +64,7 @@ class Output_Series():
 
     def save_output(
         self, file_name, save, *save_args, extension=None, file_type=None,
-        output_dir=None, forced=None, default=None, cancel=None
+        output_dir=None, logging=True, forced=None, default=None, cancel=None
     ):
         """
         Creates a proper output path given a file name, an extension and, optionnally, a file path
@@ -76,6 +76,7 @@ class Output_Series():
 
         # Check the type of output_dir
         self.check_type(output_dir, 'output_dir', ('string', 'None'))
+        self.check_type(logging, 'logging', 'boolean')
 
         # Set output_dir parameter, if needed
         if 'output_dir' not in vars(self).keys():
@@ -104,7 +105,8 @@ class Output_Series():
 
                 # Logging
                 self.log(
-                    "Existing output file located at '{}' deleted and replaced.", output_path
+                    "Existing output file located at '{}' deleted and replaced.",
+                    output_path, logging=logging
                 )
 
             # Set default file name and save output
@@ -116,14 +118,14 @@ class Output_Series():
                 # Logging
                 self.log(
                     "Output file renamed from '{}' to '{}', and output saved at '{}'.",
-                    old_filename, path.basename(output_path), output_path
+                    old_filename, path.basename(output_path), output_path, logging=logging
                 )
 
             # Cancel save
             if cancel:
                 self.log(
                     "Output was not saved because an output file already exists at '{}'.",
-                    output_path
+                    output_path, logging=logging
                 )
 
         # Save output
@@ -131,19 +133,22 @@ class Output_Series():
             save(output_path, *save_args)
 
             # Logging
-            self.log("Output saved at '{}'.", output_path)
+            self.log("Output saved at '{}'.", output_path, logging=logging)
 
     def save_figure(
-        self, file_name, fig, extension='pdf', file_type=None, output_dir=None,
-        tight=False, forced=None, default=None, cancel=None
+        self, file_name, fig, extension='pdf', file_type=None, output_dir=None, tight=False,
+        show=False, close=True, logging=True, forced=None, default=None, cancel=None
     ):
         """Saves figure with or without tight layout and some padding."""
 
-        # Logging
-        self.log('{} figure created.', fig.line_log, display=True)
-
-        # Check the type of tight
+        # Check the type of tight, show, close and logging
         self.check_type(tight, 'tight', 'boolean')
+        self.check_type(show, 'show', 'boolean')
+        self.check_type(close, 'close', 'boolean')
+        self.check_type(logging, 'logging', 'boolean')
+
+        # Logging
+        self.log('{} figure created.', fig.line_log, display=logging, logging=logging)
 
         # Save figure
         def save(output_path, tight):
@@ -158,15 +163,27 @@ class Output_Series():
             output_dir=output_dir, cancel=cancel, forced=forced, default=default
         )
 
+        # Show figure
+        if show:
+            plt.show()
+
+        # Close figure
+        if close:
+            plt.close(fig)
+
     def save_table(
-        self, file_name, lines, header=None, extension='txt', file_type=None,
-        output_dir=None, forced=None, default=None, cancel=None
+        self, file_name, line_log, lines, header=None, extension='txt', file_type=None,
+        output_dir=None, logging=True, forced=None, default=None, cancel=None
     ):
         """Saves a table to a CSV file for a given header and data."""
 
-        # Check the types of lines and header
+        # Check the type of lines, header and logging
         self.check_type(lines, 'lines', ('tuple', 'list'))
         self.check_type(header, 'header', ('string', 'None'))
+        self.check_type(logging, 'logging', 'boolean')
+
+        # Logging
+        self.log('{} table created.', line_log, display=logging, logging=logging)
 
         # Save table
         def save(output_path, lines, header):
@@ -183,16 +200,17 @@ class Output_Series():
 
     def set_figure(
         self, style, *options, width=None, height=None, left=None, bottom=None, right=None,
-        top=None, colpad=None, rowpad=None, adjust=None, v_align=None, h_align=None, styles=None
+        top=None, colpad=None, rowpad=None, ratio=None, adjust=None, v_align=None, h_align=None,
+        styles=None
     ):
         """
-        Initializes a figure with multiple axes. The axes are created with at correct position
-        and size. Ticks and labels are repositioned and set invisible accordingly.
+        Initializes a figure with multiple axes. The axes are created with at the correct position
+        and with the correct size. Ticks and labels are repositioned and set invisible accordingly.
         """
 
         def get_dimensions(
             width, height, left, bottom, right, top, colpad, rowpad, nrow, ncol,
-            ratio=1.0, adjust=None, h_align='left', v_align='bottom'
+            ratio, adjust=None, h_align='left', v_align='bottom'
         ):
             """
             Computes the dimensions of the axes of a figure based the width and height of the figure,
@@ -315,7 +333,7 @@ class Output_Series():
                     iax.pane.set_linewidth(0.5)
                     iax.pane.set_edgecolor(colors.grey[17])
 
-                    # Set lines
+                    # Set spines
                     iax.line.set_linewidth(0.5)
 
                 # Set view
@@ -347,8 +365,9 @@ class Output_Series():
         bottom = 0.335 if bottom is None else bottom
         right = 0.005 if right is None else right
         top = 0.0815 if top is None else top
-        colpad = 0.100 if 'hide_y' in options else colpad if colpad is not None else 0.5400
-        rowpad = 0.100 if 'hide_x' in options else rowpad if rowpad is not None else 0.3654
+        colpad = 0.100 if 'hide_y' in options else 0.5400 if colpad is None else colpad
+        rowpad = 0.100 if 'hide_x' in options else 0.3654 if rowpad is None else rowpad
+        ratio = 1.0 if ratio is None else ratio
 
         # Set margins if the axes and tick labels are moved to the right of the rightmost axes
         if 'label_right' in options and ncol == 2:
@@ -390,20 +409,23 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 3.3115 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
-                adjust='fig_height' if adjust is None else adjust
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
+                adjust='fig_height' if adjust is None else adjust, h_align=h_align
             )
 
             # Create figure and axes
             fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params, remove_extra=False)
+            axes = get_axes(
+                fig, axes_params, remove_extra=False,
+                projection='mollweide' if 'mollweide' in options else None
+            )
 
         # Initialize a 1x2 figure
         if style == '1x2':
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 3.3115 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -416,7 +438,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 2.3330 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -429,7 +451,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 6.5720 if height is None else height,
-                left, bottom, right, top, colpad, rowpad,nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -442,7 +464,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 6.317 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -470,7 +492,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 4.4450 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -484,7 +506,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 9.1340 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='ax_width' if adjust is None else adjust,
                 h_align='center' if adjust is None else h_align
             )
@@ -499,7 +521,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='ax_width' if adjust is None else adjust,
                 h_align='center' if adjust is None else h_align
             )
@@ -525,7 +547,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -539,7 +561,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 3.3450 if width is None else width,
                 9.1340 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='ax_width' if adjust is None else adjust,
                 h_align='center' if adjust is None else h_align
             )
@@ -561,7 +583,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 9.0994 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -586,7 +608,7 @@ class Output_Series():
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 9.0994 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -598,16 +620,19 @@ class Output_Series():
                 fig, axes_params[3], projection='3d' if '3d' in options else None, zorder=0.4
             )
 
+            # Set 3d axes
             if '3d' in options:
                 for ax in axes[3]:
                     set_axis(ax, '3d')
+                for ax in axes[3,1:]:
+                    ax.set_zlabel('', visible=False)
 
         # Initialize a 3x3 figure
         if style == '6x6':
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
                 7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='fig_height' if adjust is None else adjust
             )
 
@@ -805,10 +830,6 @@ class Output_Series():
         # Set limits
         ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
 
-        # Set ticks
-        # ax.set_xticks([0., -5., -10., -15., -20., -25., -30., -35., -40, -45, -50])
-        # ax.set_yticks([0.,  5.,  10.,  15.,  20.,  25.,  30.,  35.])
-
     def get_metric(self, metric, index=None):
         """Retrieves the proprer Metric instance from a string and index."""
 
@@ -916,7 +937,6 @@ class Output_Series():
             f'covariances_{system}_{self.name}{selection}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def plot_cross_covariances(self, ax, system, robust, sklearn):
         """
@@ -968,7 +988,6 @@ class Output_Series():
             f'cross_covariances_{system}_{self.name}{selection}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def plot_mad(self, ax, system):
         """Plots the total median absolute deviation (MAD), and the components of the MAD."""
@@ -1005,7 +1024,6 @@ class Output_Series():
             f'mad_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def plot_mst(self, ax, system):
         """
@@ -1043,7 +1061,6 @@ class Output_Series():
             f'mst_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def draw_mahalanobis(self, system, title=False, forced=None, default=None, cancel=None):
         """Creates a plot of the mean and median Mahalanobis distance."""
@@ -1073,7 +1090,6 @@ class Output_Series():
             f'mahalanobis_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def draw_covariances_mad(
         self, system, style, robust=False, sklearn=False,
@@ -1109,7 +1125,6 @@ class Output_Series():
             f'covariances_mad_{system}_{style}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def draw_covariances_cross_mad_mst(
         self, system, robust=False, sklearn=False,
@@ -1128,11 +1143,11 @@ class Output_Series():
         # Initialize figure
         fig, axes = self.set_figure('2x2', 'hide_x', 'label_right')
 
-        # Plot covariance matrix determinant and trace, and covariances
+        # Plot covariance matrix determinant and t race, and covariances
         selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
 
         # Plot the cross covariance matrix determinant and trace, and cross covariances
-        selection = self.plot_cross_covariances(axes[0,1], system, robust, sklearn=False)
+        self.plot_cross_covariances(axes[0,1], system, robust, sklearn=False)
 
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
         self.plot_mad(axes[1,0], system)
@@ -1152,123 +1167,291 @@ class Output_Series():
             f'covariances_cross_mad_mst_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
-        # Check the type of other
-        # self.stop(
-        #     type(other) != type(self), 'TypeError',
-        #     "'other' must be a Series object ({} given).", type(other)
-        # )
-        # other.check_traceback()
+    def plot_histogram(
+        self, ax, values, number_of_bins, fit=None, limits=None, value=None, error=None,
+        label=None, orientation='vertical', set_lim=True, error_lines=True, quick_fit=False,
+        curve_color=colors.azure[6], hist_color=colors.azure[9], line_color=colors.black,
+    ):
+        """
+        Plots a histogram of the values along with a normal or skew normal fit, a dash vertical
+        line representing the average value (normal fit) or mode (skew normal fit) of the fit,and
+        dotted vertical lines representing the 1σ error range. If value is None, then a shaded
+        area under the curve is drawn instead.
+        """
 
-        # Plot association size metrics (self)
-        # self.plot_metric(ax0, self.covariances_xyz_matrix_det, 0, colors.metric[4], '-', 0.8)
-        # self.plot_metric(ax0, self.mad_xyz_total, 0, colors.metric[5], '--', 0.7)
-        # self.plot_metric(ax0, self.mst_xyz_mean, 0, colors.metric[6], '-.', 0.6)
-        # self.plot_metric(ax0, self.mst_xyz_mad, 0, colors.metric[7], ':', 0.5)
-        # self.plot_metric(ax1, self.cross_covariances_xyz, 0, colors.metric[4], '-', 0.8)
-        # self.plot_metric(ax1, self.cross_covariances_xyz, 1, colors.metric[5], '--', 0.7)
-        # self.plot_metric(ax1, self.cross_covariances_xyz, 2, colors.metric[6], ':', 0.6)
+        # Check the type and value of number_of_bins
+        self.check_type(number_of_bins, 'number_of_bins', 'integer')
+        self.stop(
+            number_of_bins < 1, 'ValueError',
+            "'number_of_bins' must be greater than 0 ({} given).", number_of_bins
+        )
 
-        # Plot association size metrics (other)
-        # other.plot_metric(ax0, other.covariances_xyz_matrix_det, 0, colors.metric[0], '-', 0.8)
-        # other.plot_metric(ax0, other.mad_xyz_total, 0, colors.metric[1], '--', 0.7)
-        # other.plot_metric(ax0, other.mst_xyz_mean, 0, colors.metric[2], '-.', 0.6)
-        # other.plot_metric(ax0, other.mst_xyz_mad, 0, colors.metric[3], ':', 0.5)
-        # other.plot_metric(ax1, other.cross_covariances_xyz, 0, colors.metric[0], '-', 0.8)
-        # other.plot_metric(ax1, other.cross_covariances_xyz, 1, colors.metric[1], '--', 0.7)
-        # other.plot_metric(ax1, other.cross_covariances_xyz, 2, colors.metric[2], ':', 0.6)
+        # Check the type and value of fit
+        self.check_type(fit, 'fit', ('string', 'None'))
+        self.stop(
+            fit not in ('normal', 'skewnormal', None),
+            'ValueError', "'fit' must be 'normal', 'skewnormal' or None ({} given).", fit
+        )
 
-        # Check the type of title
-        # self.check_type(title, 'title', 'boolean')
+        # Check the value of value and error, if values is None
+        self.stop(
+            values is None and (value is None or error is None),
+            'ValueError', "'value' and 'error' cannot be None if values is None "
+            "({} and {} given).", value, error
+        )
 
-        # Title from data
-        # if title:
-        #     if self.from_data:
-        #         fig.suptitle(
-        #             '$XYZ$ covariances, MAD, MST and cross covariances of {}\n and {} over '
-        #             '{:.1f} Myr with a {:.1f} km/s radial velocity correction\n'.format(
-        #                 self.name, other.name, self.duration.value,
-        #                 self.rv_shift.to('km/s').value
-        #             ), fontsize=8
-        #         )
+        # Set value
+        value = np.mean(values) if value is None and values is not None else value
 
-            # Title from a model
-            # elif self.from_model:
-            #     fig.suptitle(
-            #         'Average $XYZ$ covariances, MAD, MST and cross covariances of {}'
-            #         'simulated associations over {:.1f} Myr\n with kinematics similar to'
-            #         "{} and {}, and a {:.1f} km/s radial velocity bias\n".format(
-            #             self.number_of_groups, self.duration.value,
-            #             self.name, other.name, self.rv_shift.to('km/s').value
-            #         ), fontsize=8
-            #     )
+        # Set errors
+        error = np.atleast_1d(np.std(values) if error is None and values is not None else error)
+        errors = np.repeat(error, 2) if error.size == 1 else error
 
-        # # Set legend
-        # for ax in (ax0, ax1):
-        #     self.set_legend(ax)
+        # Set limits
+        limits = (
+            (np.min(values), np.max(values)) if limits is None and values is not None else
+            (value - 4 * errors[0], value + 4 * errors[1]) if limits is None else limits
+        )
 
-        #     # Set labels
-        #     ax.set_xlabel('Epoch (Myr)', fontsize=8)
-        #     ax.set_ylabel(f'Association size ({units_y})', fontsize=8)
+        # Set space
+        space = np.linspace(*limits, 500)
 
-        #     # Set limits
-        #     ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
+        # Fit a normal curve
+        if fit == 'normal':
+            from scipy.stats import norm
 
-        #     # Set ticks
-        #     ax.tick_params(
-        #         top=True, right=True, which='both', direction='in', width=0.5, labelsize=8
-        #     )
+            # Compute probabiilty density function
+            pdf = norm.pdf(space, value, errors[0])
 
-        #     # Set spines
-        #     ax.spines[:].set_linewidth(0.5)
+            # Show value and error
+            if label is not None:
+                print(f'{label}: {value:.3f} ± {errors[0]:.3f}')
+
+        # Fit a skew normal curve
+        if fit == 'skewnormal':
+            from scipy.optimize import minimize
+            from scipy.stats import skewnorm
+            from scipy.special import erf
+
+            def get_skewnormal(skew, loc, scale, mode='max'):
+                """
+                Computes the probability density function, mode and asymetric standard deviations
+                of a skewnormal distribution.
+                """
+
+                # Compute density functions
+                pdf = skewnorm.pdf(space, skew, loc, scale)
+                cdf = skewnorm.cdf(space, skew, loc, scale)
+
+                # Compute mode estimate
+                if mode == 'estimate':
+                    δ = α / np.sqrt(1 + α**2)
+                    γ_1 = (4 - np.pi) / 2 * (δ * np.sqrt(2/np.pi)**3) / (1 - 2 * δ**2 / np.pi)**1.5
+                    m_0 = (
+                        np.sqrt(2 / np.pi) * δ - γ_1 * np.sqrt(1 - 2 / np.pi * δ**2) / 2 -
+                        np.sign(α) / 2 * np.exp(-2 * np.pi / np.abs(α))
+                    )
+                    mode = ξ + m_0 * ω
+
+                # Compute mode from the maximum
+                if mode == 'max':
+                    mode = space[np.argmax(pdf)]
+
+                # Compute errors
+                mode_cdf = cdf[np.argmin(np.abs(mode - space))]
+                prob = (
+                    np.repeat(mode_cdf, 2) + np.array([-1, 1]) *
+                    erf(1 / np.sqrt(2)) / 2 * np.array([mode_cdf / 0.5, (1 - mode_cdf) / 0.5])
+                )
+                errors = np.abs(
+                    space[
+                        np.argmin(np.abs(np.repeat(cdf[None], 2, axis=0).T - prob), axis=0)
+                    ] - mode
+                )
+
+                return pdf, mode, errors
+
+            def Χ2(parameters):
+                """Computes the chi squarred value of a skewnormal fit."""
+
+                fit_errors = get_skewnormal(parameters[0], value, parameters[1])[2]
+                return np.sum((fit_errors - errors)**2)
+
+            # Fit a skewnormal curve based on value and errors
+            if values is None:
+
+                # Fit two gaussian curves
+                if quick_fit:
+                    top = np.argmin(np.abs(space - value))
+                    pdf = np.exp(
+                        -0.5 * np.concatenate(
+                            ((space[:top] - value) / errors[0], (space[top:] - value) / errors[1])
+                        )**2
+                    ) / np.sqrt(2 * np.pi) / np.mean(errors)
+
+                # Fit the skew and scale
+                else:
+                    sign = np.sign(errors[1] - errors[0])
+                    bound = sign * (10 * (errors[1] - errors[0]) + 1)
+                    initial_parameters = np.array([bound / 2, np.mean(errors)])
+                    bounds = (
+                        (bound if sign < 0 else 0, bound if sign > 0 else 0),
+                        (0, 3 * np.mean(errors))
+                    )
+                    skew, scale = minimize(
+                        Χ2, initial_parameters, method='Nelder-Mead', bounds=bounds
+                    ).x
+
+                    # Recenter the mode on the value
+                    pdf = skewnorm.pdf(space, skew, value, scale)
+                    pdf = skewnorm.pdf(space - value + space[np.argmax(pdf)], skew, value, scale)
+
+            # Fit a skewnormal curve based on values
+            else:
+                skew, loc, scale = skewnorm.fit(values)
+                pdf, value, errors = get_skewnormal(skew, loc, scale)
+
+            # Show value and error
+            if label is not None:
+                print(f'{label}: {value:.3f} -{errors[0]:.3f} +{errors[1]:.3f}')
+
+        # Plot probability density function
+        if fit in ('normal', 'skewnormal'):
+            i = pdf > 0.0001 * np.max(pdf)
+            ax.plot(
+                *(space[i], pdf[i])[::1 if orientation == 'vertical' else -1],
+                color=curve_color, alpha=1.0, label=label, linewidth=1.0, linestyle='-',
+                solid_capstyle='round', dash_capstyle='round', zorder=0.8
+            )
+
+            # Draw value and error range
+            (ax.axvline if orientation == 'vertical' else ax.axhline)(
+                value, color=line_color, alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9
+            )
+            if error_lines:
+                for sign, i in zip((-1, 1), (0, 1)):
+                    (ax.axvline if orientation == 'vertical' else ax.axhline)(
+                        value + sign * errors[i], color=line_color, alpha=0.8,
+                        linewidth=0.5, linestyle=':', zorder=0.9
+                    )
+
+            # Fill the area under the curve
+            if values is None:
+                i = pdf > 0.0001 * np.max(pdf)
+                ax.fill_between(
+                    space[i], np.zeros_like(space[i]), pdf[i],
+                    color=hist_color, alpha=0.15, linewidth=0., zorder=0.5
+                )
+
+        # Plot histogram
+        if values is not None:
+            ax.hist(
+                values, bins=np.linspace(*limits, number_of_bins + 1),
+                density=True, color=hist_color, alpha=0.3, zorder=0.7,
+                orientation=orientation
+            )
+
+        # Set limits
+        if set_lim:
+            (ax.set_xlim if orientation == 'vertical' else ax.set_ylim)(*limits)
+        (ax.set_ylim if orientation == 'vertical' else ax.set_xlim)(0.0, auto=True)
+
+        return value, errors
 
     def draw_age_distribution(
-        self, metric, index=None, title=False,
-        forced=None, default=None, cancel=None
+        self, metric, index=None, fit=None, number_of_bins=60, adjusted=False,
+        title=False, forced=None, default=None, cancel=None
     ):
         """Draws a plot of the age distribution of a series for a given metric."""
 
         # Initialize figure
         fig, axes = self.set_figure('1x1')
 
-        # Retrieve the ages for the metric
+        # Retrieve metric
         metric, index = self.get_metric(metric, index)
-        if metric.status:
-            ages = vars(self)[metric.label].ages[:,:,index].flatten()
 
-            # Plot ages distribution
-            axes[0,0].hist(
-                ages, bins=np.linspace(np.min(ages), np.max(ages), 30),
-                density=True, color=colors.azure[8], alpha=0.7
+        # Adjust ages, if needed
+        if metric.status:
+            ages = metric.ages[:,:,index].flatten()
+            value = metric.age_adjusted[index] if adjusted else metric.age[index]
+            ages += (value - np.mean(ages) if adjusted else 0.0)
+
+            # Plot histogram
+            self.plot_histogram(
+                axes[0,0], ages, number_of_bins, fit=fit, value=value,
+                error=metric.age_error[index], limits=(np.min(ages), np.max((np.max(ages), 1.0))),
+                label=f"{'Corrected ' if adjusted else ''}{metric.name[index]}"
             )
 
         # Logging
         else:
             self.series.log(
-                f"Could not use '{metric.name[index]}' metric for '{self.name}' series. "
-                "It was not computed.", self.name, display=True
+                "Could not use '{}' metric for '{}' series. It was not computed.",
+                metric.name[index], self.name, display=True
             )
+
+        # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
+        self.plot_MiretRoig2020_Crundall2019(axes[0,0], mr2020=False, cr2019=False)
 
         # Set title
         self.set_title(
             title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
             f'Age distribution of {self.number_of_groups} groups of {self.name},\n'
             f'using the {metric.name[index]} as association size metric'
-            # f'Average age: ({self.covariances_xyz_matrix_det.age[0]:.2f} '
-            # f'± {self.covariances_xyz_matrix_det.age_error[0]:.2f}) Myr'
         )
+
+        # Set legend
+        self.set_legend(axes[0,0], 2)
 
         # Set labels
         axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
         axes[0,0].set_ylabel('Density', fontsize=8)
 
+        # Set limits
+        axes[0,0].set_xlim(-40, 1)
+        axes[0,0].set_ylim(0, 0.17)
+
         # Save figure
         self.save_figure(
-            f'age_distribution_{self.name}_{metric.label}.pdf', fig,
-            tight=title, forced=forced, default=default, cancel=cancel
+            f"age_distribution_{self.name}_{'corrected_' if adjusted else ''}"
+            f'{metric.name[index]}.pdf', fig, tight=title,
+            forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
+
+    def plot_MiretRoig2020_Crundall2019(self, ax, mr2020=True, cr2019=True, ldb=True):
+        """
+        Plots histogram curves of the kinematic age of the Beta Pictoris Moving group using results
+        from Miret-Roig et al. (2020) and Crundall et al. (2019). A dark shaded area showing the
+        range of ages from lithium depletion boundary and isochrones methods is also plotted.
+        """
+
+        # Plot curve from Miret-Roig et al. (2020)
+        if mr2020:
+            self.plot_histogram(
+                ax, None, 1, fit='skewnormal', value=-18.5, error=(2.0, 2.4),
+                label='Miret-Roig et al. (2020)', set_lim=False, error_lines=False,
+                curve_color=colors.orange[6], hist_color=colors.orange[9],
+                line_color=colors.orange[6]
+            )
+
+        # Plot curve from Crundall et al. (2019)
+        if cr2019:
+            self.plot_histogram(
+                ax, None, 1, fit='normal', value=-17.7, error=1.2,
+                label='Crundall et al. (2019)', set_lim=False, error_lines=False,
+                curve_color=colors.azure[6], hist_color=colors.azure[9], line_color=colors.azure[6]
+            )
+
+        # Show a shaded area for LDB and isochrone ages
+        if ldb:
+            ylim = ax.get_ylim()
+            LDB_range = np.array([-20, -26])
+            ax.fill_between(
+                LDB_range, 0, 1, transform=ax.get_xaxis_transform(),
+                color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1
+            )
+            ax.set_ylim(*ylim)
 
     def create_metrics_table(
         self, save=False, show=False, machine=False,
@@ -1369,7 +1552,7 @@ class Output_Series():
         # Save table
         if save:
             self.save_table(
-                f'metrics_{self.name}', lines,
+                f'metrics_{self.name}', f'Metrics of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -1470,6 +1653,36 @@ class Output_Group():
 
         return step, age
 
+    def get_metric(self, metric, index=None):
+        """Retrieves the proprer Metric instance from a string and index."""
+
+        # Metric instance
+        self.series.check_type(metric, 'metric', ('string', 'None'))
+        self.series.stop(
+            metric not in [metric.metric.label for metric in self.metrics], 'ValueError',
+            "'metric' must be a valid metric key ({} given).", metric
+        )
+        metric = vars(self)[metric]
+
+        # If the metric has a size of 1, index is ignored
+        if metric.value.shape[-1] == 1:
+            index = 0
+
+        # Metric index
+        else:
+            self.series.check_type(index, 'index', ('integer', 'None'))
+            self.series.stop(
+                metric.value.shape[-1] > 1 and index is None, 'ValueError',
+                "No 'index' is provided (metric is {} in size).", metric.value.shape[-1]
+            )
+            self.series.stop(
+                index > metric.value.shape[-1] - 1 and metric.value.shape[-1] > 1, 'ValueError',
+                "'index' is too large for this metric ({} given, {} in size).",
+                index, metric.value.shape[-1]
+            )
+
+        return metric, index
+
     def check_coord(self, coord):
         """Checks the type and value of a coordinate."""
 
@@ -1509,6 +1722,36 @@ class Output_Group():
                 name=self.name, joint=' ' if line_2 != '' else ''
             ).replace('ys ', 'ies ')
         )
+
+    def get_limits(self, coord, system, step, relative=False):
+        """Finds the limits of positions or velocities, at a given step."""
+
+        # Check the type and value of coord
+        self.check_coord(coord)
+
+        # Check the type and value of system
+        system = self.series.check_system(system)
+
+        # Check the type and value of relative
+        self.series.check_type(relative, 'relative', 'boolean')
+
+        # Find limits, increased by 25%
+        scale_factor = 1.25
+        values = np.array(
+            [
+                [
+                    vars(star)[('relative_' if relative else '') + f'{coord}_{system}'][step]
+                    for star in group.sample
+                ] for group in self.series
+            ]
+        ).reshape((-1, 3)).T
+        values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
+        limits = (
+            np.array([-values_range, values_range]) * scale_factor +
+            np.max(values, axis=1) + np.min(values, axis=1)
+        ).T  / 2
+
+        return values, limits
 
     def plot_trajectory(self, ax, x, y, coord, system, age, metric, index, labels):
         """Draws the trajectory of stars in the group."""
@@ -1694,7 +1937,6 @@ class Output_Group():
             f'trajectory_{coord}_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def plot_time(self, ax, y, coord, system, age, metric):
         """Draws the y coordinate of stars in the group over time."""
@@ -1936,11 +2178,10 @@ class Output_Group():
             f"{coord}_{system}_{style}_{self.name}_time.pdf", fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def plot_scatter(
         self, ax, axes, coords, system, step, errors=False,
-        labels=False, mst=False, relative=False
+        labels=False, mst=False, relative=False, values=None, limits=None
     ):
         """
         Creates a 2d or 3d scatter of positions or velocities, at a given step. 'errors', adds
@@ -2105,6 +2346,28 @@ class Output_Group():
                         linewidth=0.5, solid_capstyle='round', zorder=0.2
                     )
 
+        # Draw values
+        if projection == '2d':
+            values = [
+                vars(self)[('relative_' if relative else '') + value_coords[i]][step, axes[i]]
+                for i in range(len(axes))
+            ] if values is None else values
+            ax.axvline(
+                values[0], color=colors.black, alpha=0.8,
+                linewidth=0.5, linestyle='--', zorder=0.9
+            )
+            ax.axhline(
+                values[1], color=colors.black, alpha=0.8,
+                linewidth=0.5, linestyle='--', zorder=0.9
+            )
+
+        # Set limits
+        if limits is not None:
+            ax.set_xlim(*limits[0])
+            ax.set_ylim(*limits[1])
+            if projection == '3d':
+                ax.set_zlim(*limits[2])
+
         # Set labels
         ax.set_xlabel(
             f'${vars(systems[system])[coords[0]][axes[0]].latex}$ '
@@ -2123,98 +2386,6 @@ class Output_Group():
                 fontsize=8, #labelpad=20
             )
 
-    def plot_distribution(self, axes, coord, system, step, relative=False):
-        """Creates three 1d distributions in positions or velocities, at a given step."""
-
-        # Check the type and value of coord
-        self.check_coord(coord)
-
-        # Check the type and value of system
-        system = self.series.check_system(system)
-
-        # Check the type and value of relative
-        self.series.check_type(relative, 'relative', 'boolean')
-
-        # Find limits, increased by 25%
-        scale_factor = 1.25
-        values = np.array(
-            [
-                [
-                    vars(star)[('relative_' if relative else '') + f'{coord}_{system}'][step]
-                    for star in group.sample
-                ] for group in self.series
-            ]
-        ).reshape((-1, 3)).T
-        values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
-        limits = (
-            np.array([-values_range, values_range]) * scale_factor +
-            np.max(values, axis=1) + np.min(values, axis=1)
-        )  / 2
-
-        # Set bins
-        number_of_bins = 20
-        bins = np.linspace(limits[0], limits[1], number_of_bins + 1).T
-
-        from scipy.stats import skewnorm
-        from scipy.special import erf
-
-        # Plot histograms
-        for i in range(3):
-            axes[i].hist(
-                values[i], bins=bins[i], density=True,
-                color=colors.azure[9], alpha=0.6, zorder=0.6
-            )
-
-            # Compute the skew normal fit
-            α, ξ, ω = skewnorm.fit(values[i])
-            x = np.linspace(limits[0,i], limits[1,i], 500)
-            pdf = skewnorm.pdf(x, α, ξ, ω)
-            cdf = skewnorm.cdf(x, α, ξ, ω)
-
-            # Plot the skew normal fit
-            axes[i].plot(
-                x, pdf, color=colors.azure[6], alpha=1.0,
-                linewidth=1.0, solid_capstyle='round', zorder=0.9
-            )
-
-            # Compute the mode of the skew normal distribution
-            δ = α / np.sqrt(1 + α**2)
-            γ_1 = (4 - np.pi) / 2 * (δ * np.sqrt(2/np.pi)**3) / (1 - 2 * δ**2 / np.pi)**1.5
-            m_0 = (
-                np.sqrt(2 / np.pi) * δ - γ_1 * np.sqrt(1 - 2 / np.pi * δ**2) / 2 -
-                np.sign(α) / 2 * np.exp(-2 * np.pi / np.abs(α))
-            )
-            mode = ξ + m_0 * ω
-
-            # Compute the location of the uncertainties
-            mode_cdf = cdf[np.argmin(np.abs(mode - x))]
-            scale = np.array([mode_cdf / 0.5, (1 - mode_cdf) / 0.5])
-            prob = np.repeat(mode_cdf, 2) + np.array([-1, 1]) * erf(1 / np.sqrt(2)) / 2 * scale
-            error = np.abs(
-                x[np.argmin(np.abs(np.repeat(cdf[None], 2, axis=0).T - prob), axis=0)] - mode
-            )
-
-            # Show value with errors
-            print(f'{coord}_{system}_{i}: {mode:.3f} -{error[0]:.3f} +{error[1]:.3f}')
-
-            # Draw errors
-            axes[i].axvline(
-                mode - error[0], color=colors.black,
-                alpha=0.8, linewidth=0.5, linestyle=':', zorder=0.9
-            )
-            axes[i].axvline(
-                mode + error[1], color=colors.black,
-                alpha=0.8, linewidth=0.5, linestyle=':', zorder=0.9
-            )
-
-            # Set limits
-            axes[i].set_xlim(*limits[:,i])
-
-            # Compute the average value
-            axes[i].average_value = np.mean(np.mean(values[i]))
-            axes[i].mode_value = mode
-            axes[i].error_value = error
-
     def draw_scatter(
         self, coord, system, style, step=None, age=None, errors=False, labels=False,
         mst=False, title=False, forced=None, default=None, cancel=None
@@ -2229,10 +2400,7 @@ class Output_Group():
             '3d' if style in ('2x2', '4x1') else '', styles=('1x3', '2x2', '3x1', '4x1')
         )
 
-        # Compute the values of step and age
-        step, age = self.get_step_age(step, age)
-
-        # Set axes in accordance to style
+        # Select axes in accordance to style
         if style in ('1x3', '3x1', '4x1'):
             ax0, ax1, ax2 = axes.flatten()[:3]
         if style in ('2x2'):
@@ -2240,46 +2408,26 @@ class Output_Group():
         if style in ('4x1'):
             ax3 = axes[3,0]
 
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
+
+        # Find limits
+        limits = self.get_limits(coord, system, step)[1]
+
         # Plot positions or velocites (2d)
         i, j = zip(*((0, 1), (0, 2), (1, 2)))
         for ax, x, y in zip((ax0, ax1, ax2), i, j):
             self.plot_scatter(
-                ax, (x, y), coord, system, step,
-                errors=errors, labels=labels, mst=mst
+                ax, (x, y), coord, system, step, errors=errors,
+                labels=labels, mst=mst, limits=(limits[x], limits[y])
             )
 
         # Plot positions or velocites (3d)
         if style in ('2x2', '4x1'):
             self.plot_scatter(
                 ax3, (0, 1, 2), coord, system, step,
-                errors=errors, labels=labels, mst=mst
+                errors=errors, labels=labels, mst=mst, limits=limits
             )
-
-        # Find limits, increased by 25%
-        scale_factor = 1.25
-        values = np.array(
-            [
-                [vars(star)[f'{coord}_{system}'][step] for star in group.sample]
-                for group in self.series
-            ]
-        ).reshape((-1, 3)).T
-        values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
-        xlim, ylim, zlim = (
-            np.array([-values_range, values_range]) * scale_factor +
-            np.max(values, axis=1) + np.min(values, axis=1)
-        ).T  / 2
-
-        # Set limits
-        ax0.set_xlim(*xlim)
-        ax0.set_ylim(*ylim)
-        ax1.set_xlim(*xlim)
-        ax1.set_ylim(*zlim)
-        ax2.set_xlim(*ylim)
-        ax2.set_ylim(*zlim)
-        if style in ('2x2', '4x1'):
-            ax3.set_xlim(*xlim)
-            ax3.set_ylim(*ylim)
-            ax3.set_zlim(*zlim)
 
         # Set title
         self.series.set_title(
@@ -2292,7 +2440,6 @@ class Output_Group():
             f'{coord}_{system}_{style}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def draw_cross_scatter(
         self, system, step=None, age=None, errors=False, labels=False,
@@ -2309,11 +2456,15 @@ class Output_Group():
         # Compute the values of step and age
         step, age = self.get_step_age(step, age)
 
+        # Find limits
+        position_limits = self.get_limits('position', system, step)[1]
+        velocity_limits = self.get_limits('velocity', system, step)[1]
+
         # Plot positions and velocities
         for x, y in [(x, y) for y in range(3) for x in range(3)]:
             self.plot_scatter(
                 axes[y, x], (x, y), ('position', 'velocity'), system,
-                step, errors=errors, labels=labels
+                step, errors=errors, labels=labels, limits=(position_limits[x], velocity_limits[y])
             )
 
         # Set title
@@ -2327,7 +2478,6 @@ class Output_Group():
             f'position_velocity_cross_{system}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def draw_time_scatter(
         self, coord, system, style, steps=None, ages=None, errors=False, labels=False,
@@ -2368,37 +2518,32 @@ class Output_Group():
 
         # Compute the values of step and age
         steps, ages = zip(*[self.get_step_age(step, age) for step, age in zip(steps, ages)])
-        ages_str = [f'{age:.1f}' for age in ages]
+
+        # Find limits
+        limits = np.array(
+            [self.get_limits(coord, system, step, relative=True)[1] for step in steps]
+        )
+        limits = limits[np.argmax(limits[:,0,1] - limits[:,0,0]),:,:]
 
         # Plot positions or velocities (2d)
         for i in range(3):
             x, y = ((0, 1), (2, 1), (0, 2))[i]
             for j in range(number_of_steps):
                 self.plot_scatter(
-                    axes[i,j], (x, y), coord, system, steps[j],
-                    errors=errors, labels=labels, mst=mst, relative=True
+                    axes[i, j], (x, y), coord, system, steps[j], errors=errors,
+                    labels=labels, mst=mst, relative=True, limits=(limits[x], limits[y])
                 )
 
         # Plot positions or velocities (3d)
         if style in ('4x2', '4x3'):
             for ax, step in zip(axes[3], steps):
                 self.plot_scatter(
-                    ax, (0, 1, 2), coord, system, step,
-                    errors=errors, labels=labels, mst=mst, relative=True
+                    ax, (0, 1, 2), coord, system, step, errors=errors,
+                    labels=labels, mst=mst, relative=True, limits=limits
                 )
 
-        # Set limits
-        limits = (-100, 100) if coord == 'position' else (-6, 6) if coord == 'velocity' else None
-        for ax in axes.flatten():
-            ax.set_xlim(*limits)
-            ax.set_ylim(*limits)
-            ax.set_xticks([-90, -60, -30, 0, 30, 60, 90])
-            ax.set_yticks([-90, -60, -30, 0, 30, 60, 90])
-        if style in ('4x2', '4x3'):
-            for ax in axes[3]:
-                ax.set_zlim(*limits)
-
         # Set title
+        ages_str = [f'{age:.1f}' for age in ages]
         self.series.set_title(
             title, fig, self.get_title_coord, coord, system, '{system} {coord}s',
             line_2=f"at {enumerate_strings(*ages_str, conjunction='and')} Myr"
@@ -2409,11 +2554,10 @@ class Output_Group():
             f"{coord}_{system}_{style}_{self.name}_{'_'.join(ages_str)}Myr.pdf", fig,
             forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
 
     def draw_corner_scatter(
         self, system, step=None, age=None, errors=False, labels=False,
-        title=False, forced=None, default=None, cancel=None
+        flip=False, title=False, forced=None, default=None, cancel=None
     ):
         """
         Draws corner scatter plots of positions and velocities, at a given 'step' or 'age' in Myr.
@@ -2425,36 +2569,41 @@ class Output_Group():
         # Compute the values of step and age
         step, age = self.get_step_age(step, age)
 
-        # Plot positions and velocities (2d)
-        for x, y in filter(lambda i: i[0] < i[1], [(x, y) for y in range(6) for x in range(6)]):
-            self.plot_scatter(
-                axes[y, x], (x - (0 if x < 3 else 3), y - (0 if y < 3 else 3)),
-                ('position' if x < 3 else 'velocity', 'position' if y < 3 else 'velocity'),
-                system, step, errors=errors, labels=labels
-            )
+        # Find values and limits
+        values, limits = {}, {}
+        values['position'], limits['position'] = self.get_limits('position', system, step)
+        values['velocity'], limits['velocity'] = self.get_limits('velocity', system, step)
+
+        # Check the type of flip
+        self.series.check_type(flip, 'flip', 'boolean')
 
         # Plot positions and velocities (1d)
-        self.plot_distribution([axes[i, i] for i in range(3)], 'position', system, step)
-        self.plot_distribution([axes[i, i] for i in range(3, 6)], 'velocity', system, step)
-
-        # Draw dashed lines and set limits
         for i in range(6):
-            for ax in filter(lambda ax: ax is not None, axes[:,i].flatten()):
-                ax.axvline(
-                    axes[i,i].mode_value, color=colors.black, alpha=0.8,
-                    linewidth=0.5, linestyle='--', zorder=0.9
-                )
-                ax.set_xlim(*axes[i, i].get_xlim())
-            for ax in filter(lambda ax: ax is not None, axes[i,:i].flatten()):
-                ax.axhline(
-                    axes[i,i].mode_value, color=colors.black, alpha=0.8,
-                    linewidth=0.5, linestyle='--', zorder=0.9
-                )
-                ax.set_ylim(*axes[i, i].get_xlim())
+            j = i - (0 if i < 3 else 3)
+            coord = 'position' if i < 3 else 'velocity'
+            axes[i,i].value = self.series.plot_histogram(
+                axes[i, i], values[coord][j], 20, fit='skewnormal',
+                limits=limits[coord][j], label=vars(systems[system])[coord][j].name,
+                orientation='vertical' if i < 3 or not flip else 'horizontal'
+            )[0]
 
-        # Set labels
-        axes[-1, -1].set_xlabel(axes[-1, -2].get_ylabel())
+        # Plot positions and velocities (2d)
+        for x, y in filter(lambda i: i[0] < i[1], [(x, y) for y in range(6) for x in range(6)]):
+            i, j = x - (0 if x < 3 else 3), y - (0 if y < 3 else 3)
+            coord_x = 'position' if x < 3 else 'velocity'
+            coord_y = 'position' if y < 3 else 'velocity'
+            self.plot_scatter(
+                axes[y, x], (i, j), (coord_x, coord_y), system, step, errors=errors,
+                labels=labels, values=(axes[x, x].value, axes[y, y].value),
+                limits=(limits[coord_x][i], limits[coord_y][j])
+            )
+
+        # Set labels and ticks
         axes[0, 0].tick_params(labelleft=False)
+        if flip:
+            axes[-1, -1].tick_params(labelbottom=False)
+        else:
+            axes[-1, -1].set_xlabel(axes[-1, -2].get_ylabel())
 
         # Set title
         self.series.set_title(
@@ -2467,236 +2616,187 @@ class Output_Group():
             f'position_velocity_corner_{system}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
-
-    def draw_map(self, labels=False, title=False, forced=None, default=None, cancel=None):
-        """
-        Creates a Mollweide projection of a traceback. For this function to work, uvw
-        velocities must not compensated for the sun velocity and computing xyz positions.
-        """
-
-        # Initialize figure
-        fig = plt.figure(figsize=(6.66, 3.33), facecolor=colors.white, dpi=300)
-        ax = fig.add_subplot(111, projection="mollweide")
-
-        # Check the types of labels and title
-        self.series.check_type(labels, 'labels', 'boolean')
-        self.series.check_type(title, 'title', 'boolean')
-
-        # Compute coordinates
-        from .coordinate import galactic_xyz_equatorial_rδα
-        positions = np.array(
-            [
-                [
-                    galactic_xyz_equatorial_rδα(*star.position_xyz[step])[0]
-                    for step in range(self.series.number_of_steps)
-                ] for star in self
-            ]
-        )
-        alphas = np.vectorize(lambda α: α - (2 * np.pi if α > np.pi else 0.0))(positions[:,:,2])
-        deltas = positions[:,:,1]
-
-        # Plot trajectories
-        for star in range(len(self)):
-            color = colors.blue[6] if not self[star].outlier else colors.red[6]
-
-            # Identify discontinuties
-            discontinuties = (
-                np.abs(alphas[star, 1:] - alphas[star, :-1]) > 3 * np.pi / 2
-            ).nonzero()[0] + 1
-
-            # Create individual segments
-            segments = []
-            lower_limit = 0
-            for upper_limit in discontinuties:
-                segments.append(range(lower_limit, upper_limit))
-                lower_limit = upper_limit
-            segments.append(np.arange(lower_limit, alphas.shape[1]))
-
-            # Plot individual segments
-            for i in segments:
-                ax.plot(alphas[star, i], deltas[star, i], color=color, lw=1, zorder=0.2)
-
-            # Labels
-            if labels:
-                ax.text(
-                    alphas[star, 0] + 0.1, deltas[star, 0] + 0.1, star + 1,
-                    horizontalalignment='left', fontsize=6, zorder=0.2
-                )
-
-        # Plot current-day positions
-        ax.scatter(alphas[:,0], deltas[:,0], marker='.', color=colors.black, zorder=0.3)
-
-        # Show proper motion arrows
-        for star in self.series.data:
-            ax.arrow(
-                star.position.values[2] - (2 * np.pi if star.position.values[2] > np.pi else 0.0),
-                star.position.values[1], -star.velocity.values[2]/4, -star.velocity.values[1]/4,
-                head_width=0.03, head_length=0.03, color=colors.black, zorder=0.4
-            )
-
-        # Set title
-        if title:
-            ax.set_title('Mollweide projection of tracebacks', fontsize=8)
-
-        # Format axis
-        ax.grid(zorder=1)
-
-        # Save figure
-        self.series.save_figure(
-            f'Mollweide_{self.name}.pdf', fig,
-            forced=forced, default=default, cancel=cancel
-        )
-        # plt.show()
 
     def draw_age_distribution(
-        self, metric, index=None, title=False,
-        forced=None, default=None, cancel=None
+        self, metric, index=None, fit=None, number_of_bins=120,
+        title=False, forced=None, default=None, cancel=None
     ):
         """Draws a plot of the age distribution of a group for a given metric."""
 
         # Initialize figure
-        fig, axes = self.series.set_figure('1x1', left=0.3580)
+        fig, axes = self.series.set_figure('1x1')
 
-        # Retrieve the ages for the metric
-        metric, index = self.series.get_metric(metric, index)
-        if metric.status:
-            ages = metric.ages[self.number,:,index]
+        # Retrieve metric
+        metric, index = self.get_metric(metric, index)
 
-            # Plot uncorrected histogram and gaussian curve
-            if False:
-                x = np.linspace(8, 36, 1000)
-                μ = metric.age[index]
-                σ = metric.age_int_error[index]
-                gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
-                i, = (gauss > 0.001).nonzero()
-                axes[0,0].plot(
-                    x[i], gauss[i], label='$\\xi^\\prime$ variance',
-                    color=colors.cyan[6], alpha=1.0, linewidth=1.0, zorder=0.8
-                )
-                axes[0,0].hist(
-                    ages, bins=np.linspace(12, 32, 81), density=True,
-                    color=colors.cyan[6], alpha=0.15, zorder=0.8
-                )
-                axes[0,0].vlines(
-                    μ, ymin=0.0, ymax=np.max(gauss), color=colors.cyan[6],
-                    alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8
-                )
-
-            # Plot corrected histogram and gaussian curve
-            x = np.linspace(8, 36, 1000)
-            μ = metric.age_ajusted[index]
-            μ = 20.4
-            σ = 2.5
-            gauss = np.exp(-0.5 * ((x - μ) / σ)**2) / np.sqrt(2 * np.pi) / σ
-            i, = (gauss > 0.001).nonzero()
-            axes[0,0].plot(
-                x[i], gauss[i], label='Corrected $\\xi^\\prime$ variance',
-                color=colors.lime[5], alpha=1.0, linewidth=1.0, zorder=0.9
-            )
-            ages = (ages - metric.age[index]) * (σ / metric.age_int_error[index]) + μ
-            axes[0,0].hist(
-                ages, bins=np.linspace(12, 32, 81), density=True,
-                color=colors.lime[6], alpha=0.3, zorder=0.6
-            )
-            # axes[0,0].fill_between(
-            #     x[i], np.zeros_like(x[i]), gauss[i], color=colors.lime[6],
-            #     alpha=0.15, linewidth=0., zorder=0.6
-            # )
-            axes[0,0].vlines(
-                μ, ymin=0.0, ymax=np.max(gauss), color=colors.lime[6],
-                alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9
+        # Plot histogram
+        if metric.metric.status:
+            ages = metric.ages[:,index]
+            self.series.plot_histogram(
+                axes[0,0], ages, number_of_bins, fit=fit, value=metric.age[index],
+                error=metric.age_int_error[index], limits=(np.min(ages), max((np.max(ages), 1.0))),
+                label=metric.metric.name[index], error_lines=False, curve_color=colors.lime[4],
+                hist_color=colors.lime[7], line_color=colors.lime[4]
             )
 
         # Logging
         else:
             self.series.log(
                 "Could not use '{}' metric for '{}' group. It was not computed.",
-                str(metric.name[index]), self.name, display=True
+                metric.name[index], self.name, display=True
             )
 
-        # Plot gaussian curve from Miret-Roig et al. (2020)
-        μ = 18.5
-        σ1, σ2 = 2.4, 2.0
-        x1, x2 = np.arange(μ - 10, μ, 0.01), np.arange(μ, μ + 10, 0.01)
-        gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
-        gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
-        x = np.concatenate((x1, x2))
-        gauss = np.concatenate((gauss1, gauss2))
-        i, = (gauss > 0.001).nonzero()
-        axes[0,0].plot(
-            x[i], gauss[i], label='Miret-Roig et al. (2020)',
-            color=colors.orange[6], alpha=1.0, linewidth=1.0, zorder=0.8
-        )
-        axes[0,0].fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=colors.orange[6],
-            alpha=0.15, linewidth=0., zorder=0.5
-        )
-        axes[0,0].vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=colors.orange[6],
-            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.8
-        )
-
-        # Plot gaussian curve from Crundall et al. (2019)
-        μ = 17.7
-        σ1, σ2 = 1.2, 1.2
-        x1, x2 = np.arange(μ - 10, μ, 0.01), np.arange(μ, μ + 10, 0.01)
-        gauss1 = np.exp(-0.5 * ((x1 - μ) / σ1)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
-        gauss2 = np.exp(-0.5 * ((x2 - μ) / σ2)**2) / np.sqrt(2 * np.pi) / np.mean((σ1, σ2))
-        x = np.concatenate((x1, x2))
-        gauss = np.concatenate((gauss1, gauss2))
-        i, = (gauss > 0.001).nonzero()
-        axes[0,0].plot(
-            x[i], gauss[i], label='Crundall et al. (2019)',
-            color=colors.azure[6], alpha=1.0, linewidth=1.0, zorder=0.7
-        )
-        axes[0,0].fill_between(
-            x[i], np.zeros_like(x[i]), gauss[i], color=colors.azure[6],
-            linewidth=0.0, alpha=0.15, zorder=0.4
-        )
-        axes[0,0].vlines(
-            μ, ymin=0.0, ymax=np.max(gauss), color=colors.azure[6],
-            alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.7
-        )
-
-        # Show a shaded area for LDB and isochrone ages
-        LDB_range = np.array([20, 26])
-        axes[0,0].fill_between(
-            LDB_range, 0, 1, transform=axes[0,0].get_xaxis_transform(),
-            color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1
-        )
+        # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
+        self.series.plot_MiretRoig2020_Crundall2019(axes[0,0])
 
         # Set title
         self.series.set_title(
             title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
             f'Age distribution of {self.series.number_of_iterations} iterations of {self.name},\n'
-            f'using the {metric.name[index]} as association size metric'
-            # + (
-            #     f', Average age: ({metric.age[0]:.1f} ± {metric.age_int_error[0]:.1F}) Myr'
-            #     if metric.status else ''
-            # )
+            f'using the {metric.metric.name[index]} as association size metric'
         )
 
         # Set legend
-        self.series.set_legend(axes[0,0], 1)
+        self.series.set_legend(axes[0,0], 2)
 
         # Set labels
         axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
         axes[0,0].set_ylabel('Density', fontsize=8)
 
         # Set limits
-        axes[0,0].set_xlim(13, 27)
-        axes[0,0].set_ylim(0.0, 0.7)
-
-        # Set ticks
-        axes[0,0].set_xticks([14., 16., 18., 20., 22., 24., 26.])
+        axes[0,0].set_xlim(-27, -13)
+        axes[0,0].set_ylim(0, 0.49)
 
         # Save figure
         self.series.save_figure(
-            f'age_distribution_{self.name}_{metric.label}.pdf', fig,
+            f'age_distribution_{self.name}_{metric.metric.name[index]}.pdf', fig,
             tight=False, forced=forced, default=default, cancel=cancel
         )
-        # plt.show()
+
+    def draw_map(self, labels=False, title=False, forced=None, default=None, cancel=None):
+        """
+        Creates a Mollweide projection of a traceback. For this function to work, uvw velocities
+        must not compensated for the sun velocity when computing xyz positions. Otherwise, the
+        vantage point doesn't move and the trajectories don't match the observed proper motion.
+        Coordinate.sun_velocity = np.zeros(3).
+        """
+
+        # Initialize figure
+        fig, axes = self.series.set_figure(
+            '1x1', 'mollweide', width=7.0900, bottom=0.0815,
+            ratio=0.50, adjust='ax_width', h_align='center'
+        )
+
+        # Check the type of labels
+        self.series.check_type(labels, 'labels', 'boolean')
+
+        # Re-create stars, if the sun velocity wasn't adjusted
+        if (Coordinate.sun_velocity != np.zeros(3)).all():
+            sun_velocity = Coordinate.sun_velocity
+            Coordinate.sun_velocity = np.zeros(3)
+            stars = []
+            index = 0
+            for star in self:
+                stars.append(
+                    self.Star(
+                        self, index=index, name=star.name, time=self.series.time,
+                        velocity_xyz=star.velocity_xyz[0],
+                        velocity_xyz_error=star.velocity_xyz_error[0],
+                        position_xyz=star.position_xyz[0],
+                        position_xyz_error=star.position_xyz_error[0]
+                    )
+                )
+                index += 1
+            Coordinate.sun_velocity = sun_velocity
+        else:
+            stars = self
+
+        # Compute coordinates
+        for star in stars:
+            positions_rδα = np.array(
+                [
+                    galactic_xyz_equatorial_rδα(*star.position_xyz[step])[0]
+                    for step in range(self.series.number_of_steps)
+                ]
+            )
+            alphas = positions_rδα[:,2] - 2 * np.pi * (positions_rδα[:,2] > np.pi)
+            deltas = positions_rδα[:,1]
+
+            # Identify discontinuties
+            discontinuties = (
+                np.abs(alphas[1:] - alphas[:-1]) > 3 * np.pi / 2
+            ).nonzero()[0] + 1
+
+            # Find individual segments
+            segments = []
+            lower_limit = 0
+            for upper_limit in discontinuties:
+                segments.append(range(lower_limit, upper_limit))
+                lower_limit = upper_limit
+            segments.append(np.arange(lower_limit, alphas.shape[0]))
+
+            # Plot individual segments
+            for i in segments:
+                axes[0,0].plot(
+                    alphas[i], deltas[i],
+                    color = colors.red[6] if star.outlier else colors.blue[6], alpha=0.6,
+                    linewidth=0.5, solid_capstyle='round', zorder=0.6
+                )
+
+            # Select color
+            color = colors.red[6] if star.outlier else colors.black
+
+            # Plot current-day position
+            axes[0,0].scatter(
+                alphas[0], deltas[0], color=color + (0.4,), edgecolors=color,
+                alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.7
+            )
+
+            # Show labels
+            if labels:
+                axes[0,0].text(
+                    alphas[0] + 0.2, deltas[0] + 0.3, star.name, color=color,
+                    horizontalalignment='left', verticalalignment='top', fontsize=4, zorder=0.9
+                )
+
+        # Plot proper motion arrows
+        for star in self.series.data.sample:
+            axes[0,0].arrow(
+                star.position.values[2] - (2 * np.pi if star.position.values[2] > np.pi else 0.0),
+                star.position.values[1], -star.velocity.values[2] / 4, -star.velocity.values[1] / 4,
+                color=colors.black, linewidth=0.5, joinstyle='round',
+                head_width=0.03, head_length=0.03, zorder=0.8
+            )
+
+        # Set title
+        self.series.set_title(
+            title, fig, lambda fig, title: (title, title),
+            f'Mollweide projection of {self.name} over {self.series.duration.value:.1f} Myr'
+        )
+
+        # Set grid
+        axes[0,0].tick_params(top=False, bottom=False)
+        axes[0,0].grid(color=colors.grey[17], linewidth=0.5, alpha=0.0)
+
+        # Save figure, without a grid
+        self.series.save_figure(
+            f'Mollweide_{self.name}.pdf', fig, close=False,
+            forced=forced, default=default, cancel=cancel
+        )
+
+        # Copy grid objects and add them back to the figure, with a new zorders and alphas
+        from copy import copy
+        for tick in axes[0,0].yaxis.majorTicks + axes[0,0].xaxis.majorTicks:
+            gridline = copy(tick.gridline)
+            gridline.set_zorder(0.3)
+            gridline.set_alpha(1.0)
+            axes[0,0].add_artist(gridline)
+
+        # Save figure, with a grid
+        self.series.save_figure(
+            f'Mollweide_{self.name}.pdf', fig, logging=False,
+            forced=True, default=False, cancel=False
+        )
 
     def create_kinematics_table(
         self, save=False, show=False, machine=False, age=None,
@@ -2782,7 +2882,7 @@ class Output_Group():
         # Save table
         if save:
             self.series.save_table(
-                f'kinematics_{self.name}_{age}Myr', lines,
+                f'kinematics_{self.name}_{age}Myr', f'Kinematics of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -2875,7 +2975,7 @@ class Output_Group():
         # Save table
         if save:
             self.series.save_table(
-                f'kinematics_time_{self.name}', lines,
+                f'kinematics_time_{self.name}', f'Kinematics over time of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
@@ -2971,7 +3071,7 @@ class Output_Star():
         # Save table
         if save:
             self.group.series.save_table(
-                f'kinematics_time_{self.name}', lines,
+                f'kinematics_time_{self.name}', f'Kinematics over time of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )

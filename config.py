@@ -63,16 +63,16 @@ size_metrics.value = True
 cov_metrics.value = True
 cov_robust_metrics.value = False
 cov_sklearn_metrics.value = False
-mad_metrics.value = True
+mad_metrics.value = False
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 21
+number_of_groups.value = 1
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-# number_of_steps.value = 1000
+number_of_steps.value = 1000
 # number_of_steps.value = 240
-number_of_steps.value = 172
+# number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
 number_of_iterations.value = 200

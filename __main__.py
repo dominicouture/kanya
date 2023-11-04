@@ -19,7 +19,7 @@ import kanya
 kanya.Series(file_path='config.py', args=True)
 
 # Groups creation
-kanya.collection.create(forced=False)
+kanya.collection.create(forced=True)
 
 # Output creation
 for series in kanya.collection:
@@ -35,7 +35,7 @@ for series in kanya.collection:
     series.draw_covariances_mad('xyz', '1x2', forced=True)
     series.draw_covariances_cross_mad_mst('ξηζ', forced=True)
     series.draw_covariances_cross_mad_mst('xyz', forced=True)
-    series.draw_age_distribution('covariances_ξηζ', index=0, forced=True)
+    series.draw_age_distribution('covariances_ξηζ', index=0, fit='normal', adjusted=False, forced=True)
     series.create_metrics_table(forced=True, show=True, save=True, machine=False)
     series.create_metrics_table(show=False, save=True, forced=True, machine=False)
 
@@ -55,12 +55,12 @@ for series in kanya.collection:
             group.draw_scatter('velocity', 'xyz', '4x1', age=-5, errors=True, forced=True) # Valid
             group.draw_cross_scatter('xyz', age=-5, errors=True, forced=True)
             group.draw_cross_scatter('ξηζ', age=-5, errors=True, forced=True)
-            group.draw_time_scatter('position', 'xyz', '4x2', ages=[0,  -5], errors=True, forced=True)
-            group.draw_time_scatter('velocity', 'xyz', '4x3', ages=[0,  -5,  -10], errors=True, forced=True)
+            group.draw_time_scatter('position', 'xyz', '4x2', ages=[0,  -5], errors=True, mst=True, forced=True)
+            group.draw_time_scatter('velocity', 'xyz', '4x3', ages=[0,  -5,  -10], errors=True, mst=True, forced=True)
             group.draw_corner_scatter('xyz', age=-5, errors=True, forced=True)
             group.draw_corner_scatter('ξηζ', age=-5, errors=True, forced=True)
+            group.draw_age_distribution('covariances_ξηζ', index=0, fit='skewnormal', number_of_bins=80, forced=True)
             group.draw_map(labels=False, forced=True)
-            group.draw_age_distribution('covariances_ξηζ', index=0, forced=True)
             group.create_kinematics_table(forced=True, save=True, machine=True, age=-30.0)
             group.create_kinematics_time_table(forced=True, save=True, machine=True)
 

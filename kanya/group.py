@@ -289,33 +289,53 @@ class Group(list, Output_Group):
         self.subsample_size = len(self.subsample)
         self.number_of_outliers = len(self.outliers)
 
-        # Average xyz positions and velocities, excluding outliers
+        # Average xyz positions and velocities
         self.position_xyz = np.mean([star.position_xyz for star in self.sample], axis=0)
         self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
         self.velocity_xyz = np.mean([star.velocity_xyz for star in self.sample], axis=0)
         self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
 
-        # Average ξηζ positions and velocities, excluding outliers
+        # Average ξηζ positions and velocities
         self.position_ξηζ = np.mean([star.position_ξηζ for star in self.sample], axis=0)
         self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
         self.velocity_ξηζ = np.mean([star.velocity_ξηζ for star in self.sample], axis=0)
         self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
-        # xyz position and velocity scatter, excluding outliers
+        # Stars relative position and velocity, distance and speed, including outliers
+        for star in self:
+            star.get_relative_coordinates()
+
+        # Average relative xyz positions and velocities
+        self.relative_position_xyz = np.mean(
+            [star.relative_position_xyz for star in self.sample], axis=0
+        )
+        self.relative_distance_xyz = np.sum(self.relative_position_xyz**2, axis=1)**0.5
+        self.relative_velocity_xyz = np.mean(
+            [star.relative_velocity_xyz for star in self.sample], axis=0
+        )
+        self.relative_speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=1)**0.5
+
+        # Average relative ξηζ positions and velocities
+        self.relative_position_ξηζ = np.mean(
+            [star.relative_position_ξηζ for star in self.sample], axis=0
+        )
+        self.relative_distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
+        self.relative_velocity_ξηζ = np.mean(
+            [star.relative_velocity_ξηζ for star in self.sample], axis=0
+        )
+        self.relative_speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
+
+        # xyz position and velocity scatter
         self.scatter_position_xyz = np.std([star.position_xyz for star in self.sample], axis=0)
         self.scatter_position_xyz_total = np.sum(self.scatter_position_xyz**2, axis=1)**0.5
         self.scatter_velocity_xyz = np.std([star.velocity_xyz for star in self.sample], axis=0)
         self.scatter_velocity_xyz_total = np.sum(self.scatter_velocity_xyz**2, axis=1)**0.5
 
-        # ξηζ position and velocity scatters, excluding outliers
+        # ξηζ position and velocity scatters
         self.scatter_position_ξηζ = np.std([star.position_ξηζ for star in self.sample], axis=0)
         self.scatter_position_ξηζ_total = np.sum(self.scatter_position_ξηζ**2, axis=1)**0.5
         self.scatter_velocity_ξηζ = np.std([star.velocity_ξηζ for star in self.sample], axis=0)
         self.scatter_velocity_ξηζ_total = np.sum(self.scatter_velocity_ξηζ**2, axis=1)**0.5
-
-        # Stars relative position and velocity, distance and speed, including outliers
-        for star in self:
-            star.get_relative_coordinates()
 
     def filter_outliers(self):
         """
@@ -431,36 +451,37 @@ class Group(list, Output_Group):
         """
 
         # xyz position covariance matrices
-        self.positions_xyz = np.array(
-            [[star.position_xyz for star in group.sample] for group in self.series[1:]]
-        )
-        position_xyz_cov_matrices = self.get_covariances_matrix('positions_xyz')
-        for star in range(len(self.sample)):
-            self.sample[star].position_xyz_error = position_xyz_cov_matrices[star]
+        if self.series.number_of_groups > 1:
+            self.positions_xyz = np.array(
+                [[star.position_xyz for star in group.sample] for group in self.series[1:]]
+            )
+            position_xyz_cov_matrices = self.get_covariances_matrix('positions_xyz')
+            for star in range(len(self.sample)):
+                self.sample[star].position_xyz_error = position_xyz_cov_matrices[star]
 
-        # xyz velocity covariance matrices
-        self.velocities_xyz = np.array(
-            [[star.velocity_xyz for star in group.sample] for group in self.series[1:]]
-        )
-        velocity_xyz_cov_matrices = self.get_covariances_matrix('velocities_xyz')
-        for star in range(len(self.sample)):
-            self.sample[star].velocity_xyz_error = velocity_xyz_cov_matrices[star]
+            # xyz velocity covariance matrices
+            self.velocities_xyz = np.array(
+                [[star.velocity_xyz for star in group.sample] for group in self.series[1:]]
+            )
+            velocity_xyz_cov_matrices = self.get_covariances_matrix('velocities_xyz')
+            for star in range(len(self.sample)):
+                self.sample[star].velocity_xyz_error = velocity_xyz_cov_matrices[star]
 
-        # ξηζ position covariance matrices
-        self.positions_ξηζ = np.array(
-            [[star.position_ξηζ for star in group.sample] for group in self.series[1:]]
-        )
-        position_ξηζ_cov_matrices = self.get_covariances_matrix('positions_ξηζ')
-        for star in range(len(self.sample)):
-            self.sample[star].position_ξηζ_error = position_ξηζ_cov_matrices[star]
+            # ξηζ position covariance matrices
+            self.positions_ξηζ = np.array(
+                [[star.position_ξηζ for star in group.sample] for group in self.series[1:]]
+            )
+            position_ξηζ_cov_matrices = self.get_covariances_matrix('positions_ξηζ')
+            for star in range(len(self.sample)):
+                self.sample[star].position_ξηζ_error = position_ξηζ_cov_matrices[star]
 
-        # ξηζ velocity covariance matrices
-        self.velocities_ξηζ = np.array(
-            [[star.velocity_ξηζ for star in group.sample] for group in self.series[1:]]
-        )
-        velocity_ξηζ_cov_matrices = self.get_covariances_matrix('velocities_ξηζ')
-        for star in range(len(self.sample)):
-            self.sample[star].velocity_ξηζ_error = velocity_ξηζ_cov_matrices[star]
+            # ξηζ velocity covariance matrices
+            self.velocities_ξηζ = np.array(
+                [[star.velocity_ξηζ for star in group.sample] for group in self.series[1:]]
+            )
+            velocity_ξηζ_cov_matrices = self.get_covariances_matrix('velocities_ξηζ')
+            for star in range(len(self.sample)):
+                self.sample[star].velocity_ξηζ_error = velocity_ξηζ_cov_matrices[star]
 
     class Metric():
         """
@@ -1198,13 +1219,20 @@ class Group(list, Output_Group):
             else:
                 self.get_orbit()
 
-            # !!! Temporary xyz position and velocity errors setting !!!
-            # self.position_xyz_error = np.repeat(
-            #     self.position_xyz_error[None], self.group.series.number_of_steps, axis=0
-            # )
-            # self.velocity_xyz_error = np.repeat(
-            #     self.velocity_xyz_error[None], self.group.series.number_of_steps, axis=0
-            # )
+            # Set xyz and ξηζ positions and velocities errors for the first group
+            if self.group.number == 0:
+                self.position_xyz_error = self.set_error(self.position_xyz_error)
+                self.velocity_xyz_error = self.set_error(self.velocity_xyz_error)
+                self.position_ξηζ_error = self.set_error(np.zeros(3))
+                self.velocity_ξηζ_error = self.set_error(np.zeros(3))
+
+        def set_error(self, error):
+            """Creates a diagonal matrix of errors for every timestep."""
+
+            error_matrix = np.zeros((3, 3))
+            np.fill_diagonal(error_matrix, error)
+
+            return np.repeat(error_matrix[None], self.group.series.number_of_steps, axis=0)
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """Sets the star as an outlier."""

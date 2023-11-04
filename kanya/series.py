@@ -653,6 +653,7 @@ class Series(list, Output_Series):
                     if self.series.number_of_groups > 1
                     else vars(self.series[0])[self.label].ages[None]
                 )
+                self.ages += self.age - np.mean(self.ages, axis=1)[:,None,:]
                 self.age_error = np.std(self.ages, axis=(0, 1))
                 self.age_error_quad = (self.age_int_error**2 + self.age_ext_error**2)**0.5
 
@@ -672,7 +673,7 @@ class Series(list, Output_Series):
                 self.min_error_quad = (self.min_int_error**2 + self.min_ext_error**2)**0.5
 
                 # Age shift based on models
-                self.age_ajusted = self.age + self.age_shift
+                self.age_adjusted = self.age - self.age_shift
 
                 # Minimum change
                 self.min_change = (self.min / self.value[0] - 1.) * 100.
@@ -727,7 +728,7 @@ class Series(list, Output_Series):
 
                 # Age shift based on models
                 self.age_shift = self.series.age.value - self.age
-                self.age_ajusted = self.series.age.value
+                self.age_adjusted = self.series.age.value
 
                 # Minimum change
                 self.min_change = (self.min / self.value[0] - 1.) * 100.
@@ -778,7 +779,7 @@ class Series(list, Output_Series):
 
                 # Age shift based on models
                 self.age_shift = null_1d
-                self.age_ajusted = null_1d
+                self.age_adjusted = null_1d
 
                 # Minimum change
                 self.min_change = null_1d

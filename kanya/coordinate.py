@@ -128,7 +128,7 @@ class System():
         self.axis = axes[axis]
         self.origin = origins[origin]
 
-        # Set labels latex labels
+        # Set latex labels
         self.label = ''.join([variable.label for variable in self.position])
         self.labels = {
             'position': ''.join([variable.label for variable in self.position]),
@@ -241,6 +241,7 @@ class Coordinate:
 
     # Sun total velocity in a left-handed galactocentric frame of reference
     sun_velocity = np.dot(ggrm, lsr_velocity + sun_velocity_peculiar * np.array((-1.0, 1.0, 1.0)))
+    # sun_velocity = np.array([0.0, 0.0, 0.0])
     sun_velocity_error = np.array([0.0, 0.0, 0.0])
     # sun_velocity_error = sun_velocity_peculiar_error
 
