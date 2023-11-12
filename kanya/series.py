@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-series.py: Defines the class Series which uses a Config object to create a series of tracebacks
-either from a file, data or a model. First, it handles exceptions (name, type, value, shape)
-of all parameters, then creates or imports the file, if needed, handles unit, conversions, and
-checks for the presence of output and logs directories and creates them, if needed.
+series.py: Defines the class Series, which uses a Config object to create a series of tracebacks
+either from a file, data or a model. First, it handles exceptions (name, type, value, and shape)
+of all parameters, then creates or imports the file, if needed, handles unit conversions.
 """
 
 from tqdm import tqdm

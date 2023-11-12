@@ -1,10 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
-output.py: Defines functions to create data output such as plots of association size metrics
-over time, 2D and 3D scatters at a given time, histograms, color mesh, etc.
-"""
+"""output.py: Defines functions to create figures and tables for Series, Groups and Stars."""
 
 from matplotlib import pyplot as plt, ticker as tkr
 from scipy.interpolate import interp1d
@@ -344,11 +341,11 @@ class Output_Series():
 
         # Check the type and value of style
         styles = styles if styles is not None else (
-            '2+1', '6x6',
             '1x1', '1x2', '1x3',
             '2x1', '2x2', '2x3',
             '3x1', '3x2', '3x3',
-            '4x1', '4x2', '4x3'
+            '4x1', '4x2', '4x3',
+            '4x4', '6x6', '2+1',
         )
         self.check_type(style, 'style', 'string')
         self.stop(
@@ -375,7 +372,7 @@ class Output_Series():
             colpad = 0.100
 
         # Set margins for a figure with 3d axes
-        if '3d' in options:
+        if '3d' in options and style not in ('3x3', '6x6'):
             left = right = 0.6
 
         # Initialize a 2+1 figure
@@ -477,11 +474,11 @@ class Output_Series():
             axes = np.empty((axes_params.shape[:2]), dtype=object)
             axes[:,0] = get_axes(fig, axes_params[:,0], zorder=0.5)
             axes[1,1] = get_axes(fig, axes_params[1,1], zorder=0.5)
-            axes[0,1] = get_axes(
-                fig, axes_params[0,1], projection='3d' if '3d' in options else None, zorder=0.4
-            )
+            if 'corner' not in options:
+                axes[0,1] = get_axes(fig, axes_params[0,1], zorder=0.5)
 
             if '3d' in options:
+                axes[0,1] = get_axes(fig, axes_params[0,1], projection='3d', zorder=0.4)
                 set_axis(axes[0,1], '3d')
                 if 'label_right' in options or 'hide_y' in options:
                     axes[0,1].view_init(azim=-45)
@@ -553,7 +550,19 @@ class Output_Series():
 
             # Create figure and axes
             fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params)
+            if 'corner' not in options:
+                axes = get_axes(fig, axes_params)
+            else:
+                axes = np.empty((axes_params.shape[:2]), dtype=object)
+                for x, y in filter(
+                    lambda i: i[0] <= i[1], [(x, y) for y in range(3) for x in range(3)]
+                ):
+                    axes[y, x] = get_axes(fig, axes_params[y, x])
+
+                # Set 3d axes
+                if '3d' in options:
+                    axes[0,2] = get_axes(fig, axes_params[0,2], projection='3d', zorder=0.4)
+                    set_axis(axes[0,2], '3d')
 
         # Initialize a 4x1 figure
         if style == '4x1':
@@ -627,7 +636,26 @@ class Output_Series():
                 for ax in axes[3,1:]:
                     ax.set_zlabel('', visible=False)
 
-        # Initialize a 3x3 figure
+        # Initialize a 4x4 figure
+        if style == '4x4':
+            # left = 0.5300
+            width, height, axes_params = get_dimensions(
+                7.0900 if width is None else width,
+                7.5023 if height is None else height,
+                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
+                adjust='fig_height' if adjust is None else adjust
+            )
+
+            # Create figure and axes
+            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
+            axes = np.empty((axes_params.shape[:2]), dtype=object)
+            for x, y in filter(
+                lambda i: not (i[0] == 3 and i[1] == 0),
+                [(x, y) for y in range(4) for x in range(4)]
+            ):
+                axes[y, x] = get_axes(fig, axes_params[y, x])
+
+        # Initialize a 6x6 figure
         if style == '6x6':
             width, height, axes_params = get_dimensions(
                 7.0900 if width is None else width,
@@ -639,25 +667,42 @@ class Output_Series():
             # Create figure and axes
             fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
             axes = np.empty((axes_params.shape[:2]), dtype=object)
-            for x, y in filter(lambda i: i[0] <= i[1], [(x, y) for y in range(6) for x in range(6)]):
+            for x, y in filter(
+                lambda i: i[0] <= i[1], [(x, y) for y in range(6) for x in range(6)]
+            ):
                 axes[y, x] = get_axes(fig, axes_params[y, x])
+
+            # Set 3d axes
+            if '3d' in options:
+                axes_params[1,2,2:] += (colpad / width / 2 + axes_params[1,2,2:] * 0.9)
+                axes_params[1,2,0] += (colpad / width * 1.5 + axes_params[0,0,2] / 2)
+                axes_params[1,2,1] += rowpad / height * 3
+                axes_params[1,2,0] -= colpad / width / 2
+                axes_params[3,4,2:] += (rowpad / height / 2 + axes_params[3,4,2:] * 0.9)
+                axes_params[3,4,1] += (rowpad / height * 2 + axes_params[0,0,3] / 2)
+                axes[1,2] = get_axes(fig, axes_params[1,2], projection='3d', zorder=0.5)
+                axes[3,4] = get_axes(fig, axes_params[3,4], projection='3d', zorder=0.4)
+                set_axis(axes[1,2], '3d')
+                set_axis(axes[3,4], '3d')
 
         # Hide axis and tick labels, if needed
         if 'hide_x' in options and nrow > 1:
             for ax in filter(
                 lambda ax: ax is not None,
-                axes[:nrow - 1 - (1 if '3d' in options else 0)].flatten()
+                axes[:nrow - 1 - (1 if '3d' in options and style != '6x6' else 0)].flatten()
             ):
-                ax.set_xlabel('', visible=False)
-                ax.tick_params(labelbottom=False)
+                if not (style in ('3x3', '6x6') and ax.name == '3d'):
+                    ax.set_xlabel('', visible=False)
+                    ax.tick_params(labelbottom=False)
         if 'hide_y' in options and ncol > 1:
             if not (ncol == 2 and 'label_right' in options):
                 for ax in filter(
                     lambda ax: ax is not None,
                     axes[:nrow - (1 if style == '2x2' and '3d' in options else 0),1:].flatten()
                 ):
-                    ax.set_ylabel('', visible=False)
-                    ax.tick_params(labelleft=False)
+                    if not (style in ('3x3', '6x6') and ax.name == '3d'):
+                        ax.set_ylabel('', visible=False)
+                        ax.tick_params(labelleft=False)
 
         # Move axes and tick labels to the right of the rightmost axes
         if 'label_right' in options and ncol == 2:
@@ -1415,7 +1460,7 @@ class Output_Series():
         # Save figure
         self.save_figure(
             f"age_distribution_{self.name}_{'corrected_' if adjusted else ''}"
-            f'{metric.name[index]}.pdf', fig, tight=title,
+            f"{metric.name[index].replace(' ', '_')}.pdf", fig, tight=title,
             forced=forced, default=default, cancel=cancel
         )
 
@@ -1740,7 +1785,7 @@ class Output_Group():
         values = np.array(
             [
                 [
-                    vars(star)[('relative_' if relative else '') + f'{coord}_{system}'][step]
+                    vars(star)[f"{'relative_' if relative else ''}{coord}_{system}"][step]
                     for star in group.sample
                 ] for group in self.series
             ]
@@ -2144,8 +2189,8 @@ class Output_Group():
         ax.set_xlim(np.min(self.series.time), np.max(self.series.time) + 1)
 
     def draw_time(
-        self, coord, system, style, age=None, metric=None, title=False,
-        forced=None, default=None, cancel=None
+        self, coord, system, style, age=None, metric=None,
+        title=False, forced=None, default=None, cancel=None
     ):
         """Draws the positions or velocities of stars over time."""
 
@@ -2180,28 +2225,93 @@ class Output_Group():
         )
 
     def plot_scatter(
-        self, ax, axes, coords, system, step, errors=False,
-        labels=False, mst=False, relative=False, values=None, limits=None
+        self, ax, axes, coords, system, step, errors=False, labels=False,
+        mst=False, ellipses=True, relative=False, values=None, limits=None
     ):
         """
         Creates a 2d or 3d scatter of positions or velocities, at a given step. 'errors', adds
-        error  bars, 'labels' adds the stars' names and 'mst' adds the minimun spanning tree
-        branches.
+        error  bars, 'labels' adds the stars' names, 'mst' adds the minimun spanning tree branches,
+        'ellipses' adds 1σ and 2σ probability ellipses, and 'relative' cause the use of relative
+        values instead absolute values.
         """
+
+        def bivariate_gauss_to_ellipsoid(cov_matrix):
+            """
+            Computes the semi-major (a) and semi-minor (b) axes, and the rotation angle (θ) of the
+            ellipsoid based on the covariance matrix at 1σ and 2σ.
+            """
+
+            from scipy.special import erf
+
+            # Compute inverse matrix
+            inv_matrix = np.linalg.inv(cov_matrix)
+
+            # Compute θ, with θ = π / 2 if the covariance matrix is diagonal
+            if inv_matrix[0, 1] == 0.0:
+                θ = np.pi / 2.
+            else:
+                g = (inv_matrix[0, 0] - inv_matrix[1, 1]) / inv_matrix[0, 1]
+                θ = np.arctan((np.sqrt(g**2 + 4) - g) / 2)
+
+            # Computre ρ_u and ρ_v
+            ρ_u = np.abs(
+                inv_matrix[0, 0] * np.cos(θ)**2 +
+                inv_matrix[1, 1] * np.sin(θ)**2 +
+                inv_matrix[0, 1] * np.sin(θ) * np.cos(θ) * 2
+            )
+            ρ_v = np.abs(
+                inv_matrix[0, 0] * np.sin(θ)**2 +
+                inv_matrix[1, 1] * np.cos(θ)**2 -
+                inv_matrix[0, 1] * np.sin(θ) * np.cos(θ) * 2
+            )
+
+            # Computre the 2D 1σ and 2σ semi-major and semi-minor axes
+            prob = np.array([erf(1 / np.sqrt(2)), erf(2 / np.sqrt(2))])
+            r = np.sqrt(-np.log(1. - prob)) * 1.36
+            a = r / np.sqrt(ρ_u)
+            b = r / np.sqrt(ρ_v)
+
+            return a, b, θ
+
+        def singular_value_decomposition(cov_matrix):
+            """
+            Computes the semi-major (a) and semi-minor (b) axes, and the rotation angle (θ) of the
+            1σ error bar using singular value decomposition.
+            """
+
+            u, w, v = np.linalg.svd(cov_matrix)
+            rot_matrix = np.linalg.inv(u)
+            rot_matrix /= np.linalg.det(rot_matrix)
+            θ = np.arctan(rot_matrix[0, 1] / rot_matrix[0, 0])
+            a, b = np.sqrt(w) #* 1.36
+
+            return a, b, θ
+
+        def rotate(x, y, θ, x0, y0):
+            """
+            Rotates series of 2D vectors of coordinates x and y by an angle θ, and translate the
+            result to x0 and y0 coordinates.
+            """
+
+            x2 = x * np.cos(θ) - y * np.sin(θ) + x0
+            y2 = x * np.sin(θ) + y * np.cos(θ) + y0
+
+            return np.array([x2, y2])
 
         # Check the types and values of axes
         self.series.check_type(axes, 'axes', 'tuple')
+        ndim = len(axes)
         self.series.stop(
-            len(axes) not in (2, 3), 'ValueError',
-            "'axes' must have a length of 2 or 3 ({} given).", len(axes)
+            ndim not in (2, 3), 'ValueError',
+            "'axes' must have a length of 2 or 3 ({} given).", ndim
         )
         for i in axes:
             self.check_axis(i, 'i')
 
         # Select projection
-        if len(axes) == 2:
+        if ndim == 2:
             projection = '2d'
-        if len(axes) == 3:
+        if ndim == 3:
             projection = '3d'
 
         # Check the types and values of coords
@@ -2227,25 +2337,25 @@ class Output_Group():
         # Check the type and value of system
         system = self.series.check_system(system)
 
-        # Check the types of errors, labels, mst, relative and view
+        # Check the types of errors, labels, mst, relative and ellipses
         self.series.check_type(errors, 'errors', 'boolean')
         self.series.check_type(labels, 'labels', 'boolean')
         self.series.check_type(mst, 'mst', 'boolean')
         self.series.check_type(relative, 'relative', 'boolean')
+        self.series.check_type(ellipses, 'ellipses', 'boolean')
 
         # Value and error coordinates
-        value_coords = [f'{coords[i]}_{system}' for i in range(len(coords))]
-        error_coords = [f'{coords[i]}_{system}_error' for i in range(len(coords))]
+        value_coords = [
+            f"{'relative_' if relative else ''}{coords[i]}_{system}" for i in range(ndim)
+        ]
+        error_coords = [f'{coords[i]}_{system}_error' for i in range(ndim)]
 
         # Select coordinates
         for star in self.sample:
-            value = [
-                vars(star)[('relative_' if relative else '') + value_coords[i]][step, axes[i]]
-                for i in range(len(axes))
-            ]
-            error = [
-                vars(star)[error_coords[i]][step].diagonal()[axes[i]] for i in range(len(axes))
-            ]
+            value = np.array([vars(star)[value_coords[i]][step, axes[i]] for i in range(ndim)])
+            error = np.array(
+                [np.diag(vars(star)[error_coords[i]][step])[axes[i]] for i in range(ndim)]
+            )**0.5
 
             # Select color
             color = colors.red[9] if star.outlier else colors.black
@@ -2264,19 +2374,48 @@ class Output_Group():
                     alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.4
                 )
 
-            # Plot error bars
+            # Error bars
             if errors:
                 if projection == '2d':
-                    ax.plot(
-                        (value[0] - error[0], value[0] + error[0]),
-                        (value[1], value[1]),
-                        color=color, alpha=0.6, linewidth=0.25, linestyle='-', zorder=0.3
-                    )
-                    ax.plot(
-                        (value[0], value[0]),
-                        (value[1] - error[1], value[1] + error[1]),
-                        color=color, alpha=0.6, linewidth=0.25, linestyle='-', zorder=0.3
-                    )
+
+                    # Rotated error bars for 2d correlation scatters
+                    if value_coords[0] == value_coords[1]:
+                        all_values = np.array(
+                            [
+                                [
+                                    vars(group[star.index - 1])[value_coords[i]][step, axes[i]]
+                                    for i in range(ndim)
+                                ] for group in self.series[1:]
+                            ]
+                        )
+
+                        # Compute rotated horizontal and vertical error bars
+                        a, b, θ = singular_value_decomposition(np.cov(all_values.T))
+                        error_a = rotate(np.array([-a, a]), np.zeros(2), θ, *value)
+                        error_b = rotate(np.zeros(2), np.array([-b, b]), θ, *value)
+
+                        # Plot error bars
+                        ax.plot(
+                            error_a[0], error_a[1], color=color, alpha=0.6,
+                            linewidth=0.25, linestyle='-', zorder=0.3
+                        )
+                        ax.plot(
+                            error_b[0], error_b[1], color=color, alpha=0.6,
+                            linewidth=0.25, linestyle='-', zorder=0.3
+                        )
+
+                    # Non-rotated error bar for 2d cross correlation scatters
+                    else:
+                        ax.plot(
+                            (value[0] - error[0], value[0] + error[0]), (value[1], value[1]),
+                            color=color, alpha=0.6, linewidth=0.25, linestyle='-', zorder=0.3
+                        )
+                        ax.plot(
+                            (value[0], value[0]), (value[1] - error[1], value[1] + error[1]),
+                            color=color, alpha=0.6, linewidth=0.25, linestyle='-', zorder=0.3
+                        )
+
+                # Non-rotated error bar for 3d scatters
                 if projection == '3d':
                     ax.plot(
                         (value[0] - error[0], value[0] + error[0]),
@@ -2319,14 +2458,10 @@ class Output_Group():
             # Select branches
             for branch in mst[step]:
                 value_start = [
-                    vars(branch.start)[
-                        ('relative_' if relative else '') + value_coords[i]
-                    ][step, axes[i]] for i in range(len(axes))
+                    vars(branch.start)[value_coords[i]][step, axes[i]] for i in range(ndim)
                 ]
                 value_end = [
-                    vars(branch.end)[
-                        ('relative_' if relative else '') + value_coords[i]
-                    ][step, axes[i]] for i in range(len(axes))
+                    vars(branch.end)[value_coords[i]][step, axes[i]] for i in range(ndim)
                 ]
 
                 # Plot branches
@@ -2348,10 +2483,8 @@ class Output_Group():
 
         # Draw values
         if projection == '2d':
-            values = [
-                vars(self)[('relative_' if relative else '') + value_coords[i]][step, axes[i]]
-                for i in range(len(axes))
-            ] if values is None else values
+            if values is None:
+                values = [vars(self)[value_coords[i]][step, axes[i]] for i in range(ndim)]
             ax.axvline(
                 values[0], color=colors.black, alpha=0.8,
                 linewidth=0.5, linestyle='--', zorder=0.9
@@ -2360,6 +2493,27 @@ class Output_Group():
                 values[1], color=colors.black, alpha=0.8,
                 linewidth=0.5, linestyle='--', zorder=0.9
             )
+
+        # Draw ellipses
+        if ellipses:
+            all_values = np.array(
+                [
+                    [vars(star)[value_coords[i]][step, axes[i]] for i in range(ndim)]
+                    for star in self.sample
+                ]
+            )
+
+            # Compute semi-major and semi-minor axes, and angle
+            a, b, θ = bivariate_gauss_to_ellipsoid(np.cov(all_values.T))
+
+            # Compute, rotate and translate ellipses coordinates
+            t = np.linspace(0, 2 * np.pi, 200)
+            for i in range(a.size):
+                x, y = a[i] * np.cos(t), b[i] * np.sin(t)
+                x, y = rotate(x, y, θ, np.mean(all_values[:,0]), np.mean(all_values[:,1]))
+
+                # Plot 1σ and 2σ probabilities
+                ax.fill(x, y, facecolor=colors.azure[9], alpha=0.3, linestyle='None', zorder=0.1)
 
         # Set limits
         if limits is not None:
@@ -2387,24 +2541,43 @@ class Output_Group():
             )
 
     def draw_scatter(
-        self, coord, system, style, step=None, age=None, errors=False, labels=False,
-        mst=False, title=False, forced=None, default=None, cancel=None
+        self, coord, system, style, step=None, age=None, axis3d=True, errors=False, labels=False,
+        mst=False, ellipses=False, title=False, forced=None, default=None, cancel=None
     ):
         """
-        Draws scatter plots of positions or velocities of stars at a given 'step' or 'age' in Myr.
+        Draws 2d and 3d scatter plots of positions or velocities of stars at a given 'step' or
+        'age' in Myr.
         """
+
+        # Check the type of axis3d and set style, if needed
+        self.series.check_type(axis3d, 'axis3d', 'boolean')
+        if axis3d and style not in ('2x2', '3x3', '4x1'):
+            axis3d = False
+        if not axis3d and style == '4x1':
+            style = '3x1'
 
         # Initialize figure
         fig, axes = self.series.set_figure(
-            style, 'label_right', 'hide_x' if style == '2x2' else '',
-            '3d' if style in ('2x2', '4x1') else '', styles=('1x3', '2x2', '3x1', '4x1')
+            style, 'label_right', 'hide_x' if style in ('2x2', '2x3', '3x3') else '',
+            'hide_y' if style == '3x3' else '', 'corner' if style in ('2x2', '3x3') else '',
+            '3d' if axis3d else '', styles=('1x3', '2x2', '2x3', '3x1', '3x2', '3x3', '4x1')
         )
 
         # Select axes in accordance to style
         if style in ('1x3', '3x1', '4x1'):
             ax0, ax1, ax2 = axes.flatten()[:3]
-        if style in ('2x2'):
+        if style == '2x3':
+            ax0, ax1, ax2 = axes[1]
+            ax4, ax5, ax6 = axes[0]
+        if style == '3x2':
+            ax0, ax1, ax2 = axes[:,0]
+            ax4, ax5, ax6 = axes[:,1]
+        if style == '2x2':
             ax0, ax1, ax2, ax3 = axes[0,0], axes[1,0], axes[1,1], axes[0,1]
+        if style == '3x3':
+            ax0, ax1, ax2, ax3 = axes[1,0], axes[2,0], axes[2,1], axes[0,2]
+            ax4, ax5, ax6 = np.diag(axes)
+            ax3 = axes[0,2]
         if style in ('4x1'):
             ax3 = axes[3,0]
 
@@ -2412,21 +2585,45 @@ class Output_Group():
         step, age = self.get_step_age(step, age)
 
         # Find limits
-        limits = self.get_limits(coord, system, step)[1]
+        values, limits = self.get_limits(coord, system, step)
+
+        # Plot positions and velocities (1d)
+        if style in ('2x3', '3x2', '3x3'):
+            for ax, i in zip((ax4, ax5, ax6), range(3)):
+                ax.value = self.series.plot_histogram(
+                    ax, values[i], 20, fit='skewnormal', limits=limits[i],
+                    label=vars(systems[system])[coord][i].name,
+                    orientation='vertical' if style in ('2x3', '3x3') else 'horizontal'
+                )[0]
+
+                # Set labels and ticks
+                ax.tick_params(labelleft=False, labelbottom=False, labelright=False)
 
         # Plot positions or velocites (2d)
-        i, j = zip(*((0, 1), (0, 2), (1, 2)))
+        if style in ('2x3', '3x2'):
+            i, j = zip(*((0, 1), (1, 2), (2, 0)))
+        else:
+            i, j = zip(*((0, 1), (0, 2), (1, 2)))
         for ax, x, y in zip((ax0, ax1, ax2), i, j):
+            if style == '2x3':
+                values = (axes[0,x].value, axes[0,y].value)
+            elif style == '3x2':
+                x, y = y, x
+                values = (axes[x,1].value, axes[y,1].value)
+            elif style == '3x3':
+                values = (axes[x,x].value, axes[y,y].value)
+            else:
+                values = None
             self.plot_scatter(
-                ax, (x, y), coord, system, step, errors=errors,
-                labels=labels, mst=mst, limits=(limits[x], limits[y])
+                ax, (x, y), coord, system, step, errors=errors, labels=labels,
+                mst=mst, ellipses=ellipses, values=values, limits=(limits[x], limits[y])
             )
 
         # Plot positions or velocites (3d)
-        if style in ('2x2', '4x1'):
+        if axis3d:
             self.plot_scatter(
-                ax3, (0, 1, 2), coord, system, step,
-                errors=errors, labels=labels, mst=mst, limits=limits
+                ax3, (0, 1, 2), coord, system, step, errors=errors,
+                labels=labels, mst=mst, ellipses=False, limits=limits
             )
 
         # Set title
@@ -2442,29 +2639,53 @@ class Output_Group():
         )
 
     def draw_cross_scatter(
-        self, system, step=None, age=None, errors=False, labels=False,
-        title=False, forced=None, default=None, cancel=None
+        self, system, style, step=None, age=None, errors=False, labels=False,
+        ellipses=False, title=False, forced=None, default=None, cancel=None
     ):
         """
-        Draws cross scatter plots of positions and velocities of stars, at a given 'step' or 'age'
-        in Myr.
+        Draws 2s cross scatter plots of positions and velocities of stars, at a given 'step' or
+        'age' in Myr.
         """
 
         # Initialize figure
-        fig, axes = self.series.set_figure('3x3', 'hide_x', 'hide_y')
+        fig, axes = self.series.set_figure(style, 'hide_x', 'hide_y', styles=('3x3', '4x4'))
+
+        # Select axes in accordance to style
+        if style == '3x3':
+            axes_scatter = axes
+        if style == '4x4':
+            axes_distribution = np.concatenate((axes[0,:3], axes[1:,3]))
+            axes_scatter = axes[1:,:3]
 
         # Compute the values of step and age
         step, age = self.get_step_age(step, age)
 
-        # Find limits
-        position_limits = self.get_limits('position', system, step)[1]
-        velocity_limits = self.get_limits('velocity', system, step)[1]
+        # Find values and limits
+        values, limits = {}, {}
+        values['position'], limits['position'] = self.get_limits('position', system, step)
+        values['velocity'], limits['velocity'] = self.get_limits('velocity', system, step)
+
+        # Plot positions and velocities (1d)
+        if style in ('4x4',):
+            for i in range(6):
+                j = i - (0 if i < 3 else 3)
+                coord = 'position' if i < 3 else 'velocity'
+                axes_distribution[i].value = self.series.plot_histogram(
+                    axes_distribution[i], values[coord][j], 20, fit='skewnormal',
+                    limits=limits[coord][j], label=vars(systems[system])[coord][j].name,
+                    orientation='vertical' if i < 3 else 'horizontal'
+                )[0]
+
+                # Set labels and ticks
+                axes_distribution[i].tick_params(labelleft=False, labelbottom=False)
 
         # Plot positions and velocities
         for x, y in [(x, y) for y in range(3) for x in range(3)]:
+            values = (axes[0, x].value, axes[y + 1, 3].value) if style == '4x4' else None
             self.plot_scatter(
-                axes[y, x], (x, y), ('position', 'velocity'), system,
-                step, errors=errors, labels=labels, limits=(position_limits[x], velocity_limits[y])
+                axes_scatter[y, x], (x, y), ('position', 'velocity'), system, step,
+                errors=errors, labels=labels, ellipses=ellipses, values=values,
+                limits=(limits['position'][x], limits['velocity'][y])
             )
 
         # Set title
@@ -2475,16 +2696,17 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            f'position_velocity_cross_{system}_{self.name}_{age:.1f}Myr.pdf', fig,
+            f'position_velocity_cross_{system}_{style}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
 
     def draw_time_scatter(
         self, coord, system, style, steps=None, ages=None, errors=False, labels=False,
-        mst=False, title=False, forced=None, default=None, cancel=None
+        mst=False, ellipses=True, title=False, forced=None, default=None, cancel=None
     ):
         """
-        Draws scatter plots of positions or velocities of stars, for 2 or 3 'step' or 'age' in Myr.
+        Draws 2d and 3d scatter plots of positions or velocities of stars, for 2 or 3 'step' or
+        'age' in Myr.
         """
 
         # Initialize figure
@@ -2530,16 +2752,16 @@ class Output_Group():
             x, y = ((0, 1), (2, 1), (0, 2))[i]
             for j in range(number_of_steps):
                 self.plot_scatter(
-                    axes[i, j], (x, y), coord, system, steps[j], errors=errors,
-                    labels=labels, mst=mst, relative=True, limits=(limits[x], limits[y])
+                    axes[i, j], (x, y), coord, system, steps[j], errors=errors, labels=labels,
+                    mst=mst, ellipses=ellipses, relative=True, limits=(limits[x], limits[y])
                 )
 
         # Plot positions or velocities (3d)
         if style in ('4x2', '4x3'):
             for ax, step in zip(axes[3], steps):
                 self.plot_scatter(
-                    ax, (0, 1, 2), coord, system, step, errors=errors,
-                    labels=labels, mst=mst, relative=True, limits=limits
+                    ax, (0, 1, 2), coord, system, step, errors=errors, labels=labels,
+                    mst=mst, ellipses=False, relative=True, limits=limits
                 )
 
         # Set title
@@ -2556,15 +2778,22 @@ class Output_Group():
         )
 
     def draw_corner_scatter(
-        self, system, step=None, age=None, errors=False, labels=False,
-        flip=False, title=False, forced=None, default=None, cancel=None
+        self, system, step=None, age=None, axis3d=True, errors=False, labels=False, mst=False,
+        ellipses=False, flip=False, title=False, forced=None, default=None, cancel=None
     ):
         """
-        Draws corner scatter plots of positions and velocities, at a given 'step' or 'age' in Myr.
+        Draws corner scatter plots of positions and velocities, at a given 'step' or 'age' in Myr,
+        including 1d distributions, and 2d and 3d scatter and cross scatter plots.
         """
 
+        # Check the type of axis3d and flip
+        self.series.check_type(axis3d, 'axis3d', 'boolean')
+        self.series.check_type(flip, 'flip', 'boolean')
+
         # Initialize figure
-        fig, axes = self.series.set_figure('6x6', 'hide_x', 'hide_y')
+        fig, axes = self.series.set_figure(
+            '6x6', 'hide_x', 'hide_y', '3d' if axis3d else '', bottom=0.345
+        )
 
         # Compute the values of step and age
         step, age = self.get_step_age(step, age)
@@ -2573,9 +2802,6 @@ class Output_Group():
         values, limits = {}, {}
         values['position'], limits['position'] = self.get_limits('position', system, step)
         values['velocity'], limits['velocity'] = self.get_limits('velocity', system, step)
-
-        # Check the type of flip
-        self.series.check_type(flip, 'flip', 'boolean')
 
         # Plot positions and velocities (1d)
         for i in range(6):
@@ -2594,8 +2820,19 @@ class Output_Group():
             coord_y = 'position' if y < 3 else 'velocity'
             self.plot_scatter(
                 axes[y, x], (i, j), (coord_x, coord_y), system, step, errors=errors,
-                labels=labels, values=(axes[x, x].value, axes[y, y].value),
+                labels=labels, ellipses=ellipses, values=(axes[x, x].value, axes[y, y].value),
                 limits=(limits[coord_x][i], limits[coord_y][j])
+            )
+
+        # Plot positions and velocites (3d)
+        if axis3d:
+            self.plot_scatter(
+                axes[1,2], (0, 1, 2), 'position', system, step, errors=False,
+                labels=labels, mst=mst, ellipses=False, limits=limits['position']
+            )
+            self.plot_scatter(
+                axes[3,4], (0, 1, 2), 'velocity', system, step, errors=False,
+                labels=labels, mst=mst, ellipses=False, limits=limits['velocity']
             )
 
         # Set labels and ticks
@@ -2669,8 +2906,8 @@ class Output_Group():
 
         # Save figure
         self.series.save_figure(
-            f'age_distribution_{self.name}_{metric.metric.name[index]}.pdf', fig,
-            tight=False, forced=forced, default=default, cancel=cancel
+            f"age_distribution_{self.name}_{metric.metric.name[index].replace(' ', '_')}.pdf",
+            fig, tight=False, forced=forced, default=default, cancel=cancel
         )
 
     def draw_map(self, labels=False, title=False, forced=None, default=None, cancel=None):
@@ -2690,7 +2927,7 @@ class Output_Group():
         # Check the type of labels
         self.series.check_type(labels, 'labels', 'boolean')
 
-        # Re-create stars, if the sun velocity wasn't adjusted
+        # Recreate stars, if the sun velocity wasn't adjusted
         if (Coordinate.sun_velocity != np.zeros(3)).all():
             sun_velocity = Coordinate.sun_velocity
             Coordinate.sun_velocity = np.zeros(3)
@@ -2701,9 +2938,9 @@ class Output_Group():
                     self.Star(
                         self, index=index, name=star.name, time=self.series.time,
                         velocity_xyz=star.velocity_xyz[0],
-                        velocity_xyz_error=star.velocity_xyz_error[0],
+                        velocity_xyz_error=np.diag(star.velocity_xyz_error[0]),
                         position_xyz=star.position_xyz[0],
-                        position_xyz_error=star.position_xyz_error[0]
+                        position_xyz_error=np.diag(star.position_xyz_error[0])
                     )
                 )
                 index += 1
@@ -3003,9 +3240,7 @@ class Output_Star():
 
         # Create header
         if machine:
-            lines = [
-                'Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta'
-            ]
+            lines = ['Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta']
 
             # Create lines
             for t in np.arange(self.group.series.time.size):

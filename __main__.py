@@ -23,11 +23,11 @@ kanya.collection.create(forced=True)
 
 # Output creation
 for series in kanya.collection:
-    series.draw_covariances('ξηζ', forced=True) # Valid
+    series.draw_covariances('ξηζ', forced=True)
     series.draw_covariances('xyz', robust=True, forced=True)
-    series.draw_cross_covariances('ξηζ', forced=True) # Valid
+    series.draw_cross_covariances('ξηζ', forced=True)
     series.draw_cross_covariances('xyz', robust=True, forced=True)
-    series.draw_mad('ξηζ', forced=True) # Valid
+    series.draw_mad('ξηζ', forced=True)
     series.draw_mad('xyz', forced=True)
     series.draw_mst('ξηζ', forced=True)
     series.draw_mst('xyz', forced=True)
@@ -42,23 +42,24 @@ for series in kanya.collection:
     # Group output
     for group in series:
         if group.number == 0:
-            group.draw_trajectory('position', 'xyz', metric='covariances_xyz', index=0, forced=True) # Valid
-            group.draw_trajectory('position', 'ξηζ', metric='covariances_ξηζ', index=0, forced=True) # Valid
-            group.draw_time('position', 'xyz', '3x1', metric='covariances_xyz', forced=True) # Valid
-            group.draw_time('velocity', 'xyz', '1x3', metric='covariances_xyz', forced=True) # Valid
-            group.draw_time('position', 'ξηζ', '2x2', metric='covariances_ξηζ', forced=True) # Valid
-            group.draw_scatter('velocity', 'xyz', '2x2', age=-5, errors=True, mst=True, forced=True) # Valid
-            group.draw_scatter('velocity', 'xyz', '1x3', age=-5, errors=True, mst=True, forced=True) # Valid
-            group.draw_scatter('velocity', 'xyz', '3x1', age=-5, errors=True, mst=True, forced=True) # Valid
-            group.draw_scatter('velocity', 'xyz', '4x1', age=-5, errors=True, mst=True, forced=True) # Valid
-            group.draw_scatter('position', 'ξηζ', '2x2', age=-5, errors=True, mst=True, forced=True) # Valid
-            group.draw_scatter('velocity', 'xyz', '4x1', age=-5, errors=True, forced=True) # Valid
-            group.draw_cross_scatter('xyz', age=-5, errors=True, forced=True)
-            group.draw_cross_scatter('ξηζ', age=-5, errors=True, forced=True)
-            group.draw_time_scatter('position', 'xyz', '4x2', ages=[0,  -5], errors=True, mst=True, forced=True)
-            group.draw_time_scatter('velocity', 'xyz', '4x3', ages=[0,  -5,  -10], errors=True, mst=True, forced=True)
-            group.draw_corner_scatter('xyz', age=-5, errors=True, forced=True)
-            group.draw_corner_scatter('ξηζ', age=-5, errors=True, forced=True)
+            group.draw_trajectory('position', 'xyz', metric='covariances_xyz', index=0, forced=True)
+            group.draw_trajectory('position', 'ξηζ', metric='covariances_ξηζ', index=0, forced=True)
+            group.draw_time('position', 'xyz', '3x1', metric='covariances_xyz', forced=True)
+            group.draw_time('velocity', 'xyz', '1x3', metric='covariances_xyz', forced=True)
+            group.draw_time('position', 'ξηζ', '2x2', metric='covariances_ξηζ', forced=True)
+            group.draw_scatter('position', 'xyz', '2x2', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_scatter('velocity', 'xyz', '2x3', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_scatter('position', 'xyz', '3x2', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_scatter('velocity', 'xyz', '3x3', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_scatter('position', 'ξηζ', '1x3', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_scatter('velocity', 'ξηζ', '3x1', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_scatter('position', 'xyz', '4x1', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_cross_scatter('xyz', '3x3', age=-5, errors=True, ellipses=True, forced=True)
+            group.draw_cross_scatter('ξηζ', '4x4', age=-5, errors=True, ellipses=True, forced=True)
+            group.draw_time_scatter('position', 'xyz', '4x2', ages=[0,  -5], errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_time_scatter('velocity', 'ξηζ', '4x3', ages=[0,  -5,  -10], errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_corner_scatter('xyz', age=-5, errors=True, mst=True, ellipses=True, forced=True)
+            group.draw_corner_scatter('ξηζ', age=-5, errors=True, mst=True, ellipses=True, forced=True)
             group.draw_age_distribution('covariances_ξηζ', index=0, fit='skewnormal', number_of_bins=80, forced=True)
             group.draw_map(labels=False, forced=True)
             group.create_kinematics_table(forced=True, save=True, machine=True, age=-30.0)

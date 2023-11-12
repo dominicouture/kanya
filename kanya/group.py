@@ -3,12 +3,10 @@
 
 """
 group.py: Defines the Group class and the embeded Star classes. These classes contain the
-information and methods necessary to compute tracebacks of stars in a moving group and assess
-its age by minimizing: the 3D scatter, median absolute deviation, position-velocity covariances
-and minimum spanning tree mean branch length and median absolute deviation of branch length.
+variables and methods needed to traceback the orbits of stars in a nearby young association and
+assess its age by minimizing its size.
 """
 
-import galpy.util.coords as coords
 from galpy.orbit import Orbit
 from sklearn.covariance import MinCovDet
 from time import time as get_time
@@ -262,7 +260,7 @@ class Group(list, Output_Group):
             # Create star
             self.append(
                 self.Star(
-                    self, index=star + 1, name='star_{}'.format(star + 1), time=self.series.time,
+                    self, index=star + 1, name=f'star_{star + 1}', time=self.series.time,
                     velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
                     position_xyz=position_xyz, position_xyz_error=position_xyz_error
                 )
@@ -1214,10 +1212,77 @@ class Group(list, Output_Group):
             vars(self).update(values)
 
             # Trajectory integration
+            self.get_orbit()
+
+        def get_orbit(self):
+            """Computes the star's Galactic orbit using Galpy or a linear approximation."""
+
+            # Linear trajectories
             if self.group.series.potential is None:
-                self.get_linear()
+
+                # Compute xyz positions and velocities
+                self.position_xyz = (
+                    self.position_xyz + (self.time - self.time[0])[:,None] * (
+                        self.velocity_xyz + Coordinate.sun_velocity
+                    )
+                )
+                self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
+
+                # Compute rθz positions and velocities
+                position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz.T)
+                velocity_rθz = galactic_uvw_galactocentric_ρθz(
+                    *self.position_xyz.T, *self.velocity_xyz.T
+                )
+
+            # Orbital trajectories
             else:
-                self.get_orbit()
+
+                # Compute initial rθz position and velocity
+                position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz)
+                velocity_rθz = galactic_uvw_galactocentric_ρθz(
+                    *self.position_xyz, *self.velocity_xyz
+                )
+
+                # Convert to Galpy's natural units
+                time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
+                position_rθz /= np.array(
+                    [Coordinate.sun_position[0], 1., Coordinate.sun_position[0]]
+                )
+                velocity_rθz /= Coordinate.lsr_velocity[1]
+
+                # Integrate orbit
+                orbit = Orbit(
+                    [
+                        position_rθz[0], velocity_rθz[0], velocity_rθz[1],
+                        position_rθz[2], velocity_rθz[2], position_rθz[1]
+                    ]
+                )
+                orbit.turn_physical_off()
+                orbit.integrate(time, self.group.series.potential, method='odeint')
+
+                # Compute rθz positions and velocities, and convert to physical units
+                position_rθz = np.array(
+                    [orbit.R(time), orbit.phi(time), orbit.z(time)]
+                ).T * np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
+                velocity_rθz = np.array(
+                    [orbit.vR(time), orbit.vT(time), orbit.vz(time)]
+                ).T * Coordinate.lsr_velocity[1]
+
+                # Compute xyz positions and velocities
+                self.position_xyz = galactocentric_ρθz_galactic_xyz(*position_rθz.T)
+                self.velocity_xyz = galactocentric_ρθz_galactic_uvw(
+                    *position_rθz.T, *velocity_rθz.T
+                )
+
+            # Compute ξηζ positions and velocities
+            self.position_ξηζ = position_ρθz_ξηζ(*position_rθz.T, self.time)
+            self.velocity_ξηζ = velocity_ρθz_ξηζ(*velocity_rθz.T)
+
+            # Compute xyz and ξηζ distances and speeds
+            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
+            self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
+            self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
+            self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
             # Set xyz and ξηζ positions and velocities errors for the first group
             if self.group.number == 0:
@@ -1226,13 +1291,28 @@ class Group(list, Output_Group):
                 self.position_ξηζ_error = self.set_error(np.zeros(3))
                 self.velocity_ξηζ_error = self.set_error(np.zeros(3))
 
+        def get_relative_coordinates(self):
+            """
+            Computes relative position and velocity, the distance and the speed from the
+            average position and velocity, and their respective errors for all timesteps.
+            """
+
+            # Compute relative xyz and ξηζ positions and velocities
+            self.relative_position_xyz = self.position_xyz - self.group.position_xyz
+            self.relative_velocity_xyz = self.velocity_xyz - self.group.velocity_xyz
+            self.relative_position_ξηζ = self.position_ξηζ - self.group.position_ξηζ
+            self.relative_velocity_ξηζ = self.velocity_ξηζ - self.group.velocity_ξηζ
+
+            # Compute relative xyz and ξηζ distances and speeds
+            self.relative_distance_xyz = np.sum(self.relative_position_xyz**2, axis=1)**0.5
+            self.relative_speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=0)**0.5
+            self.relative_distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
+            self.relative_speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
+
         def set_error(self, error):
             """Creates a diagonal matrix of errors for every timestep."""
 
-            error_matrix = np.zeros((3, 3))
-            np.fill_diagonal(error_matrix, error)
-
-            return np.repeat(error_matrix[None], self.group.series.number_of_steps, axis=0)
+            return np.repeat(np.diag(error)[None], self.group.series.number_of_steps, axis=0)
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """Sets the star as an outlier."""
@@ -1240,116 +1320,6 @@ class Group(list, Output_Group):
             self.outlier = True
             self.position_outlier = position_outlier
             self.velocity_outlier = velocity_outlier
-
-        def get_linear(self):
-            """Computes a star's backward or forward linear trajectory in space."""
-
-            # xyz positions and velocities
-            self.position_xyz = (
-                self.position_xyz + (self.time - self.time[0])[:,None] * (
-                    self.velocity_xyz + Coordinate.sun_velocity
-                )
-            )
-            self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
-            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
-            self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
-
-            # rθz positions and velocities
-            position_rθz = np.array(
-                coords.XYZ_to_galcencyl(
-                    *self.position_xyz.T,
-                    Xsun=Coordinate.sun_position[0],
-                    Zsun=Coordinate.sun_position[2],
-                    _extra_rot=False
-                )
-            )
-            velocity_rθz = np.array(
-                coords.vxvyvz_to_galcencyl(
-                    *self.velocity_xyz.T,
-                    *np.array(
-                        coords.XYZ_to_galcenrect(
-                            *self.position_xyz.T,
-                            Xsun=Coordinate.sun_position[0],
-                            Zsun=Coordinate.sun_position[2],
-                            _extra_rot=False
-                        )
-                    ).T,
-                    vsun=Coordinate.sun_velocity,
-                    Xsun=Coordinate.sun_position[0],
-                    Zsun=Coordinate.sun_position[2],
-                    _extra_rot=False
-                )
-            )
-
-            # rθz positions and velocities
-            # position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz)
-            # velocity_rθz = galactic_uvw_galactocentric_ρθz(*self.position_xyz, *self.velocity_xyz)
-
-            # ξηζ positions and velocities
-            self.position_ξηζ = position_ρθz_ξηζ(*position_rθz.T, self.time)
-            self.velocity_ξηζ = velocity_ρθz_ξηζ(*velocity_rθz.T)
-            self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
-            self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
-
-        def get_orbit(self):
-            """Computes the star's galactic orbit using Galpy over time."""
-
-            # Initial rθz position and velocity
-            position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz)
-            velocity_rθz = galactic_uvw_galactocentric_ρθz(*self.position_xyz, *self.velocity_xyz)
-
-            # Conversion to Galpy's natural units
-            time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
-            position_rθz /= np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
-            velocity_rθz /= Coordinate.lsr_velocity[1]
-
-            # Orbit integration
-            orbit = Orbit(
-                [
-                    position_rθz[0], velocity_rθz[0], velocity_rθz[1],
-                    position_rθz[2], velocity_rθz[2], position_rθz[1]
-                ]
-            )
-            orbit.turn_physical_off()
-            orbit.integrate(time, self.group.series.potential, method='odeint')
-
-            # rθz positions and velocities, and conversion to physical units
-            position_rθz = np.array(
-                [orbit.R(time), orbit.phi(time), orbit.z(time)]
-            ).T * np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
-            velocity_rθz = np.array(
-                [orbit.vR(time), orbit.vT(time), orbit.vz(time)]
-            ).T * Coordinate.lsr_velocity[1]
-
-            # xyz positions and velocities
-            self.position_xyz = galactocentric_ρθz_galactic_xyz(*position_rθz.T)
-            self.velocity_xyz = galactocentric_ρθz_galactic_uvw(*position_rθz.T, *velocity_rθz.T)
-            self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
-            self.speed_xyz = np.sum(self.velocity_xyz**2, axis=1)**0.5
-
-            # ξηζ positions and velocities
-            self.position_ξηζ = position_ρθz_ξηζ(*position_rθz.T, self.time)
-            self.velocity_ξηζ = velocity_ρθz_ξηζ(*velocity_rθz.T)
-            self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
-            self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
-
-        def get_relative_coordinates(self):
-            """
-            Computes relative position and velocity, the distance and the speed from the
-            average position and velocity, and their respective errors for all timesteps.
-            """
-
-            # Relative xyz positions and velocities from the average group position
-            self.relative_position_xyz = self.position_xyz - self.group.position_xyz
-            self.relative_distance_xyz = np.sum(self.relative_position_xyz**2, axis=1)**0.5
-            self.relative_velocity_xyz = self.velocity_xyz - self.group.velocity_xyz
-            self.relative_speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=0)**0.5
-
-            # Relative ξηζ positions and velocities from the average group position
-            self.relative_position_ξηζ = self.position_ξηζ - self.group.position_ξηζ
-            self.relative_distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
-            self.relative_velocity_ξηζ = self.velocity_ξηζ - self.group.velocity_ξηζ
-            self.relative_speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
 
         def __repr__(self):
             """Returns a string of name of the star."""

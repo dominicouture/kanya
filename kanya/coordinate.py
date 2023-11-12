@@ -817,7 +817,7 @@ def galactic_xyz_galactocentric_ρθz(x, y, z):
     x, y, z = (np.dot(Coordinate.ggrm, np.array((-x, y, z))).T + Coordinate.sun_position).T
 
     # Cylindrical left-handed coordinates conversion
-    return xyz_to_ρθz(x, y, z)
+    return xyz_to_ρθz(x, y, z).T # (1001, 3)
 
 def galactocentric_ρθz_galactic_xyz(ρ, θ, z):
     """
@@ -826,11 +826,11 @@ def galactocentric_ρθz_galactic_xyz(ρ, θ, z):
     """
 
     # Cartesian right-handed coordinates conversion and origin translation
-    x, y, z = (ρθz_to_xyz(ρ, θ, z).T - Coordinate.sun_position).T
+    x, y, z = (ρθz_to_xyz(ρ, θ, z).T - Coordinate.sun_position).T # (3, 1001)
     # x, y, z = ρθz_to_xyz(ρ, θ, z)
 
     # Axes rotation
-    return np.dot(Coordinate.ggrm.T, np.array((x, y, z))).T * np.array((-1.0, 1.0, 1.0))
+    return np.dot(Coordinate.ggrm.T, np.array((x, y, z))).T * np.array((-1.0, 1.0, 1.0)) # (1001, 3)
     # return np.dot(Coordinate.ggrm.T, np.array((x, y, z))).T * np.array((-1.0, 1.0, 1.0)) + np.array([Coordinate.galactic_center_distance, 0.0, 0.0])
 
 def galactic_uvw_galactocentric_ρθz(x, y, z, u, v, w):
@@ -845,7 +845,7 @@ def galactic_uvw_galactocentric_ρθz(x, y, z, u, v, w):
     u, v, w = (np.dot(Coordinate.ggrm, np.array((-u, v, w))).T + Coordinate.sun_velocity).T
 
     # Cylindrical left-handed coordinates conversion
-    return uvw_to_μρμθw(x, y, z, u, v, w)
+    return uvw_to_μρμθw(x, y, z, u, v, w).T
 
 def galactocentric_ρθz_galactic_uvw(ρ, θ, z, μρ, μθ, w):
     """
