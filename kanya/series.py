@@ -207,6 +207,11 @@ class Series(list, Output_Series):
         self.timer = self.set_boolean(self.config.timer)
         self.timers = {} if self.timer else None
 
+        # Set default errors
+        self.default_errors = np.repeat(
+            np.diag(np.full(3, 1e-15))[None], self.number_of_steps, axis=0
+        )
+
         # Data configuration
         if self.from_data:
             self.configure_data()

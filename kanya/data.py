@@ -636,8 +636,8 @@ class Data(list):
             if label[-1] == 'μ':
                 label = 'Δμ' + label[1:-1] if label[0] == 'Δ' else 'μ' + label[:-1]
 
-            # Assumption that 'μα' stands for 'μαcosδ' when importing from observables
-            if data.data.system == 'observables' and label[-2:] == 'μα':
+            # Assumption that 'μα' stands for 'μαcosδ' when importing from spherical system
+            if data.data.system == 'spherical' and label[-2:] == 'μα':
                 label = label + 'cosδ'
 
             # If missing, error label addition

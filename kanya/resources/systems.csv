@@ -1,6 +1,5 @@
 name;position;velocity;axis;origin
+spherical;('π', 'δ', 'α');('rv', 'μδ', 'μαcosδ');equatorial;sun
 cartesian;('x', 'y', 'z');('u', 'v', 'w');equatorial;sun
-cylindrical;('r', 'θ', 'zh');('μρ', 'μθ', 'vzh');galactic;galaxy
-spherical;('ρ', 'δ', 'α');('rv', 'μδ', 'μα');equatorial;sun
-observables;('π', 'δ', 'α');('rv', 'μδ', 'μαcosδ');equatorial;sun
+cylindrical;('r', 'θ', 'h');('vr', 'vt', 'vh');galactic;galaxy
 curvilinear;('ξ', 'η', 'ζ');('vξ', 'vη', 'vζ');galactic_sun;sun

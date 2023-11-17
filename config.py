@@ -17,8 +17,12 @@ or 'values', 'unit' or 'units', and 'system':
          -  Angle: rad
          -  Angular speed: rad/Myr
 
-     -  'system': string matching the name of a coordinate system (e.g., 'cartesian', 'cylindrical',
-        'spherical' or 'observables').
+     -  'system': string matching the name of one of the following coordinate system:
+
+         - spherical: π, δ, α, rv, μδ, and μαcosδ
+         - cartesian: x, y, z, u, v, and w
+         - cylindrical: r, θ, h, vr, vt, and vh
+         - curvilinear: ξ', η', ζ', vξ', vη', and vζ'
 """
 
 # Name of series of groups (str or None)
@@ -67,11 +71,11 @@ mad_metrics.value = False
 mst_metrics.value = False
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 1
+number_of_groups.value = 5
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-number_of_steps.value = 1000
-# number_of_steps.value = 240
+# number_of_steps.value = 1000
+number_of_steps.value = 240
 # number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
@@ -99,11 +103,11 @@ number_of_stars.value = 25
 # position.values = (0.0, 0.0, 0.0)
 
 # Average position error of the simulated sample of stars (3 floats in tuple)
-# position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
+position_error.values = (0.0218, 0.0136, 0.0165) # Gaia DR3
 # position_error.values = (0.19846, 0.0, 0.0) # Gaia DR2
-position_error.values = (0.0, 0.0, 0.0)
-position_error.units = 'observables'
-position_error.system = 'observables'
+# position_error.values = (0.0, 0.0, 0.0)
+position_error.units = 'spherical'
+position_error.system = 'spherical'
 
 # Average position scatter of the simulated sample of stars (3 floats in tuple)
 position_scatter.values = (3.0, 3.0, 3.0) # Initial XYZ scatter
@@ -116,12 +120,12 @@ velocity.values = (-10.12, -15.67, -8.75) # Core sample
 velocity.units = 'km/s'
 
 # Average velocity error of the simulated sample of stars (3 floats in tuple)
-# velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
+velocity_error.values = (0.2634,  0.0196, 0.0231) # Gaia DR3
 # velocity_error.values = (1.0112, 0.30754, 0.26432) # Gaia DR2
-velocity_error.values = (0.0, 0.0, 0.0)
+# velocity_error.values = (0.0, 0.0, 0.0)
 velocity_error.units = ('km/s', 'mas/yr', 'mas/yr')
-# velocity_error.units = 'observables'
-velocity_error.system = 'observables'
+# velocity_error.units = 'spherical'
+velocity_error.system = 'spherical'
 
 # Average velocity scatter of the simulated sample of stars (3 floats in tuple)
 # velocity_scatter.values = (1.66, 0.52, 0.73) # Core sample
@@ -132,8 +136,8 @@ velocity_scatter.values = (1.0, 1.0, 1.0) # Core sample (modified)
 velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
-# data.value = 'β Pictoris Moving Group - Gaia EDR3.csv'
 data.value = 'β Pictoris Moving Group - Gaia DR3.csv'
+# data.value = 'β Pictoris Moving Group - Gaia EDR3.csv'
 # data.value = 'IC2602 Sample.csv'
 # data.value = 'Database_THA_Gaia_DR3.csv'
 # data.value = 'CAR_COL_sample.csv'
@@ -144,8 +148,8 @@ data.value = 'β Pictoris Moving Group - Gaia DR3.csv'
 # data.value = '../IC 2602/IC206_corrected_rv.csv'
 # data.value = '../COL/COL_corrected_rv_with_hr8799.csv'
 # data.value = '../PL8/PL8_corrected_rv.csv'
-data.units = 'observables'
-data.system = 'observables'
+data.units = 'spherical'
+data.system = 'spherical'
 # data.values =  {
 #     'beta_pictoris': [
 #         [    'p',        'δ',       'α',    'rv',     'μδ',     'μα'],

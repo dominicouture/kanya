@@ -64,98 +64,60 @@ class Group(list, Output_Group):
     def get_stars_from_data(self):
         """
         Creates a list of Star objects from a Python dictionary or CSV files containing the
-        parameters including the name of the stars, their xyz positions and uvw velocities,
-        and their respective measurement errors. Radial velocity shift is also added. If
-        only one group is created in the series, actual values are used. If multiple groups
-        are created, positions and velocities are scrambled based on measurement errors.
+        parameters including the name of the stars, their xyz positions and uvw velocities.
+        Radial velocity shift is applied. If only one group is created in the series, actual
+        values are used. If multiple groups are created, positions and velocities are scrambled
+        based on measurement errors.
         """
 
         # Create stars from data
         index = 0
         for star in self.series.data.sample:
 
-            # Position and velocity errors based on data
+            # Select position and velocity errors from data or model
             if self.series.data_errors:
                 position_errors = star.position.errors
                 velocity_errors = star.velocity.errors
-
-            # Position and velocity errors based on models
             else:
                 position_errors = self.series.position_error.values
                 velocity_errors = self.series.velocity_error.values
 
-            # Radial velocity shift based on data
+            # Scramble position and velocity, if needed
+            position_πδα = position_xyz = (
+                star.position.values if self.number == 0 else
+                np.random.normal(star.position.values, position_errors)
+            )
+            velocity_πδα = velocity_xyz = (
+                star.velocity.values if self.number == 0 else
+                np.random.normal(star.velocity.values, velocity_errors)
+            )
+
+            # Convert xyz cartesian galactic coordinates to πδα spherical equatorial coordinates
+            if self.series.data.data.system.name == 'cartesian':
+                position_πδα = position_xyz_to_πδα(*position_xyz)
+                velocity_πδα = velocity_xyz_to_πδα(*position_xyz, *velocity_xyz)
+
+            # Select radial velocity shift from data or model
             if self.series.data_rv_shifts:
                 rv_shift_value = star.rv_shift.value
                 rv_shift_error = star.rv_shift.error
-
-            # Radial velocity shift based on models
             else:
                 rv_shift_value = self.series.rv_shift.value
                 rv_shift_error = self.series.rv_shift.error
 
-            # From an observables coordinates system
-            if self.series.data.data.system.name == 'observables':
+            # Apply radial velocity shift correction
+            velocity_πδα -= np.array((rv_shift_value, 0.0, 0.0))
 
-                # Convert position and velocity into equatorial spherical coordinates
-                position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
-                    *(
-                        star.position.values if self.number == 0 else
-                        np.random.normal(star.position.values, position_errors)
-                    ), *(
-                        star.velocity.values if self.number == 0 else
-                        np.random.normal(star.velocity.values, velocity_errors)
-                    ), *position_errors, *velocity_errors
-                )
-
-                # Apply radial velocity shift correction and its error
-                velocity_rδα -= np.array([rv_shift_value, 0.0, 0.0])
-                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + rv_shift_error**2)**0.5
-
-                # Convert position and velocity into Galactic cartesian coordinates
-                position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
-                    *position_rδα, *position_rδα_error
-                )
-                velocity_xyz, velocity_xyz_error = equatorial_rvμδμα_galactic_uvw(
-                    *position_rδα, *velocity_rδα, *position_rδα_error, *velocity_rδα_error
-                )
-
-            # From a Galactic cartesian coordinates system
-            if self.series.data.data.system.name == 'cartesian':
-
-                # Convert position and velocity into equatorial spherical coordinates
-                position_rδα, position_rδα_error = galactic_xyz_equatorial_rδα(
-                    *(
-                        star.position.values if self.number == 0 else
-                        np.random.normal(star.position.values, position_errors)
-                    ), *star.position.errors
-                )
-                velocity_rδα, velocity_rδα_error = galactic_uvw_equatorial_rvμδμα(
-                    *(
-                        star.position.values if self.number == 0 else
-                        np.random.normal(star.position.values, position_errors)
-                    ), *(
-                        star.velocity.values if self.number == 0 else
-                        np.random.normal(star.velocity.values, velocity_errors)
-                    ), *position_errors, *velocity_errors)
-
-                # Apply radial velocity shift correction and its error
-                velocity_rδα -= np.array([rv_shift_value, 0.0, 0.0])
-                velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + rv_shift_error**2)**0.5
-
-                # Convert position and velocity back into Galactic cartesian coordinates
-                position_xyz, position_xyz_error = (star.position.values, position_errors)
-                velocity_xyz, velocity_xyz_error = equatorial_rvμδμα_galactic_uvw(
-                    *position_rδα, *velocity_rδα, *position_rδα_error, *velocity_rδα_error
-                )
+            # Convert πδα spherical equatorial coordinates to xyz cartesian galactic coordinates
+            position_xyz = position_πδα_to_xyz(*position_πδα)
+            velocity_xyz = velocity_πδα_to_xyz(*position_πδα, *velocity_πδα)
 
             # Create star
             index += 1
             self.append(
                 self.Star(
                     self, index=index, name=star.name, time=self.series.time,
-                    velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
-                    position_xyz=position_xyz, position_xyz_error=position_xyz_error
+                    position_xyz=position_xyz, velocity_xyz=velocity_xyz
                 )
             )
 
@@ -164,105 +126,75 @@ class Group(list, Output_Group):
 
     def get_stars_from_model(self):
         """
-        Creates an artificial model of star for a given number of stars and age based on the
+        Creates an artificial model of stars for a given number of stars and age based on the
         the initial average xyz position and uvw velocity, and their respective errors and
-        scatters. The sample is then moved forward in time for the given age and radial velocity
-        shift is also added.
+        scatters. The sample is then moved forward in time for the given age, and the radial
+        velocity shift is applied.
         """
 
-        # Model average star's backward orbit integration from the current-day epoch
-        # to the epoch of star formation
+        # Integrate average model star's backward orbit from the current-day epoch
         self.average_model_star = self.Star(
             self, name='average_model_star', time=self.series.model_time,
-            velocity_xyz=self.series.velocity.values, velocity_xyz_error=np.zeros(3),
-            position_xyz=self.series.position.values, position_xyz_error=np.zeros(3)
+            position_xyz=self.series.position.values, velocity_xyz=self.series.velocity.values
         )
-
-        # Average velocity at the epoch of star formation
-        velocity = self.average_model_star.velocity_xyz[-1]
-        velocity_error = self.series.velocity_error.values
-        velocity_scatter = self.series.velocity_scatter.values
-
-        # Average position at the epoch of star formation
-        position = self.average_model_star.position_xyz[-1]
-        position_error = self.series.position_error.values
-        position_scatter = self.series.position_scatter.values
 
         # Create stars from a model
         self.model_stars = []
         for star in range(self.series.number_of_stars):
+            index = star - (star // len(self.series.data.sample)) * len(self.series.data.sample)
 
-            # Model star's forward orbit integration from the epoch of star formation
-            # to the current-day epoch
-            model_star = self.Star(
-                self, name='model_star_{}'.format(star + 1), time=self.series.model_time[::-1],
-                velocity_xyz=np.random.normal(velocity, velocity_scatter),
-                velocity_xyz_error=np.zeros(3),
-                position_xyz=np.random.normal(position, position_scatter),
-                position_xyz_error=np.zeros(3)
+            # Integrate model star's forward orbit from the epoch of star formation
+            self.model_stars.append(
+                self.Star(
+                    self, name='model_star_{}'.format(star + 1), time=self.series.model_time[::-1],
+                    position_xyz=np.random.normal(
+                        self.average_model_star.position_xyz[-1],
+                        self.series.position_scatter.values
+                    ), velocity_xyz=np.random.normal(
+                        self.average_model_star.velocity_xyz[-1],
+                        self.series.velocity_scatter.values
+                    )
+                )
             )
-            self.model_stars.append(model_star)
 
-            # Convert position and velocity into equatorial spherical coordinates
-            position_rδα = galactic_xyz_equatorial_rδα(*model_star.position_xyz[-1])[0]
-            velocity_rδα = galactic_uvw_equatorial_rvμδμα(
-                *model_star.position_xyz[-1], *model_star.velocity_xyz[-1]
-            )[0]
+            # Convert xyz cartesian galactic coordinates to πδα spherical equatorial coordinates
+            position_πδα = position_xyz_to_πδα(*self.model_stars[star].position_xyz[-1])
+            velocity_πδα = velocity_xyz_to_πδα(
+                *self.model_stars[star].position_xyz[-1], *self.model_stars[star].velocity_xyz[-1]
+            )
 
-            # Convert position and velocity into observables
-            position_obs, velocity_obs = position_rδα_obs(*position_rδα, *velocity_rδα)[:2]
-
-            # Scramble position and velocity based on data
+            # Select position and velocity errors from data or model
             if self.series.data_errors:
-                errors = star - (
-                    star // len(self.series.data.sample)
-                ) * len(self.series.data.sample)
-                position_obs_error = self.series.data.sample[errors].position.errors
-                velocity_obs_error = self.series.data.sample[errors].velocity.errors
-
-            # Scramble position and velocity based on models
+                position_πδα_error = self.series.data.sample[index].position.errors
+                velocity_πδα_error = self.series.data.sample[index].velocity.errors
             else:
-                position_obs_error = position_error
-                velocity_obs_error = velocity_error
+                position_πδα_error = self.series.position_error.values
+                velocity_πδα_error = self.series.velocity_error.values
 
-            # Convert position and velocity back into equatorial spherical coordinates
-            position_rδα, velocity_rδα, position_rδα_error, velocity_rδα_error = position_obs_rδα(
-                *np.random.normal(position_obs, position_error),
-                *np.random.normal(velocity_obs, velocity_error),
-                *position_obs_error, *velocity_obs_error
-            )
+            # Scramble position and velocity
+            position_πδα = np.random.normal(position_πδα, position_πδα_error)
+            velocity_πδα = np.random.normal(velocity_πδα, velocity_πδα_error)
 
-            # Radial velocity shift based on data
+            # Select radial velocity shift from data or model
             if self.series.data_rv_shifts:
-                rv_shift = star - (
-                    star // len(self.series.data.sample)
-                ) * len(self.series.data.sample)
-                rv_shift_value = self.series.data.sample[rv_shift].rv_shift.value
-                rv_shift_error = self.series.data.sample[rv_shift].rv_shift.error
-
-            # Radial velocity shift based on models
+                rv_shift_value = self.series.data.sample[index].rv_shift.value
+                rv_shift_error = self.series.data.sample[index].rv_shift.error
             else:
                 rv_shift_value = self.series.rv_shift.value
                 rv_shift_error = self.series.rv_shift.error
 
-            # Apply radial velocity shift bias and its error
-            velocity_rδα += np.array([rv_shift_value, 0.0, 0.0])
-            velocity_rδα_error[0] = (velocity_rδα_error[0]**2 + rv_shift_error**2)**0.5
+            # Apply radial velocity shift bias
+            velocity_πδα += np.array((rv_shift_value, 0.0, 0.0))
 
-            # Convert position and velocity back into Galactic cartesian coordinates
-            position_xyz, position_xyz_error = equatorial_rδα_galactic_xyz(
-                *position_rδα, *position_rδα_error
-            )
-            velocity_xyz, velocity_xyz_error = equatorial_rvμδμα_galactic_uvw(
-                *position_rδα, *velocity_rδα, *position_rδα_error, *velocity_rδα_error
-            )
+            # Convert πδα spherical equatorial coordinates to xyz cartesian galactic coordinates
+            position_xyz = position_πδα_to_xyz(*position_πδα)
+            velocity_xyz = velocity_πδα_to_xyz(*position_πδα, *velocity_πδα)
 
             # Create star
             self.append(
                 self.Star(
                     self, index=star + 1, name=f'star_{star + 1}', time=self.series.time,
-                    velocity_xyz=velocity_xyz, velocity_xyz_error=velocity_xyz_error,
-                    position_xyz=position_xyz, position_xyz_error=position_xyz_error
+                    position_xyz=position_xyz, velocity_xyz=velocity_xyz
                 )
             )
 
@@ -1222,61 +1154,52 @@ class Group(list, Output_Group):
 
                 # Compute xyz positions and velocities
                 self.position_xyz = (
-                    self.position_xyz + (self.time - self.time[0])[:,None] * (
-                        self.velocity_xyz + Coordinate.sun_velocity
-                    )
+                    self.position_xyz + (self.velocity_xyz + Coordinate.sun_velocity) *
+                    (self.time - self.time[0])[:,None]
                 )
                 self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
 
-                # Compute rθz positions and velocities
-                position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz.T)
-                velocity_rθz = galactic_uvw_galactocentric_ρθz(
-                    *self.position_xyz.T, *self.velocity_xyz.T
-                )
+                # Compute rθh positions and velocities
+                position_rθh = position_xyz_to_rθh(*self.position_xyz.T)
+                velocity_rθh = velocity_xyz_to_rθh(*self.position_xyz.T, *self.velocity_xyz.T)
 
             # Orbital trajectories
             else:
 
-                # Compute initial rθz position and velocity
-                position_rθz = galactic_xyz_galactocentric_ρθz(*self.position_xyz)
-                velocity_rθz = galactic_uvw_galactocentric_ρθz(
-                    *self.position_xyz, *self.velocity_xyz
-                )
+                # Compute initial rθh position and velocity
+                position_rθh = position_xyz_to_rθh(*self.position_xyz)
+                velocity_rθh = velocity_xyz_to_rθh(*self.position_xyz, *self.velocity_xyz)
 
-                # Convert to Galpy's natural units
+                # Convert initial rθh position and velocity to Galpy's natural units
                 time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
-                position_rθz /= np.array(
-                    [Coordinate.sun_position[0], 1., Coordinate.sun_position[0]]
-                )
-                velocity_rθz /= Coordinate.lsr_velocity[1]
+                position_rθh[[0, 2]] = position_rθh[[0, 2]] / Coordinate.sun_position[0]
+                velocity_rθh /= Coordinate.lsr_velocity[1]
 
                 # Integrate orbit
                 orbit = Orbit(
-                    [
-                        position_rθz[0], velocity_rθz[0], velocity_rθz[1],
-                        position_rθz[2], velocity_rθz[2], position_rθz[1]
-                    ]
+                    (
+                        position_rθh[0], velocity_rθh[0], velocity_rθh[1],
+                        position_rθh[2], velocity_rθh[2], position_rθh[1]
+                    )
                 )
                 orbit.turn_physical_off()
                 orbit.integrate(time, self.group.series.potential, method='odeint')
 
-                # Compute rθz positions and velocities, and convert to physical units
-                position_rθz = np.array(
-                    [orbit.R(time), orbit.phi(time), orbit.z(time)]
-                ).T * np.array([Coordinate.sun_position[0], 1., Coordinate.sun_position[0]])
-                velocity_rθz = np.array(
-                    [orbit.vR(time), orbit.vT(time), orbit.vz(time)]
-                ).T * Coordinate.lsr_velocity[1]
+                # Compute rθh positions and velocities
+                position_rθh = np.array((orbit.R(time), orbit.phi(time), orbit.z(time))).T
+                velocity_rθh = np.array((orbit.vR(time), orbit.vT(time), orbit.vz(time))).T
+
+                # Convert rθh positions and velocities to physical units
+                position_rθh[:,[0, 2]] = position_rθh[:,[0, 2]] * Coordinate.sun_position[0]
+                velocity_rθh *= Coordinate.lsr_velocity[1]
 
                 # Compute xyz positions and velocities
-                self.position_xyz = galactocentric_ρθz_galactic_xyz(*position_rθz.T)
-                self.velocity_xyz = galactocentric_ρθz_galactic_uvw(
-                    *position_rθz.T, *velocity_rθz.T
-                )
+                self.position_xyz = position_rθh_to_xyz(*position_rθh.T)
+                self.velocity_xyz = velocity_rθh_to_xyz(*position_rθh.T, *velocity_rθh.T)
 
             # Compute ξηζ positions and velocities
-            self.position_ξηζ = position_ρθz_ξηζ(*position_rθz.T, self.time)
-            self.velocity_ξηζ = velocity_ρθz_ξηζ(*velocity_rθz.T)
+            self.position_ξηζ = position_rθh_to_ξηζ(*position_rθh.T, self.time)
+            self.velocity_ξηζ = velocity_rθh_to_ξηζ(*velocity_rθh.T)
 
             # Compute xyz and ξηζ distances and speeds
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
@@ -1284,12 +1207,11 @@ class Group(list, Output_Group):
             self.distance_ξηζ = np.sum(self.position_ξηζ**2, axis=1)**0.5
             self.speed_ξηζ = np.sum(self.velocity_ξηζ**2, axis=1)**0.5
 
-            # Set xyz and ξηζ positions and velocities errors for the first group
-            if self.group.number == 0:
-                self.position_xyz_error = self.set_error(self.position_xyz_error)
-                self.velocity_xyz_error = self.set_error(self.velocity_xyz_error)
-                self.position_ξηζ_error = self.set_error(np.zeros(3))
-                self.velocity_ξηζ_error = self.set_error(np.zeros(3))
+            # Set default xyz and ξηζ positions and velocities errors
+            self.position_xyz_error = self.group.series.default_errors
+            self.velocity_xyz_error = self.group.series.default_errors
+            self.position_ξηζ_error = self.group.series.default_errors
+            self.velocity_ξηζ_error = self.group.series.default_errors
 
         def get_relative_coordinates(self):
             """
@@ -1308,11 +1230,6 @@ class Group(list, Output_Group):
             self.relative_speed_xyz = np.sum(self.relative_velocity_xyz**2, axis=0)**0.5
             self.relative_distance_ξηζ = np.sum(self.relative_position_ξηζ**2, axis=1)**0.5
             self.relative_speed_ξηζ = np.sum(self.relative_velocity_ξηζ**2, axis=1)**0.5
-
-        def set_error(self, error):
-            """Creates a diagonal matrix of errors for every timestep."""
-
-            return np.repeat(np.diag(error)[None], self.group.series.number_of_steps, axis=0)
 
         def set_outlier(self, position_outlier, velocity_outlier):
             """Sets the star as an outlier."""

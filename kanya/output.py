@@ -239,7 +239,7 @@ class Output_Series():
                 if h_align == 'center':
                     left = (width - ax_width * ncol - colpad * (ncol - 1)) / 2
                 if h_align == 'justify':
-                    colpad = (width - left - ax_width * x_um - right) / (ncol - 1)
+                    colpad = (width - left - ax_width * ncol - right) / (ncol - 1)
 
             # Adjust axis height
             if adjust == 'ax_height' and ax_height / ax_width > ratio:
@@ -251,7 +251,7 @@ class Output_Series():
                 if v_align == 'center':
                     bottom = (height - ax_height * nrow - rowpad * (nrow - 1)) / 2
                 if v_align == 'justify':
-                    rowpad = (height - bottom - ax_height * y_um - top) / (nrow - 1)
+                    rowpad = (height - bottom - ax_height * nrow - top) / (nrow - 1)
 
             # Compute relative parameters
             left /= width
@@ -561,6 +561,7 @@ class Output_Series():
 
                 # Set 3d axes
                 if '3d' in options:
+                    axes_params[0,2,0] -= colpad / width
                     axes[0,2] = get_axes(fig, axes_params[0,2], projection='3d', zorder=0.4)
                     set_axis(axes[0,2], '3d')
 
@@ -1291,6 +1292,7 @@ class Output_Series():
 
                 # Compute mode estimate
                 if mode == 'estimate':
+                    α, ξ, ω = skew, loc, scale
                     δ = α / np.sqrt(1 + α**2)
                     γ_1 = (4 - np.pi) / 2 * (δ * np.sqrt(2/np.pi)**3) / (1 - 2 * δ**2 / np.pi)**1.5
                     m_0 = (
@@ -1848,15 +1850,15 @@ class Output_Group():
                     ax.scatter(
                         np.array([value[birth_index,x]]),
                         np.array([value[birth_index,y]]),
-                        color=color + (0.4,), edgecolors=color + (1.0,),
+                        color=color + (0.4,), edgecolors=color,
                         alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
 
                 # Show stars' names
                 if labels:
                     ax.text(
-                        np.array(value.T[0,x]), np.array(value.T[0,y]),
-                        star.name, horizontalalignment='left', fontsize=6
+                        np.array(value.T[0,x]), np.array(value.T[0,y]), star.name,
+                        color=colors.black, horizontalalignment='left', fontsize=6
                     )
 
         # Select coordinates
@@ -2378,8 +2380,11 @@ class Output_Group():
             if errors:
                 if projection == '2d':
 
-                    # Rotated error bars for 2d correlation scatters
-                    if value_coords[0] == value_coords[1]:
+                    # Rotated error bars for 2d correlation scatters, only if errors make sense
+                    if (
+                        self.series.from_data and self.number == 0
+                        and value_coords[0] == value_coords[1]
+                    ):
                         all_values = np.array(
                             [
                                 [
@@ -2910,7 +2915,10 @@ class Output_Group():
             fig, tight=False, forced=forced, default=default, cancel=cancel
         )
 
-    def draw_map(self, labels=False, title=False, forced=None, default=None, cancel=None):
+    def draw_map(
+        self, age=None, metric=None, index=None, labels=False,
+        title=False, forced=None, default=None, cancel=None
+    ):
         """
         Creates a Mollweide projection of a traceback. For this function to work, uvw velocities
         must not compensated for the sun velocity when computing xyz positions. Otherwise, the
@@ -2927,37 +2935,21 @@ class Output_Group():
         # Check the type of labels
         self.series.check_type(labels, 'labels', 'boolean')
 
-        # Recreate stars, if the sun velocity wasn't adjusted
-        if (Coordinate.sun_velocity != np.zeros(3)).all():
-            sun_velocity = Coordinate.sun_velocity
-            Coordinate.sun_velocity = np.zeros(3)
-            stars = []
-            index = 0
-            for star in self:
-                stars.append(
-                    self.Star(
-                        self, index=index, name=star.name, time=self.series.time,
-                        velocity_xyz=star.velocity_xyz[0],
-                        velocity_xyz_error=np.diag(star.velocity_xyz_error[0]),
-                        position_xyz=star.position_xyz[0],
-                        position_xyz_error=np.diag(star.position_xyz_error[0])
-                    )
-                )
-                index += 1
-            Coordinate.sun_velocity = sun_velocity
-        else:
-            stars = self
+        # Birth index, age and age error
+        if age is not None or metric is not None:
+            birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
+
+        # Compute Sun's orbit
+        sun = self.Star(
+            self, name='sun', time=self.series.time,
+            position_xyz=np.zeros(3), velocity_xyz=np.zeros(3),
+        )
 
         # Compute coordinates
-        for star in stars:
-            positions_rδα = np.array(
-                [
-                    galactic_xyz_equatorial_rδα(*star.position_xyz[step])[0]
-                    for step in range(self.series.number_of_steps)
-                ]
-            )
-            alphas = positions_rδα[:,2] - 2 * np.pi * (positions_rδα[:,2] > np.pi)
-            deltas = positions_rδα[:,1]
+        for star in self:
+            positions_πδα = position_xyz_to_πδα(*(star.position_xyz - sun.position_xyz).T)
+            alphas = positions_πδα[:,2] - 2 * np.pi * (positions_πδα[:,2] > np.pi)
+            deltas = positions_πδα[:,1]
 
             # Identify discontinuties
             discontinuties = (
@@ -2973,27 +2965,32 @@ class Output_Group():
             segments.append(np.arange(lower_limit, alphas.shape[0]))
 
             # Plot individual segments
+            color = colors.red[6] if star.outlier else colors.black
             for i in segments:
                 axes[0,0].plot(
-                    alphas[i], deltas[i],
-                    color = colors.red[6] if star.outlier else colors.blue[6], alpha=0.6,
+                    alphas[i], deltas[i], color = color, alpha=0.6,
                     linewidth=0.5, solid_capstyle='round', zorder=0.6
                 )
 
-            # Select color
-            color = colors.red[6] if star.outlier else colors.black
-
             # Plot current-day position
             axes[0,0].scatter(
-                alphas[0], deltas[0], color=color + (0.4,), edgecolors=color,
+                alphas[0], deltas[0], color=colors.black + (0.4,), edgecolors=colors.black,
                 alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.7
             )
+
+            # Plot birth position
+            if age is not None or metric is not None:
+                color = colors.red[6] if star.outlier else colors.blue[6]
+                axes[0,0].scatter(
+                    alphas[birth_index], deltas[birth_index], color=color + (0.4,),
+                    edgecolors=color, alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.7
+                )
 
             # Show labels
             if labels:
                 axes[0,0].text(
-                    alphas[0] + 0.2, deltas[0] + 0.3, star.name, color=color,
-                    horizontalalignment='left', verticalalignment='top', fontsize=4, zorder=0.9
+                    alphas[0] + 0.2, deltas[0] + 0.3, star.name, color=colors.black,
+                    horizontalalignment='left', verticalalignment='top', fontsize=6, zorder=0.9
                 )
 
         # Plot proper motion arrows
