@@ -39,27 +39,28 @@ name.value = 'beta_pictoris'
 
 # Path to the directory used for loading data relative to the current directory (str or None).
 # By default, if this is None of absent, data is loaded from the current directory. Directory
-# names end with '/'.
+# paths end with '/'.
 data_dir.value = '../Data/'
 
 # Path to the directory used for saving figures, tables and other output types relative to the
 # current directory (str or None). By default, if this is None of absent, outputs are saved to
-# the current directory. Directory names end with '/'.
+# the current directory. Directory paths end with '/'.
 output_dir.value = '../Output/'
 
 # Path to the directory of path used for logging relative to the current directory (str or None).
 # By default, if this is None of absent, logs are saved to a 'Logs' directory in the current
-# directory. Directory names end with '/'.
+# directory. Directory paths end with '/'.
 logs_path.value = '../Logs/'
 
 # Path to the file or directory used for pickle input relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are loaded from a file named
-# 'name.value'.series in the current directory. Directory names end with '/'.
+# 'name.value'.series in the current directory. Directory paths end with '/'.
 load_path.value = 'beta_pictoris.series'
+# load_path.value = 'tucana.series'
 
 # Path to the file or directory used for pickle output relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are saved to a file named
-# 'name.value'.series in the current directory. Directory names end with '/'.
+# 'name.value'.series in the current directory. Directory paths end with '/'.
 save_path.value = None
 
 # Association size metrics (boolean) to be computed
@@ -67,19 +68,20 @@ size_metrics.value = True
 cov_metrics.value = True
 cov_robust_metrics.value = False
 cov_sklearn_metrics.value = False
-mad_metrics.value = False
-mst_metrics.value = False
+mad_metrics.value = True
+tree_metrics.value = True
 
 # Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 5
+number_of_groups.value = 10
 
 # Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
 # number_of_steps.value = 1000
+# number_of_steps.value = 300
 number_of_steps.value = 240
 # number_of_steps.value = 172
 
 # Number of jackknife Monte Carlo iterations (integer, ≥ 1)
-number_of_iterations.value = 200
+number_of_iterations.value = 100
 
 # Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
 iteration_fraction.value = 0.5
@@ -141,7 +143,9 @@ data.value = 'β Pictoris Moving Group - Gaia DR3.csv'
 # data.value = 'IC2602 Sample.csv'
 # data.value = 'Database_THA_Gaia_DR3.csv'
 # data.value = 'CAR_COL_sample.csv'
-# data.value = '../THA/THA_corrected_rv.csv'
+# data.value = '../Results/Tucana-Horologium/THA_corrected_rv.csv'
+# data.value = '../Results/Tucana-Horologium/THA_not_corrected_new_cuts.csv'
+# data.value = '../Results/Tucana-Horologium/tha_corrected_with_cuts.csv'
 # data.value = '../COL/COL_sample.csv'
 # data.value = '../CAR/CAR_corrected_rv.csv'
 # data.value = '../COL/COL_corrected_rv.csv'
@@ -152,7 +156,7 @@ data.units = 'spherical'
 data.system = 'spherical'
 # data.values =  {
 #     'beta_pictoris': [
-#         [    'p',        'δ',       'α',    'rv',     'μδ',     'μα'],
+#         [    'π',        'δ',       'α',    'rv',     'μδ',     'μα'],
 #         [  'mas',      'deg',     'deg',  'km/s', 'mas/yr', 'mas/yr'],
 #         [25.0250, -23.107737, 1.7091324, 6.50000, -47.1210,  96.7760],
 #         [27.1700, -66.753496, 4.3491739, 8.75000, -16.8740,  103.039],
@@ -277,4 +281,4 @@ potential.value = 'Irrgang13I'
 pca.value = False
 
 # Whether to show the timer
-timer.value = False
+timer.value = True

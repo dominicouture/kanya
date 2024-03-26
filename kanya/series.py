@@ -657,9 +657,12 @@ class Series(list, Output_Series):
                     if self.series.number_of_groups > 1
                     else vars(self.series[0])[self.label].ages[None]
                 )
-                self.ages += self.age - np.mean(self.ages, axis=1)[:,None,:]
+                self.ages += self.age - np.mean(self.ages, axis=(0, 1))[None,None,:]
                 self.age_error = np.std(self.ages, axis=(0, 1))
                 self.age_error_quad = (self.age_int_error**2 + self.age_ext_error**2)**0.5
+                # self.ages = self.series.time[np.argmin(self.values, axis=2)]
+                # self.ages += self.age - np.mean(self.ages, axis=(0, 1))[None,None,:]
+                # self.age_error = np.std(self.ages, axis=(0, 1))
 
                 # Minimum and errors
                 self.min = vars(self.series[0])[self.label].min
@@ -1249,7 +1252,7 @@ class Series(list, Output_Series):
 
     def chronologize(
         self, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
-        cov_sklearn_metrics=None, mad_metrics=None, mst_metrics=None, logging=True
+        cov_sklearn_metrics=None, mad_metrics=None, tree_metrics=None, logging=True
     ):
         """
         Computes the kinematic age of the series by finding the epoch of minimal association size
@@ -1260,7 +1263,7 @@ class Series(list, Output_Series):
         if len(self) > 0:
             for parameter in (
                 'size_metrics', 'cov_metrics', 'cov_robust_metrics',
-                'cov_sklearn_metrics', 'mad_metrics', 'mst_metrics'
+                'cov_sklearn_metrics', 'mad_metrics', 'tree_metrics'
             ):
                 if locals()[parameter] is None:
                     vars(self)[parameter] = self.set_boolean(vars(self.config)[parameter])
@@ -1302,7 +1305,7 @@ class Series(list, Output_Series):
                             9 if self.cov_robust_metrics else 0,
                             (self.number_of_steps // 5 + 1) * 2 if self.cov_sklearn_metrics else 0,
                             self.mad_metrics,
-                            (self.number_of_steps // 6 + 1) * 2 if self.mst_metrics else 0
+                            (self.number_of_steps // 6 + 1) * 2 if self.tree_metrics else 0
                         ]
                     ), unit=' size metric', bar_format=(
                         '{desc}{percentage:3.0f}% |{bar}| '
@@ -1422,7 +1425,7 @@ class Series(list, Output_Series):
 
     def create(
         self, load_path=None, save_path=None, mode=None, size_metrics=None, cov_metrics=None,
-        cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None, mst_metrics=None,
+        cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None, tree_metrics=None,
         forced=None, default=None, cancel=None, logging=True
     ):
         """
@@ -1444,7 +1447,7 @@ class Series(list, Output_Series):
             self.chronologize(
                 size_metrics=size_metrics, cov_metrics=cov_metrics,
                 cov_robust_metrics=cov_robust_metrics, cov_sklearn_metrics=cov_sklearn_metrics,
-                mad_metrics=mad_metrics, mst_metrics=mst_metrics, logging=logging
+                mad_metrics=mad_metrics, tree_metrics=tree_metrics, logging=logging
             )
 
             # Show timer
@@ -1493,10 +1496,10 @@ class Series(list, Output_Series):
                         'Median absolute deviation',
                         self.timers['mad_metrics']
                     )
-                if self.mst_metrics:
+                if self.tree_metrics:
                     create_time_str(
-                        'Minimum spanning tree',
-                        self.timers['mst_metrics']
+                        'Tree branches',
+                        self.timers['tree_metrics']
                     )
 
     def check_traceback(self):

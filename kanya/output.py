@@ -505,7 +505,7 @@ class Output_Series():
                 9.1340 if height is None else height,
                 left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
                 adjust='ax_width' if adjust is None else adjust,
-                h_align='center' if adjust is None else h_align
+                h_align='right' if adjust is None else h_align
             )
 
             # Create figure and axes
@@ -888,21 +888,22 @@ class Output_Series():
         metric = vars(self)[metric]
 
         # If the metric has a size of 1, index is ignored
-        if metric.value.shape[-1] == 1:
-            index = 0
+        if metric.status:
+            if metric.value.shape[-1] == 1:
+                index = 0
 
-        # Metric index
-        else:
-            self.check_type(index, 'index', ('integer', 'None'))
-            self.stop(
-                metric.value.shape[-1] > 1 and index is None, 'ValueError',
-                "No 'index' is provided (metric is {} in size).", metric.value.shape[-1]
-            )
-            self.stop(
-                index > metric.value.shape[-1] - 1 and metric.value.shape[-1] > 1, 'ValueError',
-                "'index' is too large for this metric ({} given, {} in size).",
-                index, metric.value.shape[-1]
-            )
+            # Metric index
+            else:
+                self.check_type(index, 'index', ('integer', 'None'))
+                self.stop(
+                    metric.value.shape[-1] > 1 and index is None, 'ValueError',
+                    "No 'index' is provided (metric is {} in size).", metric.value.shape[-1]
+                )
+                self.stop(
+                    index > metric.value.shape[-1] - 1 and metric.value.shape[-1] > 1, 'ValueError',
+                    "'index' is too large for this metric ({} given, {} in size).",
+                    index, metric.value.shape[-1]
+                )
 
         return metric, index
 
@@ -1071,35 +1072,43 @@ class Output_Series():
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
-    def plot_mst(self, ax, system):
+    def plot_tree(self, ax, system):
         """
-        Plots the mean branch length (both empirical and robust) and median absolute deviation
-        of the minimum spanning tree (MST).
+        Plots the mean, robust mean, and median absolute deviation full and minimum spanning tree
+        (MST) branch lengths.
         """
 
         # Select association size metrics
         mst = self.select_metric('mst', system)[0]
+        branches = self.select_metric('branches', system)[0]
 
-        # Plot the mean and median absolute deviation of the minimum spanning tree
+        # Plot the mean, robust mean, and median absolute deviation full tree branch lengths
+        self.plot_metric(ax, vars(self)[f'{branches}_mean'], 0, colors.metric[0], '-', 0.9)
+        self.plot_metric(ax, vars(self)[f'{branches}_mean_robust'], 0, colors.metric[1], '--', 0.7)
+        self.plot_metric(ax, vars(self)[f'{branches}_mad'], 0, colors.metric[2], ':', 0.5)
+
+        # Plot the mean, robust mean, and median absolute deviation minimum spanning tree
+        # branch lengths
         self.plot_metric(ax, vars(self)[f'{mst}_mean'], 0, colors.metric[5], '-', 0.9)
         self.plot_metric(ax, vars(self)[f'{mst}_mean_robust'], 0, colors.metric[6], '--', 0.7)
         self.plot_metric(ax, vars(self)[f'{mst}_mad'], 0, colors.metric[7], ':', 0.5)
 
-    def draw_mst(self, system, title=False, forced=None, default=None, cancel=None):
+    def draw_tree(self, system, title=False, forced=None, default=None, cancel=None):
         """
-        Creates a plot of the mean branch length (both empirical and robust) and median absolute
-        deviation of the minimum spanning tree (MST).
+        Creates a plot the mean, robust mean, and median absolute deviation full and minimum
+        spanning tree (MST) branch lengths.
         """
 
         # Initialize figure
         fig, axes = self.set_figure('1x1', left=0.3430)
 
-        # Plot the mean and median absolute deviation of the minimum spanning tree
-        self.plot_mst(axes[0,0], system)
+        # Plot the mean, robust mean, and median absolute deviation full and minimum spanning
+        # tree branch lengths
+        self.plot_tree(axes[0,0], system)
 
         # Set title
         self.set_title(
-            title, fig, self.get_title_metric, '{system} minimum spanning tree', system
+            title, fig, self.get_title_metric, '{system} full and minimum spanning tree', system
         )
 
         # Save figure
@@ -1155,6 +1164,7 @@ class Output_Series():
 
         # Plot covariance matrix determinant and trace, and covariances
         selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
+        axes[0,0].set_yticks([0, 3, 6, 9, 12, 15, 18, 21])
 
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
         self.plot_mad(axes[1 if style == '2x1' else 0, 1 if style == '1x2' else 0], system)
@@ -1172,7 +1182,7 @@ class Output_Series():
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
-    def draw_covariances_cross_mad_mst(
+    def draw_covariances_cross_mad_tree(
         self, system, robust=False, sklearn=False,
         title=False, forced=None, default=None, cancel=None
     ):
@@ -1180,10 +1190,10 @@ class Output_Series():
         Creates plots of the determinant, the trace and the diagonal terms of the covariances
         matrix, the determinant, the trace and the diagonal terms of the cross covariances matrix
         between positions and velocities, the total median absolute deviation (MAD), the components
-        of the MAD, and the mean branch length (both empirical and robust) and median absolute
-        deviation of the minimum spanning tree (MST).  If either 'robust' or 'sklearn' is True, the
-        robust or sklearn covariances and cross covariance matrices are used. Otherwise, the
-        empirical covariances and cross covariance matrices are used.
+        of the MAD, and the mean, robust mean, and median absolute deviation full and minimum
+        spanning tree (MST) branch lengths.  If either 'robust' or 'sklearn' is True, the robust
+        or sklearn covariances and cross covariance matrices are used. Otherwise, the empirical
+        covariances and cross covariance matrices are used.
         """
 
         # Initialize figure
@@ -1198,14 +1208,15 @@ class Output_Series():
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
         self.plot_mad(axes[1,0], system)
 
-        # Plot the mean and median absolute deviation of the minimum spanning tree
-        self.plot_mst(axes[1,1], system)
+        # Plot the mean, robust mean, and median absolute deviation full and minimum spanning
+        # tree branch lengths
+        self.plot_tree(axes[1,1], system)
 
         # Set title
         self.set_title(
             title, fig, self.get_title_metric,
             '{system}'f"{selection.replace('_', ' ')} covariances, cross covariances, median "
-            "absolution deviation, and minimum spanning tree", system
+            "absolution deviation, and full and minimum spanning trees", system
         )
 
         # Save figure
@@ -1946,17 +1957,25 @@ class Output_Group():
                 axes[0,0].add_artist(
                     plt.Circle(
                         (0, 8.122), radius, color=colors.grey[17],
-                        fill=False, linewidth=0.5, linestyle=':', zorder=0.1
+                        fill=False, linewidth=0.5, linestyle=':', zorder=0.05
                     )
                 )
 
             # Set limits
-            axes[0,0].set_xlim(-9, 1)
-            axes[0,0].set_ylim(-1, 9)
-            axes[0,1].set_xlim(-80, 80)
-            axes[0,1].set_ylim(-1, 9)
-            axes[1,0].set_xlim(-9, 1)
-            axes[1,0].set_ylim(-80, 80)
+            # axes[0,0].set_xlim(-9, 1)
+            # axes[0,0].set_ylim(-1, 9)
+            # axes[0,1].set_xlim(-80, 80)
+            # axes[0,1].set_ylim(-1, 9)
+            # axes[1,0].set_xlim(-9, 1)
+            # axes[1,0].set_ylim(-80, 80)
+
+            # axes[0,0].set_xlim(-9, 1)
+            # axes[0,0].set_ylim(-1, 9)
+            # axes[0,1].set_xlim(-150, 130)
+            # axes[0,1].set_ylim(-1, 9)
+            # axes[1,0].set_xlim(-9, 1)
+            # axes[1,0].set_ylim(-150, 130)
+            axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-1)
 
         # Invert y axis
         if system == 'xyz':
@@ -1964,7 +1983,9 @@ class Output_Group():
             axes[1,0].invert_xaxis()
 
         # Set limits
-        # if coord == 'position' and system == 'ξηζ':
+        if coord == 'position' and system == 'ξηζ':
+            axes[0,0].set_ylabel(axes[0,0].get_ylabel(), labelpad=-1)
+            # axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-0.1)
         #     axes[0,0].set_xlim(-225, 60)
         #     axes[0,0].set_ylim(-45, 110)
         #     axes[0,1].set_xlim(-40, 49)
@@ -2198,8 +2219,8 @@ class Output_Group():
 
         # Initialize figure
         fig, axes = self.series.set_figure(
-            style, 'hide_x', 'label_right',
-            h_align='right' if style == '3x1' else None,
+            style, 'hide_x', 'label_right', adjust='height', left=0.428,
+            h_align='right' if style == '3x1' else None,# ratio=0.8,
             styles=('1x3', '2x2', '3x1')
         )
 
@@ -2457,7 +2478,7 @@ class Output_Group():
         if mst and len(set(coords)) == 1:
             mst = f'mst_{coords[0]}_{system}'
             if mst not in vars(self).keys():
-                self.get_minimum_spanning_tree()
+                self.get_tree_branches()
             mst = vars(self)[mst]
 
             # Select branches
@@ -2889,7 +2910,7 @@ class Output_Group():
             )
 
         # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
-        self.series.plot_MiretRoig2020_Crundall2019(axes[0,0])
+        # self.series.plot_MiretRoig2020_Crundall2019(axes[0,0])
 
         # Set title
         self.series.set_title(
@@ -2906,7 +2927,7 @@ class Output_Group():
         axes[0,0].set_ylabel('Density', fontsize=8)
 
         # Set limits
-        axes[0,0].set_xlim(-27, -13)
+        axes[0,0].set_xlim(-50, -15)
         axes[0,0].set_ylim(0, 0.49)
 
         # Save figure
@@ -2947,7 +2968,7 @@ class Output_Group():
 
         # Compute coordinates
         for star in self:
-            positions_πδα = position_xyz_to_πδα(*(star.position_xyz - sun.position_xyz).T)
+            positions_πδα = position_xyz_to_πδα(*(star.position_xyz - sun.position_xyz).T).T
             alphas = positions_πδα[:,2] - 2 * np.pi * (positions_πδα[:,2] > np.pi)
             deltas = positions_πδα[:,1]
 
@@ -3050,10 +3071,12 @@ class Output_Group():
         # Retrieve xyz positions and uvw velocities and convert units
         def get_position_velocity_xyz(star):
             position_xyz = Quantity(
-                star.position_xyz[epoch_index], 'pc', star.position_xyz_error
+                star.position_xyz[epoch_index], 'pc',
+                np.diag(star.position_xyz_error[epoch_index])
             )
             velocity_xyz = Quantity(
-                star.velocity_xyz[epoch_index], 'pc/Myr', star.velocity_xyz_error
+                star.velocity_xyz[epoch_index], 'pc/Myr',
+                np.diag(star.velocity_xyz_error[epoch_index])
             ).to('km/s')
 
             return position_xyz, velocity_xyz
@@ -3116,7 +3139,7 @@ class Output_Group():
         # Save table
         if save:
             self.series.save_table(
-                f'kinematics_{self.name}_{age}Myr', f'Kinematics of {self.name}', lines,
+                f'kinematics_{self.name}_{age}Myr.csv', f'Kinematics of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )

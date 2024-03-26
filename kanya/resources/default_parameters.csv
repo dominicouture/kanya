@@ -12,7 +12,7 @@ label;name;values;units;system;type
 'cov_robust_metrics';'Covariance robust metrics';True;None;None;'boolean'
 'cov_sklearn_metrics';'Covariance Sklearn metrics';True;None;None;'boolean'
 'mad_metrics';'Median absolute deviation metrics';True;None;None;'boolean'
-'mst_metrics';'Minimum spanning tree metrics';True;None;None;'boolean'
+'tree_metrics';'Minimum spanning tree metrics';True;None;None;'boolean'
 'from_data';'From data';False;None;None;'boolean'
 'from_model';'From model';False;None;None;'boolean'
 'number_of_groups';'Number of groups';1;None;None;'integer'

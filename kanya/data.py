@@ -8,9 +8,8 @@ an input for a Group object, and all related methods to check and convert this d
 identified and converted to default units.
 """
 
-import pandas as pd
-from csv import reader, Sniffer
 from re import split
+from csv import reader, Sniffer
 from .collection import *
 from .coordinate import *
 
@@ -856,9 +855,8 @@ class Data(list):
             elif self.mass is not None and self.radius is not None:
                 rv_shift = c.value / 1000 * (
                     (
-                        1 - 2 * G.value * self.mass.value * M_sun.value / (
-                            c.value**2 * self.radius.value * R_sun.value
-                        )
+                        1 - 2 * G.value * self.mass.value * M_sun.value
+                        / (c.value**2 * self.radius.value * R_sun.value)
                     )**(-0.5) - 1
                 )
                 self.rv_shift = Quantity(rv_shift, Unit('km/s'), 0.0).to()

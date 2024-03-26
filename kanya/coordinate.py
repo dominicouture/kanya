@@ -85,7 +85,7 @@ class Axis():
 
         return f'{self.name.capitalize()} axis'
 
-class Origin(Axis):
+class Origin():
     """Defines a Origin system origin."""
 
     def __init__(self, name):
@@ -240,7 +240,7 @@ class Coordinate:
     lsr_velocity = np.array([0.0, sun_position[0] * sun_angular_frequency, 0.0])
 
     # Sun total velocity in a left-handed galactocentric frame of reference
-    sun_velocity = np.dot(ggrm, lsr_velocity + sun_velocity_peculiar * np.array((-1.0, 1.0, 1.0)))
+    sun_velocity = np.dot(ggrm, lsr_velocity + sun_velocity_peculiar * np.array((-1, 1, 1)))
     # sun_velocity = np.array([0.0, 0.0, 0.0])
     sun_velocity_error = np.array([0.0, 0.0, 0.0])
     # sun_velocity_error = sun_velocity_peculiar_error
@@ -283,7 +283,7 @@ class Coordinate:
     )
 
     # Parallax conversion from radians to parsecs constant
-    k = pi / 648000
+    k = np.pi / 648000
 
     # Gaia bias correction
     gaia_bias = -2.618e-10
@@ -391,15 +391,15 @@ def position_πδα_to_xyz(π, δ, α):
     (z, pc), cartesian galactic coordinates.
     """
 
-    # Compute cosines, sines and norm
-    cos_δ, sin_δ, cos_α, sin_α = np.cos(δ), np.sin(δ), np.cos(α), np.sin(α)
+    # Compute norm, cosines, and sines
     norm = Coordinate.k / (π + Coordinate.gaia_bias)
+    cos_δ, sin_δ, cos_α, sin_α = np.cos(δ), np.sin(δ), np.cos(α), np.sin(α)
 
     # Convert coordinates
     x, y, z = norm * np.array((cos_δ * cos_α, cos_δ * sin_α, sin_δ))
 
     # Rotate axes
-    return (Coordinate.germ @ np.array((x, y, z))).T
+    return Coordinate.germ @ np.array((x, y, z))
 
 def velocity_πδα_to_xyz(π, δ, α, rv, μδ, μαcosδ):
     """
@@ -409,22 +409,21 @@ def velocity_πδα_to_xyz(π, δ, α, rv, μδ, μαcosδ):
     galactic coordinates.
     """
 
-    # Compute cosines, sines and norm
-    cos_δ, sin_δ, cos_α, sin_α = np.cos(δ), np.sin(δ), np.cos(α), np.sin(α)
+    # Compute norm, cosines and sines
     norm = Coordinate.k / (π + Coordinate.gaia_bias)
-    μα = μαcosδ / cos_δ
+    cos_δ, sin_δ, cos_α, sin_α = np.cos(δ), np.sin(δ), np.cos(α), np.sin(α)
 
     # Convert coordinates
     u, v, w = np.array(
         (
-            rv * (cos_δ * cos_α) - μδ * (norm * sin_δ * cos_α) - μα * (norm * cos_δ * sin_α),
-            rv * (cos_δ * sin_α) - μδ * (norm * sin_δ * sin_α) + μα * (norm * cos_δ * cos_α),
-            rv * sin_δ + μδ * (norm * cos_δ)
+            rv * cos_δ * cos_α - norm * (μδ * sin_δ * cos_α + μαcosδ * sin_α),
+            rv * cos_δ * sin_α - norm * (μδ * sin_δ * sin_α - μαcosδ * cos_α),
+            rv * sin_δ + μδ * norm * cos_δ
         )
     )
 
     # Rotate axes
-    return (Coordinate.germ @ np.array((u, v, w))).T
+    return Coordinate.germ @ np.array((u, v, w))
 
 
 # Cartesian galactic coordinates transforms
@@ -439,15 +438,14 @@ def position_xyz_to_πδα(x, y, z):
     # Rotate axes
     x, y, z = Coordinate.germ.T @ np.array((x, y, z))
 
-    # Compute norm and shift
+    # Compute norm
     norm = (x**2 + y**2 + z**2)**0.5
-    # shift = 2 * np.pi * (y < 0)
-    shift = 0.0
 
     # Convert coordinates
+    shift = 2 * np.pi * (y < 0) if False else 0.0
     return np.array(
         (Coordinate.k / norm - Coordinate.gaia_bias, np.arcsin(z / norm), np.arctan2(y, x) + shift)
-    ).T
+    )
 
 def velocity_xyz_to_πδα(x, y, z, u, v, w):
     """
@@ -461,7 +459,7 @@ def velocity_xyz_to_πδα(x, y, z, u, v, w):
     x, y, z = Coordinate.germ.T @ np.array((x, y, z))
     u, v, w = Coordinate.germ.T @ np.array((u, v, w))
 
-    # Compute norms and cosine
+    # Compute norms, and cosine
     norm_xy_2 = x**2 + y**2
     norm_xy = norm_xy_2**0.5
     norm_2 = norm_xy_2 + z**2
@@ -475,21 +473,21 @@ def velocity_xyz_to_πδα(x, y, z, u, v, w):
             (w * norm_xy - ((u * x * z) + (v * y * z)) / norm_xy) / norm_2,
             ((v * x) - (u * y)) / norm_xy_2 * cos_δ
         )
-    ).T
+    )
 
 def position_xyz_to_rθh(x, y, z):
     """
     Converts xyz, x position (x; pc), y position (y; pc), and z position (z; pc), cartesian
     galactic coordinates to rθh, radius (r; pc), angle (θ; rad), and height (h; pc), cylindrical
-    galactocentric left-handed coordinates. x, y and z can't all be null.
+    galactocentric left-handed coordinates.
     """
 
-    # Rotate axes and move origin
+    # Rotate axes, and move origin
     x, y, z = ((Coordinate.ggrm @ np.array((-x, y, z))).T + Coordinate.sun_position).T
 
     # Convert coordinates
-    return np.array(((x**2 + y**2)**0.5, np.arctan2(y, x), z)).T
-    # return np.array(((x**2 + y**2)**0.5, np.arctan2(y, x) + 2 * pi * (y < 0), z)).T
+    shift = 2 * np.pi * (y < 0) if False else 0.0
+    return np.array(((x**2 + y**2)**0.5, np.arctan2(y, x) + shift, z))
 
 def velocity_xyz_to_rθh(x, y, z, u, v, w):
 
@@ -497,28 +495,19 @@ def velocity_xyz_to_rθh(x, y, z, u, v, w):
     Converts uvw, u velocity (u; pc/Myr), v velocity (v; pc/Myr), and w velocity (w; pc/Myr),
     cartesian galactic coordinates to vrvtvh, radial velocity (vr; pc/Myr), tangential velocity
     (vt; pc/Myr), and height velocity (vh; pc/Myr), cylindrical galactocentric left-handed
-    coordinates. x, y and z can't all be null.
+    coordinates.
     """
 
-    # Rotate axes and move origin
+    # Rotate axes, and move origin
     x, y, z = ((Coordinate.ggrm @ np.array((-x, y, z))).T + Coordinate.sun_position).T
     u, v, w = ((Coordinate.ggrm @ np.array((-u, v, w))).T + Coordinate.sun_velocity).T
 
-    # Compute cosine and sine
-    # θ = np.arctan2(y, x) + 2 * np.pi * (y < 0)
-    θ = np.arctan2(y, x)
-    cos_θ, sin_θ = np.cos(θ), np.sin(θ)
+    # Compute norm, cosine, and sine
     norm_xy = (x**2 + y**2)**0.5
-    cos_θ_2, sin_θ_2 = x / norm_xy, y / norm_xy
+    cos_θ, sin_θ = x / norm_xy, y / norm_xy
 
     # Convert coordinates
-    return np.array((u * cos_θ + v * sin_θ, -u * sin_θ + v * cos_θ, w)).T
-
-    # Compute norm
-    # norm_xy = (x**2 + y**2)**0.5
-
-    # Convert coordinates
-    # return np.array((((u * x) + (v * y)) / norm_xy, ((v * x) - (u * y)) / norm_xy, w)).T
+    return np.array((u * cos_θ + v * sin_θ, v * cos_θ - u * sin_θ, w))
 
 
 # Cylindrical galactocentric transforms
@@ -530,16 +519,20 @@ def position_rθh_to_xyz(r, θ, h):
     cartesian galactic coordinates.
     """
 
-    # Convert coordinates and move origin
+    # Convert coordinates, and move origin
     x, y, z = (np.array((r * np.cos(θ), r * np.sin(θ), h)).T - Coordinate.sun_position).T
+
+    # Rotate axes
+    return ((Coordinate.ggrm.T @ np.array((x, y, z))).T * np.array((-1, 1, 1))).T
+
+    # Convert coordinates
     # x, y, z = np.array((r * np.cos(θ), r * np.sin(θ), h))
 
-    # Axes rotation
-    return (Coordinate.ggrm.T @ np.array((x, y, z))).T * np.array((-1.0, 1.0, 1.0))
+    # Rotate axes, and move origin
     # return (
-    #     (Coordinate.ggrm.T @ np.array((x, y, z))).T * np.array((-1.0, 1.0, 1.0)) +
+    #     (Coordinate.ggrm.T @ np.array((x, y, z))).T * np.array((-1, 1, 1)) +
     #     np.array((Coordinate.galactic_center_distance, 0.0, 0.0))
-    # )
+    # ).T
 
 def velocity_rθh_to_xyz(r, θ, h, vr, vt, vh):
     """
@@ -548,16 +541,16 @@ def velocity_rθh_to_xyz(r, θ, h, vr, vt, vh):
     (u; pc/Myr), v velocity (v; pc/Myr), and w velocity (w; pc/Myr), cartesian galactic coordinates.
     """
 
-    # Compute cosine and sine
+    # Compute cosine, and sine
     cos_θ, sin_θ = np.cos(θ), np.sin(θ)
 
-    # Convert coordinates and move origin
+    # Convert coordinates, and move origin
     u, v, w = (
         np.array((vr * cos_θ - vt * sin_θ, vr * sin_θ + vt * cos_θ, vh)).T - Coordinate.sun_velocity
     ).T
 
     # Rotate axes
-    return (Coordinate.ggrm.T @ np.array((u, v, w))).T * np.array((-1.0, 1.0, 1.0))
+    return ((Coordinate.ggrm.T @ np.array((u, v, w))).T * np.array((-1, 1, 1))).T
 
 def position_rθh_to_ξηζ(r, θ, h, t):
     """
@@ -566,7 +559,7 @@ def position_rθh_to_ξηζ(r, θ, h, t):
     curvilinear comoving coordinates, at a given epoch t (Myr).
     """
 
-    # Convert coordinates and move origin
+    # Convert coordinates, and move origin
     ξ, η, ζ = (
         r - Coordinate.sun_position[0],
         Coordinate.sun_position[0] * (θ - Coordinate.sun_angular_frequency * t),
@@ -574,7 +567,7 @@ def position_rθh_to_ξηζ(r, θ, h, t):
     )
 
     # Rotate axes
-    return (Coordinate.ggrm.T @ np.array((ξ, η, ζ))).T
+    return Coordinate.ggrm.T @ np.array((ξ, η, ζ))
 
 def velocity_rθh_to_ξηζ(vr, vt, vh):
     """
@@ -584,8 +577,8 @@ def velocity_rθh_to_ξηζ(vr, vt, vh):
     comoving coordinates.
     """
 
-    # Convert coordinates, rotate axes and move origin
-    return (Coordinate.ggrm.T @ (np.array((vr, vt, vh)).T - Coordinate.lsr_velocity).T).T
+    # Convert coordinates, rotate axes, and move origin
+    return Coordinate.ggrm.T @ (np.array((vr, vt, vh)).T - Coordinate.lsr_velocity).T
 
 
 # Curvilinear comoving transforms
@@ -600,14 +593,14 @@ def position_ξηζ_to_rθh(ξ, η, ζ, t):
     # Rotate axes
     ξ, η, ζ = Coordinate.ggrm @ np.array((ξ, η, ζ))
 
-    # Convert coordinates and move origin
+    # Convert coordinates, and move origin
     return np.array(
-        [
+        (
             ξ + Coordinate.sun_position[0],
             η / Coordinate.sun_position[0] + Coordinate.sun_angular_frequency * t,
             ζ + Coordinate.sun_position[2]
-        ]
-    ).T
+        )
+    )
 
 def velocity_ξηζ_to_rθh(vξ, vη, vζ):
     """
@@ -616,8 +609,8 @@ def velocity_ξηζ_to_rθh(vξ, vη, vζ):
     velocity (vt; pc/Myr), and height velocity (vh; pc/Myr), cylindrical galactocentric coordinates.
     """
 
-    # Convert coordinates, rotate axes and move origin
-    return ((Coordinate.ggrm @ np.array((vξ, vη, vζ))).T + Coordinate.lsr_velocity)
+    # Convert coordinates, rotate axes, and move origin
+    return ((Coordinate.ggrm @ np.array((vξ, vη, vζ))).T + Coordinate.lsr_velocity).T
 
 """
 Four systems (origin and orientation) :
@@ -634,7 +627,7 @@ Four coordinates :
 - Cylindrical
 - Curvilinear
 
-One can only move up or down in either systems or coordinates. The functions are :
+One can only move up or down in either systems or coordinates. The functions are:
 
 - Equatorial to Galactic (2)
 - Galactic to Heliogalactic (2)

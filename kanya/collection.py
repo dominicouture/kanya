@@ -99,7 +99,6 @@ class Collection(list):
 
         # Set the logs path
         self.logs_path = '' if logs_path is None else logs_path
-        print(self.logs_path)
 
         # Add a name and an extension to the logs path, if needed
         if path.basename(self.logs_path) == '':
@@ -221,7 +220,7 @@ class Collection(list):
 
     def chronologize(
             self, *series, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
-            cov_sklearn_metrics=None, mad_metrics=None, mst_metrics=None, logging=True
+            cov_sklearn_metrics=None, mad_metrics=None, tree_metrics=None, logging=True
         ):
         """
         Computes the kinematic age of all series in self if no series name is given or selected
@@ -232,7 +231,7 @@ class Collection(list):
             series.chronologize(
                 size_metrics=size_metrics, cov_metrics=cov_metrics,
                 cov_robust_metrics=cov_robust_metrics, cov_sklearn_metrics=cov_sklearn_metrics,
-                mad_metrics=mad_metrics, mst_metrics=mst_metrics, logging=logging
+                mad_metrics=mad_metrics, tree_metrics=tree_metrics, logging=logging
             )
 
     def save_series(
@@ -251,7 +250,7 @@ class Collection(list):
     def create(
         self, *series, load_path=None, save_path=None, mode=None, size_metrics=None,
         cov_metrics=None, cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None,
-        mst_metrics=None, forced=None, default=None, cancel=None, logging=True
+        tree_metrics=None, forced=None, default=None, cancel=None, logging=True
     ):
         """
         Either load one or multiple series from a file, or traces back one or multiple
@@ -263,7 +262,7 @@ class Collection(list):
                 load_path=load_path, save_path=save_path, mode=mode, size_metrics=size_metrics,
                 cov_metrics=cov_metrics, cov_robust_metrics=cov_robust_metrics,
                 cov_sklearn_metrics=cov_sklearn_metrics, mad_metrics=mad_metrics,
-                mst_metrics=mst_metrics, forced=forced, default=default, cancel=cancel,
+                tree_metrics=tree_metrics, forced=forced, default=default, cancel=cancel,
                 logging=logging
             )
 

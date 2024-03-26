@@ -369,7 +369,7 @@ class Group(list, Output_Group):
             outliers = [star.name for star in self.series[0].outliers]
             if len(outliers) > 0:
                 for star in filter(lambda star: star.name in outliers, self):
-                    star.outlier == True
+                    star.outlier = True
 
                 # Compute stars coordinates
                 self.get_stars_coordinates()
@@ -414,10 +414,7 @@ class Group(list, Output_Group):
                 self.sample[star].velocity_ξηζ_error = velocity_ξηζ_cov_matrices[star]
 
     class Metric():
-        """
-        Association size metric including its values, age at minimum and minimum. Computes
-        errors on values, age and minium using a jackknife Monte Carlo method.
-        """
+        """Association size metric including its values, ages, errors, and minima."""
 
         def __init__(self, group, metric):
             """Initializes the association size metric."""
@@ -430,12 +427,16 @@ class Group(list, Output_Group):
             vars(self.group)[self.metric.label] = self
             self.group.metrics.append(self)
 
-        def __call__(self, values):
-            """Computes errors on values, age and minium using a jackknife Monte Carlo method."""
+        def __call__(self, values, value=None):
+            """
+            Computes values, errors using a jackknife Monte Carlo method, ages by finding the
+            epoch of minimal association size, and minima. The value is computed by averaging
+            jackknife Monte Carlo iterations or by using the given value.
+            """
 
             # Average values and errors
             self.values = np.atleast_3d(values)
-            self.value = np.mean(self.values, axis=0)
+            self.value = np.mean(self.values, axis=0) if value is None else np.atleast_2d(value).T
             self.value_int_error = np.std(self.values, axis=0)
 
             # Average age at the minimal value and error
@@ -463,8 +464,8 @@ class Group(list, Output_Group):
         """
         Computes the kinematic age of the group by finding the epoch of minimal association size
         using several size metrics. Parameters used to compute association size metrics, including
-        weights based on Mahalanobis distances computed with empirical covariances matrices, and
-        jackknife Monte Carlo itrations.
+        weights based on Mahalanobis distances computed with empirical covariances matrices, full
+        and
         """
 
         # Compute Mahalanobis distance
@@ -534,10 +535,10 @@ class Group(list, Output_Group):
                 self.set_timer('mad_metrics')
                 self.get_median_absolute_deviation()
 
-            # Compute minimum spanning tree metrics
-            if self.series.mst_metrics:
-                self.set_timer('mst_metrics')
-                self.get_minimum_spanning_tree()
+            # Compute tree branches metrics
+            if self.series.tree_metrics:
+                self.set_timer('tree_metrics')
+                self.get_tree_branches()
             self.set_timer()
 
     def set_principal_component_analysis(self, version):
@@ -773,7 +774,7 @@ class Group(list, Output_Group):
     ):
         """
         Computes the covariances matrix with variable weights of a Star parameter, 'a', along
-        all physical dimensions for all timestep. If another Star parameter, 'b', is given, the
+        all physical dimensions. If another Star parameter, 'b', is given, the
         cross covariances matrix is computed instead. If 'robust' is True, a robust estimator
         is computed using weights from the Mahalanobis distance. If 'sklearn' is True, a robust
         covariance estimator with sklearn's minimum covariance determinant (MCD).
@@ -829,8 +830,7 @@ class Group(list, Output_Group):
 
     def get_Mahalanobis_distance(self, a, b=None, covariances_matrix=None):
         """
-        Computes the Mahalanobis distances using the covariances matrix of a of all stars in
-        the group for all jackknife iterations.
+        Computes the Mahalanobis distances using the covariances matrix of every stars in the group.
         """
 
         # Compute the covariances matrix and inverse covariances matrix
@@ -879,8 +879,8 @@ class Group(list, Output_Group):
     def get_median_absolute_deviation(self):
         """
         Computes the xyz and ξηζ, partial and total median absolute deviations (MAD) of a group
-        and their respective errors for all timesteps. The age of the group is then estimated
-        by finding the epoch when the median absolute deviation is minimal.
+        and their respective errors. The age of the group is then estimated by finding the epoch
+        when the median absolute deviation is minimal.
         """
 
         # xyz median absolute deviation ages
@@ -902,21 +902,21 @@ class Group(list, Output_Group):
         # Update progress bar
         self.series.progress_bar.update(1)
 
-    def get_minimum_spanning_tree(self):
+    def get_tree_branches(self):
         """
-        Builds the minimum spanning trees (MST) of a group for all timesteps using a Kruskal
-        algorithm, and computes the average branch length and the branch length median absolute
-        absolute deviation of branch length. The age of the association is then estimated by
-        finding the epoch when these values are minimal.
+        Finds every tree branches connecting all stars in the group, and computes the position
+        and velocity, xyz and ξηζ, full and minimum spanning trees (MSTs). The age of the group
+        is then estimated by finding the epoch when the mean, robust mean, and median absolute
+        deviation tree branch lengths are minimal.
         """
 
-        # Set the number of minimum spanning tree branches
+        # Set the number of tree branches
         self.number_of_branches = self.sample_size - 1
         self.number_of_branches_monte_carlo = (
             int(self.sample_size * self.series.iteration_fraction) - 1
         )
 
-        # Create branches for all possible pairs of stars
+        # Create branches and find branch indices for every possible pairs of stars
         self.branches = []
         branch_indices = []
         for start, end in combinations(range(self.sample_size), 2):
@@ -925,7 +925,7 @@ class Group(list, Output_Group):
         self.branches = np.array(self.branches, dtype=object)
         branch_indices = np.array(branch_indices, dtype=int)
 
-        # Find the corresponding branches for every jackknife Monte Carlo iteration
+        # Find corresponding branches for jackknife Monte Carlo
         self.branches_monte_carlo = (
             np.all(
                 np.any(
@@ -935,77 +935,104 @@ class Group(list, Output_Group):
             )
         )
 
-        # Find xyz position and velocity minimum spanning tree branches
-        self.get_branches('position', 'xyz')
-        self.get_branches('velocity', 'xyz')
+        # Find xyz position and velocity full trees
+        self.get_full_tree('position', 'xyz')
+        self.get_full_tree('velocity', 'xyz')
 
-        # xyz minimum spanning tree average branch length and median absolute deviation ages
-        if self.series.mst_metrics:
-            self.mst_xyz_mean(np.mean(self.mst_position_xyz_values, axis=0))
-            self.mst_xyz_mean_robust(
-                np.average(
-                    self.mst_position_xyz_values, weights=self.mst_position_xyz_weights, axis=0
-                )
-            )
-            self.mst_xyz_mad(
-                np.median(
-                    np.abs(
-                        self.mst_position_xyz_values -
-                        np.median(self.mst_position_xyz_values, axis=0)
-                    ), axis=0
-                )
-            )
+        # Find xyz position and velocity full trees
+        self.get_full_tree('position', 'ξηζ')
+        self.get_full_tree('velocity', 'ξηζ')
 
-        # Find ξηζ position and velocity minimum spanning tree branches
-        self.get_branches('position', 'ξηζ')
-        self.get_branches('velocity', 'ξηζ')
+        # Find xyz position and velocity minimum spanning trees
+        self.get_minimum_spanning_tree('position', 'xyz')
+        self.get_minimum_spanning_tree('velocity', 'xyz')
 
-        # ξηζ minimum spanning tree average branch length and median absolute deviation ages
-        if self.series.mst_metrics:
-            self.mst_ξηζ_mean(np.mean(self.mst_position_ξηζ_values, axis=0))
-            self.mst_ξηζ_mean_robust(
-                np.average(
-                    self.mst_position_ξηζ_values, weights=self.mst_position_ξηζ_weights, axis=0
-                )
-            )
-            self.mst_ξηζ_mad(
-                np.median(
-                    np.abs(
-                        self.mst_position_ξηζ_values -
-                        np.median(self.mst_position_ξηζ_values, axis=0)
-                    ), axis=0
-                )
-            )
+        # Find ξηζ position and velocity minimum spanning trees
+        self.get_minimum_spanning_tree('position', 'ξηζ')
+        self.get_minimum_spanning_tree('velocity', 'ξηζ')
 
-            # xyz minimum spanning tree 90 percentile
-            mst_position_xyz_values_sorted = np.sort(self.mst_position_xyz_values, axis=0)
-            mst_position_xyz_values_sorted90 = mst_position_xyz_values_sorted[
-                int(self.number_of_branches * 0.2):int(self.number_of_branches * 0.80) - 1,:
-            ]
-            self.mst_xyz_90(np.mean(mst_position_xyz_values_sorted90, axis=0))
-
-    def get_branches(self, coord, system):
+    def get_full_tree(self, coord, system):
         """
-        Computes the branches, values and weights of a minimum spanning tree for every timestep
-        and jackknife Monte Carlo iteration. The full minimum spanning tree is also computed for
-        every timestep.
+        Finds the values and weights of the full tree, and computes mean, robust mean, and median
+        absolute absolute deviation branch lengths ages.
         """
 
-        # Sort branches by coordinate for every timestep
+        # Select coordinates
         branch_coord = {'position': 'length', 'velocity': 'speed'}
         value = f'{branch_coord[coord]}_{system}'
+
+        # Initialize full tree branch values and weights, and remove branches over 1σ in length
+        branches_value = np.array([vars(branch)[value] for branch in self.branches]).T
+        branches_weight = (
+            (branches_value - np.mean(branches_value, axis=1)[:,None]) /
+            np.std(branches_value, axis=1)[:,None]
+        ) < 1.0
+
+        # Initialize full tree branch values and weights for jackknife Monte Carlo, and remove
+        # branches over 1σ in length
+        branches_values = np.array(
+            [
+                [
+                    vars(branch)[value]
+                    for branch in self.branches[self.branches_monte_carlo[:,iteration]]
+                ] for iteration in range(self.series.number_of_iterations)
+            ]
+        ).swapaxes(1, 2)
+        branches_weights = (
+            (branches_values - np.mean(branches_values, axis=2)[:,:,None]) /
+            np.std(branches_values, axis=2)[:,:,None]
+        ) < 1.0
+
+        # Mean, robust mean, and median absolute deviation full tree branch lengths ages
+        if self.series.tree_metrics and coord == 'position':
+            vars(self)[f'branches_{system}_mean'](
+                np.mean(branches_values, axis=2), np.mean(branches_value, axis=1)
+            )
+            vars(self)[f'branches_{system}_mean_robust'](
+                np.average(branches_values, weights=branches_weights, axis=2),
+                np.average(branches_value, weights=branches_weight, axis=1)
+            )
+            vars(self)[f'branches_{system}_mad'](
+                np.median(
+                    np.abs(branches_values - np.median(branches_values, axis=2)[:,:,None]), axis=2
+                ), np.median(
+                    np.abs(branches_value - np.median(branches_value, axis=1)[:,None]), axis=1
+                )
+            )
+
+    def get_minimum_spanning_tree(self, coord, system):
+        """
+        Finds branches, values, and weights of the minimum spanning tree (MST), and computes mean,
+        robust mean, and median absolute absolute deviation branch lengths ages.
+        """
+
+        # Select coordinates
+        branch_coord = {'position': 'length', 'velocity': 'speed'}
+        value = f'{branch_coord[coord]}_{system}'
+
+        # Sort branches by coordinate
         branches_order = np.argsort(
             np.array([vars(branch)[value] for branch in self.branches], dtype=float), axis=0
         ).T
         branches_sorted = self.branches[branches_order]
-        branches_monte_carlo_sorted = np.moveaxis(
-            self.branches_monte_carlo[branches_order], -1, 0
-        )
+        branches_monte_carlo_sorted = np.moveaxis(self.branches_monte_carlo[branches_order], -1, 0)
 
-        # Initialize minimum spanning trees, values and weights
-        mst = np.empty((self.series.number_of_steps, self.number_of_branches), dtype=object)
-        if self.series.mst_metrics and coord == 'position':
-            mst_monte_carlo = np.empty(
+        # Initialize minimum spanning tree branches, values and weights
+        mst = vars(self)[f'mst_{coord}_{system}'] = np.empty(
+            (self.series.number_of_steps, self.number_of_branches), dtype=object
+        )
+        mst_value = np.zeros(mst.shape)
+        mst_weight = np.zeros(mst.shape)
+
+        # Validate minimum spanning tree branches
+        for step in range(self.series.number_of_steps):
+            mst[step] = self.validate_branches(branches_sorted[step], self.number_of_branches)
+            mst_value[step] = np.array([vars(branch)[value][step] for branch in mst[step]])
+            mst_weight[step] = np.array([branch.weight[step] for branch in mst[step]])
+
+        # Initialize minimum spanning tree branches, values and weights for jackknife Monte Carlo
+        if self.series.tree_metrics and coord == 'position':
+            mst_monte_carlo = vars(self)[f'mst_monte_carlo_{coord}_{system}'] = np.empty(
                 (
                     self.series.number_of_iterations,
                     self.series.number_of_steps,
@@ -1015,12 +1042,8 @@ class Group(list, Output_Group):
             mst_values = np.zeros(mst_monte_carlo.shape)
             mst_weights = np.zeros(mst_monte_carlo.shape)
 
-        # Validate branches for every timestep
-        for step in range(self.series.number_of_steps):
-            mst[step] = self.validate_branches(branches_sorted[step], self.number_of_branches)
-
-            # Validate branches for every jackknife Monte Carlo iteration
-            if self.series.mst_metrics and coord == 'position':
+            # Validate minimum spanning tree branches for jackknife Monte Carlo
+            for step in range(self.series.number_of_steps):
                 for iteration in range(self.series.number_of_iterations):
                     mst_monte_carlo[iteration, step] = self.validate_branches(
                         branches_sorted[step, branches_monte_carlo_sorted[iteration, step]],
@@ -1037,24 +1060,31 @@ class Group(list, Output_Group):
                 if step % 6 == 0:
                     self.series.progress_bar.update(1)
 
-        # Set minimum spanning tree, values and weights
-        vars(self)[f'mst_{coord}_{system}'] = mst
-        if self.series.mst_metrics and coord == 'position':
-            vars(self)[f'mst_monte_carlo_{coord}_{system}'] = mst_monte_carlo
-            vars(self)[f'mst_{coord}_{system}_values'] = mst_values.T.swapaxes(1, 2)
-            vars(self)[f'mst_{coord}_{system}_weights'] = mst_weights.T.swapaxes(1, 2)
+            # Mean, robust mean, and median absolute deviation minimum spanning tree
+            # branch lengths ages
+            vars(self)[f'mst_{system}_mean'](
+                np.mean(mst_values, axis=2), np.mean(mst_value, axis=1)
+            )
+            vars(self)[f'mst_{system}_mean_robust'](
+                np.average(mst_values, weights=mst_weights, axis=2),
+                np.average(mst_value, weights=mst_weight, axis=1)
+            )
+            vars(self)[f'mst_{system}_mad'](
+                np.median(np.abs(mst_values - np.median(mst_values, axis=2)[:,:,None]), axis=2),
+                np.median(np.abs(mst_value - np.median(mst_value, axis=1)[:,None]), axis=1)
+            )
 
     def validate_branches(self, branches, number_of_branches):
         """
-        Validate a list sorted branches using a Kruskal algorithm up to a given number of branches.
-        Returns a list of validated branches.
+        Validate a list sorted branches using a Kruskal algorithm up to a given number of branches
+        for minimum spanning tree (MST) computation. Returns a list of validated branches.
         """
 
         # Set stars nodes
         for star in self.sample:
             star.node = self.Node()
 
-        # Initialize minimum spanning tree, and test and valid indices
+        # Initialize the minimum spanning tree and test and validate branches
         mst = np.empty(number_of_branches, dtype=object)
         test_index = 0
         valid_index = 0
@@ -1079,12 +1109,12 @@ class Group(list, Output_Group):
         return mst
 
     class Branch:
-        """Line connecting two stars used for the calculation of the minimum spanning tree."""
+        """Line connecting two stars used for the calculation of the tree."""
 
         def __init__(self, start, end):
             """
             Initializes a Branch object and computes the distance between two Star objects,
-            'start' and 'end', for all timestep.
+            'start' and 'end'.
             """
 
             # Set start and end branches
@@ -1134,7 +1164,8 @@ class Group(list, Output_Group):
             initializing from a file for instance). If a traceback is needed, the star's positions
             and velocities over time is computed with a linear approximation or galpy, in both xyz
             and ξηζ coordinate systems. The initial position and velocity corresponds to the first
-            timestep in the integration time array, even if it is nonzero.
+            timestep in the integration time array, even if the time is not the current-day epoch
+            (i.e. nonzero).
             """
 
             # Initialization
@@ -1160,8 +1191,8 @@ class Group(list, Output_Group):
                 self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
 
                 # Compute rθh positions and velocities
-                position_rθh = position_xyz_to_rθh(*self.position_xyz.T)
-                velocity_rθh = velocity_xyz_to_rθh(*self.position_xyz.T, *self.velocity_xyz.T)
+                position_rθh = position_xyz_to_rθh(*self.position_xyz.T).T
+                velocity_rθh = velocity_xyz_to_rθh(*self.position_xyz.T, *self.velocity_xyz.T).T
 
             # Orbital trajectories
             else:
@@ -1194,12 +1225,12 @@ class Group(list, Output_Group):
                 velocity_rθh *= Coordinate.lsr_velocity[1]
 
                 # Compute xyz positions and velocities
-                self.position_xyz = position_rθh_to_xyz(*position_rθh.T)
-                self.velocity_xyz = velocity_rθh_to_xyz(*position_rθh.T, *velocity_rθh.T)
+                self.position_xyz = position_rθh_to_xyz(*position_rθh.T).T
+                self.velocity_xyz = velocity_rθh_to_xyz(*position_rθh.T, *velocity_rθh.T).T
 
             # Compute ξηζ positions and velocities
-            self.position_ξηζ = position_rθh_to_ξηζ(*position_rθh.T, self.time)
-            self.velocity_ξηζ = velocity_rθh_to_ξηζ(*velocity_rθh.T)
+            self.position_ξηζ = position_rθh_to_ξηζ(*position_rθh.T, self.time).T
+            self.velocity_ξηζ = velocity_rθh_to_ξηζ(*velocity_rθh.T).T
 
             # Compute xyz and ξηζ distances and speeds
             self.distance_xyz = np.sum(self.position_xyz**2, axis=1)**0.5
@@ -1216,7 +1247,7 @@ class Group(list, Output_Group):
         def get_relative_coordinates(self):
             """
             Computes relative position and velocity, the distance and the speed from the
-            average position and velocity, and their respective errors for all timesteps.
+            average position and velocity, and their respective errors.
             """
 
             # Compute relative xyz and ξηζ positions and velocities

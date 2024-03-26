@@ -10,7 +10,6 @@ import numpy as np
 from decimal import Decimal
 from astropy import units as u
 from astropy.constants import c, G, M_sun, R_sun
-from math import cos, sin, asin, atan2, pi
 from .tools import squeeze, broadcast, full
 
 class Quantity:
