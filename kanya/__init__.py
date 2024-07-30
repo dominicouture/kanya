@@ -8,10 +8,10 @@ computes their kinematic age by finding the epoch of minimal spatial extent.
 """
 
 from .__version__ import *
-from .series import Series, collection, Config
+from .group import Group, collection, Config
 
 __all__ = [
-    'Series',
+    'Group',
     'collection',
     'Config'
 ]

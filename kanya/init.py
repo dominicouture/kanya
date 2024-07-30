@@ -3,7 +3,7 @@
 
 """
 init.py: Imports information from the configuration file, command line arguments and parameters
-into a Config. This script must be run first to configure a Series.
+into a Config. This script must be run first to configure a Group.
 """
 
 from .collection import *
@@ -14,7 +14,7 @@ class Config():
     Contains the parameters imported from a configuration file (which must be a Python file),
     command line arguments, parameters in the __init__ function call or another Config object,
     as well as related methods, a Parameter class and a dictionary of default values. A Config
-    object can then be used as the input of a Series object.
+    object can then be used as the input of a Group object.
     """
 
     class Parameter():
@@ -191,31 +191,31 @@ class Config():
         from argparse import ArgumentParser
         parser = ArgumentParser(
             prog='kanya',
-            description='traces given or simulated moving groups of stars back to their origin.'
+            description='traces given or simulated moving groups of stars back to their origin'
         )
         parser.add_argument(
             '-n', '--name', action='store', type=str,
-            help='name of the series of tracebacks.'
+            help='name of the group'
         )
         parser.add_argument(
             '-d', '--data', action='store_true',
-            help='use the data parameter in the configuration file as input.'
+            help='use the data parameter in the configuration file as input'
         )
         parser.add_argument(
             '-m', '--model', action='store_true',
-            help='model an input based on simulation parameters in the configuration file.'
+            help='model an input based on simulation parameters in the configuration file'
         )
         parser.add_argument(
             '-l', '--load', action='store_true',
-            help='load the input data from a file.'
+            help='load the input data from a file'
         )
         parser.add_argument(
             '-s', '--save', action='store_true',
-            help='save the output data to a file.'
+            help='save the output data to a file'
         )
         args = parser.parse_args()
 
-        # Series name import if not None
+        # Group name import if not None
         if args.name is not None:
             self.name.values = args.name
 

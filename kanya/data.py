@@ -19,22 +19,22 @@ class Data(list):
     Data is converted into a Quantity object and units are converted to default units.
     """
 
-    def __init__(self, series, data=None, data_dir=None):
+    def __init__(self, group, data=None, data_dir=None):
         """
         Initializes a Data object from a CSV file or a Python dictionary, list, tuple or
         np.ndarray. The first row must be a header and the second row may be a units row.
-        Units specified by series.config.data.units will override the units row. If no units,
-        are given default units are used, based on the value of series.config and data.system.
+        Units specified by group.config.data.units will override the units row. If no units,
+        are given default units are used, based on the value of group.config and data.system.
         """
 
         # Initialization
-        self.series = series
+        self.group = group
 
         # Set data parameter
-        self.data = self.series.set_parameter(
-            self.series.config.data if data is None else data,
+        self.data = self.group.set_parameter(
+            self.group.config.data if data is None else data,
             'string', 'dictionary', 'tuple', 'list', 'array',
-            mode=True if self.series.from_data else False, all=True
+            mode=True if self.group.from_data else False, all=True
         )
 
         # Initialize self from a CSV file
@@ -57,8 +57,8 @@ class Data(list):
 
     def initialize_from_CSV(self, data_dir=None):
         """
-        Initializes a Data object from the data self.series.name in a CSV file. If the the
-        CSV file doesn't specify a series or group column, all data is used. The file name
+        Initializes a Data object from the data self.group.name in a CSV file. If the the
+        CSV file doesn't specify a group or group column, all data is used. The file name
         must have a '.csv' extension.
         """
 
@@ -68,18 +68,18 @@ class Data(list):
 
         # Set data directory parameter
         if 'data_dir' not in vars(self).keys():
-            self.data_dir = self.series.set_path(
-                self.series.config.data_dir, 'data_dir',
+            self.data_dir = self.group.set_path(
+                self.group.config.data_dir, 'data_dir',
                 dir_only=True, check=False, create=False,
-                mode=True if self.series.from_data else False
+                mode=True if self.group.from_data else False
             )
 
         # Set data path
-        self.data_path = self.series.set_path(
+        self.data_path = self.group.set_path(
             self.data_dir if data_dir is None else data_dir, 'data_path',
             name=self.data.values, extension='csv', file_type='CSV',
             full_path=True, check=True, create=False,
-            mode=True if self.series.from_data else False
+            mode=True if self.group.from_data else False
         )
 
         # Read CSV file
@@ -94,7 +94,7 @@ class Data(list):
         data_csv.close()
 
         # Check if the table is a 2D array
-        self.series.stop(
+        self.group.stop(
             self.table.ndim != 2, 'ValueError',
             "'data' parameter must represent a 2D array ({} dimensions in the given CSV). "
             "Make sure all lines have an equal number of columns in the CSV file.", self.table.ndim
@@ -103,7 +103,7 @@ class Data(list):
     def initialize_from_data(self):
         """
         Initializes a Data object from a Python dictionary, list, tuple or np.ndarray (2D). If
-        a dictionary is used, only the value with a key that matches self.series.name is used
+        a dictionary is used, only the value with a key that matches self.group.name is used
         and its type must be one of the other 3 possible types. If a list, tuple or np.ndarray
         is used, all data is imported.
         """
@@ -115,27 +115,27 @@ class Data(list):
 
         # Data import and group filtering of a dictionary
         if type(self.data.values) == dict:
-            if self.series.name in self.data.values.keys():
-                if type(self.data.values[self.series.name]) in (list, tuple, np.ndarray):
-                    self.table = np.array(self.data.values[self.series.name], dtype=object)
+            if self.group.name in self.data.values.keys():
+                if type(self.data.values[self.group.name]) in (list, tuple, np.ndarray):
+                    self.table = np.array(self.data.values[self.group.name], dtype=object)
                 else:
-                    self.series.stop(
+                    self.group.stop(
                         True, 'TypeError',
                         "Data '{}' in the Python dictionary "
                         "must be a list, tuple or np.ndarray. ('{}' given).",
-                        self.series.name, type(self.data.values[self.series.name])
+                        self.group.name, type(self.data.values[self.group.name])
                     )
             else:
-                self.series.stop(
+                self.group.stop(
                     True, 'ValueError',
-                    "Group '{}' is not in the data dictionary.", self.series.name)
+                    "Group '{}' is not in the data dictionary.", self.group.name)
 
         # Data import of a list, tuple or np.ndarray
         if type(self.data.values) in (list, tuple, np.ndarray):
             self.table = np.array(self.data.values, dtype=object)
 
         # Check if self.table is a 2D array
-        self.series.stop(self.table.ndim != 2, 'ValueError',
+        self.group.stop(self.table.ndim != 2, 'ValueError',
             "'data' parameter must represent a 2D array ({} dimensions in the given data). "
             "Make sure all lines have an equal number of columns.", self.table.ndim)
 
@@ -143,7 +143,7 @@ class Data(list):
         try:
             self.table = np.vectorize(str)(self.table)
         except ValueError:
-            self.series.stop(True, 'ValueError', "Data could not be converted to string.")
+            self.group.stop(True, 'ValueError', "Data could not be converted to string.")
 
     def configure_data(self):
         """
@@ -190,12 +190,12 @@ class Data(list):
             lambda label: label.replace('.', '').replace(',', '').replace('-', '').isdigit()
         )(self.table[0]).any()
         if self.from_CSV:
-            self.series.stop(
+            self.group.stop(
                 self.header, 'ValueError',
                 "The CSV data file located at '{}' doesn't have a header.", self.data_path
             )
         elif self.from_data:
-            self.series.stop(self.header, 'ValueError', "The data doesn't have a header.")
+            self.group.stop(self.header, 'ValueError', "The data doesn't have a header.")
 
         # Checks for the presence of a unit header in self.table
         self.unit_header = not np.vectorize(
@@ -210,7 +210,7 @@ class Data(list):
 
         # Units from a string representing a coordinate system to create a dictionary
         elif type(self.data.units) == str:
-            self.series.stop(
+            self.group.stop(
                 self.data.units.lower() not in systems.keys(), 'ValueError',
                 "'{}' is not a valid coordinates system (use {} instead).",
                 self.data.units, list(systems.keys())
@@ -237,7 +237,7 @@ class Data(list):
                 self.Column.identify(self.Column, self, label):
                     self.data.units[label] for label in self.data.units.keys()
                 }
-            self.series.stop(
+            self.group.stop(
                 not np.vectorize(lambda label: label in self.variables.keys())(
                     tuple(self.data.units.keys())
                 ).all(), 'ValueError',
@@ -246,7 +246,7 @@ class Data(list):
                 )
 
             # Check if all values in self.data.units are strings
-            self.series.stop(
+            self.group.stop(
                 not np.vectorize(lambda label: type(self.data.units[label]) == str)(
                     tuple(self.data.units.keys())
                 ).all(), 'TypeError', "All elements in 'data.units' component must be strings."
@@ -257,17 +257,17 @@ class Data(list):
             self.data.units = np.squeeze(np.array(self.data.units, dtype=object))
 
             # Check if all values in self.data.units array are strings
-            self.series.stop(
+            self.group.stop(
                 not np.vectorize(lambda unit: type(unit) == str)(self.data.units).all(),
                 'TypeError', "All elements in 'data.units' component must be strings."
             )
 
             # Check if self.data.units array has valid dimensions
-            self.series.stop(
+            self.group.stop(
                 self.data.units.ndim != 1, 'ValueError',
                 "'data.units' component must have 1 dimension ({} given).", self.data.units.ndim
             )
-            self.series.stop(
+            self.group.stop(
                 len(self.data.units) != self.table.shape[1], 'ValueError',
                 "'data.units' component must be as long as the number of columns in "
                 "'data.values' component. ({} required, {} given).",
@@ -276,7 +276,7 @@ class Data(list):
 
         # Non-valid 'data.units' types
         else:
-            self.series.stop(
+            self.group.stop(
                 True, 'TypeError', "'data.units' must be a string, "
                 "dictionary, list, tuple or np.ndarray. ({} given).", type(self.data.units)
             )
@@ -446,12 +446,12 @@ class Data(list):
         # Check if all required columns are present
         for label in self.value_variables.keys():
             if label not in self.columns.keys():
-                self.series.stop(
+                self.group.stop(
                     self.from_CSV, 'NameError',
                     "The column '{}' ('{}') is missing from the CSV data file located at '{}'.",
                     self.value_variables[label].name, label, self.data_path
                 )
-                self.series.stop(
+                self.group.stop(
                     self.from_data, 'NameError',
                     "The column '{}' ('{}') is missing from the data.",
                     self.value_variables[label].name, label
@@ -517,12 +517,12 @@ class Data(list):
                     try:
                         self.unit = Unit(self.unit)
                     except ValueError:
-                        self.series.stop(
+                        self.group.stop(
                             True, 'ValueError', "Unit '{}' used for column '{}' "
                             "is not valid.", self.unit, self.data_label)
 
                     # Check unit physical type
-                    self.data.series.stop(
+                    self.data.group.stop(
                         self.unit.physical_type != self.variable.physical_type,
                         'ValueError', "The unit used for '{}' ('{}') in column ('{}'), '{}', has "
                         "an incorrect physical type ('{}' required, '{}' given)",
@@ -552,7 +552,7 @@ class Data(list):
             'final': '',
             'name': 'n',
             'designation': 'n',
-            'series': 'g',
+            'group': 'g',
             'movinggroup': 'g',
             'kinematicgroup': 'g',
             'association': 'g',
@@ -653,7 +653,7 @@ class Data(list):
     def create_rows(self):
         """
         Filters what rows in self.table are part of the selected group definied by
-        self.series.name and adds a self.Row object to self for every valid row.
+        self.group.name and adds a self.Row object to self for every valid row.
         """
 
         # Rows identification
@@ -661,11 +661,11 @@ class Data(list):
 
         # Check if there is at least one row
         if len(self.rows) < 1:
-            self.series.stop(
+            self.group.stop(
                 self.from_CSV, 'ValueError',
                 "No entry in the CSV data file located at '{}'.", self.data_path
             )
-            self.series.stop(
+            self.group.stop(
                 self.from_data, 'ValueError',
                 "No entry for the group in the data."
             )
@@ -673,19 +673,19 @@ class Data(list):
         # Group filtering
         if 'group' in self.columns.keys():
             for row in range(2 if self.unit_header else 1, self.table.shape[0]):
-                if self.table[row, self.columns['group'].column] != self.series.name:
+                if self.table[row, self.columns['group'].column] != self.group.name:
                     del self.rows[row]
 
             # Check if there is at least one row remaining
             if len(self.rows) < 1:
-                self.series.stop(
+                self.group.stop(
                     self.from_CSV, 'ValueError',
                     "No entry for the group '{}' in the CSV data file located at '{}'.",
-                    self.series.name, self.data_path
+                    self.group.name, self.data_path
                 )
-                self.series.stop(
+                self.group.stop(
                     self.from_data, 'ValueError',
-                    "No entry for the group '{}' in the data.", self.series.name
+                    "No entry for the group '{}' in the data.", self.group.name
                 )
 
         # Rows creation
@@ -716,7 +716,7 @@ class Data(list):
         }
 
         # Select sample
-        self.sample = self.samples['full' if self.series.sample is None else self.series.sample]
+        self.sample = self.samples['full' if self.group.sample is None else self.group.sample]
 
         # Uncomment this line to limit radial velocity precision in the core sample
         # self.sample = tuple(
@@ -773,7 +773,7 @@ class Data(list):
                         try:
                             self.values[label] = float(self.values[label].replace(',', '.').strip())
                         except ValueError:
-                            self.data.series.stop(
+                            self.data.group.stop(
                                 True, 'ValueError',
                                 "'{}' value could not be converted to float in '{}' column.",
                                 self.values[label], label
@@ -863,7 +863,7 @@ class Data(list):
 
             # Configuration radial velocity shift otherwise
             else:
-                 self.rv_shift = self.data.series.rv_shift
+                 self.rv_shift = self.data.group.rv_shift
 
             # Position columns and unit conversion
             self.position = Quantity(

@@ -5,7 +5,31 @@
 coordinate.py: Defines System class to handle a coordinate system initialization with a set
 of position and velocity variables, default and usual units, axis, and origins. Variable,
 Axis and Origin classes are definied as well. Individual coordinates are defined by a
-Coordinate class which includes an initialization method and tranformation methods.
+Coordinate class which includes an initialization method and tranformation methods. They are
+four systems (origin, orientation) :
+
+- Equatorial (Heliocentric, equatorial)
+- Heliogalactic (Heliocentric, Galactic Center to Sun Plane)
+- Galactic (Galactocentric, Galactic Plane)
+- Comoving (Local Standard of Rest, Galactic Center to Sun Plane)
+
+Four coordinates :
+
+- Spherical
+- Cartesian
+- Cylindrical
+- Curvilinear
+
+One can only move up or down in either systems or coordinates. The functions are:
+
+- Equatorial to Galactic (2)
+- Galactic to Heliogalactic (2)
+- Heliogalactic to Comoving (2)
+- πδα_to_xyz (2)
+- xyz_to_rθh (2)
+- rθh_to_ξηζ (4)
+
+For the comoving system, only the cartesian and curvilinear coordinates are defined.
 """
 
 import pandas as pd
@@ -399,7 +423,7 @@ def position_πδα_to_xyz(π, δ, α):
     x, y, z = norm * np.array((cos_δ * cos_α, cos_δ * sin_α, sin_δ))
 
     # Rotate axes
-    return Coordinate.germ @ np.array((x, y, z))
+    return np.sum(np.array((x, y, z)).T[..., None, :] * Coordinate.germ, axis=-1).T
 
 def velocity_πδα_to_xyz(π, δ, α, rv, μδ, μαcosδ):
     """
@@ -423,7 +447,7 @@ def velocity_πδα_to_xyz(π, δ, α, rv, μδ, μαcosδ):
     )
 
     # Rotate axes
-    return Coordinate.germ @ np.array((u, v, w))
+    return np.sum(np.array((u, v, w)).T[..., None, :] * Coordinate.germ, axis=-1).T
 
 
 # Cartesian galactic coordinates transforms
@@ -436,7 +460,7 @@ def position_xyz_to_πδα(x, y, z):
     """
 
     # Rotate axes
-    x, y, z = Coordinate.germ.T @ np.array((x, y, z))
+    x, y, z = np.sum(np.array((x, y, z)).T[..., None, :] * Coordinate.germ.T, axis=-1).T
 
     # Compute norm
     norm = (x**2 + y**2 + z**2)**0.5
@@ -456,8 +480,8 @@ def velocity_xyz_to_πδα(x, y, z, u, v, w):
     """
 
     # Rotate axes
-    x, y, z = Coordinate.germ.T @ np.array((x, y, z))
-    u, v, w = Coordinate.germ.T @ np.array((u, v, w))
+    x, y, z = np.sum(np.array((x, y, z)).T[..., None, :] * Coordinate.germ.T, axis=-1).T
+    u, v, w = np.sum(np.array((u, v, w)).T[..., None, :] * Coordinate.germ.T, axis=-1).T
 
     # Compute norms, and cosine
     norm_xy_2 = x**2 + y**2
@@ -483,7 +507,10 @@ def position_xyz_to_rθh(x, y, z):
     """
 
     # Rotate axes, and move origin
-    x, y, z = ((Coordinate.ggrm @ np.array((-x, y, z))).T + Coordinate.sun_position).T
+    x, y, z = (
+        np.sum(np.array((-x, y, z)).T[..., None, :] * Coordinate.ggrm, axis=-1) +
+        Coordinate.sun_position
+    ).T
 
     # Convert coordinates
     shift = 2 * np.pi * (y < 0) if False else 0.0
@@ -499,8 +526,14 @@ def velocity_xyz_to_rθh(x, y, z, u, v, w):
     """
 
     # Rotate axes, and move origin
-    x, y, z = ((Coordinate.ggrm @ np.array((-x, y, z))).T + Coordinate.sun_position).T
-    u, v, w = ((Coordinate.ggrm @ np.array((-u, v, w))).T + Coordinate.sun_velocity).T
+    x, y, z = (
+        np.sum(np.array((-x, y, z)).T[..., None, :] * Coordinate.ggrm, axis=-1) +
+        Coordinate.sun_position
+    ).T
+    u, v, w = (
+        np.sum(np.array((-u, v, w)).T[..., None, :] * Coordinate.ggrm, axis=-1) +
+        Coordinate.sun_velocity
+    ).T
 
     # Compute norm, cosine, and sine
     norm_xy = (x**2 + y**2)**0.5
@@ -523,7 +556,10 @@ def position_rθh_to_xyz(r, θ, h):
     x, y, z = (np.array((r * np.cos(θ), r * np.sin(θ), h)).T - Coordinate.sun_position).T
 
     # Rotate axes
-    return ((Coordinate.ggrm.T @ np.array((x, y, z))).T * np.array((-1, 1, 1))).T
+    return (
+        np.sum(np.array((x, y, z)).T[..., None, :] * Coordinate.ggrm.T, axis=-1) *
+        np.array((-1, 1, 1))
+    ).T
 
     # Convert coordinates
     # x, y, z = np.array((r * np.cos(θ), r * np.sin(θ), h))
@@ -550,7 +586,10 @@ def velocity_rθh_to_xyz(r, θ, h, vr, vt, vh):
     ).T
 
     # Rotate axes
-    return ((Coordinate.ggrm.T @ np.array((u, v, w))).T * np.array((-1, 1, 1))).T
+    return (
+        np.sum(np.array((u, v, w)).T[..., None, :] * Coordinate.ggrm.T, axis=-1) *
+        np.array((-1, 1, 1))
+    ).T
 
 def position_rθh_to_ξηζ(r, θ, h, t):
     """
@@ -562,12 +601,12 @@ def position_rθh_to_ξηζ(r, θ, h, t):
     # Convert coordinates, and move origin
     ξ, η, ζ = (
         r - Coordinate.sun_position[0],
-        Coordinate.sun_position[0] * (θ - Coordinate.sun_angular_frequency * t),
+        Coordinate.sun_position[0] * (θ.T - Coordinate.sun_angular_frequency * t).T,
         h - Coordinate.sun_position[2]
     )
 
     # Rotate axes
-    return Coordinate.ggrm.T @ np.array((ξ, η, ζ))
+    return np.sum(np.array((ξ, η, ζ)).T[..., None, :] * Coordinate.ggrm.T, axis=-1).T
 
 def velocity_rθh_to_ξηζ(vr, vt, vh):
     """
@@ -578,7 +617,10 @@ def velocity_rθh_to_ξηζ(vr, vt, vh):
     """
 
     # Convert coordinates, rotate axes, and move origin
-    return Coordinate.ggrm.T @ (np.array((vr, vt, vh)).T - Coordinate.lsr_velocity).T
+    return np.sum(
+        (np.array((vr, vt, vh)).T - Coordinate.lsr_velocity)[..., None, :] *
+        Coordinate.ggrm.T, axis=-1
+    ).T
 
 
 # Curvilinear comoving transforms
@@ -591,7 +633,7 @@ def position_ξηζ_to_rθh(ξ, η, ζ, t):
     """
 
     # Rotate axes
-    ξ, η, ζ = Coordinate.ggrm @ np.array((ξ, η, ζ))
+    ξ, η, ζ = np.sum(np.array((ξ, η, ζ)).T[..., None, :] * Coordinate.ggrm, axis=-1).T
 
     # Convert coordinates, and move origin
     return np.array(
@@ -610,31 +652,7 @@ def velocity_ξηζ_to_rθh(vξ, vη, vζ):
     """
 
     # Convert coordinates, rotate axes, and move origin
-    return ((Coordinate.ggrm @ np.array((vξ, vη, vζ))).T + Coordinate.lsr_velocity).T
-
-"""
-Four systems (origin and orientation) :
-
-- Equatorial (Heliocentric, equatorial)
-- Heliogalactic (Heliocentric, Galactic Center to Sun Plane)
-- Galactic (Galactocentric, Galactic Plane)
-- Comoving (Local Standard of Rest, Galactic Center to Sun Plane)
-
-Four coordinates :
-
-- Spherical
-- Cartesian
-- Cylindrical
-- Curvilinear
-
-One can only move up or down in either systems or coordinates. The functions are:
-
-- Equatorial to Galactic (2)
-- Galactic to Heliogalactic (2)
-- Heliogalactic to Comoving (2)
-- πδα_to_xyz (2)
-- xyz_to_rθh (2)
-- rθh_to_ξηζ (4)
-
-For the comoving system, only the cartesian and curvilinear coordinates are defined.
-"""
+    return (
+        np.sum(np.array((vξ, vη, vζ)).T[..., None, :] * Coordinate.ggrm, axis=-1) +
+        Coordinate.lsr_velocity
+    ).T

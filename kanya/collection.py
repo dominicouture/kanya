@@ -3,7 +3,7 @@
 
 """
 collection.py: Defines the Collection class and initializes global parameters. Global functions
-used by the Series class and more, such as directory, output, log and stop are also defined.
+used by the Group class and more, such as directory, output, log and stop are also defined.
 """
 
 import numpy as np
@@ -12,21 +12,21 @@ from .tools import enumerate_strings
 
 class Collection(list):
     """
-    Contains all series objects created from data, a model or a file. Functions to add,
-    remove, update, copy, load, traceback, save, create and select series are defined, as
-    well as a function to generate default series names from the existing series names in
-    self.series.
+    Contains all group objects created from data, a model or a file. Functions to add,
+    remove, update, copy, load, traceback, save, create and select groups are defined, as
+    well as a function to generate default group names from the existing group names in
+    self.groups.
     """
 
     def __init__(self, base_dir=None, data_dir=None, output_dir=None, logs_path=None):
         """
-        Initializes a collection by creating a self.series dictionary, as well as default output
+        Initializes a collection by creating a self.groups dictionary, as well as default output
         directories and logs path. A base directory is also created, from which other relative
         directory paths originate.
         """
 
-        # Initialize self.series dictionary
-        self.initialize_series()
+        # Initialize self.groups dictionary
+        self.initialize_groups()
 
         # Set the base directory
         self.set_base(base_dir)
@@ -36,13 +36,13 @@ class Collection(list):
         self.set_default_output(output_dir)
         self.set_default_logs(logs_path)
 
-    def initialize_series(self):
+    def initialize_groups(self):
         """
-        Creates a self.series dictionary of the index of Series object using their Series.name
+        Creates a self.groups dictionary of the index of Group object using their Group.name
         value as dictionary keys.
         """
 
-        self.series = {self[i].name: i for i in range(len(self))}
+        self.groups = {self[i].name: i for i in range(len(self))}
 
     def set_base(self, base_dir=None):
         """
@@ -128,137 +128,138 @@ class Collection(list):
         self, parent=None, file_path=None, args=False, forced=None,
         default=None, cancel=None, logging=True, **parameters
     ):
-        """ Creates a new Series in the collection. Arguments are the same as those of
-            Series.__init__.
+        """
+        Creates a new Group in the collection. Arguments are the same as those of Group.__init__.
         """
 
-        from .series import Series
+        from .group import Group
 
-        Series(
+        Group(
             parent=parent, file_path=file_path, args=args, forced=forced,
             default=default, cancel=cancel, logging=logging, **parameters
         )
 
-    def add(self, *series, forced=None, default=None, cancel=None, logging=True):
+    def add(self, *groups, forced=None, default=None, cancel=None, logging=True):
         """
-        Adds one or multiple new series to the collection. If forced is True, any existing
-        series with the same name is overwritten, otherwise user input is required to proceed
+        Adds one or multiple new groups to the collection. If forced is True, any existing
+        group with the same name is overwritten, otherwise user input is required to proceed
         (overwrite, do nothing or default). If default is True, then instead of asking for an
-        input, a default name is used and the series added to the collection.
+        input, a default name is used and the group added to the collection.
         """
 
-        # Series addition and replacement, if needed
-        for series in series:
+        # Group addition and replacement, if needed
+        for group in groups:
             stop(
-                str(type(series)) != "<class 'series.Series'>", 'TypeError',
-                "'series' must be Series object ({} given).", type(series)
+                str(type(group)) != "<class 'group.Group'>", 'TypeError',
+                "'group' must be Group object ({} given).", type(group)
             )
-            series.add(forced=forced, default=default, cancel=cancel, logging=logging)
+            group.add(forced=forced, default=default, cancel=cancel, logging=logging)
 
-    def remove(self, *series, logging=True):
-        """ Removes one or multiple series from the collection from series.name. """
+    def remove(self, *groups, logging=True):
+        """ Removes one or multiple groups from the collection. """
 
-        # Series deletion from collection
-        for series in self.select(*series):
-            series.remove(logging=logging)
+        # Group deletion from collection
+        for group in self.select(*groups):
+            group.remove(logging=logging)
 
-    def reset(self, *series, logging=True):
-        """ Resets one or multiple series from the collection from series.name. """
+    def reset(self, *groups, logging=True):
+        """ Resets one or multiple groups from the collection. """
 
-        # Series deletion from collection
-        for series in self.select(*series):
-            series.reset(logging=logging)
+        # Group deletion from collection
+        for group in self.select(*groups):
+            group.reset(logging=logging)
 
     def update(
-        self, *series, parent=None, file_path=None, args=False,
+        self, *groups, parent=None, file_path=None, args=False,
         logging=True, traceback=True, **parameters
     ):
         """
-        Updates the series by modifying its self.config configuration, re-initializing itself
-        and deleting existing groups. The groups are also traced back again if they had been
-        traced back before the update.
+        Updates one or multiple groups in the collection by modifying their group.config
+        configuration, re-initializing themselfve and deleting existing traceback. The groups
+        are also traced back again if they had been traced back before the update.
         """
 
-        for series in self.select(*series):
-            series.update(
+        for group in self.select(*groups):
+            group.update(
                 parent=parent, file_path=file_path, args=args,
                 logging=logging, traceback=traceback, **parameters
             )
 
     def copy(
-        self, *series, parent=None, file_path=None, args=False,
+        self, *groups, parent=None, file_path=None, args=False,
         logging=True, traceback=True, **parameters
     ):
         """
-        Copies the series under a new name. If 'parameters' are provided, this new Series
-        object is updated as well with those new parameters. If no new 'name' is provided
+        Copies one or multiple groups under a new name. If 'parameters' are provided, these new
+        Group objects are updated as well with those new parameters. If no new 'name' is provided
         as a parameter, a default name is used instead.
         """
 
-        for series in self.select(*series):
-            series.copy(
+        for group in self.select(*groups):
+            group.copy(
                 parent=parent, file_path=file_path, args=args,
                 logging=logging, traceback=traceback, **parameters
             )
 
-    def load_series(self, *series, load_path=None, forced=None, logging=True):
-        """ Loads one or multiple series from the binary file. If forced, existing groups are
-            overwritten.
+    def load_group(self, *groups, load_path=None, forced=None, logging=True):
+        """
+        Loads one or multiple groups from the binary file. If forced, existing groups are
+        overwritten.
         """
 
-        for series in self.select(*series):
-            series.load_series(load_path=load_path, forced=forced, logging=logging)
+        for group in self.select(*groups):
+            group.load_group(load_path=load_path, forced=forced, logging=logging)
 
-    def traceback(self, *series, mode=None, forced=None, logging=True):
+    def traceback(self, *groups, mode=None, forced=None, logging=True):
         """
-        Traces back all series in self if no series name is given or selected series given
-        given in argument by name. If forced, existing groups are overwritten.
+        Traces back all groups in the collection if no group name is given or selected groups
+        given given in argument by name. If forced, existing groups are overwritten.
         """
 
-        for series in self.select(*series):
-            series.traceback(mode=mode, forced=forced, logging=logging)
+        for group in self.select(*groups):
+            group.traceback(mode=mode, forced=forced, logging=logging)
 
     def chronologize(
-            self, *series, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
+            self, *groups, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
             cov_sklearn_metrics=None, mad_metrics=None, tree_metrics=None, logging=True
         ):
         """
-        Computes the kinematic age of all series in self if no series name is given or selected
-        series given given in argument by name.
+        Computes the kinematic age of all groups in the collection if no group name is given or
+        selected group given given in argument by name.
         """
 
-        for series in self.select(*series):
-            series.chronologize(
+        for group in self.select(*groups):
+            group.chronologize(
                 size_metrics=size_metrics, cov_metrics=cov_metrics,
                 cov_robust_metrics=cov_robust_metrics, cov_sklearn_metrics=cov_sklearn_metrics,
                 mad_metrics=mad_metrics, tree_metrics=tree_metrics, logging=logging
             )
 
-    def save_series(
-        self, *series, save_path=None, forced=None, default=None, cancel=None, logging=True
+    def save_group(
+        self, *groups, save_path=None, forced=None, default=None, cancel=None, logging=True
     ):
         """
-        Saves one or multiple series to a binary file. If forced, existing files are
+        Saves one or multiple groups to a binary file. If forced, existing files are
         overwritten.
         """
 
-        for series in self.select(*series):
-            series.save_series(
+        for group in self.select(*groups):
+            group.save_group(
                 save_path=save_path, forced=forced, default=default, cancel=cancel, logging=logging
             )
 
     def create(
-        self, *series, load_path=None, save_path=None, mode=None, size_metrics=None,
+        self, *groups, load_path=None, save_path=None, mode=None, size_metrics=None,
         cov_metrics=None, cov_robust_metrics=None, cov_sklearn_metrics=None, mad_metrics=None,
         tree_metrics=None, forced=None, default=None, cancel=None, logging=True
     ):
         """
-        Either load one or multiple series from a file, or traces back one or multiple
-        series from data or a model. If needed, the series is also saved.
+        Either load one or multiple groups from a file, or traces back one or multiple
+        groups from data or a model. If needed, the groups are also saved.
         """
 
-        for series in self.select(*series):
-            series.create(
+        for group in self.select(*groups):
+            group.create(
                 load_path=load_path, save_path=save_path, mode=mode, size_metrics=size_metrics,
                 cov_metrics=cov_metrics, cov_robust_metrics=cov_robust_metrics,
                 cov_sklearn_metrics=cov_sklearn_metrics, mad_metrics=mad_metrics,
@@ -266,39 +267,37 @@ class Collection(list):
                 logging=logging
             )
 
-    def select(self, *series):
+    def select(self, *groups):
         """
-        Selects one or multiple series from a collection. If no series name are specified,
-        all series are selected.
+        Selects one or multiple groups from a collection. If no group name are specified, all
+        groups are selected.
         """
 
-        # All series
-        if len(series) == 0:
-            return [series for series in self]
+        # Select all groups
+        if len(groups) == 0:
+            return [group for group in self]
 
-        # Selected series only
+        # Select groups from an Group object
         else:
+            selected_groups = []
+            for name in groups:
+                if str(type(name)) == "<class 'group.Group'>":
+                    selected_groups.append(name)
 
-            # Selected series from an Series object
-            selected_series = []
-            for name in series:
-                if str(type(name)) != "<class 'series.Series'>":
-                    selected_series.append(name)
-
-                # Selected series from a name, check if it exists
+                # Select groups from a name, check if it exists
                 else:
                     check_type(name, 'name', 'string')
                     stop(
-                        name not in self.series.keys(), 'NameError',
-                        "Series '{}' is not in the collection.", name
+                        name not in self.groups.keys(), 'NameError',
+                        "Group '{}' is not in the collection.", name
                     )
 
-            return [self[self.series[name]] for name in series]
+            return [self[self.group[name]] for name in selected_groups]
 
     def get_default_name(self, name=None):
         """
-        Loops over all Series in self and returns a default 'name-i' name where i is the
-        lowest possible number for an series titled 'name'.
+        Loops over all Group in the collection and returns a default 'name-i' name where i is the
+        lowest possible number for an group titled 'name'.
         """
 
         # Initialization
@@ -310,9 +309,9 @@ class Collection(list):
         if i.isdigit():
             name = name[:-(len(i) + 1)]
 
-        # Loops over Series in self
+        # Loops over groups in self
         i = 1
-        while '{}-{}'.format(name, i) in [series.name for series in self]:
+        while '{}-{}'.format(name, i) in [group.name for group in self]:
             i += 1
 
         return '{}-{}'.format(name, i)
@@ -377,7 +376,7 @@ def get_default_filename(file_path):
     if i.isdigit():
         name = name[:-(len(i) + 1)]
 
-    # Loops over Series in self
+    # Loops over groups in self
     i = 1
     while '{}-{}{}'.format(name, i, extension) in listdir(directory):
         i += 1
@@ -534,7 +533,7 @@ def stop(condition, error, message, *words, name=None, extra=1):
             if len(words) > 0:
                 message = message.format(*words)
             tb_message = (
-                f"{error} in '{name}' series: {message}" if name is not None
+                f"{error} in '{name}' group: {message}" if name is not None
                 else f'{error}: {message}'
             )
 

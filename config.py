@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-config.py: Series configuration file. For every parameter, three components can be defined: 'value'
+config.py: Group configuration file. For every parameter, three components can be defined: 'value'
 or 'values', 'unit' or 'units', and 'system':
 
      -  'value' or 'values': string, integer, float or tuple, list or dictionary, depending on the
@@ -25,15 +25,15 @@ or 'values', 'unit' or 'units', and 'system':
          - curvilinear: ξ', η', ζ', vξ', vη', and vζ'
 """
 
-# Name of series of groups (str or None)
+# Name of the group (str or None)
 # name.value = None
-# name.value = 'tucana'
-# name.value = 'carina'
-# name.value = 'columba'
-# name.value = 'ic2602'
-# name.value = 'platais8'
-# name.value = 'columba_carina'
-name.value = 'beta_pictoris'
+# name.value = 'THA'
+name.value = 'COL_CAR'
+# name.value = 'COL'
+# name.value = 'CAR'
+# name.value = 'IC2602'
+# name.value = 'PL8'
+# name.value = 'BPMG'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
 
@@ -54,50 +54,49 @@ logs_path.value = '../Logs/'
 
 # Path to the file or directory used for pickle input relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are loaded from a file named
-# 'name.value'.series in the current directory. Directory paths end with '/'.
-load_path.value = 'beta_pictoris.series'
-# load_path.value = 'tucana.series'
+# 'name.value'.group in the current directory. Directory paths end with '/'.
+load_path.value = 'beta_pictoris.group'
 
 # Path to the file or directory used for pickle output relative to the current directory (str
 # or None). By default, if this is None of absent, pickles are saved to a file named
-# 'name.value'.series in the current directory. Directory paths end with '/'.
+# 'name.value'.group in the current directory. Directory paths end with '/'.
 save_path.value = None
 
 # Association size metrics (boolean) to be computed
-size_metrics.value = True
+size_metrics.value = False
 cov_metrics.value = True
-cov_robust_metrics.value = False
-cov_sklearn_metrics.value = False
+cov_robust_metrics.value = True
+cov_sklearn_metrics.value = True
 mad_metrics.value = True
 tree_metrics.value = True
 
-# Number of groups to be simulated in the series (integer, > 0)
-number_of_groups.value = 10
+# Number of groups (integer, > 0)
+number_of_groups.value = 11
 
-# Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
-# number_of_steps.value = 1000
-# number_of_steps.value = 300
-number_of_steps.value = 240
-# number_of_steps.value = 172
-
-# Number of jackknife Monte Carlo iterations (integer, ≥ 1)
+# Number of jackknife Monte Carlo iterations (integer, > 0)
 number_of_iterations.value = 100
 
 # Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
 iteration_fraction.value = 0.5
 
+# Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
+# number_of_steps.value = 1000
+number_of_steps.value = 300
+# number_of_steps.value = 5
+# number_of_steps.value = 172
+
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
 
 # Final age of the traceback (float, inclusive)
-final_time.value = -50.1951006
+final_time.value = -60.0
 # final_time.value = 1.0
 
 # Age of simulated groups of stars (float, ≠ initial_time)
 age.value = -24.0
 
 # Number of stars in each simulated group of stars (integer, ≥ 1)
-number_of_stars.value = 25
+number_of_stars.value = 31
 
 # Average position of the simulated sample of stars (3 floats in tuple)
 # position.value = (22.686, -4.304, -18.495) # Core sample
@@ -138,20 +137,11 @@ velocity_scatter.values = (1.0, 1.0, 1.0) # Core sample (modified)
 velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
-data.value = 'β Pictoris Moving Group - Gaia DR3.csv'
-# data.value = 'β Pictoris Moving Group - Gaia EDR3.csv'
-# data.value = 'IC2602 Sample.csv'
-# data.value = 'Database_THA_Gaia_DR3.csv'
-# data.value = 'CAR_COL_sample.csv'
-# data.value = '../Results/Tucana-Horologium/THA_corrected_rv.csv'
-# data.value = '../Results/Tucana-Horologium/THA_not_corrected_new_cuts.csv'
-# data.value = '../Results/Tucana-Horologium/tha_corrected_with_cuts.csv'
-# data.value = '../COL/COL_sample.csv'
-# data.value = '../CAR/CAR_corrected_rv.csv'
-# data.value = '../COL/COL_corrected_rv.csv'
-# data.value = '../IC 2602/IC206_corrected_rv.csv'
-# data.value = '../COL/COL_corrected_rv_with_hr8799.csv'
-# data.value = '../PL8/PL8_corrected_rv.csv'
+# data.value = 'BPMG_raw_GaiaDR3.csv'
+# data.value = 'BPMG_sample.csv'
+# data.value = 'THA_corrected.csv'
+# data.value = 'THA_sample.csv'
+data.value = 'COL_CAR_sample.csv'
 data.units = 'spherical'
 data.system = 'spherical'
 # data.values =  {
@@ -253,7 +243,7 @@ data.system = 'spherical'
 data_errors.value = True
 
 # Whether to use actual or simulated rv shifts (boolean)
-data_rv_shifts.value = True
+data_rv_shifts.value = False
 
 # Radial velocity shift added (from model) or substracted (from data) to all stars (float)
 # rv_shift.value = 0.5
@@ -266,11 +256,11 @@ rv_shift.unit = 'km/s'
 cutoff.value = 3.0
 
 # Whether to use the full (with outliers), standard sample or the subsample (str or None)
-# sample.value = None
+sample.value = None
 # sample.value = 'rejected'
 # sample.value = 'input'
 # sample.value = 'extended'
-sample.value = 'core'
+# sample.value = 'core'
 
 # Galactic potential used for orbit integration (str or None)
 # potential.value = None

@@ -1,7 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""output.py: Defines functions to create figures and tables for Series, Groups and Stars."""
+"""output.py: Defines methods used to create figures and tables."""
 
 from matplotlib import pyplot as plt, ticker as tkr
 from scipy.interpolate import interp1d
@@ -17,9 +17,9 @@ plt.rc('lines', markersize=4)
 plt.rc('pdf', fonttype=42)
 
 # Set ticks label with commas instead of dots for French language publications
+# format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)))
 # ax.xaxis.set_major_formatter(format_ticks)
 # ax.yaxis.set_major_formatter(format_ticks)
-format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)))
 
 # Set colors
 class colors():
@@ -56,8 +56,8 @@ class colors():
     # Color cycle
     cycle = cycler(color=(azure[6], pink[6], chartreuse[6], indigo[9], orange[9], lime[9]))
 
-class Output_Series():
-    """Output methods of a series of groups."""
+class Output():
+    """Output method for a groups."""
 
     def save_output(
         self, file_name, save, *save_args, extension=None, file_type=None,
@@ -859,7 +859,7 @@ class Output_Series():
         # Logging
         else:
             self.log(
-                "Could not plot '{}' metric for '{}' series. It was not computed.",
+                "Could not plot '{}' metric for '{}' group. It was not computed.",
                 str(metric.name[index]), self.name, display=True
             )
 
@@ -1421,7 +1421,7 @@ class Output_Series():
         self, metric, index=None, fit=None, number_of_bins=60, adjusted=False,
         title=False, forced=None, default=None, cancel=None
     ):
-        """Draws a plot of the age distribution of a series for a given metric."""
+        """Draws a plot of the age distribution of a group for a given metric."""
 
         # Initialize figure
         fig, axes = self.set_figure('1x1')
@@ -1444,13 +1444,13 @@ class Output_Series():
 
         # Logging
         else:
-            self.series.log(
-                "Could not use '{}' metric for '{}' series. It was not computed.",
+            self.log(
+                "Could not use '{}' metric for '{}' group. It was not computed.",
                 metric.name[index], self.name, display=True
             )
 
         # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
-        self.plot_MiretRoig2020_Crundall2019(axes[0,0], mr2020=False, cr2019=False)
+        self.plot_MiretRoig2020_Crundall2019(axes[0,0], mr2020=False, cr2019=False, ldb=False)
 
         # Set title
         self.set_title(
@@ -1615,9 +1615,6 @@ class Output_Series():
                 forced=forced, default=default, cancel=cancel
             )
 
-class Output_Group():
-    """Output methods of a group of stars."""
-
     def get_epoch(self, age=None, metric=None, index=None):
         """
         Computes the time index of the epoch for a given association age or, association size
@@ -1626,28 +1623,28 @@ class Output_Group():
 
         # Index from age
         if age is not None:
-            self.series.check_type(age, 'age', ('integer', 'float', 'None'))
-            self.series.stop(
-                age < np.min(self.series.time), 'ValueError',
+            self.check_type(age, 'age', ('integer', 'float', 'None'))
+            self.stop(
+                age < np.min(self.time), 'ValueError',
                 "'age' must be younger the oldest time ({} Myr given, earliest time: {} Myr).",
-                age, np.min(self.series.time)
+                age, np.min(self.time)
             )
-            self.series.stop(
-                age > np.max(self.series.time), 'ValueError',
+            self.stop(
+                age > np.max(self.time), 'ValueError',
                 "'age' must be older the latest time ({} Myr given, latest time: {} Myr).",
-                age, np.max(self.series.time)
+                age, np.max(self.time)
             )
-            return np.argmin(np.abs(age - self.series.time)), age, None
+            return np.argmin(np.abs(age - self.time)), age, None
 
         # Index from the epoch of minimum of an association size metric
         elif metric is not None:
-            metric, index = self.series.get_metric(metric, index)
+            metric, index = self.get_metric(metric, index)
             if metric.status:
                 age = metric.age[index]
-                return np.argmin(np.abs(age - self.series.time)), age, metric.age_error[index]
+                return np.argmin(np.abs(age - self.time)), age, metric.age_error[index]
 
             else:
-                self.series.log(
+                self.log(
                     "Could not use '{}' metric for '{}' group. It was not computed.",
                     str(metric.name[index]), self.name, display=True
                 )
@@ -1666,48 +1663,48 @@ class Output_Group():
 
         # Check the type and value of step
         if step is not None:
-            self.series.check_type(step, 'step', ('integer', 'float'))
-            self.series.stop(
+            self.check_type(step, 'step', ('integer', 'float'))
+            self.stop(
                 step % 1 != 0, 'ValueError',
                 "'step' must be convertible to an integer ({} given).", step
             )
-            self.series.stop(
+            self.stop(
                 step < 0, 'ValueError',
                 "'step' must be greater than or equal to 0 ({} given).", step
             )
-            self.series.stop(
-                step >= self.series.number_of_steps, 'ValueError',
+            self.stop(
+                step >= self.number_of_steps, 'ValueError',
                 "'step' must be lower than the number of steps ({} and {} given).",
-                self.series.number_of_steps, step
+                self.number_of_steps, step
             )
 
         # Check the type and value of age
         if age is not None:
-            self.series.check_type(age, 'age', ('integer', 'float'))
-            self.series.stop(
-                age > self.series.initial_time.value, 'ValueError',
+            self.check_type(age, 'age', ('integer', 'float'))
+            self.stop(
+                age > self.initial_time.value, 'ValueError',
                 "'age' must older than the initial time  ({:.1f} Myr and {:.1f} Myr given).",
-                age, self.series.initial_time.value
+                age, self.initial_time.value
             )
-            self.series.stop(
-                age < self.series.final_time.value, 'ValueError',
+            self.stop(
+                age < self.final_time.value, 'ValueError',
                 "'age' must be younger than the final time ({:.1f} Myr and {:.1f} Myr given).",
-                age, self.series.final_time.value
+                age, self.final_time.value
             )
 
         # Check if both step and age are None
-        self.series.stop(
+        self.stop(
             step is None and age is None, 'ValueError',
             "'step' and 'age' cannot both be None."
         )
 
         # Compute step and age
         if age is not None:
-            step = int(round((self.series.initial_time.value - age) / self.series.timestep.value))
-            age = round(self.series.time[step], 2)
+            step = int(round((self.initial_time.value - age) / self.timestep.value))
+            age = round(self.time[step], 2)
         else:
             step = int(step)
-            age = round(self.series.initial_time.value - step * self.series.timestep.value, 2)
+            age = round(self.initial_time.value - step * self.timestep.value, 2)
 
         return step, age
 
@@ -1715,8 +1712,8 @@ class Output_Group():
         """Retrieves the proprer Metric instance from a string and index."""
 
         # Metric instance
-        self.series.check_type(metric, 'metric', ('string', 'None'))
-        self.series.stop(
+        self.check_type(metric, 'metric', ('string', 'None'))
+        self.stop(
             metric not in [metric.metric.label for metric in self.metrics], 'ValueError',
             "'metric' must be a valid metric key ({} given).", metric
         )
@@ -1728,12 +1725,12 @@ class Output_Group():
 
         # Metric index
         else:
-            self.series.check_type(index, 'index', ('integer', 'None'))
-            self.series.stop(
+            self.check_type(index, 'index', ('integer', 'None'))
+            self.stop(
                 metric.value.shape[-1] > 1 and index is None, 'ValueError',
                 "No 'index' is provided (metric is {} in size).", metric.value.shape[-1]
             )
-            self.series.stop(
+            self.stop(
                 index > metric.value.shape[-1] - 1 and metric.value.shape[-1] > 1, 'ValueError',
                 "'index' is too large for this metric ({} given, {} in size).",
                 index, metric.value.shape[-1]
@@ -1744,9 +1741,9 @@ class Output_Group():
     def check_coord(self, coord):
         """Checks the type and value of a coordinate."""
 
-        self.series.check_type(coord, 'coord', 'string')
+        self.check_type(coord, 'coord', 'string')
         coords = ('position', 'velocity')
-        self.series.stop(
+        self.stop(
             coord not in coords,
             'ValueError', "'coord' must be {} ({} given).", enumerate_strings(*coords), coord
         )
@@ -1754,8 +1751,8 @@ class Output_Group():
     def check_axis(self, axis, label):
         """Checks the type and value of an axis."""
 
-        self.series.check_type(axis, label, 'integer')
-        self.series.stop(
+        self.check_type(axis, label, 'integer')
+        self.stop(
             axis < 0 or axis > 2, 'ValueError',
             "'{}' must be 0, 1, or 2 ({} given).", label, axis
         )
@@ -1788,10 +1785,10 @@ class Output_Group():
         self.check_coord(coord)
 
         # Check the type and value of system
-        system = self.series.check_system(system)
+        system = self.check_system(system)
 
         # Check the type and value of relative
-        self.series.check_type(relative, 'relative', 'boolean')
+        self.check_type(relative, 'relative', 'boolean')
 
         # Find limits, increased by 25%
         scale_factor = 1.25
@@ -1800,7 +1797,7 @@ class Output_Group():
                 [
                     vars(star)[f"{'relative_' if relative else ''}{coord}_{system}"][step]
                     for star in group.sample
-                ] for group in self.series
+                ] for group in self
             ]
         ).reshape((-1, 3)).T
         values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
@@ -1822,10 +1819,10 @@ class Output_Group():
         self.check_coord(coord)
 
         # Check the type and value of system
-        system = self.series.check_system(system)
+        system = self.check_system(system)
 
         # Check the type of labels
-        self.series.check_type(labels, 'labels', 'boolean')
+        self.check_type(labels, 'labels', 'boolean')
 
         # Birth index, age and age error
         birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
@@ -1848,7 +1845,7 @@ class Output_Group():
             )
 
             # Plot stars' current values
-            if self.series.from_data:
+            if self.from_data:
                 ax.scatter(
                     np.array([value[0,x]]), np.array([value[0,y]]),
                     color=colors.black + (0.4,), edgecolors=colors.black,
@@ -1873,7 +1870,7 @@ class Output_Group():
                     )
 
         # Select coordinates
-        if self.series.from_model:
+        if self.from_model:
             average_model_star_value = vars(self.average_model_star)[f'{coord}_{system}'] / factors
 
             # Plot the average model star's trajectory
@@ -1930,7 +1927,7 @@ class Output_Group():
         """Draws the trajectories in position or velocity of stars."""
 
         # Initialize figure
-        fig, axes = self.series.set_figure('2+1')
+        fig, axes = self.set_figure('2+1')
 
         # Plot trajectories
         if system == 'xyz':
@@ -1994,14 +1991,14 @@ class Output_Group():
         #     axes[1,0].set_ylim(-40, 49)
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, self.get_title_coord,
             coord, system, '{system} trajectories'
         )
 
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f'trajectory_{coord}_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -2017,7 +2014,7 @@ class Output_Group():
         self.check_coord(coord)
 
         # Check the type and value of system
-        system = self.series.check_system(system)
+        system = self.check_system(system)
 
         # Birth index, age and age error
         birth_index, age, age_error  = tuple(
@@ -2031,15 +2028,15 @@ class Output_Group():
 
                 # Plot stars' trajectories
                 ax.plot(
-                    self.series.time, value[:,y],
+                    self.time, value[:,y],
                     color = colors.red[6] if star.outlier else colors.black, alpha=0.6,
                     linewidth=0.5, solid_capstyle='round', zorder=0.1
                 )
 
                 # Plot stars' current values
-                if self.series.from_data:
+                if self.from_data:
                     ax.scatter(
-                        self.series.time[0], value[0,y],
+                        self.time[0], value[0,y],
                         color=colors.black + (0.4,), edgecolors=colors.black, alpha=None,
                         s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
@@ -2048,7 +2045,7 @@ class Output_Group():
                     if birth_index[y] is not None:
                         color = colors.red[6] if star.outlier else colors.blue[6]
                         ax.scatter(
-                            self.series.time[birth_index[y]], value[birth_index[y],y],
+                            self.time[birth_index[y]], value[birth_index[y],y],
                             color=color + (0.4,), edgecolors=color, alpha=None,
                             s=6, marker='o', linewidths=0.25, zorder=0.2
                         )
@@ -2056,7 +2053,7 @@ class Output_Group():
             # Show vectical dashed line
             if birth_index[y] is not None:
                 ax.axvline(
-                    x=self.series.time[birth_index[y]], color=colors.black,
+                    x=self.time[birth_index[y]], color=colors.black,
                     linewidth=0.5, linestyle='--', zorder=0.1
                 )
 
@@ -2069,7 +2066,7 @@ class Output_Group():
                     )
 
             # Select coordinates
-            if self.series.from_model:
+            if self.from_model:
                 average_value = np.mean(
                     [vars(star)[f'{coord}_{system}'][:,y] for star in self.model_stars], axis=0
                 )
@@ -2079,7 +2076,7 @@ class Output_Group():
 
                 # Plot the average model star's value
                 ax.plot(
-                    self.series.model_time,
+                    self.model_time,
                     average_model_star_value,
                     color=colors.green[6], alpha=0.8,
                     linewidth=1.0, solid_capstyle='round', zorder=0.3
@@ -2088,7 +2085,7 @@ class Output_Group():
                 # Plot the average model star's birth and current values
                 for t, x, size, marker in ((-1, -1, 10, '*'), (0, 0, 6, 'o')):
                     ax.scatter(
-                        np.array([self.series.model_time[t]]),
+                        np.array([self.model_time[t]]),
                         np.array([average_model_star_value[x]]),
                         color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                         alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
@@ -2100,7 +2097,7 @@ class Output_Group():
 
                     # Plot model stars' values
                     ax.plot(
-                        self.series.model_time[::-1], model_star_value,
+                        self.model_time[::-1], model_star_value,
                         color=colors.blue[6], alpha=0.6,
                         linewidth=0.5, solid_capstyle='round', zorder=0.2
                     )
@@ -2108,7 +2105,7 @@ class Output_Group():
                     # Plot model stars' birth and current values
                     for t, x, size, marker in ((-1, 0, 10, '*'), (0, -1, 6, 'o')):
                         ax.scatter(
-                            np.array([self.series.model_time[t]]),
+                            np.array([self.model_time[t]]),
                             np.array([model_star_value[x]]),
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
@@ -2130,16 +2127,16 @@ class Output_Group():
             # Plot stars' average values
             for y, linestyle in ((0, '-'), (1, '--'), (2, ':')):
                 ax.plot(
-                    self.series.time, value[:,y],
+                    self.time, value[:,y],
                     label=f'$<{vars(systems[system])[coord][y].latex}>$', color=colors.black,
                     alpha=0.8, linestyle=linestyle, linewidth=1.0, solid_capstyle='round',
                     dash_capstyle='round', zorder=0.1
                 )
 
                 # Plot stars' average current values
-                if self.series.from_data:
+                if self.from_data:
                     ax.scatter(
-                        self.series.time[0], value[0,y],
+                        self.time[0], value[0,y],
                         color=colors.black + (0.4,), edgecolors=colors.black,
                         alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
                     )
@@ -2147,21 +2144,21 @@ class Output_Group():
                     # Plot stars' average birth values
                     if birth_index[y] is not None:
                         ax.scatter(
-                            self.series.time[birth_index[y]],
+                            self.time[birth_index[y]],
                             value[birth_index[y],y],
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6] + (1.0,),
                             alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.2
                         )
 
                 # Select coordinates
-                if self.series.from_model:
+                if self.from_model:
                     average_model_star_value = (
                         vars(self.average_model_star)[f'{coord}_{system}'][:,y]
                     ) / factor
 
                     # Plot the average model star's value
                     ax.plot(
-                        self.series.model_time, average_model_star_value,
+                        self.model_time, average_model_star_value,
                         color=colors.green[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.3
                     )
@@ -2169,7 +2166,7 @@ class Output_Group():
                     # Plot the average model star's birth and current values
                     for t, x, size, marker in ((-1, -1, 12, '*'), (0, 0, 6, 'o')):
                         ax.scatter(
-                            np.array([self.series.model_time[t]]),
+                            np.array([self.model_time[t]]),
                             np.array([average_model_star_value[x]]),
                             color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
@@ -2182,7 +2179,7 @@ class Output_Group():
 
                     # Plot model stars' values
                     ax.plot(
-                        self.series.model_time[::-1], model_star_value,
+                        self.model_time[::-1], model_star_value,
                         color=colors.blue[6], alpha=0.8, linestyle=linestyle,
                         linewidth=1.0, solid_capstyle='round', dash_capstyle='round', zorder=0.2
                     )
@@ -2190,7 +2187,7 @@ class Output_Group():
                     # Plot model stars' birth and current values
                     for t, x, size, marker in ((-1, 0, 12, '*'), (0, -1, 6, 'o')):
                         ax.scatter(
-                            np.array([self.series.model_time[t]]),
+                            np.array([self.model_time[t]]),
                             np.array([model_star_value[x]]),
                             color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                             alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
@@ -2203,13 +2200,13 @@ class Output_Group():
             ax.set_ylabel(f'$<{systems[system].latex[coord]}>$ ({axis_unit})', fontsize=8)
 
             # Set legend
-            self.series.set_legend(ax, 4)
+            self.set_legend(ax, 4)
 
         # Set label
         ax.set_xlabel('Epoch (Myr)', fontsize=8)
 
         # Set limits
-        ax.set_xlim(np.min(self.series.time), np.max(self.series.time) + 1)
+        ax.set_xlim(np.min(self.time), np.max(self.time) + 1)
 
     def draw_time(
         self, coord, system, style, age=None, metric=None,
@@ -2218,7 +2215,7 @@ class Output_Group():
         """Draws the positions or velocities of stars over time."""
 
         # Initialize figure
-        fig, axes = self.series.set_figure(
+        fig, axes = self.set_figure(
             style, 'hide_x', 'label_right', adjust='height', left=0.428,
             h_align='right' if style == '3x1' else None,# ratio=0.8,
             styles=('1x3', '2x2', '3x1')
@@ -2236,13 +2233,13 @@ class Output_Group():
             self.plot_time(axes[0,1], None, coord, system, age, metric)
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, self.get_title_coord, coord, system,
             '{system} {coord}s', line_2=f'over time'
         )
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f"{coord}_{system}_{style}_{self.name}_time.pdf", fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
@@ -2312,8 +2309,8 @@ class Output_Group():
 
         def rotate(x, y, θ, x0, y0):
             """
-            Rotates series of 2D vectors of coordinates x and y by an angle θ, and translate the
-            result to x0 and y0 coordinates.
+            Rotates 2D vectors of coordinates x and y by an angle θ, and translate the result to
+            x0 and y0 coordinates.
             """
 
             x2 = x * np.cos(θ) - y * np.sin(θ) + x0
@@ -2322,9 +2319,9 @@ class Output_Group():
             return np.array([x2, y2])
 
         # Check the types and values of axes
-        self.series.check_type(axes, 'axes', 'tuple')
+        self.check_type(axes, 'axes', 'tuple')
         ndim = len(axes)
-        self.series.stop(
+        self.stop(
             ndim not in (2, 3), 'ValueError',
             "'axes' must have a length of 2 or 3 ({} given).", ndim
         )
@@ -2338,9 +2335,9 @@ class Output_Group():
             projection = '3d'
 
         # Check the types and values of coords
-        self.series.check_type(coords, 'coords', ('tuple', 'list', 'string'))
+        self.check_type(coords, 'coords', ('tuple', 'list', 'string'))
         coords = [coords] if type(coords) not in (tuple, list) else coords
-        self.series.stop(
+        self.stop(
             len(coords) not in (1, 2), 'ValueError',
             "'coords' must have a length of 1 or 2 ({} given).", len(coords)
         )
@@ -2351,21 +2348,21 @@ class Output_Group():
         if len(coords) == 1 and projection == '2d':
             coords *= 2
         if projection == '3d':
-            self.series.stop(
+            self.stop(
                 len(coords) == 2, 'ValueError', "'coords' must have a length of 1 "
                 "if the projection is '3d' ({} given).", len(coords)
             )
             coords *= 3
 
         # Check the type and value of system
-        system = self.series.check_system(system)
+        system = self.check_system(system)
 
         # Check the types of errors, labels, mst, relative and ellipses
-        self.series.check_type(errors, 'errors', 'boolean')
-        self.series.check_type(labels, 'labels', 'boolean')
-        self.series.check_type(mst, 'mst', 'boolean')
-        self.series.check_type(relative, 'relative', 'boolean')
-        self.series.check_type(ellipses, 'ellipses', 'boolean')
+        self.check_type(errors, 'errors', 'boolean')
+        self.check_type(labels, 'labels', 'boolean')
+        self.check_type(mst, 'mst', 'boolean')
+        self.check_type(relative, 'relative', 'boolean')
+        self.check_type(ellipses, 'ellipses', 'boolean')
 
         # Value and error coordinates
         value_coords = [
@@ -2403,7 +2400,7 @@ class Output_Group():
 
                     # Rotated error bars for 2d correlation scatters, only if errors make sense
                     if (
-                        self.series.from_data and self.number == 0
+                        self.from_data and self.number == 0
                         and value_coords[0] == value_coords[1]
                     ):
                         all_values = np.array(
@@ -2411,7 +2408,7 @@ class Output_Group():
                                 [
                                     vars(group[star.index - 1])[value_coords[i]][step, axes[i]]
                                     for i in range(ndim)
-                                ] for group in self.series[1:]
+                                ] for group in self[1:]
                             ]
                         )
 
@@ -2576,14 +2573,14 @@ class Output_Group():
         """
 
         # Check the type of axis3d and set style, if needed
-        self.series.check_type(axis3d, 'axis3d', 'boolean')
+        self.check_type(axis3d, 'axis3d', 'boolean')
         if axis3d and style not in ('2x2', '3x3', '4x1'):
             axis3d = False
         if not axis3d and style == '4x1':
             style = '3x1'
 
         # Initialize figure
-        fig, axes = self.series.set_figure(
+        fig, axes = self.set_figure(
             style, 'label_right', 'hide_x' if style in ('2x2', '2x3', '3x3') else '',
             'hide_y' if style == '3x3' else '', 'corner' if style in ('2x2', '3x3') else '',
             '3d' if axis3d else '', styles=('1x3', '2x2', '2x3', '3x1', '3x2', '3x3', '4x1')
@@ -2616,7 +2613,7 @@ class Output_Group():
         # Plot positions and velocities (1d)
         if style in ('2x3', '3x2', '3x3'):
             for ax, i in zip((ax4, ax5, ax6), range(3)):
-                ax.value = self.series.plot_histogram(
+                ax.value = self.plot_histogram(
                     ax, values[i], 20, fit='skewnormal', limits=limits[i],
                     label=vars(systems[system])[coord][i].name,
                     orientation='vertical' if style in ('2x3', '3x3') else 'horizontal'
@@ -2653,13 +2650,13 @@ class Output_Group():
             )
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, self.get_title_coord, coord, system,
             '{system} {coord}s', line_2=f'at {age:.1f} Myr'
         )
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f'{coord}_{system}_{style}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
@@ -2674,7 +2671,7 @@ class Output_Group():
         """
 
         # Initialize figure
-        fig, axes = self.series.set_figure(style, 'hide_x', 'hide_y', styles=('3x3', '4x4'))
+        fig, axes = self.set_figure(style, 'hide_x', 'hide_y', styles=('3x3', '4x4'))
 
         # Select axes in accordance to style
         if style == '3x3':
@@ -2696,7 +2693,7 @@ class Output_Group():
             for i in range(6):
                 j = i - (0 if i < 3 else 3)
                 coord = 'position' if i < 3 else 'velocity'
-                axes_distribution[i].value = self.series.plot_histogram(
+                axes_distribution[i].value = self.plot_histogram(
                     axes_distribution[i], values[coord][j], 20, fit='skewnormal',
                     limits=limits[coord][j], label=vars(systems[system])[coord][j].name,
                     orientation='vertical' if i < 3 else 'horizontal'
@@ -2715,13 +2712,13 @@ class Output_Group():
             )
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, self.get_title_coord, 'position', system,
             '{position} positions and {velocity} velocities', line_2=f'at {age:.1f} Myr'
         )
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f'position_velocity_cross_{system}_{style}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
@@ -2736,7 +2733,7 @@ class Output_Group():
         """
 
         # Initialize figure
-        fig, axes = self.series.set_figure(
+        fig, axes = self.set_figure(
             style, 'hide_y', '3d' if style in ('4x2', '4x3') else '',
             'label_right', styles=('3x2', '3x3', '4x2', '4x3')
         )
@@ -2745,20 +2742,20 @@ class Output_Group():
         number_of_steps = int(style[-1])
 
         # Check the type and value of steps
-        self.series.check_type(steps, 'steps', ('tuple', 'list', 'None'))
+        self.check_type(steps, 'steps', ('tuple', 'list', 'None'))
         if steps is None:
             steps = number_of_steps * [None]
-        self.series.stop(
+        self.stop(
             len(steps) != number_of_steps, 'ValueError',
             "'steps' must be have a length of {} with the style '{}' ({} given).",
             number_of_steps, style, len(steps)
         )
 
         # Check the type and value of ages
-        self.series.check_type(ages, 'ages', ('tuple', 'list', 'None'))
+        self.check_type(ages, 'ages', ('tuple', 'list', 'None'))
         if ages is None:
             ages = number_of_steps * [None]
-        self.series.stop(
+        self.stop(
             len(ages) != number_of_steps, 'ValueError',
             "'ages' must be have a length of {} with the style '{}' ({} given).",
             number_of_steps, style, len(ages)
@@ -2792,13 +2789,13 @@ class Output_Group():
 
         # Set title
         ages_str = [f'{age:.1f}' for age in ages]
-        self.series.set_title(
+        self.set_title(
             title, fig, self.get_title_coord, coord, system, '{system} {coord}s',
             line_2=f"at {enumerate_strings(*ages_str, conjunction='and')} Myr"
         )
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f"{coord}_{system}_{style}_{self.name}_{'_'.join(ages_str)}Myr.pdf", fig,
             forced=forced, default=default, cancel=cancel
         )
@@ -2813,11 +2810,11 @@ class Output_Group():
         """
 
         # Check the type of axis3d and flip
-        self.series.check_type(axis3d, 'axis3d', 'boolean')
-        self.series.check_type(flip, 'flip', 'boolean')
+        self.check_type(axis3d, 'axis3d', 'boolean')
+        self.check_type(flip, 'flip', 'boolean')
 
         # Initialize figure
-        fig, axes = self.series.set_figure(
+        fig, axes = self.set_figure(
             '6x6', 'hide_x', 'hide_y', '3d' if axis3d else '', bottom=0.345
         )
 
@@ -2833,7 +2830,7 @@ class Output_Group():
         for i in range(6):
             j = i - (0 if i < 3 else 3)
             coord = 'position' if i < 3 else 'velocity'
-            axes[i,i].value = self.series.plot_histogram(
+            axes[i,i].value = self.plot_histogram(
                 axes[i, i], values[coord][j], 20, fit='skewnormal',
                 limits=limits[coord][j], label=vars(systems[system])[coord][j].name,
                 orientation='vertical' if i < 3 or not flip else 'horizontal'
@@ -2869,25 +2866,25 @@ class Output_Group():
             axes[-1, -1].set_xlabel(axes[-1, -2].get_ylabel())
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, self.get_title_coord, 'position', system,
             '{position} positions and {velocity} velocities', line_2=f'at {age:.1f} Myr'
         )
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f'position_velocity_corner_{system}_{self.name}_{age:.1f}Myr.pdf', fig,
             forced=forced, default=default, cancel=cancel
         )
 
-    def draw_age_distribution(
+    def draw_age_distribution_group(
         self, metric, index=None, fit=None, number_of_bins=120,
         title=False, forced=None, default=None, cancel=None
     ):
         """Draws a plot of the age distribution of a group for a given metric."""
 
         # Initialize figure
-        fig, axes = self.series.set_figure('1x1')
+        fig, axes = self.set_figure('1x1')
 
         # Retrieve metric
         metric, index = self.get_metric(metric, index)
@@ -2895,7 +2892,7 @@ class Output_Group():
         # Plot histogram
         if metric.metric.status:
             ages = metric.ages[:,index]
-            self.series.plot_histogram(
+            self.plot_histogram(
                 axes[0,0], ages, number_of_bins, fit=fit, value=metric.age[index],
                 error=metric.age_int_error[index], limits=(np.min(ages), max((np.max(ages), 1.0))),
                 label=metric.metric.name[index], error_lines=False, curve_color=colors.lime[4],
@@ -2904,23 +2901,23 @@ class Output_Group():
 
         # Logging
         else:
-            self.series.log(
+            self.log(
                 "Could not use '{}' metric for '{}' group. It was not computed.",
                 metric.name[index], self.name, display=True
             )
 
         # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
-        # self.series.plot_MiretRoig2020_Crundall2019(axes[0,0])
+        # self.plot_MiretRoig2020_Crundall2019(axes[0,0])
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
-            f'Age distribution of {self.series.number_of_iterations} iterations of {self.name},\n'
+            f'Age distribution of {self.number_of_iterations} iterations of {self.name},\n'
             f'using the {metric.metric.name[index]} as association size metric'
         )
 
         # Set legend
-        self.series.set_legend(axes[0,0], 2)
+        self.set_legend(axes[0,0], 2)
 
         # Set labels
         axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
@@ -2931,7 +2928,7 @@ class Output_Group():
         axes[0,0].set_ylim(0, 0.49)
 
         # Save figure
-        self.series.save_figure(
+        self.save_figure(
             f"age_distribution_{self.name}_{metric.metric.name[index].replace(' ', '_')}.pdf",
             fig, tight=False, forced=forced, default=default, cancel=cancel
         )
@@ -2948,13 +2945,13 @@ class Output_Group():
         """
 
         # Initialize figure
-        fig, axes = self.series.set_figure(
+        fig, axes = self.set_figure(
             '1x1', 'mollweide', width=7.0900, bottom=0.0815,
             ratio=0.50, adjust='ax_width', h_align='center'
         )
 
         # Check the type of labels
-        self.series.check_type(labels, 'labels', 'boolean')
+        self.check_type(labels, 'labels', 'boolean')
 
         # Birth index, age and age error
         if age is not None or metric is not None:
@@ -2962,7 +2959,7 @@ class Output_Group():
 
         # Compute Sun's orbit
         sun = self.Star(
-            self, name='sun', time=self.series.time,
+            self, name='sun', time=self.time,
             position_xyz=np.zeros(3), velocity_xyz=np.zeros(3),
         )
 
@@ -3015,7 +3012,7 @@ class Output_Group():
                 )
 
         # Plot proper motion arrows
-        for star in self.series.data.sample:
+        for star in self.data.sample:
             axes[0,0].arrow(
                 star.position.values[2] - (2 * np.pi if star.position.values[2] > np.pi else 0.0),
                 star.position.values[1], -star.velocity.values[2] / 4, -star.velocity.values[1] / 4,
@@ -3024,9 +3021,9 @@ class Output_Group():
             )
 
         # Set title
-        self.series.set_title(
+        self.set_title(
             title, fig, lambda fig, title: (title, title),
-            f'Mollweide projection of {self.name} over {self.series.duration.value:.1f} Myr'
+            f'Mollweide projection of {self.name} over {self.duration.value:.1f} Myr'
         )
 
         # Set grid
@@ -3034,7 +3031,7 @@ class Output_Group():
         axes[0,0].grid(color=colors.grey[17], linewidth=0.5, alpha=0.0)
 
         # Save figure, without a grid
-        self.series.save_figure(
+        self.save_figure(
             f'Mollweide_{self.name}.pdf', fig, close=False,
             forced=forced, default=default, cancel=cancel
         )
@@ -3048,7 +3045,7 @@ class Output_Group():
             axes[0,0].add_artist(gridline)
 
         # Save figure, with a grid
-        self.series.save_figure(
+        self.save_figure(
             f'Mollweide_{self.name}.pdf', fig, logging=False,
             forced=True, default=False, cancel=False
         )
@@ -3072,19 +3069,19 @@ class Output_Group():
         def get_position_velocity_xyz(star):
             position_xyz = Quantity(
                 star.position_xyz[epoch_index], 'pc',
-                np.diag(star.position_xyz_error[epoch_index])
+                np.sqrt(np.diag(star.position_xyz_error[epoch_index]))
             )
             velocity_xyz = Quantity(
                 star.velocity_xyz[epoch_index], 'pc/Myr',
-                np.diag(star.velocity_xyz_error[epoch_index])
+                np.sqrt(np.diag(star.velocity_xyz_error[epoch_index]))
             ).to('km/s')
 
             return position_xyz, velocity_xyz
 
         # Check the types of save, show and machine
-        self.series.check_type(save, 'save', 'boolean')
-        self.series.check_type(show, 'show', 'boolean')
-        self.series.check_type(machine, 'machine', 'boolean')
+        self.check_type(save, 'save', 'boolean')
+        self.check_type(show, 'show', 'boolean')
+        self.check_type(machine, 'machine', 'boolean')
 
         # Create header
         if machine:
@@ -3138,7 +3135,7 @@ class Output_Group():
 
         # Save table
         if save:
-            self.series.save_table(
+            self.save_table(
                 f'kinematics_{self.name}_{age}Myr.csv', f'Kinematics of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
@@ -3158,9 +3155,9 @@ class Output_Group():
         """
 
         # Check the types of save, show and machine
-        self.series.check_type(save, 'save', 'boolean')
-        self.series.check_type(show, 'show', 'boolean')
-        self.series.check_type(machine, 'machine', 'boolean')
+        self.check_type(save, 'save', 'boolean')
+        self.check_type(show, 'show', 'boolean')
+        self.check_type(machine, 'machine', 'boolean')
 
         # Create header
         if machine:
@@ -3169,10 +3166,10 @@ class Output_Group():
             ]
 
             # Create lines
-            for t in np.arange(self.series.time.size):
+            for t in np.arange(self.time.size):
                 lines.append(
                     (
-                        f'{self.series.time[t]},'
+                        f'{self.time[t]},'
                         f'{self.position_xyz[t,0]},'
                         f'{self.position_xyz[t,1]},'
                         f'{self.position_xyz[t,2]},'
@@ -3202,10 +3199,10 @@ class Output_Group():
             ]
 
             # Create lines
-            for t in np.arange(self.series.time.size):
+            for t in np.arange(self.time.size):
                 lines.append(
                     (
-                        f'{self.series.time[t]:<8.1f}'
+                        f'{self.time[t]:<8.1f}'
                         f'{self.position_xyz[t,0]:>12.2f}'
                         f'{self.position_xyz[t,1]:>12.2f}'
                         f'{self.position_xyz[t,2]:>12.2f}'
@@ -3231,16 +3228,13 @@ class Output_Group():
 
         # Save table
         if save:
-            self.series.save_table(
+            self.save_table(
                 f'kinematics_time_{self.name}', f'Kinematics over time of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
 
-class Output_Star():
-    """Ouput methods of a star."""
-
-    def create_kinematics_time_table(
+    def create_kinematics_time_table_star(
         self, save=False, show=False, machine=False,
         forced=None, default=None, cancel=None
     ):
@@ -3254,19 +3248,19 @@ class Output_Star():
         """
 
         # Check the types of save, show and machine
-        self.group.series.check_type(save, 'save', 'boolean')
-        self.group.series.check_type(show, 'show', 'boolean')
-        self.group.series.check_type(machine, 'machine', 'boolean')
+        self.group.check_type(save, 'save', 'boolean')
+        self.group.check_type(show, 'show', 'boolean')
+        self.group.check_type(machine, 'machine', 'boolean')
 
         # Create header
         if machine:
             lines = ['Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta']
 
             # Create lines
-            for t in np.arange(self.group.series.time.size):
+            for t in np.arange(self.group.time.size):
                 lines.append(
                     (
-                        f'{self.group.series.time[t]},'
+                        f'{self.group.time[t]},'
                         f'{self.position_xyz[t,0]},'
                         f'{self.position_xyz[t,1]},'
                         f'{self.position_xyz[t,2]},'
@@ -3296,10 +3290,10 @@ class Output_Star():
             ]
 
             # Create lines
-            for t in np.arange(self.group.series.time.size):
+            for t in np.arange(self.group.time.size):
                 lines.append(
                     (
-                        f'{self.group.series.time[t]:<8.1f}'
+                        f'{self.group.time[t]:<8.1f}'
                         f'{self.position_xyz[t,0]:>12.2f}'
                         f'{self.position_xyz[t,1]:>12.2f}'
                         f'{self.position_xyz[t,2]:>12.2f}'
@@ -3325,7 +3319,7 @@ class Output_Star():
 
         # Save table
         if save:
-            self.group.series.save_table(
+            self.group.save_table(
                 f'kinematics_time_{self.name}', f'Kinematics over time of {self.name}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
