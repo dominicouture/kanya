@@ -13,7 +13,7 @@ from .traceback import Traceback
 from .chrono import Chrono
 from .output import Output
 
-class Group(list, Traceback, Chrono, Output):
+class Group(Traceback, Chrono, Output):
     """
     Group of stars. This class contains the data and methods necessary to traceback the
     trajectories of stars and find their age by minimizing the size of the group. It is
@@ -47,6 +47,11 @@ class Group(list, Traceback, Chrono, Output):
         elif addition:
             self.add(forced=forced, default=default, cancel=cancel, logging=logging)
 
+    def __repr__(self):
+        """Creates a string with the name of the Group"""
+
+        return self.name
+
     def configure(self, parent=None, file_path=None, args=False, **parameters):
         """
         Configures a Group objects from 'parent', an existing Config object, 'file_path', a string
@@ -77,8 +82,9 @@ class Group(list, Traceback, Chrono, Output):
         self.load = self.set_boolean(self.config.load)
         self.save = self.set_boolean(self.config.save)
 
-        # Set traceback_present parameter
+        # Set traceback_present and chrono_present parameters
         self.traceback_present = False
+        self.chrono_present = False
 
         # Import the association size metrics file and skip the header line
         metrics_file = path.join(path.dirname(__file__), 'resources/association_size_metrics.csv')
@@ -194,7 +200,7 @@ class Group(list, Traceback, Chrono, Output):
 
         return file_path
 
-    def set_integer(self, parameter, none=False, mode=False):
+    def set_integer(self, parameter, minimum, none=False, mode=False):
         """Checks if an integer value is valid and converts it if needed."""
 
         # Set integer parameter
@@ -211,9 +217,9 @@ class Group(list, Traceback, Chrono, Output):
 
         # Check if the parameter is greater than or equal to 1
         self.stop(
-            parameter.values < 1, 'ValueError',
-            "'{}' must be greater than or equal to 1 ({} given).",
-            parameter.label, parameter.values
+            parameter.values < minimum, 'ValueError',
+            "'{}' must be greater than or equal to {} ({} given).",
+            parameter.label, minimum, parameter.values
         )
 
         # Conversion to an integer
@@ -409,7 +415,7 @@ class Group(list, Traceback, Chrono, Output):
         """Checks whether a traceback has been computed for the group."""
 
         self.stop(
-            len(self) < 1, 'ValueError', "'{}' group hasn't been traceback. "
+            not self.traceback_present, 'ValueError', "'{}' group hasn't been traceback. "
             "Impossible to create an output.", self.name
         )
 
@@ -908,7 +914,7 @@ class Group(list, Traceback, Chrono, Output):
         )
 
     def stop(self, condition, error, message, *words):
-        """Calls the stop function from collection with self.name, if it has been set."""
+        """Calls the stop function from Collection with self.name, if it has been set."""
 
         # Addition of group name to stop function call
         stop(
@@ -953,17 +959,17 @@ class Group(list, Traceback, Chrono, Output):
             if self.size_metrics:
                 if self.cov_metrics:
                     create_time_str(
-                        'Covariances (empirical)',
+                        'Covariance (empirical)',
                         self.timers['cov_metrics']
                     )
                 if self.cov_robust_metrics:
                     create_time_str(
-                        'Covariances (robust)',
+                        'Covariance (robust)',
                         self.timers['cov_robust_metrics']
                     )
                 if self.cov_sklearn_metrics:
                     create_time_str(
-                        'Covariances (sklearn)',
+                        'Covariance (sklearn)',
                         self.timers['cov_sklearn_metrics']
                     )
                 if self.mad_metrics:

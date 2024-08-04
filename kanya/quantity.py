@@ -144,9 +144,8 @@ class Quantity:
 
         return f'{hh:0>2.0f}:{mm:0>2.0f}:{ss:0>5.2f}'
 
-
     def __repr__(self):
-        """Creates a string with the values, errors and units of the Quantity object."""
+        """Creates a string with the values, errors and units of the Quantity."""
 
         def reduce(array):
             """

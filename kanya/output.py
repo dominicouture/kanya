@@ -57,7 +57,7 @@ class colors():
     cycle = cycler(color=(azure[6], pink[6], chartreuse[6], indigo[9], orange[9], lime[9]))
 
 class Output():
-    """Output method for a groups."""
+    """Output methods for Group."""
 
     def save_output(
         self, file_name, save, *save_args, extension=None, file_type=None,
@@ -796,7 +796,7 @@ class Output():
         )
         self.stop(
             metric == 'cross_covariance' and sklearn, 'ValueError',
-            "'sklearn' cross covariances are not computed."
+            "'sklearn' cross covariance cannot computed at this point."
         )
 
         return f'{metric}_{system}', '_sklearn' if sklearn else '_robust' if robust else ''
@@ -849,7 +849,7 @@ class Output():
                     metric.values.shape[2], metric.values.shape[3])
                 )
                 for i in np.unique(
-                    np.round(np.linspace(0, self.number_of_groups * self.number_of_iterations - 1, 20))
+                    np.round(np.linspace(0, self.number_monte_carlo * self.number_jackknife - 1, 20))
                 ):
                     ax.plot(
                         self.time, values[int(i),:,index],
@@ -931,108 +931,108 @@ class Output():
         # Create title from a model
         if self.from_model:
             line_2 = (
-                f"of {self.number_of_groups} association{'s' if self.number_of_groups > 1 else ''} "
+                f"of {self.number_monte_carlo} association{'s' if self.number_monte_carlo > 1 else ''} "
                 f'modeled after {self.name} over {self.duration.value:.1f} Myr'
             )
 
             return f'Average {line_1_title}\n{line_2}', f'Average {line_1_log} {line_2}'
 
-    def plot_covariances(self, ax, system, robust, sklearn):
-        """Plots the determinant, the trace and the diagonal terms of the covariances matrix."""
+    def plot_covariance(self, ax, system, robust, sklearn):
+        """Plots the determinant, the trace and the diagonal terms of the covariance matrix."""
 
         # Select association size metrics
-        covariances, selection = (
-            self.select_metric('covariances', system, robust=robust, sklearn=sklearn)
+        covariance, selection = (
+            self.select_metric('covariance', system, robust=robust, sklearn=sklearn)
         )
-        covariances_matrix_det = vars(self)[f'{covariances}_matrix_det{selection}']
-        covariances_matrix_trace = vars(self)[f'{covariances}_matrix_trace{selection}']
-        covariances = vars(self)[f'{covariances}{selection}']
+        covariance_matrix_det = vars(self)[f'{covariance}_matrix_det{selection}']
+        covariance_matrix_trace = vars(self)[f'{covariance}_matrix_trace{selection}']
+        covariance = vars(self)[f'{covariance}{selection}']
 
-        # Plot covariance matrix determinant and trace, and covariances
-        self.plot_metric(ax, covariances_matrix_det, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax, covariances_matrix_trace, 0, colors.metric[1], '--', 0.6)
-        self.plot_metric(ax, covariances, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax, covariances, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax, covariances, 2, colors.metric[7], ':', 0.5)
+        # Plot covariance matrix determinant and trace, and covariance
+        self.plot_metric(ax, covariance_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, covariance_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax, covariance, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, covariance, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, covariance, 2, colors.metric[7], ':', 0.5)
 
         return selection
 
-    def draw_covariances(
+    def draw_covariance(
         self, system, robust=False, sklearn=False,
         title=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates a plot of the determinant, the trace and the diagonal terms of the covariances
-        matrix. If either 'robust' or 'sklearn' is True, the robust or sklearn covariances matrix
-        is used. Otherwise, the empirical covariances matrix is used.
+        Creates a plot of the determinant, the trace and the diagonal terms of the covariance
+        matrix. If either 'robust' or 'sklearn' is True, the robust or sklearn covariance matrix
+        is used. Otherwise, the empirical covariance matrix is used.
         """
 
         # Initialize figure
         fig, axes = self.set_figure('1x1', left=0.3430)
 
-        # Plot covariance matrix determinant and trace, and covariances
-        selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
+        # Plot covariance matrix determinant and trace, and covariance
+        selection = self.plot_covariance(axes[0,0], system, robust, sklearn)
 
         # Set title
         self.set_title(
             title, fig, self.get_title_metric,
-            '{system}'f"{selection.replace('_', ' ')} covariances", system
+            '{system}'f"{selection.replace('_', ' ')} covariance", system
         )
 
         # Save figure
         self.save_figure(
-            f'covariances_{system}_{self.name}{selection}.pdf', fig,
+            f'covariance_{system}_{self.name}{selection}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
-    def plot_cross_covariances(self, ax, system, robust, sklearn):
+    def plot_cross_covariance(self, ax, system, robust, sklearn):
         """
-        Plots the determinant, the trace and the diagonal terms of the cross covariances matrix
+        Plots the determinant, the trace and the diagonal terms of the cross covariance matrix
         between positions and velocities.
         """
 
         # Select association size metrics
-        cross_covariances, selection = (
-            self.select_metric('cross_covariances', system, robust=robust, sklearn=sklearn)
+        cross_covariance, selection = (
+            self.select_metric('cross_covariance', system, robust=robust, sklearn=sklearn)
         )
-        cross_covariances_matrix_det = vars(self)[f'{cross_covariances}_matrix_det{selection}']
-        cross_covariances_matrix_trace = vars(self)[f'{cross_covariances}_matrix_trace{selection}']
-        cross_covariances = vars(self)[f'{cross_covariances}{selection}']
+        cross_covariance_matrix_det = vars(self)[f'{cross_covariance}_matrix_det{selection}']
+        cross_covariance_matrix_trace = vars(self)[f'{cross_covariance}_matrix_trace{selection}']
+        cross_covariance = vars(self)[f'{cross_covariance}{selection}']
 
-        # Plot the cross covariance matrix determinant and trace, and cross covariances
-        self.plot_metric(ax, cross_covariances_matrix_det, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax, cross_covariances_matrix_trace, 0, colors.metric[1], '--', 0.6)
-        self.plot_metric(ax, cross_covariances, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax, cross_covariances, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax, cross_covariances, 2, colors.metric[7], ':', 0.5)
+        # Plot the cross covariance matrix determinant and trace, and cross covariance
+        self.plot_metric(ax, cross_covariance_matrix_det, 0, colors.metric[0], '-', 0.8)
+        self.plot_metric(ax, cross_covariance_matrix_trace, 0, colors.metric[1], '--', 0.6)
+        self.plot_metric(ax, cross_covariance, 0, colors.metric[5], '-', 0.9)
+        self.plot_metric(ax, cross_covariance, 1, colors.metric[6], '--', 0.7)
+        self.plot_metric(ax, cross_covariance, 2, colors.metric[7], ':', 0.5)
 
         return selection
 
-    def draw_cross_covariances(
+    def draw_cross_covariance(
         self, system, robust=False, sklearn=False,
         title=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates a plot the determinant, the trace and the diagonal terms of the cross covariances
+        Creates a plot the determinant, the trace and the diagonal terms of the cross covariance
         matrix between positions and velocities. If either 'robust' or 'sklearn' is True, the robust
-        or sklearn covariances matrix is used. Otherwise, the empirical covariances matrix is used.
+        or sklearn covariance matrix is used. Otherwise, the empirical covariance matrix is used.
         """
 
         # Initialize figure
         fig, axes = self.set_figure('1x1', left=0.3430)
 
-        # Plot the cross covariance matrix determinant and trace, and cross covariances
-        selection = self.plot_cross_covariances(axes[0,0], system, robust, sklearn)
+        # Plot the cross covariance matrix determinant and trace, and cross covariance
+        selection = self.plot_cross_covariance(axes[0,0], system, robust, sklearn)
 
         # Set title
         self.set_title(
             title, fig, self.get_title_metric,
-            '{position} and {velocity}'f"{selection.replace('_', ' ')} cross covariances", system
+            '{position} and {velocity}'f"{selection.replace('_', ' ')} cross covariance", system
         )
 
         # Save figure
         self.save_figure(
-            f'cross_covariances_{system}_{self.name}{selection}.pdf', fig,
+            f'cross_covariance_{system}_{self.name}{selection}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
@@ -1146,15 +1146,15 @@ class Output():
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
-    def draw_covariances_mad(
+    def draw_covariance_mad(
         self, system, style, robust=False, sklearn=False,
         title=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates a plot of the determinant, the trace and the diagonal terms of the covariances
+        Creates a plot of the determinant, the trace and the diagonal terms of the covariance
         matrix, and the total median absolute deviation (MAD), the components of the MAD. If
-        either 'robust' or 'sklearn' is True, the robust or sklearn covariances matrix is used.
-        Otherwise, the empirical covariances matrix is used.
+        either 'robust' or 'sklearn' is True, the robust or sklearn covariance matrix is used.
+        Otherwise, the empirical covariance matrix is used.
         """
 
         # Initialize figure
@@ -1162,9 +1162,9 @@ class Output():
             style, 'hide_x', left=0.3430, colpad=0.4430, styles=('2x1', '1x2')
         )
 
-        # Plot covariance matrix determinant and trace, and covariances
-        selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
-        axes[0,0].set_yticks([0, 3, 6, 9, 12, 15, 18, 21])
+        # Plot covariance matrix determinant and trace, and covariance
+        selection = self.plot_covariance(axes[0,0], system, robust, sklearn)
+        # axes[0,0].set_yticks([0, 3, 6, 9, 12, 15, 18, 21])
 
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
         self.plot_mad(axes[1 if style == '2x1' else 0, 1 if style == '1x2' else 0], system)
@@ -1172,38 +1172,38 @@ class Output():
         # Set title
         self.set_title(
             title, fig, self.get_title_metric,
-            '{system}'f"{selection.replace('_', ' ')} covariances and median absolution deviation",
+            '{system}'f"{selection.replace('_', ' ')} covariance and median absolution deviation",
             system
         )
 
         # Save figure
         self.save_figure(
-            f'covariances_mad_{system}_{style}_{self.name}.pdf', fig,
+            f'covariance_mad_{system}_{style}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
-    def draw_covariances_cross_mad_tree(
+    def draw_covariance_cross_mad_tree(
         self, system, robust=False, sklearn=False,
         title=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates plots of the determinant, the trace and the diagonal terms of the covariances
-        matrix, the determinant, the trace and the diagonal terms of the cross covariances matrix
+        Creates plots of the determinant, the trace and the diagonal terms of the covariance
+        matrix, the determinant, the trace and the diagonal terms of the cross covariance matrix
         between positions and velocities, the total median absolute deviation (MAD), the components
         of the MAD, and the mean, robust mean, and median absolute deviation full and minimum
         spanning tree (MST) branch lengths.  If either 'robust' or 'sklearn' is True, the robust
-        or sklearn covariances and cross covariance matrices are used. Otherwise, the empirical
-        covariances and cross covariance matrices are used.
+        or sklearn covariance and cross covariance matrices are used. Otherwise, the empirical
+        covariance and cross covariance matrices are used.
         """
 
         # Initialize figure
         fig, axes = self.set_figure('2x2', 'hide_x', 'label_right')
 
-        # Plot covariance matrix determinant and t race, and covariances
-        selection = self.plot_covariances(axes[0,0], system, robust, sklearn)
+        # Plot covariance matrix determinant and trace, and covariance
+        selection = self.plot_covariance(axes[0,0], system, robust, sklearn)
 
-        # Plot the cross covariance matrix determinant and trace, and cross covariances
-        self.plot_cross_covariances(axes[0,1], system, robust, sklearn=False)
+        # Plot the cross covariance matrix determinant and trace, and cross covariance
+        self.plot_cross_covariance(axes[0,1], system, robust, sklearn=False)
 
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
         self.plot_mad(axes[1,0], system)
@@ -1215,13 +1215,13 @@ class Output():
         # Set title
         self.set_title(
             title, fig, self.get_title_metric,
-            '{system}'f"{selection.replace('_', ' ')} covariances, cross covariances, median "
+            '{system}'f"{selection.replace('_', ' ')} covariance, cross covariance, median "
             "absolution deviation, and full and minimum spanning trees", system
         )
 
         # Save figure
         self.save_figure(
-            f'covariances_cross_mad_mst_{system}_{self.name}.pdf', fig,
+            f'covariance_cross_mad_mst_{system}_{self.name}.pdf', fig,
             tight=title, forced=forced, default=default, cancel=cancel
         )
 
@@ -1431,15 +1431,17 @@ class Output():
 
         # Adjust ages, if needed
         if metric.status:
-            ages = metric.ages[:,:,index].flatten()
+            ages = metric.ages[:, :, index].flatten()
             value = metric.age_adjusted[index] if adjusted else metric.age[index]
-            ages += (value - np.mean(ages) if adjusted else 0.0)
+            ages = ages + value - np.mean(ages)
 
             # Plot histogram
             self.plot_histogram(
                 axes[0,0], ages, number_of_bins, fit=fit, value=value,
-                error=metric.age_error[index], limits=(np.min(ages), np.max((np.max(ages), 1.0))),
-                label=f"{'Corrected ' if adjusted else ''}{metric.name[index]}"
+                error=metric.age_error[index], limits=(np.min(ages) - 10, np.max(ages) + 10),
+                label=f"{'Corrected ' if adjusted else ''}{metric.name[index]}",
+                error_lines=True, curve_color=colors.lime[4], hist_color=colors.lime[7],
+                line_color=colors.lime[4]
             )
 
         # Logging
@@ -1455,7 +1457,7 @@ class Output():
         # Set title
         self.set_title(
             title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
-            f'Age distribution of {self.number_of_groups} groups of {self.name},\n'
+            f'Age distribution of {self.number_monte_carlo} groups of {self.name},\n'
             f'using the {metric.name[index]} as association size metric'
         )
 
@@ -1468,7 +1470,7 @@ class Output():
 
         # Set limits
         axes[0,0].set_xlim(-40, 1)
-        axes[0,0].set_ylim(0, 0.17)
+        axes[0,0].set_ylim(0, 0.30)
 
         # Save figure
         self.save_figure(
@@ -1714,7 +1716,7 @@ class Output():
         # Metric instance
         self.check_type(metric, 'metric', ('string', 'None'))
         self.stop(
-            metric not in [metric.metric.label for metric in self.metrics], 'ValueError',
+            metric not in [metric.label for metric in self.metrics], 'ValueError',
             "'metric' must be a valid metric key ({} given).", metric
         )
         metric = vars(self)[metric]
@@ -1792,14 +1794,9 @@ class Output():
 
         # Find limits, increased by 25%
         scale_factor = 1.25
-        values = np.array(
-            [
-                [
-                    vars(star)[f"{'relative_' if relative else ''}{coord}_{system}"][step]
-                    for star in group.sample
-                ] for group in self
-            ]
-        ).reshape((-1, 3)).T
+        values = vars(self)[
+            f"{'relative_' if relative else ''}{coord}_{system}"
+        ][..., step, :].reshape((-1, 3)).T
         values_range = np.repeat(np.max((np.max(values, axis=1) - np.min(values, axis=1))), 3)
         limits = (
             np.array([-values_range, values_range]) * scale_factor +
@@ -1833,11 +1830,12 @@ class Output():
             factors = np.array([1000, 1000, 1])
 
         # Select coordinates
-        for star in self:
-            value = vars(star)[f'{coord}_{system}'] / factors
+        values = vars(self)[f'{coord}_{system}'][0] / factors
+        for star in range(values.shape[0]):
+            value = values[star]
 
             # Plot stars' values
-            color = colors.red[6] if star.outlier else colors.black
+            color = colors.red[6] if self.outliers[star] else colors.black
             ax.plot(
                 value.T[x], value.T[y],
                 color=color, alpha=0.6, linewidth=0.5,
@@ -1854,7 +1852,7 @@ class Output():
 
                 # Plot stars' birth values
                 if birth_index is not None:
-                    color = colors.red[6] if star.outlier else colors.blue[6]
+                    color = colors.red[6] if self.outliers[star] else colors.blue[6]
                     ax.scatter(
                         np.array([value[birth_index,x]]),
                         np.array([value[birth_index,y]]),
@@ -1865,8 +1863,9 @@ class Output():
                 # Show stars' names
                 if labels:
                     ax.text(
-                        np.array(value.T[0,x]), np.array(value.T[0,y]), star.name,
-                        color=colors.black, horizontalalignment='left', fontsize=6
+                        np.array(value.T[0,x]), np.array(value.T[0,y]),
+                        self.star_designations[star], color=colors.black,
+                        horizontalalignment='left', fontsize=6
                     )
 
         # Select coordinates
@@ -2023,13 +2022,14 @@ class Output():
 
         # Select coordinates
         if y in (0, 1, 2):
-            for star in self:
-                value = vars(star)[f'relative_{coord}_{system}']
+            values = vars(self)[f'relative_{coord}_{system}'][0]
+            for star in range(values.shape[0]):
+                value = values[star]
 
                 # Plot stars' trajectories
                 ax.plot(
                     self.time, value[:,y],
-                    color = colors.red[6] if star.outlier else colors.black, alpha=0.6,
+                    color = colors.red[6] if self.outliers[star] else colors.black, alpha=0.6,
                     linewidth=0.5, solid_capstyle='round', zorder=0.1
                 )
 
@@ -2043,7 +2043,7 @@ class Output():
 
                     # Plot stars' birth values
                     if birth_index[y] is not None:
-                        color = colors.red[6] if star.outlier else colors.blue[6]
+                        color = colors.red[6] if self.outliers[star] else colors.blue[6]
                         ax.scatter(
                             self.time[birth_index[y]], value[birth_index[y],y],
                             color=color + (0.4,), edgecolors=color, alpha=None,
@@ -2249,7 +2249,7 @@ class Output():
         mst=False, ellipses=True, relative=False, values=None, limits=None
     ):
         """
-        Creates a 2d or 3d scatter of positions or velocities, at a given step. 'errors', adds
+        Creates a 2d or 3d scatter of positions or velocities, at a given step. 'errors' adds
         error  bars, 'labels' adds the stars' names, 'mst' adds the minimun spanning tree branches,
         'ellipses' adds 1σ and 2σ probability ellipses, and 'relative' cause the use of relative
         values instead absolute values.
@@ -2371,14 +2371,16 @@ class Output():
         error_coords = [f'{coords[i]}_{system}_error' for i in range(ndim)]
 
         # Select coordinates
-        for star in self.sample:
-            value = np.array([vars(star)[value_coords[i]][step, axes[i]] for i in range(ndim)])
+        for star in range(self.number_of_stars):
+            value = np.array(
+                [vars(self)[value_coords[i]][0, star, step, axes[i]] for i in range(ndim)]
+            )
             error = np.array(
-                [np.diag(vars(star)[error_coords[i]][step])[axes[i]] for i in range(ndim)]
-            )**0.5
+                [vars(self)[error_coords[i]][star, step, axes[i]] for i in range(ndim)]
+            )
 
             # Select color
-            color = colors.red[9] if star.outlier else colors.black
+            color = colors.red[9] if self.outliers[star] else colors.black
 
             # Plot value
             if projection == '2d':
@@ -2399,21 +2401,20 @@ class Output():
                 if projection == '2d':
 
                     # Rotated error bars for 2d correlation scatters, only if errors make sense
-                    if (
-                        self.from_data and self.number == 0
-                        and value_coords[0] == value_coords[1]
-                    ):
-                        all_values = np.array(
+                    if self.from_data and value_coords[0] == value_coords[1]:
+
+                        # Compute covariance matrix
+                        covariance_matrix = np.cov(
                             [
-                                [
-                                    vars(group[star.index - 1])[value_coords[i]][step, axes[i]]
-                                    for i in range(ndim)
-                                ] for group in self[1:]
+                                vars(self)[value_coords[i]][1:, star, step, axes[i]]
+                                for i in range(ndim)
                             ]
                         )
 
+                        # Compute errors and angle
+                        a, b, θ = singular_value_decomposition(covariance_matrix)
+
                         # Compute rotated horizontal and vertical error bars
-                        a, b, θ = singular_value_decomposition(np.cov(all_values.T))
                         error_a = rotate(np.array([-a, a]), np.zeros(2), θ, *value)
                         error_b = rotate(np.zeros(2), np.array([-b, b]), θ, *value)
 
@@ -2460,13 +2461,13 @@ class Output():
             if labels:
                 if projection == '2d':
                     ax.text(
-                        value[0] + 2, value[1] + 3, star.name,
+                        value[0] + 2, value[1] + 3, self.star_designations[star],
                         color=color, horizontalalignment='left',
                         verticalalignment='top', fontsize=4, zorder=0.9
                     )
                 if projection == '3d':
                     ax.text(
-                        value[0] + 2, value[1] + 3, value[2] + 2, star.name,
+                        value[0] + 2, value[1] + 3, value[2] + 2, self.star_designations[star],
                         color=color, horizontalalignment='left',
                         verticalalignment='top', fontsize=4, zorder=0.9
                     )
@@ -2507,7 +2508,12 @@ class Output():
         # Draw values
         if projection == '2d':
             if values is None:
-                values = [vars(self)[value_coords[i]][step, axes[i]] for i in range(ndim)]
+                values = np.array(
+                    [
+                        vars(self)[f'average_{value_coords[i]}'][0, step, axes[i]]
+                        for i in range(ndim)
+                    ]
+                )
             ax.axvline(
                 values[0], color=colors.black, alpha=0.8,
                 linewidth=0.5, linestyle='--', zorder=0.9
@@ -2518,22 +2524,21 @@ class Output():
             )
 
         # Draw ellipses
-        if ellipses:
-            all_values = np.array(
-                [
-                    [vars(star)[value_coords[i]][step, axes[i]] for i in range(ndim)]
-                    for star in self.sample
-                ]
+        if ellipses and projection == '2d':
+
+            # Compute covariance matrix
+            covariance_matrix = np.cov(
+                [vars(self)[value_coords[i]][0, :, step, axes[i]] for i in range(ndim)]
             )
 
             # Compute semi-major and semi-minor axes, and angle
-            a, b, θ = bivariate_gauss_to_ellipsoid(np.cov(all_values.T))
+            a, b, θ = bivariate_gauss_to_ellipsoid(covariance_matrix)
 
-            # Compute, rotate and translate ellipses coordinates
+            # Compute, rotate, and translate ellipses coordinates
             t = np.linspace(0, 2 * np.pi, 200)
             for i in range(a.size):
                 x, y = a[i] * np.cos(t), b[i] * np.sin(t)
-                x, y = rotate(x, y, θ, np.mean(all_values[:,0]), np.mean(all_values[:,1]))
+                x, y = rotate(x, y, θ, values[0], values[1])
 
                 # Plot 1σ and 2σ probabilities
                 ax.fill(x, y, facecolor=colors.azure[9], alpha=0.3, linestyle='None', zorder=0.1)
@@ -2877,62 +2882,6 @@ class Output():
             forced=forced, default=default, cancel=cancel
         )
 
-    def draw_age_distribution_group(
-        self, metric, index=None, fit=None, number_of_bins=120,
-        title=False, forced=None, default=None, cancel=None
-    ):
-        """Draws a plot of the age distribution of a group for a given metric."""
-
-        # Initialize figure
-        fig, axes = self.set_figure('1x1')
-
-        # Retrieve metric
-        metric, index = self.get_metric(metric, index)
-
-        # Plot histogram
-        if metric.metric.status:
-            ages = metric.ages[:,index]
-            self.plot_histogram(
-                axes[0,0], ages, number_of_bins, fit=fit, value=metric.age[index],
-                error=metric.age_int_error[index], limits=(np.min(ages), max((np.max(ages), 1.0))),
-                label=metric.metric.name[index], error_lines=False, curve_color=colors.lime[4],
-                hist_color=colors.lime[7], line_color=colors.lime[4]
-            )
-
-        # Logging
-        else:
-            self.log(
-                "Could not use '{}' metric for '{}' group. It was not computed.",
-                metric.name[index], self.name, display=True
-            )
-
-        # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
-        # self.plot_MiretRoig2020_Crundall2019(axes[0,0])
-
-        # Set title
-        self.set_title(
-            title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
-            f'Age distribution of {self.number_of_iterations} iterations of {self.name},\n'
-            f'using the {metric.metric.name[index]} as association size metric'
-        )
-
-        # Set legend
-        self.set_legend(axes[0,0], 2)
-
-        # Set labels
-        axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
-        axes[0,0].set_ylabel('Density', fontsize=8)
-
-        # Set limits
-        axes[0,0].set_xlim(-50, -15)
-        axes[0,0].set_ylim(0, 0.49)
-
-        # Save figure
-        self.save_figure(
-            f"age_distribution_{self.name}_{metric.metric.name[index].replace(' ', '_')}.pdf",
-            fig, tight=False, forced=forced, default=default, cancel=cancel
-        )
-
     def draw_map(
         self, age=None, metric=None, index=None, labels=False,
         title=False, forced=None, default=None, cancel=None
@@ -2958,14 +2907,15 @@ class Output():
             birth_index, age, age_error = self.get_epoch(age=age, metric=metric, index=index)
 
         # Compute Sun's orbit
-        sun = self.Star(
-            self, name='sun', time=self.time,
-            position_xyz=np.zeros(3), velocity_xyz=np.zeros(3),
-        )
+        sun_position_xyz = self.get_orbits(
+            np.zeros(3), np.zeros(3), self.time, self.potential
+        )[0]
 
         # Compute coordinates
-        for star in self:
-            positions_πδα = position_xyz_to_πδα(*(star.position_xyz - sun.position_xyz).T).T
+        for star in range(self.number_of_stars):
+            positions_πδα = position_xyz_to_πδα(
+                *(self.position_xyz[0, star] - sun_position_xyz).T
+            ).T
             alphas = positions_πδα[:,2] - 2 * np.pi * (positions_πδα[:,2] > np.pi)
             deltas = positions_πδα[:,1]
 
@@ -2983,7 +2933,7 @@ class Output():
             segments.append(np.arange(lower_limit, alphas.shape[0]))
 
             # Plot individual segments
-            color = colors.red[6] if star.outlier else colors.black
+            color = colors.red[6] if self.outliers[star] else colors.black
             for i in segments:
                 axes[0,0].plot(
                     alphas[i], deltas[i], color = color, alpha=0.6,
@@ -2998,7 +2948,7 @@ class Output():
 
             # Plot birth position
             if age is not None or metric is not None:
-                color = colors.red[6] if star.outlier else colors.blue[6]
+                color = colors.red[6] if self.outliers[star] else colors.blue[6]
                 axes[0,0].scatter(
                     alphas[birth_index], deltas[birth_index], color=color + (0.4,),
                     edgecolors=color, alpha=None, s=6, marker='o', linewidths=0.25, zorder=0.7
@@ -3007,8 +2957,9 @@ class Output():
             # Show labels
             if labels:
                 axes[0,0].text(
-                    alphas[0] + 0.2, deltas[0] + 0.3, star.name, color=colors.black,
-                    horizontalalignment='left', verticalalignment='top', fontsize=6, zorder=0.9
+                    alphas[0] + 0.2, deltas[0] + 0.3, self.star_designations[star],
+                    color=colors.black, horizontalalignment='left', verticalalignment='top',
+                    fontsize=6, zorder=0.9
                 )
 
         # Plot proper motion arrows
@@ -3056,10 +3007,10 @@ class Output():
     ):
         """
         Creates a table of the 6D kinematics (xyz Galactic positions and uvw space velocities)
-        at the given age of all members in the group. If 'save' if True, the table is
-        saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
-        machine-readable table, with separate columns for values and errors, no units in the
-        header and '.csv' extension instead of a '.txt', is created.
+        at the given age of all stars in the group. If 'save' if True, the table is saved and if
+        'show' is True, the table is displayed. If 'machine' is True, then a machine-readable
+        table, with separate columns for values and errors, no units in the header and '.csv'
+        extension instead of a '.txt', is created.
         """
 
         # Retrieve the epoch index
@@ -3068,12 +3019,12 @@ class Output():
         # Retrieve xyz positions and uvw velocities and convert units
         def get_position_velocity_xyz(star):
             position_xyz = Quantity(
-                star.position_xyz[epoch_index], 'pc',
-                np.sqrt(np.diag(star.position_xyz_error[epoch_index]))
+                self.position_xyz[0, star, epoch_index], 'pc',
+                self.position_xyz_error[0, star, epoch_index]
             )
             velocity_xyz = Quantity(
-                star.velocity_xyz[epoch_index], 'pc/Myr',
-                np.sqrt(np.diag(star.velocity_xyz_error[epoch_index]))
+                self.velocity_xyz[0, star, epoch_index], 'pc/Myr',
+                self.velocity_xyz_error[0, star, epoch_index]
             ).to('km/s')
 
             return position_xyz, velocity_xyz
@@ -3085,14 +3036,14 @@ class Output():
 
         # Create header
         if machine:
-            lines = ['Designation,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW']
+            lines = ['designation,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW']
 
             # Create lines
-            for star in self:
+            for star in range(self.number_of_stars):
                 position_xyz, velocity_xyz = get_position_velocity_xyz(star)
                 lines.append(
                     ','.join(
-                        [star.name] + [
+                        [self.star_designations[star]] + [
                             str(float(i)) for i in [
                                 position_xyz.values[0], position_xyz.errors[0],
                                 position_xyz.values[1], position_xyz.errors[1],
@@ -3115,7 +3066,7 @@ class Output():
             ]
 
             # Create lines
-            for star in self:
+            for star in range(self.number_of_stars):
                 position_xyz, velocity_xyz = get_position_velocity_xyz(star)
                 x = f'{position_xyz.values[0]:.2f} ± {position_xyz.errors[0]:.2f}'
                 y = f'{position_xyz.values[1]:.2f} ± {position_xyz.errors[1]:.2f}'
@@ -3123,7 +3074,10 @@ class Output():
                 u = f'{velocity_xyz.values[0]:.2f} ± {velocity_xyz.errors[0]:.2f}'
                 v = f'{velocity_xyz.values[1]:.2f} ± {velocity_xyz.errors[1]:.2f}'
                 w = f'{velocity_xyz.values[2]:.2f} ± {velocity_xyz.errors[2]:.2f}'
-                lines.append(f'{star.name:<35}{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}')
+                lines.append(
+                    f'{self.star_designations[star]:<35}'
+                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}'
+                )
 
             # Creater footer
             lines.append(f"{'':-<155}")
@@ -3141,12 +3095,12 @@ class Output():
                 forced=forced, default=default, cancel=cancel
             )
 
-    def create_kinematics_time_table(
+    def create_average_kinematics_time_table(
         self, save=False, show=False, machine=False,
         forced=None, default=None, cancel=None
     ):
         """
-        Creates a table of the group average kinematics over time. If 'save' if True, the table
+        Creates a table of the group's average kinematics over time. If 'save' if True, the table
         is saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
         machine-readable table, without units in the header and '.csv' extension instead of a
         '.txt', is created. The machine-readable table also has an additional column 'status'
@@ -3161,65 +3115,75 @@ class Output():
 
         # Create header
         if machine:
-            lines = [
-                'Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta'
-            ]
+            lines = ['time,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW,ξ,eξ,η,eη,ζ,eζ,vξ,evξ,vη,evη,ζ,evζ']
 
             # Create lines
             for t in np.arange(self.time.size):
                 lines.append(
                     (
                         f'{self.time[t]},'
-                        f'{self.position_xyz[t,0]},'
-                        f'{self.position_xyz[t,1]},'
-                        f'{self.position_xyz[t,2]},'
-                        f'{self.velocity_xyz[t,0]},'
-                        f'{self.velocity_xyz[t,1]},'
-                        f'{self.velocity_xyz[t,2]},'
-                        f'{self.position_ξηζ[t,0]},'
-                        f'{self.position_ξηζ[t,1]},'
-                        f'{self.position_ξηζ[t,2]},'
-                        f'{self.velocity_ξηζ[t,0]},'
-                        f'{self.velocity_ξηζ[t,1]},'
-                        f'{self.velocity_ξηζ[t,2]}'
+                        f'{self.average_position_xyz[0, t, 0]},'
+                        f'{self.average_position_xyz_error[t, 0]},'
+                        f'{self.average_position_xyz[0, t, 1]},'
+                        f'{self.average_position_xyz_error[t, 1]},'
+                        f'{self.average_position_xyz[0, t, 2]},'
+                        f'{self.average_position_xyz_error[t, 2]},'
+                        f'{self.average_velocity_xyz[0, t, 0]},'
+                        f'{self.average_velocity_xyz_error[t, 0]},'
+                        f'{self.average_velocity_xyz[0, t, 1]},'
+                        f'{self.average_velocity_xyz_error[t, 1]},'
+                        f'{self.average_velocity_xyz[0, t, 2]},'
+                        f'{self.average_velocity_xyz_error[t, 2]},'
+                        f'{self.average_position_ξηζ[0, t, 0]},'
+                        f'{self.average_position_ξηζ_error[t, 0]},'
+                        f'{self.average_position_ξηζ[0, t, 1]},'
+                        f'{self.average_position_ξηζ_error[t, 1]},'
+                        f'{self.average_position_ξηζ[0, t, 2]},'
+                        f'{self.average_position_ξηζ_error[t, 2]},'
+                        f'{self.average_velocity_ξηζ[0, t, 0]},'
+                        f'{self.average_velocity_ξηζ_error[t, 0]},'
+                        f'{self.average_velocity_ξηζ[0, t, 1]},'
+                        f'{self.average_velocity_ξηζ_error[t, 1]},'
+                        f'{self.average_velocity_ξηζ[0, t, 2]},'
+                        f'{self.average_velocity_ξηζ_error[t, 2]}'
                     )
                 )
 
         # Create header
         else:
             lines = [
-                f"{'':-<152}",
-                f"{'Time':<8}{'X':>12}{'Y':>12}{'Z':>12}{'U':>12}{'V':>12}{'W':>12}"
-                f"{'ξ':>12}{'η':>12}{'ζ':>12}{'vξ':>12}{'vη':>12}{'vζ':>12}",
-                f"{'[Myr]':<8}{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
-                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}"
-                f"{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
-                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}",
-                f"{'':-<152}"
+                f"{'':-<248}",
+                f"{'Time':<8}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}"
+                f"{'ξ':>20}{'η':>20}{'ζ':>20}{'vξ':>20}{'vη':>20}{'vζ':>20}",
+                f"{'[Myr]':<8}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
+                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}"
+                f"{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
+                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}",
+                f"{'':-<248}"
             ]
 
             # Create lines
             for t in np.arange(self.time.size):
+                x = f'{self.average_position_xyz[0, t, 0]:.2f} ± {self.average_position_xyz_error[t, 0]:.2f}'
+                y = f'{self.average_position_xyz[0, t, 1]:.2f} ± {self.average_position_xyz_error[t, 1]:.2f}'
+                z = f'{self.average_position_xyz[0, t, 2]:.2f} ± {self.average_position_xyz_error[t, 2]:.2f}'
+                u = f'{self.average_velocity_xyz[0, t, 0]:.2f} ± {self.average_velocity_xyz_error[t, 0]:.2f}'
+                v = f'{self.average_velocity_xyz[0, t, 1]:.2f} ± {self.average_velocity_xyz_error[t, 1]:.2f}'
+                w = f'{self.average_velocity_xyz[0, t, 2]:.2f} ± {self.average_velocity_xyz_error[t, 2]:.2f}'
+                ξ = f'{self.average_position_ξηζ[0, t, 0]:.2f} ± {self.average_position_ξηζ_error[t, 0]:.2f}'
+                η = f'{self.average_position_ξηζ[0, t, 1]:.2f} ± {self.average_position_ξηζ_error[t, 1]:.2f}'
+                ζ = f'{self.average_position_ξηζ[0, t, 2]:.2f} ± {self.average_position_ξηζ_error[t, 2]:.2f}'
+                vξ = f'{self.average_velocity_ξηζ[0, t, 0]:.2f} ± {self.average_velocity_ξηζ_error[t, 0]:.2f}'
+                vη = f'{self.average_velocity_ξηζ[0, t, 1]:.2f} ± {self.average_velocity_ξηζ_error[t, 1]:.2f}'
+                vζ = f'{self.average_velocity_ξηζ[0, t, 2]:.2f} ± {self.average_velocity_ξηζ_error[t, 2]:.2f}'
                 lines.append(
-                    (
-                        f'{self.time[t]:<8.1f}'
-                        f'{self.position_xyz[t,0]:>12.2f}'
-                        f'{self.position_xyz[t,1]:>12.2f}'
-                        f'{self.position_xyz[t,2]:>12.2f}'
-                        f'{self.velocity_xyz[t,0]:>12.2f}'
-                        f'{self.velocity_xyz[t,1]:>12.2f}'
-                        f'{self.velocity_xyz[t,2]:>12.2f}'
-                        f'{self.position_ξηζ[t,0]:>12.2f}'
-                        f'{self.position_ξηζ[t,1]:>12.2f}'
-                        f'{self.position_ξηζ[t,2]:>12.2f}'
-                        f'{self.velocity_ξηζ[t,0]:>12.2f}'
-                        f'{self.velocity_ξηζ[t,1]:>12.2f}'
-                        f'{self.velocity_ξηζ[t,2]:>12.2f}'
-                    )
+                    f'{self.time[t]:<8.1f}'
+                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}'
+                    f'{ξ:>20}{η:>20}{ζ:>20}{vξ:>20}{vη:>20}{vζ:>20}'
                 )
 
             # Create footer
-            lines.append(f"{'':-<152}")
+            lines.append(f"{'':-<248}")
 
         # Show table
         if show:
@@ -3229,13 +3193,14 @@ class Output():
         # Save table
         if save:
             self.save_table(
-                f'kinematics_time_{self.name}', f'Kinematics over time of {self.name}', lines,
-                extension='csv' if machine else 'txt',
+                f'average_kinematics_time_{self.name}',
+                f'Kinematics over time of {self.name}',
+                lines, extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )
 
-    def create_kinematics_time_table_star(
-        self, save=False, show=False, machine=False,
+    def create_star_kinematics_time_table(
+        self, star, save=False, show=False, machine=False,
         forced=None, default=None, cancel=None
     ):
         """
@@ -3247,70 +3212,90 @@ class Output():
         table uses side heads.
         """
 
-        # Check the types of save, show and machine
-        self.group.check_type(save, 'save', 'boolean')
-        self.group.check_type(show, 'show', 'boolean')
-        self.group.check_type(machine, 'machine', 'boolean')
+        # Check the types of star, save, show and machine
+        self.check_type(star, 'save', 'integer')
+        self.check_type(save, 'save', 'boolean')
+        self.check_type(show, 'show', 'boolean')
+        self.check_type(machine, 'machine', 'boolean')
+
+        # Check the value of star
+        self.stop(
+            star >= self.number_of_stars, 'ValueError',
+            "'star' index must lower than {}, the number of star ({} given).",
+            self.number_of_stars, star
+        )
 
         # Create header
         if machine:
-            lines = ['Time,X,Y,Z,U,V,W,xi,eta,zeta,v_xi,v_eta,v_zeta']
+            lines = ['time,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW,ξ,eξ,η,eη,ζ,eζ,vξ,evξ,vη,evη,ζ,evζ']
 
             # Create lines
-            for t in np.arange(self.group.time.size):
+            for t in np.arange(self.time.size):
                 lines.append(
                     (
-                        f'{self.group.time[t]},'
-                        f'{self.position_xyz[t,0]},'
-                        f'{self.position_xyz[t,1]},'
-                        f'{self.position_xyz[t,2]},'
-                        f'{self.velocity_xyz[t,0]},'
-                        f'{self.velocity_xyz[t,1]},'
-                        f'{self.velocity_xyz[t,2]},'
-                        f'{self.position_ξηζ[t,0]},'
-                        f'{self.position_ξηζ[t,1]},'
-                        f'{self.position_ξηζ[t,2]},'
-                        f'{self.velocity_ξηζ[t,0]},'
-                        f'{self.velocity_ξηζ[t,1]},'
-                        f'{self.velocity_ξηζ[t,2]}'
+                        f'{self.time[t]},'
+                        f'{self.position_xyz[0, star, t, 0]},'
+                        f'{self.position_xyz_error[star, t, 0]},'
+                        f'{self.position_xyz[0, star, t, 1]},'
+                        f'{self.position_xyz_error[star, t, 1]},'
+                        f'{self.position_xyz[0, star, t, 2]},'
+                        f'{self.position_xyz_error[star, t, 2]},'
+                        f'{self.velocity_xyz[0, star, t, 0]},'
+                        f'{self.velocity_xyz_error[star, t, 0]},'
+                        f'{self.velocity_xyz[0, star, t, 1]},'
+                        f'{self.velocity_xyz_error[star, t, 1]},'
+                        f'{self.velocity_xyz[0, star, t, 2]},'
+                        f'{self.velocity_xyz_error[star, t, 2]},'
+                        f'{self.position_ξηζ[0, star, t, 0]},'
+                        f'{self.position_ξηζ_error[star, t, 0]},'
+                        f'{self.position_ξηζ[0, star, t, 1]},'
+                        f'{self.position_ξηζ_error[star, t, 1]},'
+                        f'{self.position_ξηζ[0, star, t, 2]},'
+                        f'{self.position_ξηζ_error[star, t, 2]},'
+                        f'{self.velocity_ξηζ[0, star, t, 0]},'
+                        f'{self.velocity_ξηζ_error[star, t, 0]},'
+                        f'{self.velocity_ξηζ[0, star, t, 1]},'
+                        f'{self.velocity_ξηζ_error[star, t, 1]},'
+                        f'{self.velocity_ξηζ[0, star, t, 2]},'
+                        f'{self.velocity_ξηζ_error[star, t, 2]}'
                     )
                 )
 
         # Create header
         else:
             lines = [
-                f"{'':-<152}",
-                f"{'Time':<8}{'X':>12}{'Y':>12}{'Z':>12}{'U':>12}{'V':>12}{'W':>12}"
-                f"{'ξ':>12}{'η':>12}{'ζ':>12}{'vξ':>12}{'vη':>12}{'vζ':>12}",
-                f"{'[Myr]':<8}{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
-                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}"
-                f"{'[pc]':>12}{'[pc]':>12}{'[pc]':>12}"
-                f"{'[pc/Myr]':>12}{'[pc/Myr]':>12}{'[pc/Myr]':>12}",
-                f"{'':-<152}"
+                f"{'':-<248}",
+                f"{'Time':<8}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}"
+                f"{'ξ':>20}{'η':>20}{'ζ':>20}{'vξ':>20}{'vη':>20}{'vζ':>20}",
+                f"{'[Myr]':<8}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
+                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}"
+                f"{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
+                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}",
+                f"{'':-<248}"
             ]
 
             # Create lines
-            for t in np.arange(self.group.time.size):
+            for t in np.arange(self.time.size):
+                x = f'{self.position_xyz[0, star, t, 0]:.2f} ± {self.position_xyz_error[star, t, 0]:.2f}'
+                y = f'{self.position_xyz[0, star, t, 1]:.2f} ± {self.position_xyz_error[star, t, 1]:.2f}'
+                z = f'{self.position_xyz[0, star, t, 2]:.2f} ± {self.position_xyz_error[star, t, 2]:.2f}'
+                u = f'{self.velocity_xyz[0, star, t, 0]:.2f} ± {self.velocity_xyz_error[star, t, 0]:.2f}'
+                v = f'{self.velocity_xyz[0, star, t, 1]:.2f} ± {self.velocity_xyz_error[star, t, 1]:.2f}'
+                w = f'{self.velocity_xyz[0, star, t, 2]:.2f} ± {self.velocity_xyz_error[star, t, 2]:.2f}'
+                ξ = f'{self.position_ξηζ[0, star, t, 0]:.2f} ± {self.position_ξηζ_error[star, t, 0]:.2f}'
+                η = f'{self.position_ξηζ[0, star, t, 1]:.2f} ± {self.position_ξηζ_error[star, t, 1]:.2f}'
+                ζ = f'{self.position_ξηζ[0, star, t, 2]:.2f} ± {self.position_ξηζ_error[star, t, 2]:.2f}'
+                vξ = f'{self.velocity_ξηζ[0, star, t, 0]:.2f} ± {self.velocity_ξηζ_error[star, t, 0]:.2f}'
+                vη = f'{self.velocity_ξηζ[0, star, t, 1]:.2f} ± {self.velocity_ξηζ_error[star, t, 1]:.2f}'
+                vζ = f'{self.velocity_ξηζ[0, star, t, 2]:.2f} ± {self.velocity_ξηζ_error[star, t, 2]:.2f}'
                 lines.append(
-                    (
-                        f'{self.group.time[t]:<8.1f}'
-                        f'{self.position_xyz[t,0]:>12.2f}'
-                        f'{self.position_xyz[t,1]:>12.2f}'
-                        f'{self.position_xyz[t,2]:>12.2f}'
-                        f'{self.velocity_xyz[t,0]:>12.2f}'
-                        f'{self.velocity_xyz[t,1]:>12.2f}'
-                        f'{self.velocity_xyz[t,2]:>12.2f}'
-                        f'{self.position_ξηζ[t,0]:>12.2f}'
-                        f'{self.position_ξηζ[t,1]:>12.2f}'
-                        f'{self.position_ξηζ[t,2]:>12.2f}'
-                        f'{self.velocity_ξηζ[t,0]:>12.2f}'
-                        f'{self.velocity_ξηζ[t,1]:>12.2f}'
-                        f'{self.velocity_ξηζ[t,2]:>12.2f}'
-                    )
+                    f'{self.time[t]:<8.1f}'
+                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}'
+                    f'{ξ:>20}{η:>20}{ζ:>20}{vξ:>20}{vη:>20}{vζ:>20}'
                 )
 
             # Create footer
-            lines.append(f"{'':-<152}")
+            lines.append(f"{'':-<248}")
 
         # Show table
         if show:
@@ -3319,8 +3304,9 @@ class Output():
 
         # Save table
         if save:
-            self.group.save_table(
-                f'kinematics_time_{self.name}', f'Kinematics over time of {self.name}', lines,
+            self.save_table(
+                f'kinematics_time_{self.star_designations[star]}',
+                f'Kinematics over time of {self.star_designations[star]}', lines,
                 extension='csv' if machine else 'txt',
                 forced=forced, default=default, cancel=cancel
             )

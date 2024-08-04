@@ -36,6 +36,13 @@ class Config():
             # Update
             self.update(components.copy())
 
+        def __repr__(self):
+            """Returns a string with all the components of the parameter."""
+
+            return '({})'.format(
+                ', '.join(['{}: {}'.format(key, value) for key, value in vars(self).items()])
+            )
+
         def update(self, parameter):
             """
             Updates the components of 'self' with those of another 'parameter' or a dictionary
@@ -65,13 +72,6 @@ class Config():
                             if key in self.default_components and component is not None
                         }
                     )
-
-        def __repr__(self):
-            """Returns a string with all the components of the parameter."""
-
-            return '({})'.format(
-                ', '.join(['{}: {}'.format(key, value) for key, value in vars(self).items()])
-            )
 
     # Default units
     unitless = ''

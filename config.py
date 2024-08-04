@@ -62,24 +62,24 @@ load_path.value = 'beta_pictoris.group'
 # 'name.value'.group in the current directory. Directory paths end with '/'.
 save_path.value = None
 
-# Association size metrics (boolean) to be computed
-size_metrics.value = False
+# Association size metrics to be computed (boolean)
+size_metrics.value = True
 cov_metrics.value = True
-cov_robust_metrics.value = True
-cov_sklearn_metrics.value = True
+cov_robust_metrics.value = False
+cov_sklearn_metrics.value = False
 mad_metrics.value = True
-tree_metrics.value = True
+tree_metrics.value = False
 
-# Number of groups (integer, > 0)
-number_of_groups.value = 11
+# Number of Monte Carlo (integer, ≥ 0)
+number_monte_carlo.value = 10
 
-# Number of jackknife Monte Carlo iterations (integer, > 0)
-number_of_iterations.value = 100
+# Number of jackknife Monte Carlo (integer, ≥ 0)
+number_jackknife.value = 10
 
-# Fraction of stars included in every jackknife Monte Carlo iteration (0 < float ≤ 1)
-iteration_fraction.value = 0.5
+# Fraction of stars per jackknife Monte Carlo (0 < float ≤ 1)
+fraction_jackknife.value = 0.67
 
-# Number of steps of the traceback, excluding the initial step at t = 0 (integer, > 0)
+# Number of steps of the traceback, including the initial step at t = 0 (integer, ≥ 1)
 # number_of_steps.value = 1000
 number_of_steps.value = 300
 # number_of_steps.value = 5

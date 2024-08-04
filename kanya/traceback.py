@@ -1,9 +1,8 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""traceback.py: Defines the methods used for traceback analysis of group."""
+"""traceback.py: Defines the methods used for the traceback analysis of the group."""
 
-from tqdm import tqdm
 from galpy.orbit import Orbit
 from .coordinate import *
 
@@ -21,11 +20,11 @@ class Traceback():
         """
         Traces back the Galactic orbit of every star in the group, either using imported data
         or by modeling groups from parameters. Outliers are also removed from the data sample.
-        Positions and velocities are saved in 4D arrays (number_of_groups, number_of_stars,
+        Positions and velocities are saved in 4D arrays (number_monte_carlo, number_of_stars,
         number_of_steps + 1, 3).
         """
 
-        # Choose behaviour if groups have already been traced back
+        # Choose behaviour, if groups have already been traced back
         if self.traceback_present:
             forced = self.choose(f"'{self.name}' group has already been traced back.", 1, forced)
 
@@ -50,71 +49,70 @@ class Traceback():
             # Configure traceback
             self.configure_traceback(logging=logging)
 
-            # Logging
-            self.log(
-                "Tracing back '{}' group from {}.",
-                self.name, 'data' if self.from_data else 'a model',
-                display=True, logging=logging
-            )
-            self.set_timer('orbits')
+            # Logging, if no groups are to be traced back from a model
+            if self.from_model and self.number_of_groups == 0:
+                self.log(
+                    "No '{}' groups to be traced back from a model.",
+                    self.name, display=True, logging=logging
+                )
 
-            # Set progress bar
-            # self.progress_bar = tqdm(
-            #     total=self.number_of_groups * self.number_of_stars, unit=' orbit',
-            #     leave=False, bar_format=(
-            #         '{desc}{percentage:3.0f}% |{bar}| '
-            #         '{n_fmt}/{total_fmt} {elapsed} {remaining} '
-            #     )
-            # )
+            # Logging, if at least one group is to be traced back
+            else:
+                self.log(
+                    "Tracing back '{}' group from {}.",
+                    self.name, 'data' if self.from_data else 'a model',
+                    display=True, logging=logging
+                )
 
-            # Set group name and message logging
-            # for number in range(self.number_of_groups):
-            #     name = f'{self.name}-{number}'
-            #     message = f"Tracing back '{name}' group"
+                # Set progress bar
+                # self.progress_bar = tqdm(
+                #     total=self.number_monte_carlo * self.number_of_stars, unit=' orbit',
+                #     leave=False, bar_format=(
+                #         '{desc}{percentage:3.0f}% |{bar}| '
+                #         '{n_fmt}/{total_fmt} {elapsed} {remaining} '
+                #     )
+                # )
 
-            #     # Logging traceback and set progress bar
-            #     self.log(f'{message}.', display=False, logging=logging)
-            #     self.progress_bar.set_description(desc=message, refresh=True)
+                # Logging and progress bar
+                # for number in range(self.number_monte_carlo):
+                #     message = f"Tracing back '{self.name}-{number}' group"
+                #     self.log(f'{message}.', display=False, logging=logging)
+                #     self.progress_bar.set_description(desc=message, refresh=True)
 
-            # Stars from data
-            if self.from_data:
-                self.get_stars_from_data()
+                # Stars from data
+                self.set_timer('orbits')
+                if self.from_data:
+                    self.get_stars_from_data()
 
-                # Compute galactic orbits
-                self.get_stars_orbits()
+                    # Compute stars' coordinates
+                    self.get_stars_coordinates()
 
-                # Compute stars' coordinates
-                self.get_stars_coordinates()
+                    # Filter outliers
+                    self.filter_outliers(logging=logging)
 
-                # Filter outliers
-                self.filter_outliers(logging=logging)
+                    # Compute covariance error matrices
+                    self.get_stars_errors()
 
-                # Compute covariance error matrices
-                self.get_stars_errors()
+                # Stars from model
+                elif self.from_model:
+                    self.get_stars_from_model()
 
-            # Stars from model
-            elif self.from_model:
-                self.get_stars_from_model()
+                    # Compute stars' coordinates
+                    self.get_stars_coordinates()
 
-                # Compute galactic orbits
-                self.get_stars_orbits()
+                    # Compute covariance error matrices
+                    self.get_stars_errors()
 
-                # Compute stars' coordinates
-                self.get_stars_coordinates()
+                # Logging message and progress bar
+                self.set_timer()
+                message = f"'{self.name}' group succesfully traced back"
+                self.log(f'{message}.', display=True, logging=logging)
+                # self.progress_bar.set_description(message, refresh=True)
+                # self.progress_bar.close()
+                # del self.progress_bar
 
-                # Compute covariance error matrices
-                self.get_stars_errors()
-
-            # Traceback loggging and set progress bar
-            self.set_timer()
-            message = f"'{self.name}' group succesfully traced back"
-            self.log(f'{message}.', display=True, logging=logging)
-            # self.progress_bar.set_description(message, refresh=True)
-            # self.progress_bar.close()
-            # del self.progress_bar
-
-            # Set traceback as present
-            self.traceback_present = True
+                # Set traceback as present
+                self.traceback_present = True
 
     def configure_mode(self, mode=None):
         """
@@ -159,10 +157,12 @@ class Traceback():
         """Checks traceback configuration parameters for 'From data' and 'From model' modes."""
 
         # Set number of groups parameter
-        self.number_of_groups = self.set_integer(self.config.number_of_groups)
+        self.number_monte_carlo = self.set_integer(
+            self.config.number_monte_carlo, 0 if self.from_data else 1
+        )
 
-        # Set number of steps parameter with one more step to account for t = 0
-        self.number_of_steps = self.set_integer(self.config.number_of_steps) + 1
+        # Set number of steps parameter, including the initial step at t = 0
+        self.number_of_steps = self.set_integer(self.config.number_of_steps, 1)
 
         # Set initial time parameter
         self.initial_time = self.set_quantity(self.config.initial_time)
@@ -304,7 +304,7 @@ class Traceback():
         self.log("Initializing '{}' group from a model.", self.name, logging=logging)
 
         # Set number of stars parameter
-        self.number_of_stars = self.set_integer(self.config.number_of_stars, mode=True)
+        self.number_of_stars = self.set_integer(self.config.number_of_stars, 1, mode=True)
 
         # Set age parameter
         self.age = self.set_quantity(self.config.age, mode=True)
@@ -352,7 +352,7 @@ class Traceback():
         Computes the initial XYZ Galactic positions and UVW space velocities of stars in the group
         from data, either in spherical of cartesian coordinates. Radial velocity shifts are applied,
         and Monte Carlo iterations are also computed to measure the error on position and velocity
-        over the orbital integration.
+        over the orbital integration. Orbits are then integrated.
         """
 
         # Star names from data
@@ -379,11 +379,11 @@ class Traceback():
         # Monte Carlo position and velocity
         position_monte_carlo = np.random.normal(
             position, position_errors,
-            (self.number_of_groups - 1,) + position.shape
+            (self.number_monte_carlo,) + position.shape
         )
         velocity_monte_carlo = np.random.normal(
             velocity, velocity_errors,
-            (self.number_of_groups - 1,) + velocity.shape
+            (self.number_monte_carlo,) + velocity.shape
         )
 
         # Concatenate position and velocity
@@ -409,6 +409,28 @@ class Traceback():
         # Convert πδα spherical equatorial coordinates to xyz cartesian galactic coordinates
         self.position_xyz = position_πδα_to_xyz(*position.T).T
         self.velocity_xyz = velocity_πδα_to_xyz(*position.T, *velocity.T).T
+
+        # Compute xyz and ξηζ positions and velocities (group, star, time, axis)
+        self.position_xyz, self.velocity_xyz, \
+        self.position_ξηζ, self.velocity_ξηζ = self.get_orbits(
+            self.position_xyz, self.velocity_xyz, self.time, self.potential
+        )
+
+        # Set the number of Monte Carlo iterations, if needed
+        if self.number_monte_carlo == 0:
+            self.number_monte_carlo = 1
+            self.position_xyz = np.repeat(self.position_xyz, 2, axis=0)
+            self.velocity_xyz = np.repeat(self.velocity_xyz, 2, axis=0)
+            self.position_ξηζ = np.repeat(self.position_ξηζ, 2, axis=0)
+            self.velocity_ξηζ = np.repeat(self.velocity_ξηζ, 2, axis=0)
+
+        # Set the core and outliers
+        self.core = np.ones(self.number_of_stars, dtype=bool)
+        self.outliers = np.zeros(self.number_of_stars, dtype=bool)
+
+        # Set the number in the core, and the number of outliers
+        self.number_in_core = self.number_of_stars
+        self.number_of_outliers = 0
 
     def get_stars_from_model(self):
         """
@@ -487,75 +509,6 @@ class Traceback():
             # Update progress bar
             # self.progress_bar.update(1)
 
-    def get_stars_orbits(self):
-        """
-        Computes the stars' Galactic orbit using Galpy or a linear approximation. The XYZ and ξηζ
-        position, velocity, distance, and speed are computed for every group, star, and step from
-        the initial to the final time. Default errors are also set.
-        """
-
-        # Linear trajectories
-        if self.potential is None:
-
-            # Compute xyz positions and velocities
-            self.position_xyz = (
-                self.position_xyz + (self.velocity_xyz + Coordinate.sun_velocity) *
-                (self.time - self.time[0])[:, None]
-            )
-            self.velocity_xyz = np.repeat(self.velocity_xyz[None], self.time.size, axis=0)
-
-            # Compute rθh positions and velocities
-            position_rθh = position_xyz_to_rθh(*self.position_xyz.T).T
-            velocity_rθh = velocity_xyz_to_rθh(*self.position_xyz.T, *self.velocity_xyz.T).T
-
-        # Orbital trajectories
-        else:
-
-            # Compute initial rθh position and velocity
-            position_rθh = position_xyz_to_rθh(*self.position_xyz.T).T
-            velocity_rθh = velocity_xyz_to_rθh(*self.position_xyz.T, *self.velocity_xyz.T).T
-
-            # Convert initial rθh position and velocity to Galpy's natural units
-            time = self.time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
-            position_rθh[..., [0, 2]] = position_rθh[..., [0, 2]] / Coordinate.sun_position[0]
-            velocity_rθh /= Coordinate.lsr_velocity[1]
-
-            # Integrate orbit
-            orbit = Orbit(
-                np.array(
-                    [
-                        position_rθh.T[0], velocity_rθh.T[0], velocity_rθh.T[1],
-                        position_rθh.T[2], velocity_rθh.T[2], position_rθh.T[1]
-                    ]
-                ).T
-            )
-            orbit.turn_physical_off()
-            orbit.integrate(time, self.potential, method='odeint', progressbar=True)
-
-            # Compute rθh positions and velocities
-            position_rθh = np.array((orbit.R(time).T, orbit.phi(time).T, orbit.z(time).T)).T
-            velocity_rθh = np.array((orbit.vR(time).T, orbit.vT(time).T, orbit.vz(time).T)).T
-
-            # Convert rθh positions and velocities to physical units
-            position_rθh[..., [0, 2]] = position_rθh[..., [0, 2]] * Coordinate.sun_position[0]
-            velocity_rθh *= Coordinate.lsr_velocity[1]
-
-            # Compute xyz positions and velocities (group, star, time, axis)
-            self.position_xyz = position_rθh_to_xyz(*position_rθh.T).T
-            self.velocity_xyz = velocity_rθh_to_xyz(*position_rθh.T, *velocity_rθh.T).T
-
-        # Compute ξηζ positions and velocities (group, star, time, axis)
-        self.position_ξηζ = position_rθh_to_ξηζ(*position_rθh.T, self.time).T
-        self.velocity_ξηζ = velocity_rθh_to_ξηζ(*velocity_rθh.T).T
-
-        # Set the core and outliers
-        self.core = np.ones(self.number_of_stars, dtype=bool)
-        self.outliers = np.zeros(self.number_of_stars, dtype=bool)
-
-        # Set the number in the core, and the number of outliers
-        self.number_in_core = self.number_of_stars
-        self.number_of_outliers = 0
-
     def get_stars_coordinates(self):
         """
         Computes the stars' and group's average xyz and ξηζ average position, velocity, distance,
@@ -626,7 +579,7 @@ class Traceback():
     def filter_outliers(self, logging=True):
         """
         Filters outliers from the sample based on ξηζ position and velocity scatter over time.
-        A subcore is created based on a robust covariances matrix estimator using the scikit-
+        A subcore is created based on a robust covariance matrix estimator using the scikit-
         learn (sklearn) Python package, leaving other stars as part of the core sample.
         """
 
@@ -709,21 +662,21 @@ class Traceback():
             for message in self.outliers_messages:
                 self.log(message, display=True, logging=logging)
 
-        # Robust covariances matrix and support fraction
+        # Robust covariance matrix and support fraction
         if False:
             a = np.swapaxes(np.array([star.position_ξηζ for star in self.sample]), 0, 1)
-            robust_covariances_matrix = []
+            robust_covariance_matrix = []
             support_fraction = []
 
             # Iteration over time
             for step in range(self.number_of_steps):
                 MCD = MinCovDet(assume_centered=False).fit(a[step])
-                robust_covariances_matrix.append(MCD.covariance_)
+                robust_covariance_matrix.append(MCD.covariance_)
                 support_fraction.append(MCD.support_)
                 # print(step, MCD.support_.size, MCD.support_.nonzero()[0].size, MCD.dist_.size)
 
             # Array conversion
-            robust_covariances_matrix = np.array(robust_covariances_matrix)
+            robust_covariance_matrix = np.array(robust_covariance_matrix)
             support_fraction = np.array(support_fraction)
             support_fraction_all = (
                 np.sum(support_fraction, axis=0) / self.number_of_steps > 0.7
@@ -755,12 +708,15 @@ class Traceback():
             error for an operation.
             """
 
+            # Set index
+            i = 1 if self.from_data else 0
+
             # Set label
             label = '_'.join((operation, coord, system) if operation != None else (coord, system))
 
             # Covariance matrix: (star, time, axix, axis) or (time, axix, axis)
-            if self.number_of_groups > 0:
-                vars(self)[f'{label}_cov_error'] = self.get_covariances_matrix(vars(self)[label][1:])
+            if self.number_monte_carlo > 0:
+                vars(self)[f'{label}_cov_error'] = self.get_covariance_matrix(vars(self)[label][i:])
             elif vars(self)[label].ndim == 4:
                 vars(self)[f'{label}_cov_error'] = self.default_cov_error
             else:
@@ -773,12 +729,12 @@ class Traceback():
 
             # Hypotenuse error: (star, time) or (time)
             label = label.replace(coord, hyp[coord])
-            vars(self)[f'{label}_error'] = np.std(vars(self)[label][1:], axis=0)
+            vars(self)[f'{label}_error'] = np.std(vars(self)[label][i:], axis=0)
 
             # Group error: (time)
             if group:
                 label = label.replace(operation, f'group_{operation}')
-                vars(self)[f'{label}_error'] = np.std(vars(self)[label][1:], axis=0)
+                vars(self)[f'{label}_error'] = np.std(vars(self)[label][i:], axis=0)
 
         # Select coordinate and system
         for coord in ('position', 'velocity'):
@@ -799,11 +755,74 @@ class Traceback():
                 # Relative average covariance matrix, error, hypotenuse error, and group error
                 compute_errors(coord, system, operation='relative_average', group=True)
 
-    def get_covariances_matrix(
+    def get_orbits(self, position_xyz, velocity_xyz, time, potential):
+        """
+        Computes the stars' Galactic orbit using Galpy with the given potential at the given time.
+        The XYZ and ξηζ positions and velocities are computed.
+        """
+
+        # Linear trajectories
+        if potential is None:
+
+            # Compute xyz positions and velocities
+            position_xyz = (
+                position_xyz + (velocity_xyz + Coordinate.sun_velocity) *
+                (time - time[0])[:, None]
+            )
+            velocity_xyz = np.repeat(velocity_xyz[None], time.size, axis=0)
+
+            # Compute rθh positions and velocities
+            position_rθh = position_xyz_to_rθh(*position_xyz.T).T
+            velocity_rθh = velocity_xyz_to_rθh(*position_xyz.T, *velocity_xyz.T).T
+
+        # Orbital trajectories
+        else:
+
+            # Compute initial rθh position and velocity
+            position_rθh = position_xyz_to_rθh(*position_xyz.T).T
+            velocity_rθh = velocity_xyz_to_rθh(*position_xyz.T, *velocity_xyz.T).T
+
+            # Convert time, and initial rθh position and velocity to Galpy's natural units
+            time = time * Coordinate.lsr_velocity[1] / Coordinate.sun_position[0]
+            position_rθh[..., [0, 2]] = position_rθh[..., [0, 2]] / Coordinate.sun_position[0]
+            velocity_rθh /= Coordinate.lsr_velocity[1]
+
+            # Integrate orbit
+            orbit = Orbit(
+                np.array(
+                    [
+                        position_rθh.T[0], velocity_rθh.T[0], velocity_rθh.T[1],
+                        position_rθh.T[2], velocity_rθh.T[2], position_rθh.T[1]
+                    ]
+                ).T
+            )
+            orbit.turn_physical_off()
+            orbit.integrate(time, potential, method='odeint', progressbar=True)
+
+            # Compute rθh positions and velocities
+            position_rθh = np.array((orbit.R(time).T, orbit.phi(time).T, orbit.z(time).T)).T
+            velocity_rθh = np.array((orbit.vR(time).T, orbit.vT(time).T, orbit.vz(time).T)).T
+
+            # Convert time, and rθh positions and velocities back to physical units
+            time = time * Coordinate.sun_position[0] / Coordinate.lsr_velocity[1]
+            position_rθh[..., [0, 2]] = position_rθh[..., [0, 2]] * Coordinate.sun_position[0]
+            velocity_rθh *= Coordinate.lsr_velocity[1]
+
+            # Compute xyz positions and velocities (group, star, time, axis)
+            position_xyz = position_rθh_to_xyz(*position_rθh.T).T
+            velocity_xyz = velocity_rθh_to_xyz(*position_rθh.T, *velocity_rθh.T).T
+
+        # Compute ξηζ positions and velocities (group, star, time, axis)
+        position_ξηζ = position_rθh_to_ξηζ(*position_rθh.T, time).T
+        velocity_ξηζ = velocity_rθh_to_ξηζ(*velocity_rθh.T).T
+
+        return position_xyz, velocity_xyz, position_ξηζ, velocity_ξηζ
+
+    def get_covariance_matrix(
         self, a, b=None, robust=False, sklearn=False, Mahalanobis_distance=None
     ):
         """
-        Computes covariances matrices for the values and samples in 'a', an array where the first
+        Computes covariance matrices for the values and samples in 'a', an array where the first
         dimension represents the samples and the last dimension represents the values. In between,
         there's an arbitrary number of extra dimensions (samples, ..., values). The output is an
         array with the same number of dimensions. However, the dimension representing samples is
@@ -828,11 +847,11 @@ class Traceback():
         # Sklearn covariance estimator
         if sklearn and False:
             a = np.swapaxes(np.array([vars(star)[a] for star in self.sample]), 0, 1)
-            covariances_matrix = []
+            covariance_matrix = []
             support_fraction = []
             for step in range(self.number_of_steps):
                 MCD = MinCovDet(assume_centered=False).fit(a[step])
-                covariances_matrix.append(MCD.covariance_)
+                covariance_matrix.append(MCD.covariance_)
                 support_fraction.append(MCD.support_)
 
                 # Update progress bar
@@ -840,8 +859,8 @@ class Traceback():
                     self.progress_bar.update(1)
 
             return np.repeat(
-                np.array(covariances_matrix)[None],
-                self.number_of_iterations, axis=0
+                np.array(covariance_matrix)[None],
+                self.number_jackknife, axis=0
             )
 
         # Weights from the Mahalanobis distance
@@ -856,17 +875,54 @@ class Traceback():
                 weights = np.repeat(weights[..., None], weights.shape[-1], axis=-1)
 
             # Covariance matrices
-            a -= np.mean(a, axis=0) # a_weights = np.exp(-2. * (a / np.std(a, axis=0))**2)
+            a = a - np.mean(a, axis=0) # a_weights = np.exp(-2. * (a / np.std(a, axis=0))**2)
             a = np.repeat(a[..., None], a.shape[-1], axis=-1)
+            # d = np.tile(a[..., None], (1,) * a.ndim + (a.shape[-1],))
             if b is None:
                 b = np.swapaxes(a, -1, -2)
 
             # Cross covariance matrices
             else:
-                b -= np.mean(b, axis=0) # b_weights = np.exp(-2. * (b / np.std(b, axis=0))**2)
+                b = b - np.mean(b, axis=0) # b_weights = np.exp(-2. * (b / np.std(b, axis=0))**2)
                 b = np.swapaxes(np.repeat(b[..., None], b.shape[-1], axis=-1), -1, -2)
 
             return (
                 np.average(a * b, weights=weights, axis=0) if robust
                 else np.mean(a * b, axis=0)
             )
+
+    def get_Mahalanobis_distance(self, a, b=None, covariance_matrix=None):
+        """
+        Computes the Mahalanobis distances using the covariance matrix of every stars in the group.
+        """
+
+        # Find a and b arrays, if needed
+        if type(a) == str:
+            a = vars(self)[a]
+        if type(b) == str:
+            b = vars(self)[b]
+
+        # Compute the covariance matrix
+        if covariance_matrix is None:
+            covariance_matrix = self.get_covariance_matrix(a, b)
+
+        # Compute the inverse covariance matrix
+        covariance_matrix_invert = np.repeat(
+            np.linalg.inv(covariance_matrix)[None],
+            self.number_of_stars_iteration, axis=0
+        )
+
+        # Compute the Mahalanobis distances !!! Needs to be checked !!!
+        if b is None:
+            b = a
+        c = (a - np.mean(a, axis=0))[..., None]
+        # d = (b - np.mean(b, axis=0))[..., None]
+        # d = c
+        # c = (((a - np.mean(a, axis=0)) + (b - np.mean(b, axis=0))) / 2)[..., None]
+
+        return np.abs(
+            np.squeeze(
+                np.matmul(np.swapaxes(c, -2, -1), np.matmul(covariance_matrix_invert, c)),
+                axis=(-2, -1)
+            )
+        )**0.5
