@@ -5,6 +5,7 @@
 
 from galpy.orbit import Orbit
 from .coordinate import *
+from sklearn.covariance import MinCovDet
 
 class Traceback():
     """
@@ -518,32 +519,31 @@ class Traceback():
         computed.
         """
 
-        # Hypotenuse definition
-        hyp = {'position': 'distance', 'velocity': 'speed'}
+        # Norm definition
+        norm = {'position': 'distance', 'velocity': 'speed'}
 
         def compute_coordinates(operation, coord, system):
             """
-            Computes the hypotenuse, average, average hypotenuse, and group average hypotenuse,
-            and, if needed, the scatter, scatter hypotenuse, and group scatter hypotenuse. The
-            hypotenuse corresponds to the distance for position coordinates and to the speed for
-            velocity coordinates.
+            Computes the norm, average, average norm, and group average norm, and, if needed,
+            the scatter, scatter norm, and group scatter norm. The norm corresponds to the
+            distance for position coordinates and to the speed for velocity coordinates.
             """
 
             # Select function
             func = np.mean if operation in ('average', 'relative_average') else np.std
 
-            # Average : (group, time, axis)
+            # Average or scatter : (group, time, axis)
             vars(self)[f'{operation}_{coord}_{system}'] = func(
                 vars(self)[f'{coord}_{system}'][:, self.core], axis=-3
             )
 
-            # Average hypotenuse : (group, time)
-            vars(self)[f'{operation}_{hyp[coord]}_{system}'] = func(
-                vars(self)[f'{hyp[coord]}_{system}'][:, self.core], axis=-2
+            # Norm verage or scatter : (group, time)
+            vars(self)[f'{operation}_{norm[coord]}_{system}'] = func(
+                vars(self)[f'{norm[coord]}_{system}'][:, self.core], axis=-2
             )
 
-            # Group average hypotenuse : (group, time)
-            vars(self)[f'group_{operation}_{hyp[coord]}_{system}'] = np.sum(
+            # Group norm average or scatter : (group, time)
+            vars(self)[f'{operation}_group_{norm[coord]}_{system}'] = np.sum(
                 vars(self)[f'{operation}_{coord}_{system}']**2, axis=-1
             )**0.5
 
@@ -551,15 +551,15 @@ class Traceback():
         for coord in ('position', 'velocity'):
             for system in ('xyz', 'ξηζ'):
 
-                # Hypotenuse : (group, star, time)
-                vars(self)[f'{hyp[coord]}_{system}'] = np.sum(
+                # Norm : (group, star, time)
+                vars(self)[f'{norm[coord]}_{system}'] = np.sum(
                     vars(self)[f'{coord}_{system}']**2, axis=-1
                 )**0.5
 
-                # Average
+                # Average : (group, time)
                 compute_coordinates('average', coord, system)
 
-                # Scatter
+                # Scatter : (group, time)
                 compute_coordinates('scatter', coord, system)
 
                 # Relative value : (group, star, time, axis)
@@ -568,13 +568,24 @@ class Traceback():
                     vars(self)[f'average_{coord}_{system}'][:, None]
                 )
 
-                # Hypotenuse : (group, star, time)
-                vars(self)[f'relative_{hyp[coord]}_{system}'] = np.sum(
+                # Relative norm : (group, star, time)
+                vars(self)[f'relative_{norm[coord]}_{system}'] = np.sum(
                     vars(self)[f'relative_{coord}_{system}']**2, axis=-1
                 )**0.5
 
-                # Relative coordinates
+                # Relative average : (gruop, time)
                 compute_coordinates('relative_average', coord, system)
+
+                # Relative scatter : (group, time), same as the absolute scatter
+                vars(self)[f'relative_scatter_{coord}_{system}'] = vars(self)[
+                    f'scatter_{coord}_{system}'
+                ]
+                vars(self)[f'relative_scatter_{norm[coord]}_{system}'] = vars(self)[
+                    f'scatter_{norm[coord]}_{system}'
+                ]
+                vars(self)[f'relative_scatter_group_{norm[coord]}_{system}'] = vars(self)[
+                    f'scatter_group_{norm[coord]}_{system}'
+                ]
 
     def filter_outliers(self, logging=True):
         """
@@ -699,12 +710,12 @@ class Traceback():
         in every group, as a function of time, and their respective errors.
         """
 
-        # Hypotenuse definition
-        hyp = {'position': 'distance', 'velocity': 'speed'}
+        # Norm definition
+        norm = {'position': 'distance', 'velocity': 'speed'}
 
         def compute_errors(coord, system, operation=None, group=False):
             """
-            Computes the covariance matrix, error, hypotenuse error, and, if needed, the group
+            Computes the covariance matrix, error, norm error, and, if needed, the group
             error for an operation.
             """
 
@@ -727,33 +738,47 @@ class Traceback():
                 vars(self)[f'{label}_cov_error'], axis1=-2, axis2=-1
             )**0.5
 
-            # Hypotenuse error: (star, time) or (time)
-            label = label.replace(coord, hyp[coord])
+            # Norm error: (star, time) or (time)
+            label = label.replace(coord, norm[coord])
             vars(self)[f'{label}_error'] = np.std(vars(self)[label][i:], axis=0)
 
-            # Group error: (time)
+            # Group norm error: (time)
             if group:
-                label = label.replace(operation, f'group_{operation}')
+                label = label.replace(operation, f'{operation}_group')
                 vars(self)[f'{label}_error'] = np.std(vars(self)[label][i:], axis=0)
 
         # Select coordinate and system
         for coord in ('position', 'velocity'):
             for system in ('xyz', 'ξηζ'):
 
-                # Covariance matrix, error, and hypotenuse error
+                # Covariance matrix, error, and norm error
                 compute_errors(coord, system)
 
-                # Average covariance matrix, error, hypotenuse error, and group error
+                # Average covariance matrix, error, norm error, and group norm error
                 compute_errors(coord, system, operation='average', group=True)
 
-                # Scatter covariance matrix, error, hypotenuse error, and group error
+                # Scatter covariance matrix, error, norm error, and group norm error
                 compute_errors(coord, system, operation='scatter', group=True)
 
-                # Relative covariance matrix, error, and hypotenuse error
+                # Relative covariance matrix, error, and norm error
                 compute_errors(coord, system, operation='relative')
 
-                # Relative average covariance matrix, error, hypotenuse error, and group error
+                # Relative average covariance matrix, error, norm error, and group norm error
                 compute_errors(coord, system, operation='relative_average', group=True)
+
+                # Relative scatter covariance matrix, error, norm error, and group norm error
+                vars(self)[f'relative_scatter_{coord}_{system}_cov_error'] = vars(self)[
+                    f'scatter_{coord}_{system}_cov_error'
+                ]
+                vars(self)[f'relative_scatter_{coord}_{system}_error'] = vars(self)[
+                    f'scatter_{coord}_{system}_error'
+                ]
+                vars(self)[f'relative_scatter_{norm[coord]}_{system}_error'] = vars(self)[
+                    f'scatter_{norm[coord]}_{system}_error'
+                ]
+                vars(self)[f'relative_scatter_group_{norm[coord]}_{system}_error'] = vars(self)[
+                    f'scatter_group_{norm[coord]}_{system}_error'
+                ]
 
     def get_orbits(self, position_xyz, velocity_xyz, time, potential):
         """

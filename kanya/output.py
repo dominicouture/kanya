@@ -73,7 +73,6 @@ class Output():
 
         # Check the type of output_dir
         self.check_type(output_dir, 'output_dir', ('string', 'None'))
-        self.check_type(logging, 'logging', 'boolean')
 
         # Set output_dir parameter, if needed
         if 'output_dir' not in vars(self).keys():
@@ -138,11 +137,10 @@ class Output():
     ):
         """Saves figure with or without tight layout and some padding."""
 
-        # Check the type of tight, show, close and logging
+        # Check the type of tight, show, and close
         self.check_type(tight, 'tight', 'boolean')
         self.check_type(show, 'show', 'boolean')
         self.check_type(close, 'close', 'boolean')
-        self.check_type(logging, 'logging', 'boolean')
 
         # Logging
         self.log('{} figure created.', fig.line_log, display=logging, logging=logging)
@@ -169,15 +167,17 @@ class Output():
             plt.close(fig)
 
     def save_table(
-        self, file_name, line_log, lines, header=None, extension='txt', file_type=None,
-        output_dir=None, logging=True, forced=None, default=None, cancel=None
+        self, file_name, line_log, lines, header=None, extension='txt',
+        file_type=None, output_dir=None, save=False, show=False, logging=True,
+        forced=None, default=None, cancel=None
     ):
-        """Saves a table to a CSV file for a given header and data."""
+        """Saves a table to a CSV file for given header and lines."""
 
-        # Check the type of lines, header and logging
+        # Check the type of lines, header, save, and show
         self.check_type(lines, 'lines', ('tuple', 'list'))
         self.check_type(header, 'header', ('string', 'None'))
-        self.check_type(logging, 'logging', 'boolean')
+        self.check_type(save, 'save', 'boolean')
+        self.check_type(show, 'show', 'boolean')
 
         # Logging
         self.log('{} table created.', line_log, display=logging, logging=logging)
@@ -189,11 +189,17 @@ class Output():
                     output_file.write(header + '\n')
                 output_file.writelines([line + '\n' for line in lines])
 
-        # Choose behavior
-        self.save_output(
-            file_name, save, lines, header, extension=extension, file_type=file_type,
-            output_dir=output_dir, cancel=cancel, forced=forced, default=default
-        )
+        # Save output
+        if save:
+            self.save_output(
+                file_name, save, lines, header, extension=extension, file_type=file_type,
+                output_dir=output_dir, cancel=cancel, forced=forced, default=default
+            )
+
+        # Show table
+        if show:
+            for line in lines:
+                print(line)
 
     def set_figure(
         self, style, *options, width=None, height=None, left=None, bottom=None, right=None,
@@ -755,28 +761,6 @@ class Output():
         # Set title
         if title:
             fig.suptitle(fig.line_title, y=fig.offset, fontsize=8)
-
-    def check_system(self, system):
-        """
-        Check the type and value of system. Returns the value of the short label if the long
-        label is provided.
-        """
-
-        # Check the type and value of system
-        self.check_type(system, 'system', 'string')
-        systems = ('cartesian', 'xyz', 'curvilinear', 'ξηζ')
-        self.stop(
-            system not in systems, 'ValueError',
-            "'system' can only take as value {} ({} given).", enumerate_strings(*systems), system
-        )
-
-        # Select the value of the short label if the long label is provided
-        if system == 'cartesian':
-            system = 'xyz'
-        if system == 'curvilinear':
-            system = 'ξηζ'
-
-        return system
 
     def select_metric(self, metric, system, robust=False, sklearn=False):
         """
@@ -1514,16 +1498,15 @@ class Output():
             ax.set_ylim(*ylim)
 
     def create_metrics_table(
-        self, save=False, show=False, machine=False,
+        self, machine=False, save=False, show=False,
         forced=None, default=None, cancel=None
     ):
         """
-        Creates a table of the association size metrics. If 'save' if True, the table is
-        saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
-        machine-readable table, without units in the header and '.csv' extension instead of a
-        '.txt', is created. The machine-readable table also has an additional column 'status'
-        to indicate whether a metric is valid or rejected, whereas the non-machine-readable
-        table uses side heads.
+        Creates a table of the association size metrics. If 'machine' is True, a machine-readable
+        table, without units in the header and '.csv' extension instead of a '.txt', is created.
+        The machine-readable table also has an additional column 'status' to indicate whether a
+        metric is valid or rejected, whereas the non-machine-readable table uses side heads. If
+        'save' is True, the table is saved and if 'show' is True, the table is displayed.
         """
 
         # Returns a converted, rounded string for display
@@ -1560,11 +1543,9 @@ class Output():
                     f'{convert(metric.min_change[i]):>20}'
                     f'{convert(metric.age_shift[i]):>15}'
                     for i in filter(lambda i: valid[i], np.arange(valid.size))
-                    ]
+                ]
 
-        # Check the types of save, show and machine
-        self.check_type(save, 'save', 'boolean')
-        self.check_type(show, 'show', 'boolean')
+        # Check the type of machine
         self.check_type(machine, 'machine', 'boolean')
 
         # Set precision and order
@@ -1604,18 +1585,53 @@ class Output():
                 lines += create_line(self.metrics[i], valid=False)
             lines.append(f"{'':-<155}")
 
-        # Show table
-        if show:
-            for line in lines:
-                print(line)
-
         # Save table
-        if save:
-            self.save_table(
-                f'metrics_{self.name}', f'Metrics of {self.name}', lines,
-                extension='csv' if machine else 'txt',
-                forced=forced, default=default, cancel=cancel
+        self.save_table(
+            f'metrics_{self.name}', f'Metrics of {self.name}', lines,
+            extension='csv' if machine else 'txt', save=save, show=show,
+            forced=forced, default=default, cancel=cancel
+        )
+
+    def get_star(self, identifier):
+        """
+        Retrieves the proper label and index of a star for a given identifier, which can be either
+        the label of a star (string) of its index (integer or float).
+        """
+
+        # Check the type of the identifier
+        self.check_type(identifier, 'identifier', ('string', 'integer', 'float'))
+
+        # Check the value of the label
+        if type(identifier) == str:
+            label = identifier.lower().replace(' ', '')
+            designations = np.char.lower(np.char.replace(self.star_designations, ' ', ''))
+            index = (designations == label).nonzero()[0]
+            self.stop(
+                len(index) == 0, 'ValueError', "Could not match the label '{}' with a star "
+                "in '{}' group.", identifier, self.name
             )
+
+            return self.star_designations[index[0]], index[0]
+
+        # Check the type and value of the index
+        elif type(identifier) in (int, float):
+            index = identifier
+            self.stop(
+                index % 1 != 0, 'ValueError',
+                "'index' must be convertible to an integer ({} given).", index
+            )
+            self.stop(
+                index < 0, 'ValueError',
+                "'index' must be greater than or equal to 0 ({} given).", index
+            )
+            self.stop(
+                index >= self.number_of_stars, 'ValueError',
+                "'index' must be lower than the number of stars ({} and {} given).",
+                self.number_of_stars, index
+            )
+            index = int(index)
+
+            return self.star_designations[index], index
 
     def get_epoch(self, age=None, metric=None, index=None):
         """
@@ -1740,25 +1756,6 @@ class Output():
 
         return metric, index
 
-    def check_coord(self, coord):
-        """Checks the type and value of a coordinate."""
-
-        self.check_type(coord, 'coord', 'string')
-        coords = ('position', 'velocity')
-        self.stop(
-            coord not in coords,
-            'ValueError', "'coord' must be {} ({} given).", enumerate_strings(*coords), coord
-        )
-
-    def check_axis(self, axis, label):
-        """Checks the type and value of an axis."""
-
-        self.check_type(axis, label, 'integer')
-        self.stop(
-            axis < 0 or axis > 2, 'ValueError',
-            "'{}' must be 0, 1, or 2 ({} given).", label, axis
-        )
-
     def get_title_coord(self, fig, coord, system, line_1, line_2=''):
         """Creates a title for position or velocity coordinates."""
 
@@ -1804,6 +1801,47 @@ class Output():
         ).T  / 2
 
         return values, limits
+
+    def check_coord(self, coord):
+        """Checks the type and value of a coordinate."""
+
+        self.check_type(coord, 'coord', 'string')
+        coords = ('position', 'velocity')
+        self.stop(
+            coord not in coords,
+            'ValueError', "'coord' must be {} ({} given).", enumerate_strings(*coords), coord
+        )
+
+    def check_system(self, system):
+        """
+        Check the type and value of system. Returns the value of the short label if the long
+        label is provided.
+        """
+
+        # Check the type and value of system
+        self.check_type(system, 'system', 'string')
+        systems = ('cartesian', 'xyz', 'curvilinear', 'ξηζ')
+        self.stop(
+            system not in systems, 'ValueError',
+            "'system' can only take as value {} ({} given).", enumerate_strings(*systems), system
+        )
+
+        # Select the value of the short label if the long label is provided
+        if system == 'cartesian':
+            system = 'xyz'
+        if system == 'curvilinear':
+            system = 'ξηζ'
+
+        return system
+
+    def check_axis(self, axis, label):
+        """Checks the type and value of an axis."""
+
+        self.check_type(axis, label, 'integer')
+        self.stop(
+            axis < 0 or axis > 2, 'ValueError',
+            "'{}' must be 0, 1, or 2 ({} given).", label, axis
+        )
 
     def plot_trajectory(self, ax, x, y, coord, system, age, metric, index, labels):
         """Draws the trajectory of stars in the group."""
@@ -1883,8 +1921,8 @@ class Output():
             # Plot the average model star's birth and current values
             for t, size, marker in ((-1, 12, '*'), (0, 6, 'o')):
                 ax.scatter(
-                    np.array([average_model_star_value[t,x]]),
-                    np.array([average_model_star_value[t,y]]),
+                    np.array([average_model_star_value[t, x]]),
+                    np.array([average_model_star_value[t, y]]),
                     color=colors.green[6] + (0.4,), edgecolors=colors.green[6],
                     alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.3
                 )
@@ -1903,8 +1941,8 @@ class Output():
                 # Plot model stars' birth and current values
                 for t, size, marker in ((0, 12, '*'), (-1, 6, 'o')):
                     ax.scatter(
-                        np.array([value[t,x]]),
-                        np.array([value[t,y]]),
+                        np.array([value[t, x]]),
+                        np.array([value[t, y]]),
                         color=colors.blue[6] + (0.4,), edgecolors=colors.blue[6],
                         alpha=None, s=size, marker=marker, linewidths=0.25, zorder=0.2
                     )
@@ -2474,18 +2512,20 @@ class Output():
 
         # Find minimum spanning tree branches, if needed
         if mst and len(set(coords)) == 1:
-            mst = f'mst_{coords[0]}_{system}'
+            mst = f'mst_branches_{coords[0]}_{system}'
             if mst not in vars(self).keys():
                 self.get_tree_branches()
             mst = vars(self)[mst]
 
             # Select branches
-            for branch in mst[step]:
+            for branch in mst[:, step]:
                 value_start = [
-                    vars(branch.start)[value_coords[i]][step, axes[i]] for i in range(ndim)
+                    vars(self)[value_coords[i]][0, self.core][branch[0], step, axes[i]]
+                    for i in range(ndim)
                 ]
                 value_end = [
-                    vars(branch.end)[value_coords[i]][step, axes[i]] for i in range(ndim)
+                    vars(self)[value_coords[i]][0, self.core][branch[1], step, axes[i]]
+                    for i in range(ndim)
                 ]
 
                 # Plot branches
@@ -3002,311 +3042,377 @@ class Output():
         )
 
     def create_kinematics_table(
-        self, save=False, show=False, machine=False, age=None,
-        forced=None, default=None, cancel=None
+        self, system, step=None, age=None, relative=False, machine=False,
+        save=False, show=False, forced=None, default=None, cancel=None
     ):
         """
-        Creates a table of the 6D kinematics (xyz Galactic positions and uvw space velocities)
-        at the given age of all stars in the group. If 'save' if True, the table is saved and if
-        'show' is True, the table is displayed. If 'machine' is True, then a machine-readable
-        table, with separate columns for values and errors, no units in the header and '.csv'
-        extension instead of a '.txt', is created.
+        Creates a table of the absolute or relative kinematics for the given system, and age or
+        step a for all stars in the group. If 'machine' is True, a machine-readable table, with
+        separate columns for values and errors, no units in the header and '.csv' extension
+        instead of a '.txt', is created. If 'save' is True, the table is saved, and if 'show' is
+        True, the table is displayed.
         """
 
-        # Retrieve the epoch index
-        epoch_index = self.get_epoch(age=age)[0]
+        # Check the type and value of system
+        system = self.check_system(system)
 
-        # Retrieve xyz positions and uvw velocities and convert units
-        def get_position_velocity_xyz(star):
-            position_xyz = Quantity(
-                self.position_xyz[0, star, epoch_index], 'pc',
-                self.position_xyz_error[0, star, epoch_index]
-            )
-            velocity_xyz = Quantity(
-                self.velocity_xyz[0, star, epoch_index], 'pc/Myr',
-                self.velocity_xyz_error[0, star, epoch_index]
-            ).to('km/s')
+        # Compute the values of step and age
+        step, age = self.get_step_age(step, age)
 
-            return position_xyz, velocity_xyz
-
-        # Check the types of save, show and machine
-        self.check_type(save, 'save', 'boolean')
-        self.check_type(show, 'show', 'boolean')
+        # Check the types of relative and machine
+        self.check_type(relative, 'relative', 'boolean')
         self.check_type(machine, 'machine', 'boolean')
 
-        # Create header
-        if machine:
-            lines = ['designation,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW']
-
-            # Create lines
-            for star in range(self.number_of_stars):
-                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
-                lines.append(
-                    ','.join(
-                        [self.star_designations[star]] + [
-                            str(float(i)) for i in [
-                                position_xyz.values[0], position_xyz.errors[0],
-                                position_xyz.values[1], position_xyz.errors[1],
-                                position_xyz.values[2], position_xyz.errors[2],
-                                velocity_xyz.values[0], velocity_xyz.errors[0],
-                                velocity_xyz.values[1], velocity_xyz.errors[1],
-                                velocity_xyz.values[2], velocity_xyz.errors[2]
-                            ]
-                        ]
-                    )
-                )
-
-        # Create header
-        else:
-            lines = [
-                f"{'':-<155}",
-                f"{'Designation':<35}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}",
-                f"{'[pc]':>55}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}{'[km/s]':>20}{'[km/s]':>20}",
-                f"{'':-<155}"
-            ]
-
-            # Create lines
-            for star in range(self.number_of_stars):
-                position_xyz, velocity_xyz = get_position_velocity_xyz(star)
-                x = f'{position_xyz.values[0]:.2f} ± {position_xyz.errors[0]:.2f}'
-                y = f'{position_xyz.values[1]:.2f} ± {position_xyz.errors[1]:.2f}'
-                z = f'{position_xyz.values[2]:.2f} ± {position_xyz.errors[2]:.2f}'
-                u = f'{velocity_xyz.values[0]:.2f} ± {velocity_xyz.errors[0]:.2f}'
-                v = f'{velocity_xyz.values[1]:.2f} ± {velocity_xyz.errors[1]:.2f}'
-                w = f'{velocity_xyz.values[2]:.2f} ± {velocity_xyz.errors[2]:.2f}'
-                lines.append(
-                    f'{self.star_designations[star]:<35}'
-                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}'
-                )
-
-            # Creater footer
-            lines.append(f"{'':-<155}")
-
-        # Show table
-        if show:
-            for line in lines:
-                print(line)
-
-        # Save table
-        if save:
-            self.save_table(
-                f'kinematics_{self.name}_{age}Myr.csv', f'Kinematics of {self.name}', lines,
-                extension='csv' if machine else 'txt',
-                forced=forced, default=default, cancel=cancel
-            )
-
-    def create_average_kinematics_time_table(
-        self, save=False, show=False, machine=False,
-        forced=None, default=None, cancel=None
-    ):
-        """
-        Creates a table of the group's average kinematics over time. If 'save' if True, the table
-        is saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
-        machine-readable table, without units in the header and '.csv' extension instead of a
-        '.txt', is created. The machine-readable table also has an additional column 'status'
-        to indicate whether a metric is valid or rejected, whereas the non-machine-readable
-        table uses side heads.
-        """
-
-        # Check the types of save, show and machine
-        self.check_type(save, 'save', 'boolean')
-        self.check_type(show, 'show', 'boolean')
-        self.check_type(machine, 'machine', 'boolean')
-
-        # Create header
-        if machine:
-            lines = ['time,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW,ξ,eξ,η,eη,ζ,eζ,vξ,evξ,vη,evη,ζ,evζ']
-
-            # Create lines
-            for t in np.arange(self.time.size):
-                lines.append(
-                    (
-                        f'{self.time[t]},'
-                        f'{self.average_position_xyz[0, t, 0]},'
-                        f'{self.average_position_xyz_error[t, 0]},'
-                        f'{self.average_position_xyz[0, t, 1]},'
-                        f'{self.average_position_xyz_error[t, 1]},'
-                        f'{self.average_position_xyz[0, t, 2]},'
-                        f'{self.average_position_xyz_error[t, 2]},'
-                        f'{self.average_velocity_xyz[0, t, 0]},'
-                        f'{self.average_velocity_xyz_error[t, 0]},'
-                        f'{self.average_velocity_xyz[0, t, 1]},'
-                        f'{self.average_velocity_xyz_error[t, 1]},'
-                        f'{self.average_velocity_xyz[0, t, 2]},'
-                        f'{self.average_velocity_xyz_error[t, 2]},'
-                        f'{self.average_position_ξηζ[0, t, 0]},'
-                        f'{self.average_position_ξηζ_error[t, 0]},'
-                        f'{self.average_position_ξηζ[0, t, 1]},'
-                        f'{self.average_position_ξηζ_error[t, 1]},'
-                        f'{self.average_position_ξηζ[0, t, 2]},'
-                        f'{self.average_position_ξηζ_error[t, 2]},'
-                        f'{self.average_velocity_ξηζ[0, t, 0]},'
-                        f'{self.average_velocity_ξηζ_error[t, 0]},'
-                        f'{self.average_velocity_ξηζ[0, t, 1]},'
-                        f'{self.average_velocity_ξηζ_error[t, 1]},'
-                        f'{self.average_velocity_ξηζ[0, t, 2]},'
-                        f'{self.average_velocity_ξηζ_error[t, 2]}'
-                    )
-                )
-
-        # Create header
-        else:
-            lines = [
-                f"{'':-<248}",
-                f"{'Time':<8}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}"
-                f"{'ξ':>20}{'η':>20}{'ζ':>20}{'vξ':>20}{'vη':>20}{'vζ':>20}",
-                f"{'[Myr]':<8}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
-                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}"
-                f"{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
-                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}",
-                f"{'':-<248}"
-            ]
-
-            # Create lines
-            for t in np.arange(self.time.size):
-                x = f'{self.average_position_xyz[0, t, 0]:.2f} ± {self.average_position_xyz_error[t, 0]:.2f}'
-                y = f'{self.average_position_xyz[0, t, 1]:.2f} ± {self.average_position_xyz_error[t, 1]:.2f}'
-                z = f'{self.average_position_xyz[0, t, 2]:.2f} ± {self.average_position_xyz_error[t, 2]:.2f}'
-                u = f'{self.average_velocity_xyz[0, t, 0]:.2f} ± {self.average_velocity_xyz_error[t, 0]:.2f}'
-                v = f'{self.average_velocity_xyz[0, t, 1]:.2f} ± {self.average_velocity_xyz_error[t, 1]:.2f}'
-                w = f'{self.average_velocity_xyz[0, t, 2]:.2f} ± {self.average_velocity_xyz_error[t, 2]:.2f}'
-                ξ = f'{self.average_position_ξηζ[0, t, 0]:.2f} ± {self.average_position_ξηζ_error[t, 0]:.2f}'
-                η = f'{self.average_position_ξηζ[0, t, 1]:.2f} ± {self.average_position_ξηζ_error[t, 1]:.2f}'
-                ζ = f'{self.average_position_ξηζ[0, t, 2]:.2f} ± {self.average_position_ξηζ_error[t, 2]:.2f}'
-                vξ = f'{self.average_velocity_ξηζ[0, t, 0]:.2f} ± {self.average_velocity_ξηζ_error[t, 0]:.2f}'
-                vη = f'{self.average_velocity_ξηζ[0, t, 1]:.2f} ± {self.average_velocity_ξηζ_error[t, 1]:.2f}'
-                vζ = f'{self.average_velocity_ξηζ[0, t, 2]:.2f} ± {self.average_velocity_ξηζ_error[t, 2]:.2f}'
-                lines.append(
-                    f'{self.time[t]:<8.1f}'
-                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}'
-                    f'{ξ:>20}{η:>20}{ζ:>20}{vξ:>20}{vη:>20}{vζ:>20}'
-                )
-
-            # Create footer
-            lines.append(f"{'':-<248}")
-
-        # Show table
-        if show:
-            for line in lines:
-                print(line)
-
-        # Save table
-        if save:
-            self.save_table(
-                f'average_kinematics_time_{self.name}',
-                f'Kinematics over time of {self.name}',
-                lines, extension='csv' if machine else 'txt',
-                forced=forced, default=default, cancel=cancel
-            )
-
-    def create_star_kinematics_time_table(
-        self, star, save=False, show=False, machine=False,
-        forced=None, default=None, cancel=None
-    ):
-        """
-        Creates a table of the star 6D kinematics over time. If 'save' if True, the table is
-        saved and if 'show' is True, the table is displayed. If 'machine' is True, then a
-        machine-readable table, without units in the header and '.csv' extension instead of a
-        '.txt', is created. The machine-readable table also has an additional column 'status'
-        to indicate whether a metric is valid or rejected, whereas the non-machine-readable
-        table uses side heads.
-        """
-
-        # Check the types of star, save, show and machine
-        self.check_type(star, 'save', 'integer')
-        self.check_type(save, 'save', 'boolean')
-        self.check_type(show, 'show', 'boolean')
-        self.check_type(machine, 'machine', 'boolean')
-
-        # Check the value of star
-        self.stop(
-            star >= self.number_of_stars, 'ValueError',
-            "'star' index must lower than {}, the number of star ({} given).",
-            self.number_of_stars, star
+        # Find data
+        position, velocity, distance, speed = self.get_star_values_errors(
+            system, step=step, relative=relative
         )
 
         # Create header
         if machine:
-            lines = ['time,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW,ξ,eξ,η,eη,ζ,eζ,vξ,evξ,vη,evη,ζ,evζ']
+            if system == 'xyz':
+                lines = ['designation,x,ey,y,ey,z,ez,u,eu,v,ev,w,ew,xyzdist,exyzdist,xyzspeed,exyzspeed']
+            elif system == 'ξηζ':
+                lines = ['designation,ξ,eξ,η,eη,ζ,eζ,vξ,evξ,vη,evη,ζ,evζ,ξηζdist,eξηζdist,ξηζspeed,eξηζspeed']
 
             # Create lines
-            for t in np.arange(self.time.size):
+            for star in range(self.number_of_stars):
                 lines.append(
                     (
-                        f'{self.time[t]},'
-                        f'{self.position_xyz[0, star, t, 0]},'
-                        f'{self.position_xyz_error[star, t, 0]},'
-                        f'{self.position_xyz[0, star, t, 1]},'
-                        f'{self.position_xyz_error[star, t, 1]},'
-                        f'{self.position_xyz[0, star, t, 2]},'
-                        f'{self.position_xyz_error[star, t, 2]},'
-                        f'{self.velocity_xyz[0, star, t, 0]},'
-                        f'{self.velocity_xyz_error[star, t, 0]},'
-                        f'{self.velocity_xyz[0, star, t, 1]},'
-                        f'{self.velocity_xyz_error[star, t, 1]},'
-                        f'{self.velocity_xyz[0, star, t, 2]},'
-                        f'{self.velocity_xyz_error[star, t, 2]},'
-                        f'{self.position_ξηζ[0, star, t, 0]},'
-                        f'{self.position_ξηζ_error[star, t, 0]},'
-                        f'{self.position_ξηζ[0, star, t, 1]},'
-                        f'{self.position_ξηζ_error[star, t, 1]},'
-                        f'{self.position_ξηζ[0, star, t, 2]},'
-                        f'{self.position_ξηζ_error[star, t, 2]},'
-                        f'{self.velocity_ξηζ[0, star, t, 0]},'
-                        f'{self.velocity_ξηζ_error[star, t, 0]},'
-                        f'{self.velocity_ξηζ[0, star, t, 1]},'
-                        f'{self.velocity_ξηζ_error[star, t, 1]},'
-                        f'{self.velocity_ξηζ[0, star, t, 2]},'
-                        f'{self.velocity_ξηζ_error[star, t, 2]}'
+                        f'{self.star_designations[star]},'
+                        f'{position.values[star, 0]},{position.errors[star, 0]},'
+                        f'{position.values[star, 1]},{position.errors[star, 1]},'
+                        f'{position.values[star, 2]},{position.errors[star, 2]},'
+                        f'{velocity.values[star, 0]},{velocity.errors[star, 0]},'
+                        f'{velocity.values[star, 1]},{velocity.errors[star, 1]},'
+                        f'{velocity.values[star, 2]},{velocity.errors[star, 2]},'
+                        f'{distance.values[star]},{distance.values[star]},'
+                        f'{speed.values[star]},{speed.values[star]}'
                     )
                 )
 
         # Create header
         else:
-            lines = [
-                f"{'':-<248}",
-                f"{'Time':<8}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}"
-                f"{'ξ':>20}{'η':>20}{'ζ':>20}{'vξ':>20}{'vη':>20}{'vζ':>20}",
-                f"{'[Myr]':<8}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
-                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}"
-                f"{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}"
-                f"{'[pc/Myr]':>20}{'[pc/Myr]':>20}{'[pc/Myr]':>20}",
-                f"{'':-<248}"
+            if system == 'xyz':
+                header = (
+                    f"{'Designation':<35}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}"
+                    f"{'XYZ Distance':>20}{'XYZ Speed':>20}"
+                )
+            elif system == 'ξηζ':
+                header = (
+                    f"{'Designation':<35}{'ξ':>20}{'η':>20}{'ζ':>20}{'vξ':>20}{'vη':>20}{'vζ':>20}"
+                    f"{'ξηζ Distance':>20}{'ξηζ Speed':>20}"
+                )
+            lines =[
+                f"{'':-<195}", header,
+                f"{'':<35}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}"
+                f"{'[km/s]':>20}{'[kms/s]':>20}{'[pc]':>20}{'[km/s]':>20}",
+                f"{'':-<195}"
             ]
 
             # Create lines
-            for t in np.arange(self.time.size):
-                x = f'{self.position_xyz[0, star, t, 0]:.2f} ± {self.position_xyz_error[star, t, 0]:.2f}'
-                y = f'{self.position_xyz[0, star, t, 1]:.2f} ± {self.position_xyz_error[star, t, 1]:.2f}'
-                z = f'{self.position_xyz[0, star, t, 2]:.2f} ± {self.position_xyz_error[star, t, 2]:.2f}'
-                u = f'{self.velocity_xyz[0, star, t, 0]:.2f} ± {self.velocity_xyz_error[star, t, 0]:.2f}'
-                v = f'{self.velocity_xyz[0, star, t, 1]:.2f} ± {self.velocity_xyz_error[star, t, 1]:.2f}'
-                w = f'{self.velocity_xyz[0, star, t, 2]:.2f} ± {self.velocity_xyz_error[star, t, 2]:.2f}'
-                ξ = f'{self.position_ξηζ[0, star, t, 0]:.2f} ± {self.position_ξηζ_error[star, t, 0]:.2f}'
-                η = f'{self.position_ξηζ[0, star, t, 1]:.2f} ± {self.position_ξηζ_error[star, t, 1]:.2f}'
-                ζ = f'{self.position_ξηζ[0, star, t, 2]:.2f} ± {self.position_ξηζ_error[star, t, 2]:.2f}'
-                vξ = f'{self.velocity_ξηζ[0, star, t, 0]:.2f} ± {self.velocity_ξηζ_error[star, t, 0]:.2f}'
-                vη = f'{self.velocity_ξηζ[0, star, t, 1]:.2f} ± {self.velocity_ξηζ_error[star, t, 1]:.2f}'
-                vζ = f'{self.velocity_ξηζ[0, star, t, 2]:.2f} ± {self.velocity_ξηζ_error[star, t, 2]:.2f}'
+            for star in range(self.number_of_stars):
+                x = f'{position.values[star, 0]:.2f} ± {position.errors[star, 0]:.2f}'
+                y = f'{position.values[star, 1]:.2f} ± {position.errors[star, 1]:.2f}'
+                z = f'{position.values[star, 2]:.2f} ± {position.errors[star, 2]:.2f}'
+                u = f'{velocity.values[star, 0]:.2f} ± {velocity.errors[star, 0]:.2f}'
+                v = f'{velocity.values[star, 1]:.2f} ± {velocity.errors[star, 1]:.2f}'
+                w = f'{velocity.values[star, 2]:.2f} ± {velocity.errors[star, 2]:.2f}'
+                d = f'{distance.values[star]:.2f} ± {distance.errors[star]:.2f}'
+                s = f'{speed.values[star]:.2f} ± {speed.errors[star]:.2f}'
                 lines.append(
-                    f'{self.time[t]:<8.1f}'
-                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}'
-                    f'{ξ:>20}{η:>20}{ζ:>20}{vξ:>20}{vη:>20}{vζ:>20}'
+                    f'{self.star_designations[star]:<35}'
+                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}{d:>20}{s:>20}'
+                )
+            # Creater footer
+            lines.append(f"{'':-<195}")
+
+        # Save table
+        self.save_table(
+            f"kinematics_{system}_{self.name}_{age:.1f}Myr.{'csv' if machine else 'txt'}",
+            f'{system} kinematics of {self.name} at {age:.1f} Myr',
+            lines, extension='csv' if machine else 'txt', save=save, show=show,
+            forced=forced, default=default, cancel=cancel
+        )
+
+    def create_kinematics_time_table(
+        self, system, star, relative=False, machine=False,
+        save=False, show=False, forced=None, default=None, cancel=None
+    ):
+        """
+        Creates a table of the absolute or relative kinematics of a star for the given system over
+        time. If 'machine' is True, a machine-readable table, with separate columns for values and
+        errors, no units in the header and '.csv' extension instead of a '.txt', is created. If
+        'save' is True, the table is saved, and if 'show' is True, the table is displayed.
+        """
+
+        # Check the type and value of system
+        system = self.check_system(system)
+
+        # Check the type and value of star
+        label, star = self.get_star(star)
+
+        # Check the types of relative and machine
+        self.check_type(relative, 'relative', 'boolean')
+        self.check_type(machine, 'machine', 'boolean')
+
+        # Find data
+        position, velocity, distance, speed = self.get_star_values_errors(
+            system, star=star, relative=relative
+        )
+
+        # Create header
+        if machine:
+            if system == 'xyz':
+                lines = ['time,X,eX,Y,eY,Z,eZ,U,eU,V,eV,W,eW,xyzdist,exyzdist,xyzspeed,exyzspeed']
+            elif system == 'ξηζ':
+                lines = ['time,ξ,eξ,η,eη,ζ,eζ,vξ,evξ,vη,evη,ζ,evζ,ξηζdist,eξηζdist,ξηζspeed,eξηζspeed']
+
+            # Create lines
+            for step in np.arange(self.number_of_steps):
+                lines.append(
+                    (
+                        f'{self.time[step]},'
+                        f'{position.values[step, 0]},{position.errors[step, 0]},'
+                        f'{position.values[step, 1]},{position.errors[step, 1]},'
+                        f'{position.values[step, 2]},{position.errors[step, 2]},'
+                        f'{velocity.values[step, 0]},{velocity.errors[step, 0]},'
+                        f'{velocity.values[step, 1]},{velocity.errors[step, 1]},'
+                        f'{velocity.values[step, 2]},{velocity.errors[step, 2]},'
+                        f'{distance.values[step]},{distance.values[step]},'
+                        f'{speed.values[step]},{speed.values[step]}'
+                    )
+                )
+
+        # Create header
+        else:
+            if system == 'xyz':
+                header = (
+                    f"{'Time':<8}{'X':>20}{'Y':>20}{'Z':>20}{'U':>20}{'V':>20}{'W':>20}"
+                    f"{'XYZ Distance':>20}{'XYZ Speed':>20}"
+                )
+            elif system == 'ξηζ':
+                header = (
+                    f"{'Time':<8}{'ξ':>20}{'η':>20}{'ζ':>20}{'vξ':>20}{'vη':>20}{'vζ':>20}"
+                    f"{'ξηζ Distance':>20}{'ξηζ Speed':>20}"
+                )
+            lines = [
+                f"{'':-<168}", header,
+                f"{'[Myr]':<8}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}"
+                f"{'[km/s]':>20}{'[kms/s]':>20}{'[pc]':>20}{'[km/s]':>20}",
+                f"{'':-<168}"
+            ]
+
+            # Create lines
+            for step in np.arange(self.number_of_steps):
+                x = f'{position.values[step, 0]:.2f} ± {position.errors[step, 0]:.2f}'
+                y = f'{position.values[step, 1]:.2f} ± {position.errors[step, 1]:.2f}'
+                z = f'{position.values[step, 2]:.2f} ± {position.errors[step, 2]:.2f}'
+                u = f'{velocity.values[step, 0]:.2f} ± {velocity.errors[step, 0]:.2f}'
+                v = f'{velocity.values[step, 1]:.2f} ± {velocity.errors[step, 1]:.2f}'
+                w = f'{velocity.values[step, 2]:.2f} ± {velocity.errors[step, 2]:.2f}'
+                d = f'{distance.values[step]:.2f} ± {distance.errors[step]:.2f}'
+                s = f'{speed.values[step]:.2f} ± {speed.errors[step]:.2f}'
+                lines.append(
+                    f'{self.time[step]:<8.1f}'
+                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}{d:>20}{s:>20}'
                 )
 
             # Create footer
-            lines.append(f"{'':-<248}")
-
-        # Show table
-        if show:
-            for line in lines:
-                print(line)
+            lines.append(f"{'':-<168}")
 
         # Save table
-        if save:
-            self.save_table(
-                f'kinematics_time_{self.star_designations[star]}',
-                f'Kinematics over time of {self.star_designations[star]}', lines,
-                extension='csv' if machine else 'txt',
-                forced=forced, default=default, cancel=cancel
-            )
+        self.save_table(
+            f'kinematics_time_{system}_{label}', f'{system} kinematics of {label} over time',
+            lines, extension='csv' if machine else 'txt', save=save, show=show,
+            forced=forced, default=default, cancel=cancel
+        )
+
+    def create_group_kinematics_time_table(
+        self, operation, system, relative=False, machine=False,
+        save=False, show=False, forced=None, default=None, cancel=None
+    ):
+        """
+        Creates a table of the absolute and relative kinematics of the group for a given system
+        over time. If 'machine' is True, a machine-readable table,with separate columns for values
+        and errors, no units in the header and '.csv' extension instead of a '.txt', is created.
+        If 'save' if True, the table is is saved and if 'show' is True, the table is displayed.
+        """
+
+        # Check the type and value of operation
+        self.check_type(operation, 'operation', 'string')
+        self.stop(
+            operation.lower() not in ('average', 'scatter'), 'ValueError',
+            "'operation' must be 'average' or 'scatter' ('{}' given).", operation
+        )
+
+        # Check the type and value of system
+        system = self.check_system(system)
+
+        # Check the type of machine
+        self.check_type(relative, 'relative', 'boolean')
+        self.check_type(machine, 'machine', 'boolean')
+
+        # Find data
+        position, velocity, distance, speed, \
+        group_distance, group_speed = self.get_group_values_errors(
+            system, operation.lower(), relative=relative
+        )
+
+        # Create header
+        if machine:
+            if system == 'xyz' and operation == 'average':
+                lines = [
+                    'time,<x>,e<x>,<y>,e<y>,<z>,e<z>,<u>,e<u>,<v>,e<v>,<w>,e<w>,'
+                    '<xyz>dist,e<xyz>dist,<xyz>speed,e<xyz>speed,'
+                    '<xyz>gpdist,e<xyz>gpdist,<xyz>gpspeed,e<xyz>gpseed'
+                ]
+            elif system == 'xyz' and operation == 'scatter':
+                lines = [
+                    'time,σX,eσX,σY,eσY,σZ,eσZ,σU,eσU,σV,eσV,σW,eσW,'
+                    'σxyzdist,eσxyzdist,σxyzspeed,eσxyzspeed,'
+                    'σxyzgpdist,eσxyzgpdist,σxyzgpspeed,eσxyzgpseed'
+                ]
+            elif system == 'ξηζ' and operation == 'average':
+                lines =[
+                    'time,<ξ>,e<ξ>,<η>,e<η>,<ζ>,e<ζ>,<vξ>,e<vξ>,<vη>,e<vη>,<vζ>,e<vζ>,'
+                    '<ξηζ>dist,e<ξηζ>dist,<ξηζ>speed,e<ξηζ>speed,'
+                    '<ξηζ>gpdist,e<ξηζ>gpdist,<ξηζ>gpspeed,e<ξηζ>gpseed'
+                ]
+            elif system == 'ξηζ' and operation == 'scatter':
+                lines = [
+                    'time,σξ,eσξ,ση,eση,σζ,eσζ,σvξ,eσvξ,σvη,eσvη,σvζ,eσvζ,'
+                    'σξηζdist,eσξηζdist,σξηζspeed,eσξηζspeed,'
+                    'σξηζgpdist,eσξηζgpdist,σξηζgpspeed,eσξηζgpseed'
+                ]
+
+            # Create lines
+            for step in np.arange(self.number_of_steps):
+                lines.append(
+                    (
+                        f'{self.time[step]},'
+                        f'{position.values[step, 0]},{position.errors[step, 0]},'
+                        f'{position.values[step, 1]},{position.errors[step, 1]},'
+                        f'{position.values[step, 2]},{position.errors[step, 2]},'
+                        f'{velocity.values[step, 0]},{velocity.errors[step, 0]},'
+                        f'{velocity.values[step, 1]},{velocity.errors[step, 1]},'
+                        f'{velocity.values[step, 2]},{velocity.errors[step, 2]},'
+                        f'{distance.values[step]},{distance.errors[step]},'
+                        f'{speed.values[step]},{speed.errors[step]},'
+                        f'{group_distance.values[step]},{group_distance.errors[step]},'
+                        f'{group_speed.values[step]},{group_speed.errors[step]}'
+                    )
+                )
+
+        # Create header
+        else:
+            if system == 'xyz' and operation == 'average':
+                header = (
+                    f"{'Time':<8}{'<X>':>20}{'<Y>':>20}{'<Z>':>20}{'<U>':>20}"
+                    f"{'<V>':>20}{'<W>':>20}{'<XYZ> Distance':>20}{'<XYZ> Speed':>20}"
+                    f"{'<XYZ> Group Distance':>21}{'<XYZ> Group Speed':>21}"
+                )
+            elif system == 'xyz' and operation == 'scatter':
+                header = (
+                    f"{'Time':<8}{'σX':>20}{'σY':>20}{'σZ':>20}{'σU':>20}"
+                    f"{'σV':>20}{'σW':>20}{'σXYZ Distance':>20}{'σXYZ Speed':>20}"
+                    f"{'σXYZ Group Distance':>21}{'σXYZ Group Speed':>21}"
+                )
+            elif system == 'ξηζ' and operation == 'average':
+                header = (
+                    f"{'Time':<8}{'<ξ>':>20}{'<η>':>20}{'<ζ>':>20}{'<vξ>':>20}"
+                    f"{'<vη>':>20}{'<vζ>':>20}{'<ξηζ> Distance':>20}{'<ξηζ> Speed':>20}"
+                    f"{'<ξηζ> Group Distance':>21}{'<ξηζ> Group Speed':>21}"
+                )
+            elif system == 'ξηζ' and operation == 'scatter':
+                header = (
+                    f"{'Time':<8}{'σξ':>20}{'ση':>20}{'σζ':>20}{'σvξ':>20}"
+                    f"{'σvη':>20}{'σvζ':>20}{'σξηζ Distance':>20}{'σξηζ Speed':>20}"
+                    f"{'σξηζ Group Distance':>21}{'σξηζ Group Speed':>21}"
+                )
+            lines = [
+                f"{'':-<210}", header,
+                f"{'[Myr]':<8}{'[pc]':>20}{'[pc]':>20}{'[pc]':>20}{'[km/s]':>20}{'[km/s]':>20}"
+                f"{'[km/s]':>20}{'[pc]':>20}{'[km/s]':>20}{'[pc]':>21}{'[km/s]':>21}",
+                f"{'':-<210}"
+            ]
+
+            # Create lines
+            for step in np.arange(self.number_of_steps):
+                x = f'{position.values[step, 0]:.2f} ± {position.errors[step, 0]:.2f}'
+                y = f'{position.values[step, 1]:.2f} ± {position.errors[step, 1]:.2f}'
+                z = f'{position.values[step, 2]:.2f} ± {position.errors[step, 2]:.2f}'
+                u = f'{velocity.values[step, 0]:.2f} ± {velocity.errors[step, 0]:.2f}'
+                v = f'{velocity.values[step, 1]:.2f} ± {velocity.errors[step, 1]:.2f}'
+                w = f'{velocity.values[step, 2]:.2f} ± {velocity.errors[step, 2]:.2f}'
+                d = f'{distance.values[step]:.2f} ± {distance.errors[step]:.2f}'
+                s = f'{speed.values[step]:.2f} ± {speed.errors[step]:.2f}'
+                gd = f'{group_distance.values[step]:.2f} ± {group_distance.errors[step]:.2f}'
+                gs = f'{group_speed.values[step]:.2f} ± {group_speed.errors[step]:.2f}'
+                lines.append(
+                    f'{self.time[step]:<8.1f}'
+                    f'{x:>20}{y:>20}{z:>20}{u:>20}{v:>20}{w:>20}{d:>20}{s:>20}{gd:>21}{gs:>21}'
+                )
+
+            # Create footer
+            lines.append(f"{'':-<210}")
+
+        # Save table
+        self.save_table(
+            f"{'relative_' if relative else ''}{operation}_kinematics_time_{system}_{self.name}", (
+                f"{'relative ' if relative else ''}{'average ' if operation == 'average' else ''}"
+            ).capitalize() + f"{system} kinematics {'scatter ' if operation == 'scatter' else ''}"
+            f"of {self.name} over time", lines, extension='csv' if machine else 'txt',
+            save=save, show=show, forced=forced, default=default, cancel=cancel
+        )
+
+    def get_star_values_errors(self, system, star=None, step=None, relative=False):
+        """
+        Retrieves the star's absolute or relative position, velocity, distance, and speed for a
+        given system.
+        """
+
+        for coord in ('position', 'velocity', 'distance', 'speed'):
+
+            # Find values and errors, if star and step are None
+            if star is None and step is None:
+                yield Quantity(
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}"][0],
+                    'pc/Myr' if coord in ('velocity', 'speed') else 'pc',
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}_error"]
+                ).to('km/s' if coord in ('velocity', 'speed') else 'pc')
+
+            elif star is not None and step is None:
+                yield Quantity(
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}"][0, star],
+                    'pc/Myr' if coord in ('velocity', 'speed') else 'pc',
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}_error"][star]
+                ).to('km/s' if coord in ('velocity', 'speed') else 'pc')
+
+            elif star is None and step is not None:
+                yield Quantity(
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}"][0, :, step],
+                    'pc/Myr' if coord in ('velocity', 'speed') else 'pc',
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}_error"][:, step]
+                ).to('km/s' if coord in ('velocity', 'speed') else 'pc')
+
+            else:
+                yield Quantity(
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}"][0, star, step],
+                    'pc/Myr' if coord in ('velocity', 'speed') else 'pc',
+                    vars(self)[f"{'relative_' if relative else ''}{coord}_{system}_error"][star, step]
+                ).to('km/s' if coord in ('velocity', 'speed') else 'pc')
+
+    def get_group_values_errors(self, system, operation, relative=False):
+        """
+        Retrieves the group's absolute or relative position, velocity, distance, speed, group
+        distance, and group speed average or scatter, for a given system.
+        """
+
+        # Find average values and errors
+        for coord in ('position', 'velocity', 'distance', 'speed', 'group_distance', 'group_speed'):
+            yield Quantity(
+                vars(self)[f"{'relative_' if relative else ''}{operation}_{coord}_{system}"][0],
+                'pc/Myr' if coord in ('velocity', 'speed', 'group_speed') else 'pc',
+                vars(self)[f"{'relative_' if relative else ''}{operation}_{coord}_{system}_error"]
+            ).to('km/s' if coord in ('velocity', 'speed', 'group_speed') else 'pc')

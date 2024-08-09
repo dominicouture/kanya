@@ -68,13 +68,13 @@ cov_metrics.value = True
 cov_robust_metrics.value = False
 cov_sklearn_metrics.value = False
 mad_metrics.value = True
-tree_metrics.value = False
+tree_metrics.value = True
 
 # Number of Monte Carlo (integer, ≥ 0)
 number_monte_carlo.value = 10
 
 # Number of jackknife Monte Carlo (integer, ≥ 0)
-number_jackknife.value = 10
+number_jackknife.value = 5
 
 # Fraction of stars per jackknife Monte Carlo (0 < float ≤ 1)
 fraction_jackknife.value = 0.67

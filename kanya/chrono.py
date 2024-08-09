@@ -5,8 +5,9 @@
 
 import numpy as np
 from tqdm import tqdm
-from sklearn.covariance import MinCovDet
 from itertools import combinations
+from multiprocessing import Pool
+from .tools import Iterate
 
 class Chrono():
     """
@@ -232,7 +233,7 @@ class Chrono():
                             9 if self.cov_robust_metrics else 0,
                             (self.number_of_steps // 5 + 1) * 2 if self.cov_sklearn_metrics else 0,
                             2 * self.mad_metrics,
-                            (self.number_of_steps // 6 + 1) * 2 if self.tree_metrics else 0
+                            self.number_monte_carlo * self.number_jackknife * 2 + 18 if self.tree_metrics else 0
                         ]
                     ), leave=False
                     # unit=' size metric',
@@ -363,11 +364,14 @@ class Chrono():
         self.number_of_stars_iteration = int(
             self.number_in_core * self.fraction_jackknife
         )
-        self.stars_jackknife = np.array(
+
+        self.stars_monte_carlo = np.array(
             [
-                np.random.choice(
-                    self.number_in_core, self.number_of_stars_iteration, replace=False
-                ) for i in range(self.number_jackknife)
+                [
+                    np.random.choice(
+                        self.number_in_core, self.number_of_stars_iteration, replace=False
+                    ) for i in range(self.number_jackknife)
+                ] for j in range(self.number_monte_carlo)
             ]
         )
 
@@ -380,18 +384,20 @@ class Chrono():
                 if self.from_data:
                     vars(self)[f'{label}_0'] = vars(self)[label][0, self.core]
                     if self.number_monte_carlo > 0:
-                        vars(self)[f'{label}_monte_carlo'] = (
-                            vars(self)[label][1:, self.core][:, self.stars_jackknife]
+                        vars(self)[f'{label}_monte_carlo'] = np.take_along_axis(
+                            vars(self)[label][1:, None, self.core],
+                            self.stars_monte_carlo[..., None, None], axis=2
                         )
                     else:
-                        vars(self)[f'{label}_monte_carlo'] = (
-                            vars(self)[f'{label}_0'][None][:, self.stars_jackknife]
+                        vars(self)[f'{label}_monte_carlo'] = np.take_along_axis(
+                            vars(self)[f'{label}_0'][None],
+                            self.stars_monte_carlo[..., None, None], axis=2
                         )
 
                 # Select stars from jackknife iterations
                 elif self.from_model:
                     vars(self)[f'{label}_monte_carlo'] = (
-                        vars(self)[label][:, self.stars_jackknife]
+                        vars(self)[label][:, self.stars_monte_carlo]
                     )
 
         # Logging
@@ -685,252 +691,268 @@ class Chrono():
 
     def get_tree_branches(self):
         """
-        Finds every tree branches connecting all stars in the group, and computes the position
-        and velocity, xyz and ξηζ, full and minimum spanning trees (MSTs). The age of the group
-        is then estimated by finding the epoch when the mean, robust mean, and median absolute
+        Finds every tree branches connecting all stars in the group, computes their xyz and ξηζ
+        lengths and speeds, and finds the full and minimum spanning trees (MSTs). The age of the
+        group is estimated by finding the epoch when the mean, robust mean, and median absolute
         deviation tree branch lengths are minimal.
         """
 
-        # Set the number of tree branches
-        self.number_of_branches = self.sample_size - 1
-        self.number_of_branches_monte_carlo = (
-            int(self.sample_size * self.fraction_jackknife) - 1
+        # Find the branch indices for every possible pair of stars in the core
+        self.branches = np.array(
+            [(start, end) for start, end in combinations(range(self.number_in_core), 2)]
         )
 
-        # Create branches and find branch indices for every possible pairs of stars
-        self.branches = []
-        branch_indices = []
-        for start, end in combinations(range(self.sample_size), 2):
-            self.branches.append(self.Branch(self.sample[start], self.sample[end]))
-            branch_indices.append((start, end))
-        self.branches = np.array(self.branches, dtype=object)
-        branch_indices = np.array(branch_indices, dtype=int)
+        # Find the corresponding Monte Carlo branch indices
+        self.branches_monte_carlo = self.branches[
+            np.apply_along_axis(
+                np.nonzero, 2, np.all(
+                    np.any(
+                        self.branches[None, None, ..., None] ==
+                        self.stars_monte_carlo[..., None, None, :], axis=-1
+                    ), axis=-1
+                )
+            )[..., 0, :]
+        ]
 
-        # Find corresponding branches for jackknife Monte Carlo
-        self.branches_monte_carlo = (
-            np.all(
-                np.any(
-                    branch_indices[:,None,:,None] == self.stars_jackknife.T[None,:,None,:],
-                    axis=3
-                ), axis=2
-            )
-        )
-
-        # Find xyz position and velocity full trees
-        self.get_full_tree('position', 'xyz')
-        self.get_full_tree('velocity', 'xyz')
-
-        # Find xyz position and velocity full trees
-        self.get_full_tree('position', 'ξηζ')
-        self.get_full_tree('velocity', 'ξηζ')
-
-        # Find xyz position and velocity minimum spanning trees
-        self.get_minimum_spanning_tree('position', 'xyz')
-        self.get_minimum_spanning_tree('velocity', 'xyz')
-
-        # Find ξηζ position and velocity minimum spanning trees
-        self.get_minimum_spanning_tree('position', 'ξηζ')
-        self.get_minimum_spanning_tree('velocity', 'ξηζ')
+        # Find the xyz and ξηζ position and velocity full and minimum spanning trees
+        for coord in ('position', 'velocity'):
+            for system in ('xyz', 'ξηζ'):
+                self.get_full_tree(coord, system)
+                self.get_minimum_spanning_tree(coord, system)
 
     def get_full_tree(self, coord, system):
         """
-        Finds the values and weights of the full tree, and computes mean, robust mean, and median
-        absolute absolute deviation branch lengths ages.
+        Computes the values and weights of the branches of full tree, and computes the mean,
+        robust mean, and median absolute absolute deviation full tree branch lengths ages.
         """
 
         # Select coordinates
         branch_coord = {'position': 'length', 'velocity': 'speed'}
-        value = f'{branch_coord[coord]}_{system}'
 
-        # Initialize full tree branch values and weights, and remove branches over 1σ in length
-        branches_value = np.array([vars(branch)[value] for branch in self.branches]).T
-        branches_weight = (
-            (branches_value - np.mean(branches_value, axis=1)[:,None]) /
-            np.std(branches_value, axis=1)[:,None]
-        ) < 1.0
+        # Compute branches values
+        values = vars(self)[f'branches_{branch_coord[coord]}_{system}_values'] = np.sum(
+            (
+                vars(self)[f'{coord}_{system}_0'][self.branches[:, 0]] -
+                vars(self)[f'{coord}_{system}_0'][self.branches[:, 1]]
+            )**2, axis=-1
+        )**0.5
 
-        # Initialize full tree branch values and weights for jackknife Monte Carlo, and remove
-        # branches over 1σ in length
-        branches_values = np.array(
-            [
-                [
-                    vars(branch)[value]
-                    for branch in self.branches[self.branches_monte_carlo[:, iteration]]
-                ] for iteration in range(self.number_jackknife)
-            ]
-        ).swapaxes(1, 2)
-        branches_weights = (
-            (branches_values - np.mean(branches_values, axis=2)[:,:,None]) /
-            np.std(branches_values, axis=2)[:,:,None]
-        ) < 1.0
+        # Compute branches weights
+        weights = vars(self)[
+            f'branches_{branch_coord[coord]}_{system}_weights'
+        ] = np.ones(values.shape)
 
-        # Mean, robust mean, and median absolute deviation full tree branch lengths ages
+        # Update progress bar
+        if self.tree_metrics:
+            self.progress_bar.update(1)
+
+        # Compute Monte Carlo branches values
         if self.tree_metrics and coord == 'position':
+            values_monte_carlo = vars(self)[
+                f'branches_{branch_coord[coord]}_{system}_values_monte_carlo'
+            ] = np.sum(
+                (
+                    np.take_along_axis(
+                        vars(self)[f'{coord}_{system}'][1:, None, self.core],
+                        self.branches_monte_carlo[..., 0, None, None], axis=2
+                    ) - np.take_along_axis(
+                        vars(self)[f'{coord}_{system}'][1:, None, self.core],
+                        self.branches_monte_carlo[..., 1, None, None], axis=2
+                    )
+                )**2, axis=-1
+            )**0.5
+
+            # Compute Monte Carlo branches weights
+            weights_monte_carlo = vars(self)[
+                f'branches_{branch_coord[coord]}_{system}_weights_monte_carlo'
+            ] = np.ones(values_monte_carlo.shape)
+
+            # Mean, robust mean, and median absolute deviation full tree branch lengths ages
             vars(self)[f'branches_{system}_mean'](
-                np.mean(branches_values, axis=2), np.mean(branches_value, axis=1)
+                np.mean(values, axis=0),
+                np.mean(values_monte_carlo, axis=2)
             )
             vars(self)[f'branches_{system}_mean_robust'](
-                np.average(branches_values, weights=branches_weights, axis=2),
-                np.average(branches_value, weights=branches_weight, axis=1)
+                np.average(values, weights=weights, axis=0),
+                np.average(values_monte_carlo, weights=weights_monte_carlo, axis=2)
             )
             vars(self)[f'branches_{system}_mad'](
                 np.median(
-                    np.abs(branches_values - np.median(branches_values, axis=2)[:,:,None]), axis=2
-                ), np.median(
-                    np.abs(branches_value - np.median(branches_value, axis=1)[:,None]), axis=1
+                    np.abs(values - np.median(values, axis=0)[None]), axis=0
+                ),
+                np.median(
+                    np.abs(
+                        values_monte_carlo -
+                        np.median(values_monte_carlo, axis=2)[..., None, :]
+                    ), axis=2
                 )
             )
 
+            # Update progress bar
+            self.progress_bar.update(1)
+
     def get_minimum_spanning_tree(self, coord, system):
         """
-        Finds branches, values, and weights of the minimum spanning tree (MST), and computes mean,
-        robust mean, and median absolute absolute deviation branch lengths ages.
+        Finds the branches, values, and weights of the minimum spanning tree (MST), and computes
+        the mean, robust mean, and median absolute absolute deviation minimum spanning tree branch
+        lengths ages.
         """
 
         # Select coordinates
         branch_coord = {'position': 'length', 'velocity': 'speed'}
-        value = f'{branch_coord[coord]}_{system}'
+        values = vars(self)[f'branches_{branch_coord[coord]}_{system}_values']
+        weights = vars(self)[f'branches_{branch_coord[coord]}_{system}_weights']
 
-        # Sort branches by coordinate
-        branches_order = np.argsort(
-            np.array([vars(branch)[value] for branch in self.branches], dtype=float), axis=0
-        ).T
+        # Set the number of branches in the minimum spanning tree
+        self.number_of_branches = self.number_in_core - 1
+        self.number_of_branches_monte_carlo = self.number_of_stars_iteration - 1
+
+        # Sort branches by values
+        branches_order = np.argsort(values, axis=0)
         branches_sorted = self.branches[branches_order]
-        branches_monte_carlo_sorted = np.moveaxis(self.branches_monte_carlo[branches_order], -1, 0)
 
-        # Initialize minimum spanning tree branches, values and weights
-        mst = vars(self)[f'mst_{coord}_{system}'] = np.empty(
-            (self.number_of_steps, self.number_of_branches), dtype=object
-        )
-        mst_value = np.zeros(mst.shape)
-        mst_weight = np.zeros(mst.shape)
+        # Update progress bar
+        if self.tree_metrics:
+            self.progress_bar.update(1)
 
-        # Validate minimum spanning tree branches
-        for step in range(self.number_of_steps):
-            mst[step] = self.validate_branches(branches_sorted[step], self.number_of_branches)
-            mst_value[step] = np.array([vars(branch)[value][step] for branch in mst[step]])
-            mst_weight[step] = np.array([branch.weight[step] for branch in mst[step]])
+        # Create process pool
+        pool = Pool()
 
-        # Initialize minimum spanning tree branches, values and weights for jackknife Monte Carlo
-        if self.tree_metrics and coord == 'position':
-            mst_monte_carlo = vars(self)[f'mst_monte_carlo_{coord}_{system}'] = np.empty(
-                (
-                    self.number_jackknife,
-                    self.number_of_steps,
-                    self.number_of_branches_monte_carlo
-                ), dtype=object
+        # Validate minimum spanning tree's branches
+        indices = np.array(
+            pool.starmap(
+                validate_branches, zip(
+                    np.moveaxis(branches_sorted, 1, 0),
+                    Iterate(self.number_of_branches),
+                    Iterate(self.number_in_core)
+                )
             )
-            mst_values = np.zeros(mst_monte_carlo.shape)
-            mst_weights = np.zeros(mst_monte_carlo.shape)
+        ).T
 
-            # Validate minimum spanning tree branches for jackknife Monte Carlo
-            for step in range(self.number_of_steps):
+        # Update progress bar
+        if self.tree_metrics:
+            self.progress_bar.update(1)
+
+        # Find minimum spanning tree branches, values and weights
+        vars(self)[f'mst_branches_{coord}_{system}'] = np.take_along_axis(
+            branches_sorted, indices[..., None], axis=0
+        )
+        indices = np.take_along_axis(branches_order, indices, axis=0)
+        mst_values = np.take_along_axis(values, indices, axis=0)
+        mst_weights = np.take_along_axis(weights, indices, axis=0)
+
+        # Select Monte Carlo coordinates
+        if self.tree_metrics and coord == 'position':
+            values_monte_carlo = vars(self)[
+                f'branches_{branch_coord[coord]}_{system}_values_monte_carlo'
+            ]
+            weights_monte_carlo = vars(self)[
+                f'branches_{branch_coord[coord]}_{system}_weights_monte_carlo'
+            ]
+
+            # Sort branches by Monte Carlo values
+            branches_monte_carlo_order = np.argsort(values_monte_carlo, axis=2)
+            branches_monte_carlo_sorted = np.take_along_axis(
+                self.branches_monte_carlo[..., None, :],
+                branches_monte_carlo_order[..., None], axis=2
+            )
+
+            # Update progress bar
+            self.progress_bar.update(1)
+
+            # Validate Monte Carlo minimum spanning tree's branches
+            indices = np.zeros(
+                (
+                    self.number_monte_carlo, self.number_jackknife,
+                    self.number_of_branches_monte_carlo, self.number_of_steps
+                ), dtype=int
+            )
+            for group in range(self.number_monte_carlo):
                 for iteration in range(self.number_jackknife):
-                    mst_monte_carlo[iteration, step] = self.validate_branches(
-                        branches_sorted[step, branches_monte_carlo_sorted[iteration, step]],
-                        self.number_of_branches_monte_carlo
-                    )
-                    mst_values[iteration, step] = np.array(
-                        [vars(branch)[value][step] for branch in mst_monte_carlo[iteration, step]]
-                    )
-                    mst_weights[iteration, step] = np.array(
-                        [branch.weight[step] for branch in mst_monte_carlo[iteration, step]]
-                    )
+                    indices[group, iteration] = np.array(
+                        pool.starmap(
+                            func=validate_branches,
+                            iterable=zip(
+                                np.moveaxis(branches_monte_carlo_sorted[group, iteration], 1, 0),
+                                Iterate(self.number_of_branches_monte_carlo),
+                                Iterate(self.number_in_core)
+                            )
+                        )
+                    ).T
 
-                # Update progress bar
-                if step % 6 == 0:
+                    # Update progress bar
                     self.progress_bar.update(1)
+
+            # Find Monte_carlo minimum spanning tree branches, values and weights
+            vars(self)[f'mst_branches_{coord}_{system}_monte_carlo'] = np.take_along_axis(
+                branches_monte_carlo_sorted, indices[..., None], axis=2
+            )
+            indices = np.take_along_axis(branches_monte_carlo_order, indices, axis=2)
+            mst_values_monte_carlo = np.take_along_axis(values_monte_carlo, indices, axis=2)
+            mst_weights_monte_carlo = np.take_along_axis(weights_monte_carlo, indices, axis=2)
 
             # Mean, robust mean, and median absolute deviation minimum spanning tree
             # branch lengths ages
             vars(self)[f'mst_{system}_mean'](
-                np.mean(mst_values, axis=2), np.mean(mst_value, axis=1)
+                np.mean(mst_values, axis=0), np.mean(mst_values_monte_carlo, axis=2)
             )
             vars(self)[f'mst_{system}_mean_robust'](
-                np.average(mst_values, weights=mst_weights, axis=2),
-                np.average(mst_value, weights=mst_weight, axis=1)
+                np.average(mst_values, weights=mst_weights, axis=0),
+                np.average(mst_values_monte_carlo, weights=mst_weights_monte_carlo, axis=2)
             )
             vars(self)[f'mst_{system}_mad'](
-                np.median(np.abs(mst_values - np.median(mst_values, axis=2)[:,:,None]), axis=2),
-                np.median(np.abs(mst_value - np.median(mst_value, axis=1)[:,None]), axis=1)
+                np.median(np.abs(mst_values - np.median(mst_values, axis=0)[None]), axis=0),
+                np.median(
+                    np.abs(
+                        mst_values_monte_carlo -
+                        np.median(mst_values_monte_carlo, axis=2)[..., None, :]
+                    ), axis=2
+                )
             )
 
-    def validate_branches(self, branches, number_of_branches):
-        """
-        Validate a list sorted branches using a Kruskal algorithm up to a given number of branches
-        for minimum spanning tree (MST) computation. Returns a list of validated branches.
-        """
+            # Update progress bar
+            self.progress_bar.update(1)
 
-        # Set stars nodes
-        for star in self.sample:
-            star.node = self.Node()
+        # Close process pool
+        pool.close()
 
-        # Initialize the minimum spanning tree and test and validate branches
-        mst = np.empty(number_of_branches, dtype=object)
-        test_index = 0
-        valid_index = 0
-
-        # Branches verification and addition to tree
-        while valid_index < number_of_branches:
-            branch = branches[test_index]
-            test_index += 1
-
-            # Find branch start and end stars largest parent node
-            while branch.start.node.parent != None:
-                branch.start.node = branch.start.node.parent
-            while branch.end.node.parent != None:
-                branch.end.node = branch.end.node.parent
-
-            # Validate branch if both stars have different parent nodes
-            if branch.start.node != branch.end.node:
-                branch.start.node.parent = branch.end.node.parent = self.Node()
-                mst[valid_index] = branch
-                valid_index += 1
-
-        return mst
-
-    class Branch:
-        """Line connecting two stars."""
-
-        def __init__(self, start, end):
-            """
-            Initializes a Branch object and computes the distance between two Star objects,
-            'start' and 'end'.
-            """
-
-            # Set start and end branches
-            self.start = start
-            self.end = end
-
-            # Compute branch lengths, speeds and weigth
-            self.length_xyz = np.sum(
-                (self.start.position_xyz - self.end.position_xyz)**2, axis=1
-            )**0.5
-            self.length_ξηζ = np.sum(
-                (self.start.position_ξηζ - self.end.position_ξηζ)**2, axis=1
-            )**0.5
-            self.speed_xyz = np.sum(
-                (self.start.velocity_xyz - self.end.velocity_xyz)**2, axis=1
-            )**0.5
-            self.speed_ξηζ = np.sum(
-                (self.start.velocity_ξηζ - self.end.velocity_ξηζ)**2, axis=1
-            )**0.5
-            self.weight = np.mean(np.vstack((self.start.weight, self.end.weight)), axis=0)
-
-        def __repr__(self):
-            """Returns a string of name of the branch."""
-
-            return "'{}' to '{}' branch".format(self.start.name, self.end.name)
+def validate_branches(branches, number_of_branches, number_in_core):
+    """
+    Validate a list sorted branches using a Kruskal algorithm up to a given number of branches
+    for minimum spanning tree (MST) computation. Returns a list of validated branch indices.
+    """
 
     class Node:
-        """Node of a star."""
+        """Node of a minimum spanning tree."""
 
         def __init__(self):
-            """Sets the parent node of a star as None."""
+            """Sets the parent node as None."""
 
             self.parent = None
 
-        def __repr__(self):
-            """Returns a string of name of the parent."""
+    # Set nodes
+    nodes = [Node() for i in range(number_in_core)]
 
-            return 'None' if self.parent is None else self.parent
+    # Initialize the minimum spanning tree and test and validate branches
+    mst = np.zeros(number_of_branches, dtype=int)
+    test_index = 0
+    valid_index = 0
+
+    # Branches verification and addition to tree
+    while valid_index < number_of_branches:
+        branch = branches[test_index]
+
+        # Find branch start (0) and end (1) stars largest parent node
+        while nodes[branch[0]].parent != None:
+            nodes[branch[0]] = nodes[branch[0]].parent
+        while nodes[branch[1]].parent != None:
+            nodes[branch[1]] = nodes[branch[1]].parent
+
+        # Validate branch if both stars have different parent nodes
+        if nodes[branch[0]] != nodes[branch[1]]:
+            nodes[branch[0]].parent = nodes[branch[1]].parent = Node()
+            mst[valid_index] = test_index
+            valid_index += 1
+        test_index += 1
+
+    return mst

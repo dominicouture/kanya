@@ -8,6 +8,18 @@ Monte Carlo algorithm, or enumerate a sequence of strings.
 
 import numpy as np
 
+class Iterate:
+    """Returns the same value for every iteration."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.value
+
 def squeeze(array):
     """Squeezes a np.ndarray and adds one dimension if the resulting array has no dimension."""
 
