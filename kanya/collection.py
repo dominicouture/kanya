@@ -420,7 +420,7 @@ def log(message, *words, logs_path=None, level='info', display=False, logging=Tr
         )
 
         # Logs configuration, if needed
-        from logging import basicConfig, root, info, warning, INFO
+        from logging import basicConfig, root, info, warning, INFO, DEBUG
         if not collection.logs_configured or collection.logs_path != logs_path:
 
             # Logs configuration, if logs_path matches collection.logs_path

@@ -16,7 +16,7 @@ from .coordinate import *
 class Data(list):
     """
     Contains the data imported from a CSV file or a Python dictionary and related methods.
-    Data is converted into a Quantity object and units are converted to default units.
+    The data are converted into a Quantity object and units are converted to default units.
     """
 
     def __init__(self, group, data=None, data_dir=None):
@@ -345,9 +345,9 @@ class Data(list):
         # Match spectral type components
         new_spt = spt.replace(' ', '').replace('(', '').replace(')', '')
         try:
-            letter, number, other = split('(\d+\.?\d*)', new_spt)
-        except ValueError as e:
-            raise ValueError(f"{spt} is an invalid spectral type.") from e
+            letter, number, other = split(r'(\d+\.?\d*)', new_spt)
+        except ValueError as error:
+            raise ValueError(f"{spt} is an invalid spectral type.") from error
 
         # Uppercase letter and match
         letter = letter.upper()
@@ -358,8 +358,8 @@ class Data(list):
         # Convert letter
         try:
             number = float(number)
-        except ValueError as e:
-            raise ValueError(f"{spt} is an invalid spectral type.") from e
+        except ValueError as error:
+            raise ValueError(f"{spt} is an invalid spectral type.") from error
         if number < 0. or number >= 10.:
             raise ValueError(f"{spt} is an invalid spectral type.")
 
@@ -378,8 +378,8 @@ class Data(list):
         # Check if 'sptn' is a valid number
         try:
             sptn = float(sptn)
-        except ValueError as e:
-            raise ValueError(f'{sptn} must be a number ({type(sptn)} given).') from e
+        except ValueError as error:
+            raise ValueError(f'{sptn} must be a number ({type(sptn)} given).') from error
         if sptn < 0.0 or sptn >= 100.0:
             raise ValueError(f'{sptn} is an invalid spectral type number.')
 

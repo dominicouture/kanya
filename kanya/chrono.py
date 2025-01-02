@@ -1,21 +1,24 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""chrono.py: Defines the methods used to compute the age of the group."""
+"""
+chrono.py: Defines the methods used to compute the age of the group by finding the epoch when
+several association size metrics are minimal.
+"""
 
 import numpy as np
 from tqdm import tqdm
 from itertools import combinations
-from multiprocessing import Pool
+import multiprocessing as mp
 from .tools import Iterate
 
 class Chrono():
     """
     Contains the methods used to compute the age of the group. This chronoligization is done
-    by minimizing by finding the epoch when several association size metrics is minimal. This
-    process, and the computation of the errors the traceback ages, is done within the Metric
-    subclass. Only members flagged as part of the core of the group are used in the computation
-    of the association size metrics, including:
+    by finding the epoch when several association size metrics is minimal. This process, and the
+    computation of the errors the traceback ages, is done within the Metric subclass. Only members
+    flagged as part of the core of the group are used in the computation of the association size
+    metrics, including:
 
       - Empirical, robust, and sklearn's spatial covariance matrix diagonal, determinant and trace
       - Empirical, robust, and sklearn's spatial-kinematic cross-covariance matrix diagonal,
@@ -187,6 +190,10 @@ class Chrono():
         are computed with the empirical covariance matrices.
         """
 
+        # Start process pool
+        mp.set_start_method('fork', force=True)
+        self.pool = mp.Pool()
+
         # Choose behaviour, if groups have already been chronologized
         if self.traceback_present:
             if self.chrono_present:
@@ -229,11 +236,11 @@ class Chrono():
                 self.progress_bar = tqdm(
                     total=sum(
                         [
-                            4 * self.cov_metrics,
-                            9 if self.cov_robust_metrics else 0,
-                            (self.number_of_steps // 5 + 1) * 2 if self.cov_sklearn_metrics else 0,
-                            2 * self.mad_metrics,
-                            self.number_monte_carlo * self.number_jackknife * 2 + 18 if self.tree_metrics else 0
+                            4 * self.cov_metrics, 9 if self.cov_robust_metrics else 0,
+                            2 * self.number_of_iterations * (self.number_of_steps // 5 + 1)
+                            if self.cov_sklearn_metrics else 0, 2 * self.mad_metrics,
+                            self.number_monte_carlo * self.number_jackknife * 2 + 18
+                            if self.tree_metrics else 0
                         ]
                     ), leave=False
                     # unit=' size metric',
@@ -314,6 +321,9 @@ class Chrono():
                 self.name, level='info', display=True, logging=logging
             )
 
+        # Close process pool
+        self.pool.close()
+
     def configure_chrono(
         self, size_metrics=None, cov_metrics=None, cov_robust_metrics=None,
         cov_sklearn_metrics=None, mad_metrics=None, tree_metrics=None, logging=True
@@ -352,19 +362,21 @@ class Chrono():
         # Set principal component analysis parameter
         self.pca = self.set_boolean(self.config.pca)
 
-        # ??? These steps could be done in the Traceback class, only if robust is selected ???
         # Compute the xyz Mahalanobis distances
+        # !!! New distances for every Monte Carlo and jackknife iteration, and xyz and ξηζ !!!
+        # !!! positions and velocity !!!
         self.number_of_stars_iteration = 1
         self.Mahalanobis_xyz = self.get_Mahalanobis_distance(self.position_xyz[0, self.core, None])
 
         # Compute weights
         self.weights = np.exp(-self.Mahalanobis_xyz)
 
-        # Randomly select stars for the jackknife Monte Carlo
+        # Compute the number of stars per jackknife Monte Carlo iteration
         self.number_of_stars_iteration = int(
             self.number_in_core * self.fraction_jackknife
         )
 
+        # Randomly select stars for the jackknife Monte Carlo
         self.stars_monte_carlo = np.array(
             [
                 [
@@ -743,11 +755,11 @@ class Chrono():
         ] = np.ones(values.shape)
 
         # Update progress bar
-        if self.tree_metrics:
+        if self.size_metrics and self.tree_metrics:
             self.progress_bar.update(1)
 
         # Compute Monte Carlo branches values
-        if self.tree_metrics and coord == 'position':
+        if self.size_metrics and self.tree_metrics and coord == 'position':
             values_monte_carlo = vars(self)[
                 f'branches_{branch_coord[coord]}_{system}_values_monte_carlo'
             ] = np.sum(
@@ -812,15 +824,12 @@ class Chrono():
         branches_sorted = self.branches[branches_order]
 
         # Update progress bar
-        if self.tree_metrics:
+        if self.size_metrics and self.tree_metrics:
             self.progress_bar.update(1)
-
-        # Create process pool
-        pool = Pool()
 
         # Validate minimum spanning tree's branches
         indices = np.array(
-            pool.starmap(
+            self.pool.starmap(
                 validate_branches, zip(
                     np.moveaxis(branches_sorted, 1, 0),
                     Iterate(self.number_of_branches),
@@ -830,7 +839,7 @@ class Chrono():
         ).T
 
         # Update progress bar
-        if self.tree_metrics:
+        if self.size_metrics and self.tree_metrics:
             self.progress_bar.update(1)
 
         # Find minimum spanning tree branches, values and weights
@@ -842,7 +851,7 @@ class Chrono():
         mst_weights = np.take_along_axis(weights, indices, axis=0)
 
         # Select Monte Carlo coordinates
-        if self.tree_metrics and coord == 'position':
+        if self.size_metrics and self.tree_metrics and coord == 'position':
             values_monte_carlo = vars(self)[
                 f'branches_{branch_coord[coord]}_{system}_values_monte_carlo'
             ]
@@ -870,7 +879,7 @@ class Chrono():
             for group in range(self.number_monte_carlo):
                 for iteration in range(self.number_jackknife):
                     indices[group, iteration] = np.array(
-                        pool.starmap(
+                        self.pool.starmap(
                             func=validate_branches,
                             iterable=zip(
                                 np.moveaxis(branches_monte_carlo_sorted[group, iteration], 1, 0),
@@ -912,9 +921,6 @@ class Chrono():
 
             # Update progress bar
             self.progress_bar.update(1)
-
-        # Close process pool
-        pool.close()
 
 def validate_branches(branches, number_of_branches, number_in_core):
     """

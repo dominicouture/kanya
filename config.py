@@ -5,35 +5,31 @@
 config.py: Group configuration file. For every parameter, three components can be defined: 'value'
 or 'values', 'unit' or 'units', and 'system':
 
-     -  'value' or 'values': string, integer, float or tuple, list or dictionary, depending on the
-        given parameter.
-
-     -  'unit' or 'units': string or a list or tuple of strings convertible to an Astropy.Unit
-        object. The default units are:
-
-         -  Time: Myr
-         -  Distance: pc
-         -  Velocity: pc/Myr
-         -  Angle: rad
-         -  Angular speed: rad/Myr
-
-     -  'system': string matching the name of one of the following coordinate system:
-
-         - spherical: π, δ, α, rv, μδ, and μαcosδ
-         - cartesian: x, y, z, u, v, and w
-         - cylindrical: r, θ, h, vr, vt, and vh
-         - curvilinear: ξ', η', ζ', vξ', vη', and vζ'
+  - 'value' or 'values': string, integer, float or tuple, list or dictionary, depending on the
+    given parameter.
+  - 'unit' or 'units': string or a list or tuple of strings convertible to an Astropy.Unit
+    object. The default units are:
+      - Time: Myr
+      - Distance: pc
+      - Velocity: pc/Myr
+      - Angle: rad
+      - Angular speed: rad/Myr
+  - 'system': string matching the name of one of the following coordinate system:
+      - spherical: π, δ, α, rv, μδ, and μαcosδ
+      - cartesian: x, y, z, u, v, and w
+      - cylindrical: r, θ, h, vr, vt, and vh
+      - curvilinear: ξ', η', ζ', vξ', vη', and vζ'
 """
 
 # Name of the group (str or None)
 # name.value = None
-# name.value = 'THA'
-name.value = 'COL_CAR'
+# name.value = 'BPMG'
+name.value = 'THA'
+# name.value = 'COL_CAR'
 # name.value = 'COL'
 # name.value = 'CAR'
 # name.value = 'IC2602'
 # name.value = 'PL8'
-# name.value = 'BPMG'
 # name.value = 'beta_pictoris_Miret-Roig'
 # name.value = 'beta_pictoris_Crundall'
 
@@ -67,30 +63,33 @@ size_metrics.value = True
 cov_metrics.value = True
 cov_robust_metrics.value = False
 cov_sklearn_metrics.value = False
-mad_metrics.value = True
-tree_metrics.value = True
+mad_metrics.value = False
+tree_metrics.value = False
 
 # Number of Monte Carlo (integer, ≥ 0)
 number_monte_carlo.value = 10
+# number_monte_carlo.value = 0
 
 # Number of jackknife Monte Carlo (integer, ≥ 0)
 number_jackknife.value = 5
+# number_jackknife.value = 15
 
 # Fraction of stars per jackknife Monte Carlo (0 < float ≤ 1)
 fraction_jackknife.value = 0.67
+# fraction_jackknife.value = 0.50
 
 # Number of steps of the traceback, including the initial step at t = 0 (integer, ≥ 1)
 # number_of_steps.value = 1000
 number_of_steps.value = 300
-# number_of_steps.value = 5
 # number_of_steps.value = 172
+# number_of_steps.value = 10
 
 # Initial age of the traceback (float, inclusive)
 initial_time.value = 0.0
 
 # Final age of the traceback (float, inclusive)
-final_time.value = -60.0
-# final_time.value = 1.0
+final_time.value = -61.0
+# final_time.value = -51.0
 
 # Age of simulated groups of stars (float, ≠ initial_time)
 age.value = -24.0
@@ -138,10 +137,8 @@ velocity_scatter.units = 'km/s'
 
 # Path to CSV data file (str) or Python dictionary with the data (dictionary)
 # data.value = 'BPMG_raw_GaiaDR3.csv'
-# data.value = 'BPMG_sample.csv'
-# data.value = 'THA_corrected.csv'
-# data.value = 'THA_sample.csv'
-data.value = 'COL_CAR_sample.csv'
+data.value = 'THA_sample.csv'
+# data.value = 'COL_CAR_sample.csv'
 data.units = 'spherical'
 data.system = 'spherical'
 # data.values =  {
@@ -271,4 +268,4 @@ potential.value = 'Irrgang13I'
 pca.value = False
 
 # Whether to show the timer
-timer.value = True
+timer.value = False

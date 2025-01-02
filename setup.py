@@ -24,13 +24,14 @@ classifiers = [
     'Programming Language :: Python'
 ]
 install_requires = [
-    'numpy',
-    'scipy',
-    'matplotlib',
-    'astropy',
-    'galpy',
-    'sklearn',
-    'pandas'
+    'numpy==2.0.1',
+    'scipy==1.14.0',
+    'matplotlib==3.9.1',
+    'astropy==6.1.2',
+    'galpy==1.10.0',
+    'scikit-learn==1.5.1',
+    'pandas==2.2.2',
+    'tqdm==4.66.5'
 ]
 setup_requires = [
     'setuptools>=40.6.0',
@@ -82,4 +83,5 @@ if __name__ == '__main__':
         extras_require=extra_require,
         classifiers=classifiers,
         zip_safe=False,
-        options={'bdist_wheel': {'universal': '1'}})
+        options={'bdist_wheel': {'universal': '1'}}
+    )

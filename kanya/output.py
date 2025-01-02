@@ -1,60 +1,15 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""output.py: Defines methods used to create figures and tables."""
+"""
+output.py: Defines methods used to create, show and save figures and tables for the group,
+including stellar trajectories, scatters, and association size metrics.
+"""
 
-from matplotlib import pyplot as plt, ticker as tkr
-from scipy.interpolate import interp1d
-from colorsys import hls_to_rgb
-from cycler import cycler
+# from .fap import *
+from .figure import *
 from .collection import *
 from .coordinate import *
-
-# Set pyplot rc parameters
-plt.rc('font', serif='Latin Modern Math', family='serif', size='8')
-plt.rc('mathtext', fontset='custom', it='Latin Modern Roman:italic', rm='Latin Modern Roman:roman')
-plt.rc('lines', markersize=4)
-plt.rc('pdf', fonttype=42)
-
-# Set ticks label with commas instead of dots for French language publications
-# format_ticks = tkr.FuncFormatter(lambda x, pos: str(round(float(x), 1)))
-# ax.xaxis.set_major_formatter(format_ticks)
-# ax.yaxis.set_major_formatter(format_ticks)
-
-# Set colors
-class colors():
-    """Defines a set of RGB color and grey tones."""
-
-    # RGB color tones
-    vars().update(
-        {
-            name: color for name, color in zip(
-                (
-                    'red',   'orange', 'yellow',  'chartreuse',
-                    'green', 'lime',   'cyan',    'azure',
-                    'blue',  'indigo', 'magenta', 'pink'
-                ),
-                tuple(
-                    tuple(
-                        tuple(
-                            np.round(hls_to_rgb(hue / 360, luma, 1.0), 3)
-                        ) for luma in np.arange(0.05, 1.0, 0.05)
-                    ) for hue in np.arange(0, 360, 30)
-                )
-            )
-        }
-    )
-
-    # Grey tones
-    black = (0.0, 0.0, 0.0)
-    grey = tuple((luma, luma, luma) for luma in np.arange(0.05, 1.0, 0.05))
-    white = (1.0, 1.0, 1.0)
-
-    # Metric colors
-    metric = (green[3], green[6], green[9], green[12], azure[3], azure[6], azure[9], azure[12])
-
-    # Color cycle
-    cycle = cycler(color=(azure[6], pink[6], chartreuse[6], indigo[9], orange[9], lime[9]))
 
 class Output():
     """Output methods for Group."""
@@ -211,137 +166,6 @@ class Output():
         and with the correct size. Ticks and labels are repositioned and set invisible accordingly.
         """
 
-        def get_dimensions(
-            width, height, left, bottom, right, top, colpad, rowpad, nrow, ncol,
-            ratio, adjust=None, h_align='left', v_align='bottom'
-        ):
-            """
-            Computes the dimensions of the axes of a figure based the width and height of the figure,
-            and the number of axes along the x and y dimensions. The width of the figure is supposed
-            to be fixed. The ratio is the desired value of the height an axis over its width.
-            """
-
-            # Compute the width and size of figures, in inches
-            ax_width = (width - left - colpad * (ncol - 1) - right) / ncol
-            ax_height = (height - bottom - rowpad * (nrow - 1) - top) / nrow
-
-            # Adjust figure width
-            if adjust == 'fig_width':
-                ax_width = ax_height / ratio
-                width = left + ax_width * ncol + colpad * (ncol - 1) + right
-
-            # Adjust figure height
-            if adjust == 'fig_height':
-                ax_height = ax_width * ratio
-                height = bottom + ax_height * nrow + rowpad * (nrow - 1) + top
-
-            # Adjust axis width
-            if adjust == 'ax_width' and ax_height / ax_width < ratio:
-                ax_width = ax_height / ratio
-
-                # Horizontal alignment
-                if h_align == 'right':
-                    left = width - right - ax_width * ncol - colpad * (ncol - 1)
-                if h_align == 'center':
-                    left = (width - ax_width * ncol - colpad * (ncol - 1)) / 2
-                if h_align == 'justify':
-                    colpad = (width - left - ax_width * ncol - right) / (ncol - 1)
-
-            # Adjust axis height
-            if adjust == 'ax_height' and ax_height / ax_width > ratio:
-                ax_height = ax_width * ratio
-
-                # Horizontal alignment
-                if v_align == 'top':
-                    bottom = height - top - ax_height * nrow - rowpad * (nrow - 1)
-                if v_align == 'center':
-                    bottom = (height - ax_height * nrow - rowpad * (nrow - 1)) / 2
-                if v_align == 'justify':
-                    rowpad = (height - bottom - ax_height * nrow - top) / (nrow - 1)
-
-            # Compute relative parameters
-            left /= width
-            bottom /= height
-            ax_width /= width
-            ax_height /= height
-            colpad /= width
-            rowpad /= height
-
-            # Compute axes parameters
-            axes_params = np.array(
-                [
-                    [
-                        [
-                            left + i * (ax_width + colpad),
-                            bottom + j * (ax_height + rowpad),
-                            ax_width, ax_height
-                        ] for i in list(range(ncol))
-                    ] for j in list(range(nrow))[::-1]
-                ]
-            )
-
-            return width, height, axes_params
-
-        def get_axes(fig, axes_params, remove_extra=True, **kwargs):
-            """Add axes to the figure using the axes parameters."""
-
-            # Add dimensions and create an empty array
-            while axes_params.ndim != 3:
-                axes_params = axes_params[None]
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-
-            # Create axes
-            for i in range(axes_params.shape[0]):
-                for j in range(axes_params.shape[1]):
-                    axes[i, j] = fig.add_axes(axes_params[i,j], **kwargs)
-
-            # Remove extra dimensions
-            if remove_extra:
-                while axes.shape[0] == 1 and axes.ndim > 1:
-                    axes = axes[0]
-
-                return axes[0] if axes.size == 1 else axes
-
-            # Return axes with all dimensions
-            else:
-                return axes
-
-        def set_axis(ax, projection):
-            """Sets the basic parameter of a 2d or 3d axis."""
-
-            # Set ticks
-            if projection == '2d':
-                ax.tick_params(
-                    top=True, right=True, bottom=True, left=True,
-                    which='both', direction='in', width=0.5, labelsize=8
-                )
-
-                # Set spines
-                ax.spines[:].set_linewidth(0.5)
-
-            # Set ticks
-            if projection == '3d':
-                for iax in (ax.xaxis, ax.yaxis, ax.zaxis):
-                    iax._axinfo['tick']['outward_factor'] = 0.5
-                    iax._axinfo['tick']['inward_factor'] = 0.0
-                    iax._axinfo['tick']['linewidth'] = {True: 0.5, False: 0.0}
-
-                    # Set grids
-                    iax._axinfo['grid']['color'] = colors.grey[17]
-                    iax._axinfo['grid']['linewidth'] = 0.5
-
-                    # Set panes
-                    iax.pane._alpha = 1.0
-                    iax.pane.fill = False
-                    iax.pane.set_linewidth(0.5)
-                    iax.pane.set_edgecolor(colors.grey[17])
-
-                    # Set spines
-                    iax.line.set_linewidth(0.5)
-
-                # Set view
-                ax.view_init(azim=45)
-
         # Check traceback
         self.check_traceback()
 
@@ -359,395 +183,12 @@ class Output():
             "'style' must be {} ({} given).", enumerate_strings(*styles), style
         )
 
-        # Number of axes in y and x
-        nrow = int(style[0])
-        ncol = int(style[-1])
-
-        # Default margins, in inches
-        left = 0.445 if left is None else left
-        bottom = 0.335 if bottom is None else bottom
-        right = 0.005 if right is None else right
-        top = 0.0815 if top is None else top
-        colpad = 0.100 if 'hide_y' in options else 0.5400 if colpad is None else colpad
-        rowpad = 0.100 if 'hide_x' in options else 0.3654 if rowpad is None else rowpad
-        ratio = 1.0 if ratio is None else ratio
-
-        # Set margins if the axes and tick labels are moved to the right of the rightmost axes
-        if 'label_right' in options and ncol == 2:
-            right = left
-            colpad = 0.100
-
-        # Set margins for a figure with 3d axes
-        if '3d' in options and style not in ('3x3', '6x6'):
-            left = right = 0.6
-
-        # Initialize a 2+1 figure
-        if style == '2+1':
-            fig = plt.figure(figsize=(3.345, 3.3115), facecolor=colors.white, dpi=300)
-
-            # Set dimensions
-            left, bottom = (0.133, 0.102)
-            x_short, y_short  = (0.236, 0.2381)
-            x_long, y_long = (0.618, 0.6236)
-            colpad, rowpad = (0.012, 0.0119)
-
-            # Create axes
-            axes = np.empty((2,2), dtype=object)
-            axes[0,0] = fig.add_axes([left, bottom + rowpad + y_short, x_long, y_long])
-            axes[0,1] = fig.add_axes([left + x_long + colpad, bottom + rowpad + y_short, x_short, y_long])
-            axes[1,0] = fig.add_axes([left, bottom, x_long, y_short])
-
-            # Set axes
-            axes[0,0].set_xlabel('', visible=False)
-            axes[0,1].set_ylabel('', visible=False)
-            axes[0,0].tick_params(labelbottom=False)
-            axes[0,1].tick_params(labelleft=False)
-
-            # Set title
-            fig.joint = ''
-            fig.offset = 1.05
-
-        # Initialize a 1x1 figure
-        if style == '1x1':
-            width, height, axes_params = get_dimensions(
-                3.3450 if width is None else width,
-                3.3115 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust, h_align=h_align
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(
-                fig, axes_params, remove_extra=False,
-                projection='mollweide' if 'mollweide' in options else None
-            )
-
-        # Initialize a 1x2 figure
-        if style == '1x2':
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                3.3115 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params, remove_extra=False)
-
-        # Initialize a 1x3 figure
-        if style == '1x3':
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                2.3330 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params, remove_extra=False)
-
-        # Initialize a 2x1 figure
-        if style == '2x1':
-            width, height, axes_params = get_dimensions(
-                3.3450 if width is None else width,
-                6.5720 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params)
-
-        # Initialize a 2x2 figure
-        if style == '2x2':
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                6.317 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Add padding for 3d axis
-            if '3d' in options:
-                axes_params[0,1,1] += 1.5 * rowpad / height
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            axes[:,0] = get_axes(fig, axes_params[:,0], zorder=0.5)
-            axes[1,1] = get_axes(fig, axes_params[1,1], zorder=0.5)
-            if 'corner' not in options:
-                axes[0,1] = get_axes(fig, axes_params[0,1], zorder=0.5)
-
-            if '3d' in options:
-                axes[0,1] = get_axes(fig, axes_params[0,1], projection='3d', zorder=0.4)
-                set_axis(axes[0,1], '3d')
-                if 'label_right' in options or 'hide_y' in options:
-                    axes[0,1].view_init(azim=-45)
-
-        # Initialize a 2x3 figure
-        if style == '2x3':
-            # left = 0.5300
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                4.4450 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params)
-
-        # Initialize a 3x1 figure
-        if style == '3x1':
-            # width, height = (3.3450, 7.5000)
-            width, height, axes_params = get_dimensions(
-                3.3450 if width is None else width,
-                9.1340 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='ax_width' if adjust is None else adjust,
-                h_align='right' if adjust is None else h_align
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = get_axes(fig, axes_params)
-
-        # Initialize a 3x2 figure
-        if style == '3x2':
-            # left = 0.5300
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='ax_width' if adjust is None else adjust,
-                h_align='center' if adjust is None else h_align
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            axes[:2] = get_axes(fig, axes_params[:2], zorder=0.5)
-            axes[2] = get_axes(
-                fig, axes_params[2], projection='3d' if '3d' in options else None, zorder=0.4
-            )
-
-            # Set 3d axes
-            if '3d' in options:
-                for ax in axes[2]:
-                    set_axis(ax, '3d')
-                if 'label_right' in options:
-                    axes[2,1].view_init(azim=-45)
-
-        # Initialize a 3x3 figure
-        if style == '3x3':
-            # left = 0.5300
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            if 'corner' not in options:
-                axes = get_axes(fig, axes_params)
-            else:
-                axes = np.empty((axes_params.shape[:2]), dtype=object)
-                for x, y in filter(
-                    lambda i: i[0] <= i[1], [(x, y) for y in range(3) for x in range(3)]
-                ):
-                    axes[y, x] = get_axes(fig, axes_params[y, x])
-
-                # Set 3d axes
-                if '3d' in options:
-                    axes_params[0,2,0] -= colpad / width
-                    axes[0,2] = get_axes(fig, axes_params[0,2], projection='3d', zorder=0.4)
-                    set_axis(axes[0,2], '3d')
-
-        # Initialize a 4x1 figure
-        if style == '4x1':
-            # width, height = (3.3450, 7.5000)
-            width, height, axes_params = get_dimensions(
-                3.3450 if width is None else width,
-                9.1340 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='ax_width' if adjust is None else adjust,
-                h_align='center' if adjust is None else h_align
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            axes[:3,0] = get_axes(fig, axes_params[:3,0], zorder=0.5)
-            axes[3,0] = get_axes(
-                fig, axes_params[3,0], projection='3d' if '3d' in options else None, zorder=0.4
-            )
-
-            if '3d' in options:
-                set_axis(axes[3,0], '3d')
-
-        # Initialize a 4x2 figure
-        if style == '4x2':
-            left = right = 0.600
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                9.0994 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            axes[:3] = get_axes(fig, axes_params[:3], zorder=0.5)
-            axes[3] = get_axes(
-                fig, axes_params[3], projection='3d' if '3d' in options else None, zorder=0.4
-            )
-
-            # Set 3d axes
-            if '3d' in options:
-                for ax in axes[3]:
-                    set_axis(ax, '3d')
-                if 'label_right' in options:
-                    axes[3,1].view_init(azim=-45)
-
-        # Initialize a 4x3 figure
-        if style == '4x3':
-            left = right = 0.600
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                9.0994 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            axes[:3] = get_axes(fig, axes_params[:3], zorder=0.5)
-            axes[3] = get_axes(
-                fig, axes_params[3], projection='3d' if '3d' in options else None, zorder=0.4
-            )
-
-            # Set 3d axes
-            if '3d' in options:
-                for ax in axes[3]:
-                    set_axis(ax, '3d')
-                for ax in axes[3,1:]:
-                    ax.set_zlabel('', visible=False)
-
-        # Initialize a 4x4 figure
-        if style == '4x4':
-            # left = 0.5300
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            for x, y in filter(
-                lambda i: not (i[0] == 3 and i[1] == 0),
-                [(x, y) for y in range(4) for x in range(4)]
-            ):
-                axes[y, x] = get_axes(fig, axes_params[y, x])
-
-        # Initialize a 6x6 figure
-        if style == '6x6':
-            width, height, axes_params = get_dimensions(
-                7.0900 if width is None else width,
-                7.5023 if height is None else height,
-                left, bottom, right, top, colpad, rowpad, nrow, ncol, ratio,
-                adjust='fig_height' if adjust is None else adjust
-            )
-
-            # Create figure and axes
-            fig = plt.figure(facecolor=colors.white, figsize=(width, height), dpi=300)
-            axes = np.empty((axes_params.shape[:2]), dtype=object)
-            for x, y in filter(
-                lambda i: i[0] <= i[1], [(x, y) for y in range(6) for x in range(6)]
-            ):
-                axes[y, x] = get_axes(fig, axes_params[y, x])
-
-            # Set 3d axes
-            if '3d' in options:
-                axes_params[1,2,2:] += (colpad / width / 2 + axes_params[1,2,2:] * 0.9)
-                axes_params[1,2,0] += (colpad / width * 1.5 + axes_params[0,0,2] / 2)
-                axes_params[1,2,1] += rowpad / height * 3
-                axes_params[1,2,0] -= colpad / width / 2
-                axes_params[3,4,2:] += (rowpad / height / 2 + axes_params[3,4,2:] * 0.9)
-                axes_params[3,4,1] += (rowpad / height * 2 + axes_params[0,0,3] / 2)
-                axes[1,2] = get_axes(fig, axes_params[1,2], projection='3d', zorder=0.5)
-                axes[3,4] = get_axes(fig, axes_params[3,4], projection='3d', zorder=0.4)
-                set_axis(axes[1,2], '3d')
-                set_axis(axes[3,4], '3d')
-
-        # Hide axis and tick labels, if needed
-        if 'hide_x' in options and nrow > 1:
-            for ax in filter(
-                lambda ax: ax is not None,
-                axes[:nrow - 1 - (1 if '3d' in options and style != '6x6' else 0)].flatten()
-            ):
-                if not (style in ('3x3', '6x6') and ax.name == '3d'):
-                    ax.set_xlabel('', visible=False)
-                    ax.tick_params(labelbottom=False)
-        if 'hide_y' in options and ncol > 1:
-            if not (ncol == 2 and 'label_right' in options):
-                for ax in filter(
-                    lambda ax: ax is not None,
-                    axes[:nrow - (1 if style == '2x2' and '3d' in options else 0),1:].flatten()
-                ):
-                    if not (style in ('3x3', '6x6') and ax.name == '3d'):
-                        ax.set_ylabel('', visible=False)
-                        ax.tick_params(labelleft=False)
-
-        # Move axes and tick labels to the right of the rightmost axes
-        if 'label_right' in options and ncol == 2:
-            if style == '2x2' and '3d' in options:
-                right_axes = [axes[1,1]]
-            else:
-                right_axes = axes[:nrow - (1 if '3d' in options else 0),1].flatten()
-            for ax in filter(lambda ax: ax is not None, right_axes):
-                ax.yaxis.set_label_position('right')
-                ax.yaxis.tick_right()
-
-        # Adjust specific parameters for 2x2 style:
-        if style == '2x2' and '3d' in options and 'hide_x' in options:
-            axes[0,0].set_xlabel('', visible=False)
-            axes[0,0].tick_params(labelbottom=False)
-
-        # Set ticks and spines
-        for ax in filter(lambda ax: ax is not None, axes.flatten()):
-            set_axis(ax, '2d')
-
-        # Set title joint and offset
-        if ncol == 1:
-            fig.joint = '\n'
-            fig.offset = 1.03
-        else:
-            fig.joint = ' '
-            fig.offset = 1.025
-
-        return fig, axes
-
-    def set_legend(self, ax, loc):
-        """Sets the parameters of the legend of the axis."""
-
-        legend = ax.legend(loc=loc, fontsize=8, fancybox=False, borderpad=0.5, borderaxespad=1.0)
-        legend.get_frame().set_alpha(None)
-        legend.get_frame().set_facecolor(colors.white + (0.8,))
-        legend.get_frame().set_edgecolor(colors.black)
-        legend.get_frame().set_linewidth(0.5)
+        # Set figure
+        return set_figure(
+            style, *options, width=width, height=height, left=left, bottom=bottom, right=right,
+            top=top, colpad=colpad, rowpad=rowpad, ratio=ratio, adjust=adjust, v_align=v_align,
+            h_align=h_align
+        )
 
     def set_title(self, title, fig, get_title, *args, **kwargs):
         """Sets a title for the figure, if 'title' is True."""
@@ -785,18 +226,20 @@ class Output():
 
         return f'{metric}_{system}', '_sklearn' if sklearn else '_robust' if robust else ''
 
-    def plot_metric(self, ax, metric, index, color, linestyle, zorder=0.5, secondary=False):
+    def plot_metric(self, ax, metric, index, color, linestyle, zorder=0.5, secondary=False, step=1):
         """
         Plots the association size metric's value over time on a given axis along with an
         enveloppe to display the uncertainty. The display is further customized with the
         'linestyle' and 'color' parameters. If 'secondary' is True, secondary lines are
-        displayed as well.
+        displayed as well. 'step' can be used to reduce the number of points used draw the
+        uncetainty enveloppe around the value line.
         """
 
         # Check metric status
         if metric.status:
 
             # Extrapolate one point in time, value and value error arrays
+            from scipy.interpolate import interp1d
             time = np.insert(self.time, 0, 1.0)
             value = np.insert(
                 metric.value.T[index], 0,
@@ -810,17 +253,17 @@ class Output():
             # Plot the value of the metric over time
             ax.plot(
                 time, value, label=(
-                    f'{metric.latex_short[index]} : {metric.age[index]:.1f}'
-                    f' ± {metric.age_error[index]:.1f}  Myr'
-                ).replace('-', '–'),
+                    f'{metric.latex_short[index]}: {metric.age[index]:.1f}'
+                    f' ± {metric.age_error[index]:.1f} Myr'
+                ),
                 color=color, alpha=1.0, linewidth=1.0, linestyle=linestyle,
                 solid_capstyle='round', dash_capstyle='round', zorder=zorder
             )
 
             # Plot an enveloppe to display the uncertainty
             ax.fill_between(
-                time, value - value_error, value + value_error,
-                color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.5
+                time[::step], (value - value_error)[::step], (value + value_error)[::step],
+                color=color, alpha=0.15, linewidth=0.0, zorder=zorder - 0.05
             )
 
             # Check the type of secondary
@@ -848,7 +291,7 @@ class Output():
             )
 
         # Set legend
-        self.set_legend(ax, 2)
+        set_legend(ax, 2, fontsize=8)
 
         # Select units
         units = f' ({metric.units[index]})' if metric.units[index] != '' else ''
@@ -858,7 +301,7 @@ class Output():
         ax.set_ylabel(f'Association size{units}', fontsize=8)
 
         # Set limits
-        ax.set_xlim(self.final_time.value + 1, self.initial_time.value + 1)
+        ax.set_xlim(self.final_time.value, self.initial_time.value + 1)
 
     def get_metric(self, metric, index=None):
         """Retrieves the proprer Metric instance from a string and index."""
@@ -933,11 +376,11 @@ class Output():
         covariance = vars(self)[f'{covariance}{selection}']
 
         # Plot covariance matrix determinant and trace, and covariance
-        self.plot_metric(ax, covariance_matrix_det, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax, covariance_matrix_trace, 0, colors.metric[1], '--', 0.6)
-        self.plot_metric(ax, covariance, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax, covariance, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax, covariance, 2, colors.metric[7], ':', 0.5)
+        self.plot_metric(ax, covariance_matrix_det, 0, colors.metric[0], '-', 0.8, step=8)
+        self.plot_metric(ax, covariance_matrix_trace, 0, colors.metric[1], '--', 0.6, step=8)
+        self.plot_metric(ax, covariance, 0, colors.metric[5], '-', 0.9, step=8)
+        self.plot_metric(ax, covariance, 1, colors.metric[6], '--', 0.7, step=8)
+        self.plot_metric(ax, covariance, 2, colors.metric[7], ':', 0.5, step=8)
 
         return selection
 
@@ -984,11 +427,11 @@ class Output():
         cross_covariance = vars(self)[f'{cross_covariance}{selection}']
 
         # Plot the cross covariance matrix determinant and trace, and cross covariance
-        self.plot_metric(ax, cross_covariance_matrix_det, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax, cross_covariance_matrix_trace, 0, colors.metric[1], '--', 0.6)
-        self.plot_metric(ax, cross_covariance, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax, cross_covariance, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax, cross_covariance, 2, colors.metric[7], ':', 0.5)
+        self.plot_metric(ax, cross_covariance_matrix_det, 0, colors.metric[0], '-', 0.8, step=4)
+        self.plot_metric(ax, cross_covariance_matrix_trace, 0, colors.metric[1], '--', 0.6, step=4)
+        self.plot_metric(ax, cross_covariance, 0, colors.metric[5], '-', 0.9, step=4)
+        self.plot_metric(ax, cross_covariance, 1, colors.metric[6], '--', 0.7, step=4)
+        self.plot_metric(ax, cross_covariance, 2, colors.metric[7], ':', 0.5, step=4)
 
         return selection
 
@@ -1029,10 +472,10 @@ class Output():
         mad = vars(self)[mad]
 
         # Plot the total median aboslute deviation (MAD), and the components of the MAD
-        self.plot_metric(ax, mad_total, 0, colors.metric[0], '-', 0.8)
-        self.plot_metric(ax, mad, 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax, mad, 1, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax, mad, 2, colors.metric[7], ':', 0.5)
+        self.plot_metric(ax, mad_total, 0, colors.metric[0], '-', 0.8, step=2)
+        self.plot_metric(ax, mad, 0, colors.metric[5], '-', 0.9, step=2)
+        self.plot_metric(ax, mad, 1, colors.metric[6], '--', 0.7, step=2)
+        self.plot_metric(ax, mad, 2, colors.metric[7], ':', 0.5, step=2)
 
     def draw_mad(self, system, title=False, forced=None, default=None, cancel=None):
         """
@@ -1067,15 +510,15 @@ class Output():
         branches = self.select_metric('branches', system)[0]
 
         # Plot the mean, robust mean, and median absolute deviation full tree branch lengths
-        self.plot_metric(ax, vars(self)[f'{branches}_mean'], 0, colors.metric[0], '-', 0.9)
-        self.plot_metric(ax, vars(self)[f'{branches}_mean_robust'], 0, colors.metric[1], '--', 0.7)
-        self.plot_metric(ax, vars(self)[f'{branches}_mad'], 0, colors.metric[2], ':', 0.5)
+        self.plot_metric(ax, vars(self)[f'{branches}_mean'], 0, colors.metric[0], '-', 0.8, step=8)
+        self.plot_metric(ax, vars(self)[f'{branches}_mad'], 0, colors.metric[1], '--', 0.6, step=8)
+        # self.plot_metric(ax, vars(self)[f'{branches}_mean_robust'], 0, colors.metric[2], ':', 0.4)
 
         # Plot the mean, robust mean, and median absolute deviation minimum spanning tree
         # branch lengths
-        self.plot_metric(ax, vars(self)[f'{mst}_mean'], 0, colors.metric[5], '-', 0.9)
-        self.plot_metric(ax, vars(self)[f'{mst}_mean_robust'], 0, colors.metric[6], '--', 0.7)
-        self.plot_metric(ax, vars(self)[f'{mst}_mad'], 0, colors.metric[7], ':', 0.5)
+        self.plot_metric(ax, vars(self)[f'{mst}_mean'], 0, colors.metric[5], '-', 0.9, step=8)
+        self.plot_metric(ax, vars(self)[f'{mst}_mad'], 0, colors.metric[6], '--', 0.7, step=4)
+        # self.plot_metric(ax, vars(self)[f'{mst}_mean_robust'], 0, colors.metric[7], ':', 0.5)
 
     def draw_tree(self, system, title=False, forced=None, default=None, cancel=None):
         """
@@ -1181,7 +624,7 @@ class Output():
         """
 
         # Initialize figure
-        fig, axes = self.set_figure('2x2', 'hide_x', 'label_right')
+        fig, axes = self.set_figure('2x2', 'hide_x', 'label_right', left=0.4, adjust='fig_height')
 
         # Plot covariance matrix determinant and trace, and covariance
         selection = self.plot_covariance(axes[0,0], system, robust, sklearn)
@@ -1211,8 +654,9 @@ class Output():
 
     def plot_histogram(
         self, ax, values, number_of_bins, fit=None, limits=None, value=None, error=None,
-        label=None, orientation='vertical', set_lim=True, error_lines=True, quick_fit=False,
-        curve_color=colors.azure[6], hist_color=colors.azure[9], line_color=colors.black,
+        label=None, orientation='vertical', set_lim=True, value_line=True, error_lines=True,
+        quick_fit=False, curve_color=colors.azure[6], hist_color=colors.azure[9],
+        line_color=colors.black,
     ):
         """
         Plots a histogram of the values along with a normal or skew normal fit, a dash vertical
@@ -1267,7 +711,8 @@ class Output():
 
             # Show value and error
             if label is not None:
-                print(f'{label}: {value:.3f} ± {errors[0]:.3f}')
+                label = f'{label}: {value:.1f} ± {errors[0]:.1f} Myr'
+                print(label)
 
         # Fit a skew normal curve
         if fit == 'skewnormal':
@@ -1320,7 +765,7 @@ class Output():
                 fit_errors = get_skewnormal(parameters[0], value, parameters[1])[2]
                 return np.sum((fit_errors - errors)**2)
 
-            # Fit a skewnormal curve based on value and errors
+            # Fit a skewnormal curve based on the value and errors
             if values is None:
 
                 # Fit two gaussian curves
@@ -1332,17 +777,20 @@ class Output():
                         )**2
                     ) / np.sqrt(2 * np.pi) / np.mean(errors)
 
-                # Fit the skew and scale
+                # Find initial skew and scale
                 else:
-                    sign = np.sign(errors[1] - errors[0])
-                    bound = sign * (10 * (errors[1] - errors[0]) + 1)
-                    initial_parameters = np.array([bound / 2, np.mean(errors)])
-                    bounds = (
-                        (bound if sign < 0 else 0, bound if sign > 0 else 0),
-                        (0, 3 * np.mean(errors))
-                    )
+                    sign = int(np.sign(errors[1] - errors[0]))
+                    initial_skew = sign * (10 * abs(errors[1] - errors[0]) + 1) / 2
+                    initial_scale = np.mean(errors)
+
+                    # Find skew and scale bounds
+                    skew_bounds = (0.0, 4 * initial_skew)[::sign]
+                    scale_bounds = (0.0, 3 * initial_scale)
+
+                    # Fit the skew and scale
                     skew, scale = minimize(
-                        Χ2, initial_parameters, method='Nelder-Mead', bounds=bounds
+                        Χ2, np.array([initial_skew, initial_scale]),
+                        method='Nelder-Mead', bounds=(skew_bounds, scale_bounds)
                     ).x
 
                     # Recenter the mode on the value
@@ -1356,7 +804,13 @@ class Output():
 
             # Show value and error
             if label is not None:
-                print(f'{label}: {value:.3f} -{errors[0]:.3f} +{errors[1]:.3f}')
+                label = (
+                    f'{label}: ''${{'
+                    f'{value:.1f}' '}}_{{'
+                    f'-{errors[0]:.1f}''}}^{{'
+                    f'+ {errors[1]:.1f}''}}$ Myr'
+                )
+                print(label)
 
         # Plot probability density function
         if fit in ('normal', 'skewnormal'):
@@ -1368,9 +822,11 @@ class Output():
             )
 
             # Draw value and error range
-            (ax.axvline if orientation == 'vertical' else ax.axhline)(
-                value, color=line_color, alpha=0.8, linewidth=0.5, linestyle='--', zorder=0.9
-            )
+            if value_line:
+                (ax.axvline if orientation == 'vertical' else ax.axhline)(
+                    value, color=line_color, alpha=0.8, linewidth=0.5,
+                    linestyle='--', zorder=0.9
+                )
             if error_lines:
                 for sign, i in zip((-1, 1), (0, 1)):
                     (ax.axvline if orientation == 'vertical' else ax.axhline)(
@@ -1401,14 +857,10 @@ class Output():
 
         return value, errors
 
-    def draw_age_distribution(
-        self, metric, index=None, fit=None, number_of_bins=60, adjusted=False,
-        title=False, forced=None, default=None, cancel=None
+    def plot_age_distribution(
+        self, axes, metric, index, fit, number_of_bins, adjusted, curve_color, hist_color
     ):
-        """Draws a plot of the age distribution of a group for a given metric."""
-
-        # Initialize figure
-        fig, axes = self.set_figure('1x1')
+        """Plots the age distribution of a metric"""
 
         # Retrieve metric
         metric, index = self.get_metric(metric, index)
@@ -1419,48 +871,106 @@ class Output():
             value = metric.age_adjusted[index] if adjusted else metric.age[index]
             ages = ages + value - np.mean(ages)
 
+            # Adjustment
+            # value = -20.3
+            # error = 3.4
+            # ages = (ages - np.mean(ages)) / np.std(ages) * error + value
+
             # Plot histogram
             self.plot_histogram(
-                axes[0,0], ages, number_of_bins, fit=fit, value=value,
-                error=metric.age_error[index], limits=(np.min(ages) - 10, np.max(ages) + 10),
-                label=f"{'Corrected ' if adjusted else ''}{metric.name[index]}",
-                error_lines=True, curve_color=colors.lime[4], hist_color=colors.lime[7],
-                line_color=colors.lime[4]
+                axes[0, 0], ages, number_of_bins, fit=fit,
+                value=value, # error=metric.age_error[index],
+                limits=(np.min(ages) - 10, np.max(ages) + 10),
+                label=f"{'Corrected ' if adjusted else ''}{metric.latex_short[index]}",
+                error_lines=False, curve_color=curve_color,
+                hist_color=hist_color, line_color=colors.black
             )
 
         # Logging
         else:
             self.log(
                 "Could not use '{}' metric for '{}' group. It was not computed.",
-                metric.name[index], self.name, display=True
+                str(metric.name[index]), self.name, display=True
             )
 
+    def draw_age_distribution(
+        self, metric, index=None, fit=None, number_of_bins=60, adjusted=False,
+        title=False, forced=None, default=None, cancel=None
+    ):
+        """Draws a plot of the age distribution of a group for a given metric."""
+
+        # Initialize figure
+        fig, axes = set_figure(
+            '1x1', width=6.5, height=3.5, adjust='fig_height',
+            ratio=1.0, left=1.625, right=1.625
+        )
+        # fig, axes = self.set_figure('1x1')
+
+        # Plot metrics
+        self.plot_age_distribution(
+            axes, metric, index, fit, number_of_bins, adjusted,
+            colors.azure[6], colors.azure[9]
+        )
+        self.plot_age_distribution(
+            axes, 'covariance_ξηζ_matrix_trace', 0, fit, number_of_bins, adjusted,
+            colors.pink[6], colors.pink[9]
+        )
+        # self.plot_age_distribution(
+        #     axes, 'cross_covariance_ξηζ_matrix_trace', 0, fit, number_of_bins, adjusted,
+        #     colors.orange[8 ], colors.orange[10]
+        # )
+        self.plot_age_distribution(
+            axes, 'branches_ξηζ_mean', 0, fit, number_of_bins, adjusted,
+            colors.lime[4], colors.lime[7]
+        )
+
         # Plot results from Miret-Roig et al. (2020) and Crundall et al. (2019)
-        self.plot_MiretRoig2020_Crundall2019(axes[0,0], mr2020=False, cr2019=False, ldb=False)
+        self.plot_MiretRoig2020_Crundall2019(axes[0,0], mr2020=False, cr2019=False, ldb=True)
+        # self.plot_MiretRoig2020_Crundall2019(axes[0,0], mr2020=True, cr2019=True, ldb=True)
 
         # Set title
+        # self.set_title(
+        #     title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
+        #     f'Age distribution of {self.number_monte_carlo} groups of {self.name},\n'
+        #     f'using the {str(metric.name[index])} as association size metric'
+        # )
         self.set_title(
             title, fig, lambda fig, title: (title, title.replace('\n', ' ')),
-            f'Age distribution of {self.number_monte_carlo} groups of {self.name},\n'
-            f'using the {metric.name[index]} as association size metric'
+            f'Age distribution of {self.number_monte_carlo} groups of {self.name}'
         )
 
         # Set legend
-        self.set_legend(axes[0,0], 2)
+        set_legend(axes[0,0], 2)
 
         # Set labels
-        axes[0,0].set_xlabel('Age (Myr)', fontsize=8)
+        axes[0,0].set_xlabel('Epoch (Myr)', fontsize=8)
         axes[0,0].set_ylabel('Density', fontsize=8)
 
         # Set limits
-        axes[0,0].set_xlim(-40, 1)
-        axes[0,0].set_ylim(0, 0.30)
+        # axes[0,0].set_xlim(-51, -8)
+        # axes[0,0].set_ylim(0, 0.25)
+
+        # Set limits (COL and CAR)
+        axes[0,0].set_xlim(-43, 1)
+        axes[0,0].set_ylim(0, 0.40)
+
+        # Set limits (BPMG)
+        # axes[0,0].set_xlim(-29, -9)
+        # axes[0,0].set_xlim(-31, -9)
+        # axes[0,0].set_ylim(0, 0.50)
+
+        # Set ticks (BPMG)
+        # axes[0,0].set_xticks([-10, -14, -18, -22, -26, -30])
 
         # Save figure
+        # self.save_figure(
+        #     f"age_distribution_{self.name}_{'corrected_' if adjusted else ''}"
+        #     f"{str(metric.name[index]).replace(' ', '_')}.pdf", fig, tight=title,
+        #     forced=forced, default=default, cancel=cancel
+        # )
         self.save_figure(
-            f"age_distribution_{self.name}_{'corrected_' if adjusted else ''}"
-            f"{metric.name[index].replace(' ', '_')}.pdf", fig, tight=title,
-            forced=forced, default=default, cancel=cancel
+            f"age_distribution_{self.name}{'_corrected' if adjusted else ''}.pdf",
+            fig, tight=title, forced=forced, default=default, cancel=cancel
         )
 
     def plot_MiretRoig2020_Crundall2019(self, ax, mr2020=True, cr2019=True, ldb=True):
@@ -1475,22 +985,28 @@ class Output():
             self.plot_histogram(
                 ax, None, 1, fit='skewnormal', value=-18.5, error=(2.0, 2.4),
                 label='Miret-Roig et al. (2020)', set_lim=False, error_lines=False,
-                curve_color=colors.orange[6], hist_color=colors.orange[9],
-                line_color=colors.orange[6]
+                curve_color=colors.pink[6], hist_color=colors.pink[9]
             )
 
         # Plot curve from Crundall et al. (2019)
         if cr2019:
             self.plot_histogram(
-                ax, None, 1, fit='normal', value=-17.7, error=1.2,
+                ax, None, 1, fit='normal', value=-17.8, error=1.2,
                 label='Crundall et al. (2019)', set_lim=False, error_lines=False,
-                curve_color=colors.azure[6], hist_color=colors.azure[9], line_color=colors.azure[6]
+                curve_color=colors.lime[4], hist_color=colors.lime[7]
             )
 
         # Show a shaded area for LDB and isochrone ages
         if ldb:
             ylim = ax.get_ylim()
-            LDB_range = np.array([-20, -26])
+            # LDB_range = np.array([-20, -26]) # BPMG
+            # LDB_range = np.array([-51, -41]) # THA
+            LDB_range = np.array([-30, -24]) # COL and CAR
+            ax.fill_between(
+                LDB_range, 0, 1, transform=ax.get_xaxis_transform(),
+                color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1
+            )
+            LDB_range = np.array([-38, -43]) # COL and CAR
             ax.fill_between(
                 LDB_range, 0, 1, transform=ax.get_xaxis_transform(),
                 color=colors.grey[9], alpha=0.1, linewidth=0.0, zorder=0.1
@@ -1760,22 +1276,48 @@ class Output():
         """Creates a title for position or velocity coordinates."""
 
         # Create title for figure
-        return (
-            (line_1 + ' of stars in {name}{joint}' + line_2).format(
-                system=f'${systems[system].latex[coord]}$', coord=coord,
-                position=f"${systems[system].latex['position']}$",
-                velocity=f"${systems[system].latex['velocity']}$",
-                name=self.name, joint=fig.joint if line_2 != '' else ''
-            ).replace('ys ', 'ies '),
+        if system == 'both':
+            return (
+                (line_1 + ' of stars in {name}{joint}' + line_2).format(
+                    system='${}$ and ${}$'.format(
+                        systems['xyz'].labels[coord], systems['ξηζ'].labels[coord]
+                    ), coord=coord, position='${}$ and ${}$'.format(
+                        systems['xyz'].latex['position'], systems['ξηζ'].latex['position']
+                    ), velocity='${}$ and ${}$'.format(
+                        systems['xyz'].latex['velocity'], systems['ξηζ'].latex['velocity']
+                    ), name=self.name, joint=fig.joint if line_2 != '' else ''
+                ).replace('ys ', 'ies '),
 
             # Create title for logging
             (line_1 + ' of stars in {name}{joint}' + line_2).format(
-                system=systems[system].labels[coord], coord=coord,
-                position=f"{systems[system].labels['position']}",
-                velocity=f"{systems[system].labels['velocity']}",
-                name=self.name, joint=' ' if line_2 != '' else ''
+                system='{} and {}'.format(
+                    systems['xyz'].labels[coord], systems['ξηζ'].labels[coord]
+                ), coord=coord, position='{} and {}'.format(
+                    systems['xyz'].latex['position'], systems['ξηζ'].latex['position']
+                ), velocity='{} and {}'.format(
+                    systems['xyz'].latex['velocity'], systems['ξηζ'].latex['velocity']
+                ), name=self.name, joint=' ' if line_2 != '' else ''
             ).replace('ys ', 'ies ')
         )
+
+        # Create title for figure
+        else:
+            return (
+                (line_1 + ' of stars in {name}{joint}' + line_2).format(
+                    system=f'${systems[system].latex[coord]}$', coord=coord,
+                    position=f"${systems[system].latex['position']}$",
+                    velocity=f"${systems[system].latex['velocity']}$",
+                    name=self.name, joint=fig.joint if line_2 != '' else ''
+                ).replace('ys ', 'ies '),
+
+                # Create title for logging
+                (line_1 + ' of stars in {name}{joint}' + line_2).format(
+                    system=systems[system].labels[coord], coord=coord,
+                    position=f"{systems[system].labels['position']}",
+                    velocity=f"{systems[system].labels['velocity']}",
+                    name=self.name, joint=' ' if line_2 != '' else ''
+                ).replace('ys ', 'ies ')
+            )
 
     def get_limits(self, coord, system, step, relative=False):
         """Finds the limits of positions or velocities, at a given step."""
@@ -1964,19 +1506,17 @@ class Output():
         """Draws the trajectories in position or velocity of stars."""
 
         # Initialize figure
-        fig, axes = self.set_figure('2+1')
+        if system == 'both':
+            from kanya.fap import set_figure_trajectory
+            fig, axes = set_figure_trajectory()
 
-        # Plot trajectories
-        if system == 'xyz':
+            # Plot xyz trajectories
             i, j = zip(*((1, 0), (2, 0), (1, 2)))
-        if system == 'ξηζ':
-            i, j = zip(*((0, 1), (2, 1), (0, 2)))
-        for ax, x, y in zip(axes.flatten(), i, j):
-            self.plot_trajectory(ax, x, y, coord, system, age, metric, index, labels)
+            for ax, x, y in zip(axes[:, :2].flatten(), i, j):
+                self.plot_trajectory(ax, x, y, coord, 'xyz', age, metric, index, labels)
 
-        # Draw vertical and horizontal lines through the Sun's position at the current epoch
-        if coord == 'position' and system == 'xyz':
-            for ax, x, y in zip(axes.flatten(), i, j):
+            # Draw vertical and horizontal lines through the Sun's position at the current epoch
+            for ax, x, y in zip(axes[:, :2].flatten(), i, j):
                 ax.axhline(
                     0.0, color=colors.black, alpha=0.8,
                     linewidth=0.5, linestyle=':', zorder=0.2
@@ -1995,44 +1535,173 @@ class Output():
                     )
                 )
 
-            # Set limits
-            # axes[0,0].set_xlim(-9, 1)
-            # axes[0,0].set_ylim(-1, 9)
-            # axes[0,1].set_xlim(-80, 80)
-            # axes[0,1].set_ylim(-1, 9)
-            # axes[1,0].set_xlim(-9, 1)
-            # axes[1,0].set_ylim(-80, 80)
+            # Set limits (BPMG)
+            axes[0,0].set_xlim(-9, 1)
+            axes[0,0].set_ylim(-1, 9)
+            axes[0,1].set_xlim(-60, 60)
+            axes[0,1].set_ylim(-1, 9)
+            axes[1,0].set_xlim(-9, 1)
+            axes[1,0].set_ylim(-60, 60)
+            axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=2)
 
-            # axes[0,0].set_xlim(-9, 1)
-            # axes[0,0].set_ylim(-1, 9)
-            # axes[0,1].set_xlim(-150, 130)
-            # axes[0,1].set_ylim(-1, 9)
-            # axes[1,0].set_xlim(-9, 1)
-            # axes[1,0].set_ylim(-150, 130)
-            axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-1)
+            # Set limits (THA, COL, and CAR)
+            # axes[0,0].set_xlim(-10.5, 0.5)
+            # axes[0,0].set_ylim(-0.5, 10.5)
+            # axes[0,1].set_xlim(-150, 150)
+            # axes[0,1].set_ylim(-0.5, 10.5)
+            # axes[1,0].set_xlim(-10.5, 0.5)
+            # axes[1,0].set_ylim(-150, 150)
+            # axes[0,0].set_xticks([-10, -8, -6, -4, -2, 0])
+            # axes[1,0].set_xticks([-10, -8, -6, -4, -2, 0])
+            # axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-1)
 
-        # Invert y axis
-        if system == 'xyz':
+            # Set ticks and labels
+            axes[0,1].set_xlabel(axes[0,1].get_xlabel(), visible=True)
+            axes[0,1].tick_params(labelbottom=True)
+
+            # Invert y axis
             axes[0,0].invert_xaxis()
             axes[1,0].invert_xaxis()
 
-        # Set limits
-        if coord == 'position' and system == 'ξηζ':
-            axes[0,0].set_ylabel(axes[0,0].get_ylabel(), labelpad=-1)
-            # axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-0.1)
-        #     axes[0,0].set_xlim(-225, 60)
-        #     axes[0,0].set_ylim(-45, 110)
-        #     axes[0,1].set_xlim(-40, 49)
-        #     axes[0,1].set_ylim(-45, 110)
-        #     axes[1,0].set_xlim(-225, 60)
-        #     axes[1,0].set_ylim(-40, 49)
+            # Plot ξηζ trajectories
+            i, j = zip(*((0, 1), (2, 1), (0, 2)))
+            for ax, x, y in zip(axes[:, 2:].flatten(), i, j):
+                self.plot_trajectory(ax, x, y, coord, 'ξηζ', age, metric, index, labels)
+
+            # Set limits (BPMG)
+            axes[0,2].set_xlim(-236, 60)
+            axes[0,2].set_ylim(-110, 110)
+            axes[0,3].set_xlim(-70, 30)
+            axes[0,3].set_ylim(-110, 110)
+            axes[1,2].set_xlim(-236, 60)
+            axes[1,2].set_ylim(-70, 30)
+            # axes[0,2].set_yticks([-120, -60, 0, 60, 120])
+            # axes[0,3].set_yticks([-120, -60, 0, 60, 120])
+
+            # Set limits (THA)
+            # axes[0,2].set_xlim(-650, 125)
+            # axes[0,2].set_ylim(-325, 225)
+            # axes[0,3].set_xlim(-150, 150)
+            # axes[0,3].set_ylim(-325, 225)
+            # axes[1,2].set_xlim(-650, 125)
+            # axes[1,2].set_ylim(-150, 150)
+
+            # Set limits (COL and CAR)
+            # axes[0,2].set_xlim(-750, 150)
+            # axes[0,2].set_ylim(-625, 275)
+            # axes[0,3].set_xlim(-150, 150)
+            # axes[0,3].set_ylim(-625, 275)
+            # axes[1,2].set_xlim(-750, 150)
+            # axes[1,2].set_ylim(-150, 150)
+            # axes[0,2].set_yticks([-600, -400, -200, 0, 200])
+            # axes[0,3].set_yticks([-600, -400, -200, 0, 200])
+
+            # Set ticks and labels
+            axes[0,2].set_ylabel(axes[0,2].get_ylabel(), visible=True)
+            axes[0,3].set_xlabel(axes[0,3].get_xlabel(), visible=True)
+            axes[1,2].set_ylabel(axes[1,2].get_ylabel(), visible=True)
+            axes[0,2].tick_params(labelleft=True)
+            axes[1,2].tick_params(labelleft=True)
+            axes[0,3].tick_params(labelbottom=True)
+
+        # Initialize figure
+        else:
+            fig, axes = self.set_figure('2+1')
+
+            # Plot trajectories
+            if system == 'xyz':
+                i, j = zip(*((1, 0), (2, 0), (1, 2)))
+            if system == 'ξηζ':
+                i, j = zip(*((0, 1), (2, 1), (0, 2)))
+            for ax, x, y in zip(axes.flatten(), i, j):
+                self.plot_trajectory(ax, x, y, coord, system, age, metric, index, labels)
+
+            # Draw vertical and horizontal lines through the Sun's position at the current epoch
+            if coord == 'position' and system == 'xyz':
+                for ax, x, y in zip(axes.flatten(), i, j):
+                    ax.axhline(
+                        0.0, color=colors.black, alpha=0.8,
+                        linewidth=0.5, linestyle=':', zorder=0.2
+                    )
+                    ax.axvline(
+                        0.0, color=colors.black, alpha=0.8,
+                        linewidth=0.5, linestyle=':', zorder=0.2
+                    )
+
+                # Draw circles around the galactic center located at 8.122 kpc from the Sun
+                for radius in range(1, 16):
+                    axes[0,0].add_artist(
+                        plt.Circle(
+                            (0, 8.122), radius, color=colors.grey[17],
+                            fill=False, linewidth=0.5, linestyle=':', zorder=0.05
+                        )
+                    )
+
+                # Set limits
+                # axes[0,0].set_xlim(-9, 1)
+                # axes[0,0].set_ylim(-1, 9)
+                # axes[0,1].set_xlim(-80, 80)
+                # axes[0,1].set_ylim(-1, 9)
+                # axes[1,0].set_xlim(-9, 1)
+                # axes[1,0].set_ylim(-80, 80)
+
+                # Set limits
+                # axes[0,0].set_xlim(-9, 1)
+                # axes[0,0].set_ylim(-1, 9)
+                # axes[0,1].set_xlim(-150, 130)
+                # axes[0,1].set_ylim(-1, 9)
+                # axes[1,0].set_xlim(-9, 1)
+                # axes[1,0].set_ylim(-150, 130)
+
+                # Set limits
+                axes[0,0].set_xlim(-10.5, 0.5)
+                axes[0,0].set_ylim(-0.5, 10.5)
+                axes[0,1].set_xlim(-150, 150)
+                axes[0,1].set_ylim(-0.5, 10.5)
+                axes[1,0].set_xlim(-10.5, 0.5)
+                axes[1,0].set_ylim(-150, 150)
+
+                # Set ticks and labels
+                axes[0,1].set_xticks([-100, 0, 100])
+                axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-1)
+
+            # Invert y axis
+            if system == 'xyz':
+                axes[0,0].invert_xaxis()
+                axes[1,0].invert_xaxis()
+
+            # Set limits
+            if coord == 'position' and system == 'ξηζ':
+                # axes[0,0].set_xlim(-750, 150)
+                # axes[0,0].set_ylim(-625, 275)
+                # axes[0,1].set_xlim(-150, 150)
+                # axes[0,1].set_ylim(-625, 275)
+                # axes[1,0].set_xlim(-750, 150)
+                # axes[1,0].set_ylim(-150, 150)
+                # axes[0,0].set_yticks([-600, -400, -200, 0, 200])
+                # axes[0,1].set_yticks([-600, -400, -200, 0, 200])
+
+                # Set limits
+                axes[0,0].set_xlim(-650, 125)
+                axes[0,0].set_ylim(-325, 225)
+                axes[0,1].set_xlim(-150, 150)
+                axes[0,1].set_ylim(-325, 225)
+                axes[1,0].set_xlim(-650, 125)
+                axes[1,0].set_ylim(-150, 150)
+                # axes[0,0].set_yticks([-400, -200, 0, 200])
+                # axes[0,1].set_yticks([-400, -200, 0, 200])
+
+                # Set ticks and labels
+                axes[0,1].set_xticks([-100, 0, 100])
+                axes[1,0].set_yticks([-100, 0, 100])
+                axes[0,0].set_ylabel(axes[0,0].get_ylabel(), labelpad=-1)
+                axes[1,0].set_ylabel(axes[1,0].get_ylabel(), labelpad=-1)
 
         # Set title
         self.set_title(
             title, fig, self.get_title_coord,
             coord, system, '{system} trajectories'
         )
-
 
         # Save figure
         self.save_figure(
@@ -2160,7 +1829,7 @@ class Output():
             factor = 1000 if coord == 'position' and system == 'xyz' else 1
 
             # Select coordinates
-            value = vars(self)[f'{coord}_{system}'] / factor
+            value = vars(self)[f'average_{coord}_{system}'][0] / factor
 
             # Plot stars' average values
             for y, linestyle in ((0, '-'), (1, '--'), (2, ':')):
@@ -2238,7 +1907,7 @@ class Output():
             ax.set_ylabel(f'$<{systems[system].latex[coord]}>$ ({axis_unit})', fontsize=8)
 
             # Set legend
-            self.set_legend(ax, 4)
+            set_legend(ax, 4)
 
         # Set label
         ax.set_xlabel('Epoch (Myr)', fontsize=8)
@@ -2254,8 +1923,8 @@ class Output():
 
         # Initialize figure
         fig, axes = self.set_figure(
-            style, 'hide_x', 'label_right', adjust='height', left=0.428,
-            h_align='right' if style == '3x1' else None,# ratio=0.8,
+            style, 'hide_x', 'label_right', width=6.55, left=0.4, right=0.45, adjust='fig_height',
+            h_align='right' if style == '3x1' else None, ratio=1.0,
             styles=('1x3', '2x2', '3x1')
         )
 
@@ -2269,6 +1938,26 @@ class Output():
         # Plot the average xyz position
         if style == '2x2':
             self.plot_time(axes[0,1], None, coord, system, age, metric)
+
+            # Adjust axes (BPMG)
+            axes[0, 0].get_yaxis().labelpad = 2.5
+            axes[0, 1].get_yaxis().labelpad = 2.5
+            axes[1, 0].get_yaxis().labelpad = 2.4
+            axes[1, 1].get_yaxis().labelpad = 3.5
+
+            # Adjust axes (THA)
+            # axes[0, 1].get_yaxis().labelpad = 2.5
+            # axes[0, 0].get_yaxis().labelpad = 2.5
+            # axes[1, 0].get_yaxis().labelpad = 2.5
+            # axes[1, 1].get_yaxis().labelpad = 2.5
+
+            # Adjust labelpads and limits (COL and CAR)
+            # axes[0, 1].get_yaxis().labelpad = 2.5
+            # axes[0, 0].get_yaxis().labelpad = -1.5
+            # axes[1, 0].get_yaxis().labelpad = -1.5
+            # axes[1, 1].get_yaxis().labelpad = 2.5
+            # axes[1, 0].set_ylim([-260, 110])
+            # axes[0, 1].set_ylim([-620, 160])
 
         # Set title
         self.set_title(
@@ -2435,6 +2124,7 @@ class Output():
                 )
 
             # Error bars
+            # !!! Should check if errors have been computed (number_monte_carlo = 0) !!!
             if errors:
                 if projection == '2d':
 
@@ -2514,7 +2204,10 @@ class Output():
         if mst and len(set(coords)) == 1:
             mst = f'mst_branches_{coords[0]}_{system}'
             if mst not in vars(self).keys():
+                import multiprocessing as mp
+                self.pool = mp.Pool()
                 self.get_tree_branches()
+                self.pool.close()
             mst = vars(self)[mst]
 
             # Select branches
@@ -2550,8 +2243,9 @@ class Output():
             if values is None:
                 values = np.array(
                     [
-                        vars(self)[f'average_{value_coords[i]}'][0, step, axes[i]]
-                        for i in range(ndim)
+                        vars(self)[
+                            f"{'relative_' if relative else ''}average_{coords[i]}_{system}"
+                        ][0, step, axes[i]] for i in range(ndim)
                     ]
                 )
             ax.axvline(
@@ -2563,25 +2257,27 @@ class Output():
                 linewidth=0.5, linestyle='--', zorder=0.9
             )
 
-        # Draw ellipses
+        # Draw probability ellipses
         if ellipses and projection == '2d':
 
+            from matplotlib.patches import Ellipse
+
             # Compute covariance matrix
-            covariance_matrix = np.cov(
-                [vars(self)[value_coords[i]][0, :, step, axes[i]] for i in range(ndim)]
-            )
+            values = [vars(self)[value_coords[i]][0, self.core, step, axes[i]] for i in range(ndim)]
+            covariance_matrix = np.cov(values)
+            average_value = np.mean(values, axis=1)
 
             # Compute semi-major and semi-minor axes, and angle
             a, b, θ = bivariate_gauss_to_ellipsoid(covariance_matrix)
 
-            # Compute, rotate, and translate ellipses coordinates
-            t = np.linspace(0, 2 * np.pi, 200)
+            # Compute, rotate, translate, and draw probability ellipses
             for i in range(a.size):
-                x, y = a[i] * np.cos(t), b[i] * np.sin(t)
-                x, y = rotate(x, y, θ, values[0], values[1])
-
-                # Plot 1σ and 2σ probabilities
-                ax.fill(x, y, facecolor=colors.azure[9], alpha=0.3, linestyle='None', zorder=0.1)
+                ax.add_patch(
+                    Ellipse(
+                        average_value, 2 * a[i], 2 * b[i], angle = θ * 180 / np.pi,
+                        facecolor=colors.azure[9], alpha=0.3, linestyle='None', zorder=0.1
+                    )
+                )
 
         # Set limits
         if limits is not None:
@@ -2594,18 +2290,18 @@ class Output():
         ax.set_xlabel(
             f'${vars(systems[system])[coords[0]][axes[0]].latex}$ '
             f'({vars(systems[system])[coords[0]][axes[0]].unit.label})',
-            fontsize=8, #labelpad=16
+            fontsize=8, verticalalignment='top' #, labelpad=16
         )
         ax.set_ylabel(
             f'${vars(systems[system])[coords[1]][axes[1]].latex}$ '
             f'({vars(systems[system])[coords[1]][axes[1]].unit.label})',
-            fontsize=8, #labelpad=16
+            fontsize=8, verticalalignment='bottom' #, labelpad=16
         )
         if projection == '3d':
             ax.set_zlabel(
                 f'${vars(systems[system])[coords[2]][axes[2]].latex}$ '
                 f'({vars(systems[system])[coords[2]][axes[2]].unit.label})',
-                fontsize=8, #labelpad=20
+                fontsize=8, verticalalignment='top' #, labelpad=20
             )
 
     def draw_scatter(
@@ -2645,7 +2341,6 @@ class Output():
         if style == '3x3':
             ax0, ax1, ax2, ax3 = axes[1,0], axes[2,0], axes[2,1], axes[0,2]
             ax4, ax5, ax6 = np.diag(axes)
-            ax3 = axes[0,2]
         if style in ('4x1'):
             ax3 = axes[3,0]
 
@@ -2693,6 +2388,11 @@ class Output():
                 ax3, (0, 1, 2), coord, system, step, errors=errors,
                 labels=labels, mst=mst, ellipses=False, limits=limits
             )
+
+        # Set labels and ticks
+        if style == '3x3':
+            ax6.tick_params(labelbottom=True)
+            ax6.set_xlabel(ax2.get_ylabel())
 
         # Set title
         self.set_title(
@@ -2908,7 +2608,23 @@ class Output():
         if flip:
             axes[-1, -1].tick_params(labelbottom=False)
         else:
-            axes[-1, -1].set_xlabel(axes[-1, -2].get_ylabel())
+            axes[-1, -1].set_xlabel(
+                axes[-1, 0].get_ylabel(), fontsize=8, verticalalignment='top'
+            )
+
+        # Adjust labelpad
+        axes[1, 0].get_yaxis().labelpad = 1.0
+        axes[2, 0].get_yaxis().labelpad = 1.0
+
+        # Adjust ticks
+        from matplotlib.ticker import MaxNLocator
+        for ax in filter(lambda ax: ax is not None and ax.name != '3d', axes.flatten()):
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=3))
+            ax.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=3))
+
+        # axes[-1, -1].set_xticks([5, 7, 9])
+        # axes[-1, -2].set_xticks([-7, -9, -11])
+        # axes[-1, -3].set_xticks([-4, -2, 0])
 
         # Set title
         self.set_title(
@@ -2935,8 +2651,8 @@ class Output():
 
         # Initialize figure
         fig, axes = self.set_figure(
-            '1x1', 'mollweide', width=7.0900, bottom=0.0815,
-            ratio=0.50, adjust='ax_width', h_align='center'
+            '1x1', 'mollweide', width=6.5, left=0.3, bottom=0.0815, right=0.3,
+            ratio=0.50, adjust='fig_height', h_align='center'
         )
 
         # Check the type of labels

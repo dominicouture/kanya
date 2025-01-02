@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-quantity.py: Defines Quantity and Unit classes to handle n dimension values with unit
-conversions and error handling,
+quantity.py: Defines Quantity and Unit classes to handle n-dimensional values and units. Unit
+conversions are supported.
 """
 
 import numpy as np
@@ -170,8 +170,8 @@ class Quantity:
             )
 
         return '({} ± {}) {}'.format(
-            flatten(self.values),
-            flatten(reduce(self.errors)),
+            flatten(np.round(self.values, 3)),
+            flatten(reduce(np.round(self.errors, 3))),
             flatten(
                 reduce(
                     np.vectorize(lambda unit: unit.to_string().replace(' ', ''))(self.units.units)
@@ -520,15 +520,22 @@ class Quantity:
     def to(self, units=None):
         """Converts a Quantity object to new units or default units if none are given."""
 
-        # Default units per physical types if 'units' is None.
+        def get_default(unit):
+            """Retrieves the default unit based on the unit's physical type."""
+
+            # Convert astropy's unit to a unit
+            unit = Unit(unit)
+
+            # Find the default unit
+            return (
+                default_units[unit.physical_type].unit
+                if unit.physical_type in default_units.keys() else unit
+            )
+
+        # Default units per physical types if 'units' is None
         if units is None:
             from .coordinate import default_units
-            units = Unit(
-                np.vectorize(
-                    lambda unit: default_units[unit.physical_type].unit
-                    if unit.physical_type in default_units.keys() else unit
-                )(self.units.units)
-            )
+            units = Unit(np.vectorize(get_default)(self.units.units))
 
         # Units import
         else:
@@ -568,8 +575,8 @@ class Unit():
 
         # Units import
         if type(units) in (
-                str, type(None), u.core.PrefixUnit, u.core.CompositeUnit,
-                u.core.IrreducibleUnit, u.core.NamedUnit, u.core.Unit, np.str_, np.unicode_
+            str, type(None), u.core.PrefixUnit, u.core.CompositeUnit,
+            u.core.IrreducibleUnit, u.core.NamedUnit, u.core.Unit, np.str_
         ):
             units = [units]
         if type(units) == Unit:
@@ -589,7 +596,7 @@ class Unit():
         self.ndim = self.units.ndim
 
         # Physical types
-        self.physical_types = np.vectorize(lambda unit: unit.physical_type)(self.units)
+        self.physical_types = np.vectorize(self.get_physical_type)(self.units)
 
         # Labels
         self.labels = np.vectorize(lambda unit: unit.to_string().replace(' ', ''))(self.units)
@@ -618,6 +625,25 @@ class Unit():
         """Tests whether self is not the equal to other."""
 
         return vars(self) == vars(other)
+
+    def get_physical_type(self, unit):
+        """Transforms the astropy unit's physical type object into a string."""
+
+        # Label permutations
+        permutations = {
+            'speed/velocity': 'speed',
+            'angular frequency/angular speed/angular velocity': 'angular speed'
+        }
+
+        # Convert physical type to a string
+        physical_type = str(unit.physical_type)
+
+        # Change physical type to the proper label
+        for key, label in permutations.items():
+            if physical_type == key:
+                physical_type = label
+
+        return physical_type
 
     def compare(self, other, shape=None, types=True):
         """

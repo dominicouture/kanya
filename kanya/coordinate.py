@@ -6,28 +6,28 @@ coordinate.py: Defines System class to handle a coordinate system initialization
 of position and velocity variables, default and usual units, axis, and origins. Variable,
 Axis and Origin classes are definied as well. Individual coordinates are defined by a
 Coordinate class which includes an initialization method and tranformation methods. They are
-four systems (origin, orientation) :
+four systems (origin, orientation):
 
-- Equatorial (Heliocentric, equatorial)
-- Heliogalactic (Heliocentric, Galactic Center to Sun Plane)
-- Galactic (Galactocentric, Galactic Plane)
-- Comoving (Local Standard of Rest, Galactic Center to Sun Plane)
+    -   Equatorial (Heliocentric, equatorial)
+    -   Heliogalactic (Heliocentric, Galactic Center to Sun Plane)
+    -   Galactic (Galactocentric, Galactic Plane)
+    -   Comoving (Local Standard of Rest, Galactic Center to Sun Plane)
 
 Four coordinates :
 
-- Spherical
-- Cartesian
-- Cylindrical
-- Curvilinear
+    -   Spherical
+    -   Cartesian
+    -   Cylindrical
+    -   Curvilinear
 
 One can only move up or down in either systems or coordinates. The functions are:
 
-- Equatorial to Galactic (2)
-- Galactic to Heliogalactic (2)
-- Heliogalactic to Comoving (2)
-- πδα_to_xyz (2)
-- xyz_to_rθh (2)
-- rθh_to_ξηζ (4)
+    -   Equatorial to Galactic (2)
+    -   Galactic to Heliogalactic (2)
+    -   Heliogalactic to Comoving (2)
+    -   πδα_to_xyz (2)
+    -   xyz_to_rθh (2)
+    -   rθh_to_ξηζ (4)
 
 For the comoving system, only the cartesian and curvilinear coordinates are defined.
 """
@@ -517,7 +517,6 @@ def position_xyz_to_rθh(x, y, z):
     return np.array(((x**2 + y**2)**0.5, np.arctan2(y, x) + shift, z))
 
 def velocity_xyz_to_rθh(x, y, z, u, v, w):
-
     """
     Converts uvw, u velocity (u; pc/Myr), v velocity (v; pc/Myr), and w velocity (w; pc/Myr),
     cartesian galactic coordinates to vrvtvh, radial velocity (vr; pc/Myr), tangential velocity

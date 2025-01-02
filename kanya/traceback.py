@@ -1,20 +1,24 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""traceback.py: Defines the methods used for the traceback analysis of the group."""
+"""
+traceback.py: Defines the methods used for the traceback analysis of the group, either from data
+of from a model.
+"""
 
 from galpy.orbit import Orbit
-from .coordinate import *
 from sklearn.covariance import MinCovDet
+from .coordinate import *
+from .tools import enumerate_strings
 
 class Traceback():
     """
-    Contains the methods used for the traceback analysis of a group. When tracing back stars from
+    Contains the methods used for the traceback analysis of the group. When tracing back stars from
     data, the first group (index 0) has no Monte Carlo measurement errors applied on positions and
-    velocities, and the only difference between the remaining groups is the measurements errors.
-    When tracing back stars from models, the initial positions, initial velocities (based on the
-    initial position and velocity scatters, the current-day positions and velocities, the age, and
-    the number of stars), and the mesurement errors are different all between groups.
+    velocities, and the differences with the remaining groups are due to measurements errors. When
+    tracing back stars from models, the initial positions, initial velocities (based on the initial
+    position and velocity scatters, the current-day positions and velocities, the age, and the
+    number of stars), and the mesurement errors are different among all groups.
     """
 
     def traceback(self, mode=None, forced=None, logging=True):
@@ -522,61 +526,62 @@ class Traceback():
         # Norm definition
         norm = {'position': 'distance', 'velocity': 'speed'}
 
-        def compute_coordinates(operation, coord, system):
+        def compute_coordinates(operation, coord, system, relative=False):
             """
-            Computes the norm, average, average norm, and group average norm, and, if needed,
-            the scatter, scatter norm, and group scatter norm. The norm corresponds to the
-            distance for position coordinates and to the speed for velocity coordinates.
+            Computes the average, norm average, and group norm average, and, if needed, the
+            scatter, scatter norm, and group scatter norm. The norm corresponds to the distance
+            for position coordinates and to the speed for velocity coordinates.
             """
 
-            # Select function
-            func = np.mean if operation in ('average', 'relative_average') else np.std
+            # Select mean or standard deviation, and absolute or relative coordinates
+            func = np.mean if operation == 'average' else np.std
+            relative = 'relative_' if relative else ''
 
-            # Average or scatter : (group, time, axis)
-            vars(self)[f'{operation}_{coord}_{system}'] = func(
-                vars(self)[f'{coord}_{system}'][:, self.core], axis=-3
+            # Average or scatter (group, time, axis)
+            vars(self)[f'{relative}{operation}_{coord}_{system}'] = func(
+                vars(self)[f'{relative}{coord}_{system}'][:, self.core], axis=-3
             )
 
-            # Norm verage or scatter : (group, time)
-            vars(self)[f'{operation}_{norm[coord]}_{system}'] = func(
-                vars(self)[f'{norm[coord]}_{system}'][:, self.core], axis=-2
+            # Norm average or scatter (group, time)
+            vars(self)[f'{relative}{operation}_{norm[coord]}_{system}'] = func(
+                vars(self)[f'{relative}{norm[coord]}_{system}'][:, self.core], axis=-2
             )
 
-            # Group norm average or scatter : (group, time)
-            vars(self)[f'{operation}_group_{norm[coord]}_{system}'] = np.sum(
-                vars(self)[f'{operation}_{coord}_{system}']**2, axis=-1
+            # Group norm average or scatter (group, time)
+            vars(self)[f'{relative}{operation}_group_{norm[coord]}_{system}'] = np.sum(
+                vars(self)[f'{relative}{operation}_{coord}_{system}']**2, axis=-1
             )**0.5
 
         # Select coordinate and system
         for coord in ('position', 'velocity'):
             for system in ('xyz', 'ξηζ'):
 
-                # Norm : (group, star, time)
+                # Norm (group, star, time)
                 vars(self)[f'{norm[coord]}_{system}'] = np.sum(
                     vars(self)[f'{coord}_{system}']**2, axis=-1
                 )**0.5
 
-                # Average : (group, time)
+                # Average (group, time)
                 compute_coordinates('average', coord, system)
 
-                # Scatter : (group, time)
+                # Scatter (group, time)
                 compute_coordinates('scatter', coord, system)
 
-                # Relative value : (group, star, time, axis)
+                # Relative value (group, star, time, axis)
                 vars(self)[f'relative_{coord}_{system}'] = (
                     vars(self)[f'{coord}_{system}'] -
                     vars(self)[f'average_{coord}_{system}'][:, None]
                 )
 
-                # Relative norm : (group, star, time)
+                # Relative norm (group, star, time)
                 vars(self)[f'relative_{norm[coord]}_{system}'] = np.sum(
                     vars(self)[f'relative_{coord}_{system}']**2, axis=-1
                 )**0.5
 
-                # Relative average : (gruop, time)
-                compute_coordinates('relative_average', coord, system)
+                # Relative average (group, time)
+                compute_coordinates('average', coord, system, relative=True)
 
-                # Relative scatter : (group, time), same as the absolute scatter
+                # Relative scatter (group, time), same as the absolute scatter
                 vars(self)[f'relative_scatter_{coord}_{system}'] = vars(self)[
                     f'scatter_{coord}_{system}'
                 ]
@@ -855,13 +860,13 @@ class Traceback():
         two dimensions represent the covariance matrices (..., values, values). If 'b' is not None,
         the cross covariance matrices are computed instead. If 'robust' is True, a robust estimator
         is computed using weights from the Mahalanobis distance. If 'sklearn' is True, a robust
-        covariance estimator with sklearn's minimum covariance determinant (MCD). If 'a' or 'b' are
-        strings instead of arrays, the function assumes the strings represent the names of the
-        arrays in the group. 'a' and 'b' must have at least 2 dimensions.
-
-          - Pour robuste et sklearn, ça peut attendre.
-          - On pourrait créer un fonction self.get_weights
+        covariance estimator with scikit-learn's minimum covariance determinant (MCD). If 'a' or
+        'b' are strings instead of arrays, the function assumes the strings represent the names of
+        the arrays in the group. 'a' and 'b' must have at least 2 dimensions.
         """
+
+        # !!! Pour robuste et sklearn, ça peut attendre !!!
+        # !!! On pourrait créer un fonction self.get_weights !!!
 
         # Find a and b arrays, if needed
         if type(a) == str:
@@ -869,24 +874,31 @@ class Traceback():
         if type(b) == str:
             b = vars(self)[b]
 
-        # Sklearn covariance estimator
-        if sklearn and False:
-            a = np.swapaxes(np.array([vars(star)[a] for star in self.sample]), 0, 1)
-            covariance_matrix = []
-            support_fraction = []
-            for step in range(self.number_of_steps):
-                MCD = MinCovDet(assume_centered=False).fit(a[step])
-                covariance_matrix.append(MCD.covariance_)
-                support_fraction.append(MCD.support_)
-
-                # Update progress bar
-                if step % 5 == 0:
-                    self.progress_bar.update(1)
-
-            return np.repeat(
-                np.array(covariance_matrix)[None],
-                self.number_jackknife, axis=0
+        # scikit-learn's covariance estimator
+        if sklearn:
+            a = np.moveaxis(
+                np.array([vars(star)[a] for star in self.sample])[self.stars_monte_carlo],
+                (0, 1, 2), (2, 0, 1)
             )
+            covariance_matrices = np.empty(
+                (self.number_jackknife, self.number_of_steps, 3, 3)
+            )
+            support_fraction = np.empty(
+                (self.number_jackknife, self.number_of_steps, self.number_of_stars_iteration)
+            )
+
+            # Compute covariance matrices
+            for iteration in range(self.number_of_iterations):
+                for step in range(self.number_of_steps):
+                    MCD = MinCovDet(assume_centered=False).fit(a[iteration, step])
+                    covariance_matrices[iteration, step] = MCD.covariance_
+                    support_fraction[iteration, step] = MCD.support_
+
+                    # Update progress bar
+                    if step % 5 == 0:
+                        self.progress_bar.update(1)
+
+            return covariance_matrices
 
         # Weights from the Mahalanobis distance
         else:

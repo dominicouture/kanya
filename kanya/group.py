@@ -371,6 +371,7 @@ class Group(Traceback, Chrono, Output):
         )
 
         # Units conversion to default units
+        print(quantity)
         return quantity.to()
 
     def create(
